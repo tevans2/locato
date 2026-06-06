@@ -3,7 +3,7 @@ import type { GameState } from "../core/game";
 import type { GameMode } from "../core/modes";
 import { createRoundQueue } from "../core/game/roundQueue";
 
-export const SOLO_SAVE_KEY = "locale:solo:v1";
+export const SOLO_SAVE_KEY = "locato:solo:v1";
 
 export interface SoloSaveV1 {
   readonly version: 1;

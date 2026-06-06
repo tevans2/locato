@@ -1,4 +1,4 @@
-# locale Refactor Plan
+# locato Refactor Plan
 
 ## Goal
 
@@ -479,8 +479,8 @@ export interface SoloSaveV1 {
 Storage keys:
 
 ```text
-locale:solo:v1
-locale:settings:v1
+locato:solo:v1
+locato:settings:v1
 ```
 
 Bad or outdated save data must not crash the app.

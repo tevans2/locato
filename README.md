@@ -1,6 +1,6 @@
-# locale
+# locato
 
-locale is a minimal dark-mode geography game about reading flags, naming places, and clearing a world board one country at a time.
+locato is a minimal dark-mode geography game about reading flags, naming places, and clearing a world board one country at a time.
 
 The app uses a pure browser-independent game engine, typed country indexing, deterministic seeded rounds, local save persistence, and a vanilla DOM UI. Multiplayer is represented by a typed protocol and mock lobby shell so a real server can be added without changing UI contracts.
 

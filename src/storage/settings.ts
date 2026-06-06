@@ -1,4 +1,4 @@
-export const SETTINGS_KEY = "locale:settings:v1";
+export const SETTINGS_KEY = "locato:settings:v1";
 
 export interface Settings {
   readonly reducedMotion: boolean;

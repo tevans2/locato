@@ -1,11 +1,11 @@
-# Fly.io Hosting Plan for locale
+# Fly.io Hosting Plan for locato
 
 ## Recommended shape
 
-Run `locale` as a single small Fly.io app:
+Run `locato` as a single small Fly.io app:
 
 ```text
-https://locale.game
+https://locato.quest
   ├─ static Vite frontend from dist/
   └─ /ws WebSocket multiplayer endpoint
 ```
@@ -211,7 +211,7 @@ Bun.serve({
 Recommended first config:
 
 ```toml
-app = "locale-game"
+app = "locato-quest"
 primary_region = "ams"
 
 [env]
@@ -286,7 +286,7 @@ This can be tightened later once the server code is finalized.
 ```text
 PORT=3000
 NODE_ENV=production
-ALLOWED_ORIGINS=https://locale.game,https://www.locale.game
+ALLOWED_ORIGINS=https://locato.quest,https://www.locato.quest
 ROOM_TTL_SECONDS=7200
 MAX_PLAYERS_PER_ROOM=8
 MAX_ROOMS=500
@@ -308,7 +308,7 @@ Initial setup:
 
 ```sh
 fly auth login
-fly launch --name locale-game --region ams --no-deploy
+fly launch --name locato-quest --region ams --no-deploy
 fly scale vm shared-cpu-1x --memory 512
 ```
 
@@ -330,7 +330,7 @@ fly logs
 Add domain:
 
 ```sh
-fly certs add locale.game
+fly certs add locato.quest
 ```
 
 Then configure DNS as instructed by Fly.

@@ -217,7 +217,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     className: "brand-lockup compact",
     children: [
       el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }),
-      el("span", { className: "brand-name", text: "locale" }),
+      el("span", { className: "brand-name", text: "locato" }),
     ],
   });
 
