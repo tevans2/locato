@@ -60,6 +60,18 @@ describe("game engine", () => {
     expect(engine.getState().hintLevel).toBe(2);
   });
 
+  it("accepts punctuation-heavy abbreviations and close misspellings on submit", () => {
+    const countryIndex = indexCountries([
+      { name: "United States", code: "US", aliases: ["USA"], continent: "North America", flagSrc: "assets/flags/us.svg" },
+    ] as const satisfies readonly RawCountry[]);
+    const engine = createGameEngine({ countryIndex, mode: classicMode, seed: "abbr", now: 1000 });
+
+    expect(engine.dispatch({ type: "SUBMIT_GUESS", value: "U.S.A.", now: 1100 })[0]?.type).toBe("GUESS_CORRECT");
+
+    const typoEngine = createGameEngine({ countryIndex, mode: classicMode, seed: "abbr", now: 1000 });
+    expect(typoEngine.dispatch({ type: "SUBMIT_GUESS", value: "Untied States", now: 1100 })[0]?.type).toBe("GUESS_CORRECT");
+  });
+
   it("keeps the flag live after a wrong answer", () => {
     const { countryIndex, engine } = createFixtureGame();
     const current = getCurrentCountry(countryIndex, engine.getState());

@@ -1,5 +1,5 @@
 import { COUNTRY_FACTS } from "../countries/facts";
-import { normalizeAnswer, type Country, type CountryId, type CountryIndex } from "../countries";
+import { isToleratedMisspelling, normalizeAnswerVariants, type Country, type CountryId, type CountryIndex } from "../countries";
 import type { GameMode, ModeOptions } from "../modes";
 import { createRoundQueue, takeNextCountry } from "./roundQueue";
 import type { CreateGameEngineInput, GameCommand, GameEngine, GameEvent, GameState, Hint } from "./types";
@@ -41,13 +41,23 @@ function createHint(country: Country, level: number): Hint {
 }
 
 function acceptedByMode(country: Country, guess: string, mode: GameMode, auto: boolean): boolean {
-  const normalized = normalizeAnswer(guess);
-  if (!normalized) return false;
-  if (auto) return normalized === country.normalizedName;
-  if (normalized === country.normalizedName) return true;
-  if (mode.acceptCountryCodes && normalized === normalizeAnswer(country.code)) return true;
-  if (!mode.acceptAliases) return false;
-  return country.aliases.some((alias) => normalizeAnswer(alias) === normalized);
+  const guesses = normalizeAnswerVariants(guess);
+  if (guesses.length === 0) return false;
+  if (auto) return guesses.includes(country.normalizedName);
+
+  const exactAnswers = new Set<string>();
+  for (const value of [country.name, ...(mode.acceptAliases ? country.aliases : [])]) {
+    for (const variant of normalizeAnswerVariants(value)) exactAnswers.add(variant);
+  }
+
+  if (mode.acceptCountryCodes) {
+    for (const variant of normalizeAnswerVariants(country.code)) exactAnswers.add(variant);
+  }
+
+  if (guesses.some((candidate) => exactAnswers.has(candidate))) return true;
+
+  const fuzzyAnswers = [country.name, ...(mode.acceptAliases ? country.aliases : [])];
+  return fuzzyAnswers.some((answer) => isToleratedMisspelling(guess, answer));
 }
 
 function createInitialState(

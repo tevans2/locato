@@ -1,5 +1,5 @@
 export { rawCountries } from "./countries";
-export { addNormalizedAnswer, normalizeAnswer } from "./normalize";
+export { addNormalizedAnswer, compactAnswer, isToleratedMisspelling, levenshteinDistance, normalizeAnswer, normalizeAnswerVariants } from "./normalize";
 export { buildAcceptedAnswers, indexCountries, isCorrectAnswer } from "./indexCountries";
 export { validateCountries } from "./validateCountries";
 export type {

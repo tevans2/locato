@@ -1,9 +1,24 @@
-import { addNormalizedAnswer, normalizeAnswer } from "./normalize";
+import { addNormalizedAnswer, isToleratedMisspelling, normalizeAnswer, normalizeAnswerVariants } from "./normalize";
 import type { AnswerOptions, Country, CountryId, CountryIndex, RawCountry } from "./types";
 
 const DEFAULT_ANSWER_OPTIONS: AnswerOptions = {
   includeCodes: true,
   includeAliases: true,
+};
+
+const COMMON_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  AE: ["UAE", "U.A.E."],
+  BA: ["Bosnia Herzegovina", "BiH"],
+  CD: ["DR Congo", "DRC", "D.R.C."],
+  CF: ["CAR", "C.A.R."],
+  GB: ["UK", "U.K.", "Britain", "Great Britain"],
+  KR: ["South Korea", "ROK"],
+  KP: ["North Korea", "DPRK"],
+  NZ: ["NZ", "N.Z."],
+  PG: ["PNG", "P.N.G."],
+  SA: ["KSA", "Saudi"],
+  US: ["USA", "U.S.A.", "U.S.", "America"],
+  ZA: ["RSA", "South Africa"],
 };
 
 export function buildAcceptedAnswers(
@@ -17,6 +32,7 @@ export function buildAcceptedAnswers(
 
   if (options.includeAliases) {
     for (const alias of country.aliases) addNormalizedAnswer(answers, alias);
+    for (const alias of COMMON_ALIASES[country.code.toUpperCase()] ?? []) addNormalizedAnswer(answers, alias);
   }
 
   return [...answers].sort();
@@ -63,7 +79,12 @@ export function indexCountries(
 }
 
 export function isCorrectAnswer(index: CountryIndex, countryId: CountryId, answer: string): boolean {
-  const normalized = normalizeAnswer(answer);
-  if (!normalized) return false;
-  return index.answerSetByCountryId.get(countryId)?.has(normalized) ?? false;
+  const guesses = normalizeAnswerVariants(answer);
+  if (guesses.length === 0) return false;
+
+  const answerSet = index.answerSetByCountryId.get(countryId);
+  if (!answerSet) return false;
+  if (guesses.some((guess) => answerSet.has(guess))) return true;
+
+  return [...answerSet].some((candidate) => isToleratedMisspelling(answer, candidate));
 }

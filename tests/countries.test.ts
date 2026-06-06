@@ -31,5 +31,9 @@ describe("country dataset", () => {
     expect(isCorrectAnswer(countryIndex, unitedKingdom!.id, "UK")).toBe(true);
     expect(isCorrectAnswer(countryIndex, unitedStates!.id, "USA")).toBe(true);
     expect(isCorrectAnswer(countryIndex, ivoryCoast!.id, "Cote d Ivoire")).toBe(true);
+    expect(isCorrectAnswer(countryIndex, unitedKingdom!.id, "U.K.")).toBe(true);
+    expect(isCorrectAnswer(countryIndex, unitedStates!.id, "U.S.A.")).toBe(true);
+    expect(isCorrectAnswer(countryIndex, unitedStates!.id, "Untied States")).toBe(true);
+    expect(isCorrectAnswer(countryIndex, ivoryCoast!.id, "Ivory Cost")).toBe(true);
   });
 });
