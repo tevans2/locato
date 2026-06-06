@@ -20,6 +20,7 @@ export interface SoloSaveV1 {
   readonly streak: number;
   readonly bestStreak: number;
   readonly score: number;
+  readonly timeLimitSeconds?: number | null;
   readonly roundNumber: number;
   readonly startedAt: number;
   readonly updatedAt: number;
@@ -61,6 +62,7 @@ export function createSoloSave(index: CountryIndex, state: GameState, updatedAt:
     streak: state.streak,
     bestStreak: state.bestStreak,
     score: state.score,
+    timeLimitSeconds: state.timeLimitSeconds,
     roundNumber: state.roundNumber,
     startedAt: state.startedAt ?? updatedAt,
     updatedAt,
@@ -95,9 +97,12 @@ export function hydrateGameState(index: CountryIndex, mode: GameMode, save: Solo
   const queueCountryIds = idsFromCodes(index, save.queueCountryCodes);
 
   if (poolCountryIds.length === 0) return null;
+  const timeLimitSeconds = save.timeLimitSeconds ?? mode.durationSeconds ?? null;
+  const timeRemainingMs = timeLimitSeconds === null ? null : Math.max(0, timeLimitSeconds * 1000 - (Date.now() - save.startedAt));
+
 
   return {
-    status: currentCountryId === null ? "complete" : "playing",
+    status: currentCountryId === null || timeRemainingMs === 0 ? "complete" : "playing",
     modeId: mode.id,
     seed: save.seed,
     currentCountryId,
@@ -111,8 +116,10 @@ export function hydrateGameState(index: CountryIndex, mode: GameMode, save: Solo
     bestStreak: save.bestStreak,
     score: save.score,
     hintLevel: 0,
+    timeLimitSeconds,
+    timeRemainingMs,
     startedAt: save.startedAt,
-    endedAt: currentCountryId === null ? save.updatedAt : null,
+    endedAt: currentCountryId === null || timeRemainingMs === 0 ? save.updatedAt : null,
     lastResult: null,
     queue: queueCountryIds.length > 0 ? { remainingCountryIds: queueCountryIds } : createRoundQueue([], save.seed),
     poolCountryIds,

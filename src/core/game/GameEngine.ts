@@ -59,6 +59,15 @@ function acceptedByMode(country: Country, guess: string, mode: GameMode, auto: b
   const fuzzyAnswers = [country.name, ...(mode.acceptAliases ? country.aliases : [])];
   return fuzzyAnswers.some((answer) => isToleratedMisspelling(guess, answer));
 }
+function calculateTimeRemainingMs(state: Pick<GameState, "startedAt" | "timeLimitSeconds">, now: number): number | null {
+  if (state.startedAt === null || state.timeLimitSeconds === null) return null;
+  return Math.max(0, state.timeLimitSeconds * 1000 - (now - state.startedAt));
+}
+
+function withUpdatedTimer(state: GameState, now: number): GameState {
+  return { ...state, timeRemainingMs: calculateTimeRemainingMs(state, now) };
+}
+
 
 function createInitialState(
   index: CountryIndex,
@@ -85,6 +94,8 @@ function createInitialState(
     streak: 0,
     bestStreak: 0,
     score: 0,
+    timeLimitSeconds: mode.durationSeconds ?? null,
+    timeRemainingMs: mode.durationSeconds === undefined ? null : mode.durationSeconds * 1000,
     hintLevel: 0,
     startedAt: now,
     endedAt: next.countryId === null ? now : null,
@@ -114,10 +125,19 @@ function advanceToNextCountry(
 export function createGameEngine(input: CreateGameEngineInput): GameEngine {
   const { countryIndex, mode, seed, modeOptions } = input;
   let state = input.initialState ?? createInitialState(countryIndex, mode, seed, input.now ?? Date.now(), modeOptions);
-
   function completeIfNeeded(events: GameEvent[], now: number): void {
-    if (state.status === "complete" || mode.isComplete(state, state.poolCountryIds.length)) {
-      if (state.status !== "complete") state = { ...state, status: "complete", currentCountryId: null, endedAt: now };
+    if (state.status === "complete") {
+      if (state.endedAt === now && !events.some((event) => event.type === "GAME_COMPLETED")) events.push({ type: "GAME_COMPLETED" });
+      return;
+    }
+    state = withUpdatedTimer(state, now);
+    const timerExpired = state.timeRemainingMs !== null && state.timeRemainingMs <= 0;
+    if (timerExpired && !events.some((event) => event.type === "TIMER_EXPIRED")) {
+      events.push({ type: "TIMER_EXPIRED" });
+    }
+
+    if (timerExpired || mode.isComplete(state, state.poolCountryIds.length)) {
+      if (state.status !== "complete") state = { ...state, status: "complete", currentCountryId: null, endedAt: now, timeRemainingMs: timerExpired ? 0 : state.timeRemainingMs };
       if (!events.some((event) => event.type === "GAME_COMPLETED")) events.push({ type: "GAME_COMPLETED" });
     }
   }
@@ -133,6 +153,15 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
         if (command.type === "RESET_GAME") events.push({ type: "GAME_RESET" });
         return events;
       }
+
+      if (command.type === "TICK") {
+        completeIfNeeded(events, command.now);
+        return events;
+      }
+
+      state = withUpdatedTimer(state, command.now);
+      completeIfNeeded(events, command.now);
+      if (events.some((event) => event.type === "TIMER_EXPIRED")) return events;
 
       if (state.status !== "playing" || state.currentCountryId === null) return events;
 

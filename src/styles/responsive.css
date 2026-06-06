@@ -4,7 +4,7 @@
   .answer-panel { justify-content: start; }
   .flag-card { min-height: 460px; }
   .flag-slot { min-height: 330px; }
-  .stats-panel { grid-template-columns: repeat(4, auto); }
+  .stats-panel { grid-template-columns: repeat(5, auto); }
   .progress-card { grid-column: 1 / -1; }
 }
 

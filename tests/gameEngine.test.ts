@@ -72,6 +72,18 @@ describe("game engine", () => {
     expect(typoEngine.dispatch({ type: "SUBMIT_GUESS", value: "Untied States", now: 1100 })[0]?.type).toBe("GUESS_CORRECT");
   });
 
+  it("expires timed mode when the clock reaches zero", () => {
+    const countryIndex = indexCountries(fixtureCountries);
+    const engine = createGameEngine({ countryIndex, mode: { ...classicMode, id: "timed-test", durationSeconds: 1 }, seed: "timer", now: 1000 });
+
+    expect(engine.getState().timeRemainingMs).toBe(1000);
+    const events = engine.dispatch({ type: "TICK", now: 2000 });
+
+    expect(events.map((event) => event.type)).toEqual(["TIMER_EXPIRED", "GAME_COMPLETED"]);
+    expect(engine.getState().status).toBe("complete");
+    expect(engine.getState().timeRemainingMs).toBe(0);
+  });
+
   it("keeps the flag live after a wrong answer", () => {
     const { countryIndex, engine } = createFixtureGame();
     const current = getCurrentCountry(countryIndex, engine.getState());

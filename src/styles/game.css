@@ -36,7 +36,7 @@
 
 .stats-panel {
   display: grid;
-  grid-template-columns: repeat(4, auto) minmax(180px, 1fr);
+  grid-template-columns: repeat(5, auto) minmax(180px, 1fr);
   gap: 8px;
   align-items: center;
   margin: 12px 0 12px;

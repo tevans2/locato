@@ -26,6 +26,7 @@ export interface GameMode {
   readonly id: string;
   readonly label: string;
   readonly description: string;
+  readonly durationSeconds?: number;
   readonly allowSkip: boolean;
   readonly acceptCountryCodes: boolean;
   readonly acceptAliases: boolean;

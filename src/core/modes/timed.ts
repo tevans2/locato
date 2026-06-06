@@ -3,7 +3,8 @@ import type { GameMode } from "./types";
 export const timedMode: GameMode = {
   id: "timed",
   label: "Timed Rush",
-  description: "Score quickly before the clock expires. Built for daily and multiplayer races.",
+  description: "Two minutes on the clock. Score quickly before the run ends.",
+  durationSeconds: 120,
   allowSkip: true,
   acceptCountryCodes: true,
   acceptAliases: true,

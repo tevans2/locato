@@ -31,6 +31,7 @@ function visibleCountries(index: CountryIndex, state: GameState): readonly Count
 }
 
 function applyEvents(events: readonly GameEvent[], views: SoloViews, index: CountryIndex): void {
+  const timerExpired = events.some((event) => event.type === "TIMER_EXPIRED");
   for (const event of events) {
     if (event.type === "GUESS_CORRECT") {
       const country = index.byId[event.countryId];
@@ -54,7 +55,13 @@ function applyEvents(events: readonly GameEvent[], views: SoloViews, index: Coun
     }
 
     if (event.type === "GAME_COMPLETED") {
-      showFeedback(views.feedback, "Complete. Every flag in this mode has been solved.", "good");
+      if (!timerExpired) showFeedback(views.feedback, "Complete. Every flag in this mode has been solved.", "good");
+      continue;
+    }
+
+    if (event.type === "TIMER_EXPIRED") {
+      showFeedback(views.feedback, "Time. Final score locked.", "neutral");
+      continue;
     }
   }
 }
@@ -117,7 +124,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     children: [el("label", { text: "Your guess", attrs: { for: "guess-input" } }), el("div", { className: "input-row", children: [input, submitButton] })],
   });
 
-  function render(): void {
+  function render(persist = true): void {
     const state = engine.getState();
     const current = getCurrentCountry(countryIndex, state);
     updateStatsView(stats, countryIndex, state);
@@ -127,15 +134,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     submitButton.disabled = state.status !== "playing";
     hintButton.disabled = state.status !== "playing" || !mode.hints.enabled;
     skipButton.disabled = state.status !== "playing" || !mode.allowSkip;
-    options.onStateChange(state);
+    if (persist) options.onStateChange(state);
   }
 
-  function dispatchAndRender(events: readonly GameEvent[]): void {
+  function dispatchAndRender(events: readonly GameEvent[], persist = true): void {
     applyEvents(events, views, countryIndex);
-    render();
+    render(persist);
     if (events.some((event) => event.type === "GUESS_CORRECT")) input.value = "";
     if (engine.getState().status === "playing") input.focus();
   }
+
+  const timerId =
+    mode.durationSeconds === undefined
+      ? null
+      : window.setInterval(() => {
+          const events = engine.dispatch({ type: "TICK", now: Date.now() });
+          if (events.length > 0) dispatchAndRender(events);
+          else if (engine.getState().status === "playing") render(false);
+        }, 250);
 
   form.addEventListener(
     "submit",
@@ -234,6 +250,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   return {
     element,
-    destroy: () => controller.abort(),
+    destroy: () => {
+      if (timerId !== null) window.clearInterval(timerId);
+      controller.abort();
+    },
   };
 }

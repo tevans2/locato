@@ -32,6 +32,8 @@ export interface GameState {
   readonly bestStreak: number;
   readonly score: number;
   readonly hintLevel: number;
+  readonly timeLimitSeconds: number | null;
+  readonly timeRemainingMs: number | null;
   readonly startedAt: number | null;
   readonly endedAt: number | null;
   readonly lastResult: GuessResult | null;
@@ -58,7 +60,8 @@ export type GameCommand =
   | { readonly type: "SUBMIT_GUESS"; readonly value: string; readonly now: number; readonly auto?: boolean }
   | { readonly type: "REQUEST_HINT"; readonly now: number }
   | { readonly type: "SKIP_ROUND"; readonly now: number }
-  | { readonly type: "RESET_GAME"; readonly now: number };
+  | { readonly type: "RESET_GAME"; readonly now: number }
+  | { readonly type: "TICK"; readonly now: number };
 
 export type GameEvent =
   | { readonly type: "GAME_STARTED"; readonly currentCountryId: CountryId }
@@ -67,6 +70,7 @@ export type GameEvent =
   | { readonly type: "ROUND_SKIPPED"; readonly previousCountryId: CountryId; readonly nextCountryId: CountryId | null }
   | { readonly type: "HINT_REVEALED"; readonly countryId: CountryId; readonly hint: Hint }
   | { readonly type: "GAME_COMPLETED" }
+  | { readonly type: "TIMER_EXPIRED" }
   | { readonly type: "GAME_RESET" };
 
 export interface GameStats {
