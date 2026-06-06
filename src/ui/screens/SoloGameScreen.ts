@@ -1,6 +1,6 @@
-import type { Country, CountryIndex } from "../../core/countries";
+import { CONTINENTS, type Continent, type Country, type CountryIndex } from "../../core/countries";
 import { getCurrentCountry, type GameEngine, type GameEvent, type GameState } from "../../core/game";
-import type { GameMode } from "../../core/modes";
+import type { GameMode, GameModeId } from "../../core/modes";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createBoardView, revealCountryOnBoard, resetBoardView, updateContinentCounts, type BoardView } from "../dom/renderBoard";
@@ -12,7 +12,8 @@ export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly mode: GameMode;
-  readonly onHome: () => void;
+  readonly modes: readonly GameMode[];
+  readonly onModeChange: (modeId: GameModeId, continent?: Continent) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
 }
@@ -79,6 +80,36 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const hintButton = el("button", { className: "secondary-action", text: "Hint", attrs: { type: "button" } });
   const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
+  const modeSelect = el("select", {
+    className: "mode-select",
+    attrs: { "aria-label": "Game mode" },
+    children: options.modes.map((gameMode) => el("option", { text: gameMode.label, attrs: { value: gameMode.id } })),
+  });
+  modeSelect.value = mode.id;
+
+  const continentSelect = el("select", {
+    className: "mode-select",
+    attrs: { "aria-label": "Continent" },
+    children: CONTINENTS.map((continent) => el("option", { text: continent, attrs: { value: continent } })),
+  });
+  const firstPoolCountryId = initialState.poolCountryIds[0];
+  continentSelect.value = mode.id === "continent" && firstPoolCountryId !== undefined ? countryIndex.byId[firstPoolCountryId]?.continent ?? "Africa" : "Africa";
+  continentSelect.hidden = mode.id !== "continent";
+
+  modeSelect.addEventListener(
+    "change",
+    () => {
+      const nextModeId = modeSelect.value as GameModeId;
+      options.onModeChange(nextModeId, nextModeId === "continent" ? (continentSelect.value as Continent) : undefined);
+    },
+    { signal: controller.signal },
+  );
+
+  continentSelect.addEventListener(
+    "change",
+    () => options.onModeChange("continent", continentSelect.value as Continent),
+    { signal: controller.signal },
+  );
 
   hintButton.toggleAttribute("disabled", !mode.hints.enabled);
   skipButton.toggleAttribute("disabled", !mode.allowSkip);
@@ -163,7 +194,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const logo = el("div", {
     className: "brand-lockup compact",
     children: [
-      el("span", { className: "map-pin-logo", attrs: { "aria-hidden": "true" } }),
+      el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }),
       el("span", { className: "brand-name", text: "locale" }),
     ],
   });
@@ -175,8 +206,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("header", {
         className: "game-header",
         children: [
-          el("button", { className: "ghost-action", text: "← Home", on: { click: options.onHome } }),
-          el("div", { children: [logo, el("p", { className: "eyebrow", text: mode.label })] }),
+          logo,
+          el("div", { className: "mode-controls", children: [modeSelect, continentSelect] }),
         ],
       }),
       stats.element,
@@ -187,7 +218,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           el("aside", {
             className: "answer-panel",
             children: [
-              el("div", { className: "panel-title", children: [el("h2", { text: "Name the locale." }), el("p", { text: mode.description })] }),
+              el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" }), el("p", { text: mode.description })] }),
               form,
               feedback.element,
               el("div", { className: "actions", children: [hintButton, skipButton, resetButton] }),

@@ -6,7 +6,7 @@ export function getCurrentCountry(index: CountryIndex, state: GameState) {
 }
 
 export function getGameStats(index: CountryIndex, state: GameState): GameStats {
-  const totalCountries = index.countries.length;
+  const totalCountries = state.poolCountryIds.length;
   const guessedCount = state.guessedCountryIds.size;
   const remainingCount = Math.max(0, totalCountries - guessedCount);
   const accuracy = state.attempts === 0 ? 1 : state.correctAnswers / state.attempts;

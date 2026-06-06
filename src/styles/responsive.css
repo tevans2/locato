@@ -1,23 +1,22 @@
 @media (max-width: 980px) {
   .app-shell { width: min(100% - 24px, 900px); }
-  .home-screen, .play-layout { grid-template-columns: 1fr; }
+  .play-layout { grid-template-columns: 1fr; }
   .stats-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .progress-card { grid-column: 1 / -1; }
-  .mode-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
-  .app-shell { width: min(100% - 20px, 100%); padding-block: 14px; }
-  h1 { font-size: clamp(2.2rem, 18vw, 4.2rem); }
-  .game-header, .board-heading, .flag-card-top { flex-direction: column; align-items: start; }
-  .stats-panel { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .play-layout { gap: 12px; }
-  .flag-card { min-height: 330px; }
+  .app-shell { width: min(100% - 20px, 100%); padding-block: 12px; }
+  .game-header, .board-heading { align-items: stretch; flex-direction: column; }
+  .mode-controls { justify-content: stretch; }
+  .mode-select { width: 100%; }
+  .stats-panel { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .flag-card { min-height: 320px; }
   .flag-slot { min-height: 220px; }
   .input-row, .actions { grid-template-columns: 1fr; display: grid; }
   button { width: 100%; }
-  th, td { padding: 10px 12px; }
-  .slot-number { width: 48px; }
+  th, td { padding: 10px 11px; }
+  .slot-number { width: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

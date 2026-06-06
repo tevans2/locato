@@ -1,9 +1,0 @@
-.multiplayer-screen { max-width: 900px; }
-.connection-card { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--muted); font-weight: 1000; }
-.connection-status { color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; }
-.room-panel { min-height: 220px; margin-bottom: 16px; }
-.room-code { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; color: var(--muted); border-bottom: 2px solid var(--line-soft); padding-bottom: 14px; }
-.room-code strong { color: var(--accent); font-size: 2rem; letter-spacing: 0.08em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.player-list { display: grid; gap: 10px; }
-.player-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 2px solid var(--line-soft); background: #0b0e0a; }
-.player-row strong { color: var(--accent); }

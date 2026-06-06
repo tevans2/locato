@@ -1,10 +1,7 @@
 import { type Continent, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
-import { getGameMode, type GameMode, type GameModeId } from "../core/modes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
-import { createHomeScreen } from "../ui/screens/HomeScreen";
-import { createModeSelectScreen } from "../ui/screens/ModeSelectScreen";
-import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
+import { selectableModes, getGameMode, type GameMode, type GameModeId } from "../core/modes";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
 import type { AppRoute, Screen } from "./router";
 
@@ -49,7 +46,11 @@ export function createApp(options: AppOptions): App {
         countryIndex: options.countryIndex,
         engine,
         mode,
-        onHome: () => navigate({ type: "home" }),
+        modes: selectableModes,
+        onModeChange: (nextModeId, nextContinent) => {
+          clearSoloSave(options.storage);
+          startSolo(nextModeId, nextContinent, false);
+        },
         onReset: () => clearSoloSave(options.storage),
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
       }),
@@ -57,42 +58,18 @@ export function createApp(options: AppOptions): App {
   }
 
   function navigate(route: AppRoute): void {
-    if (route.type === "home") {
-      mount(
-        createHomeScreen({
-          hasSave: readSoloSave(options.storage) !== null,
-          onContinue: () => {
-            const save = readSoloSave(options.storage);
-            const modeId = (save?.modeId ?? "classic") as GameModeId;
-            startSolo(modeId, undefined, true);
-          },
-          onSolo: () => navigate({ type: "mode-select" }),
-          onMultiplayer: () => navigate({ type: "multiplayer-lobby" }),
-        }),
-      );
-      return;
-    }
-
-    if (route.type === "mode-select") {
-      mount(createModeSelectScreen({ onBack: () => navigate({ type: "home" }), onSelect: (modeId, continent) => startSolo(modeId, continent, false) }));
-      return;
-    }
-
     if (route.type === "solo-game") {
       startSolo(route.modeId, route.continent, route.continueSaved ?? false);
       return;
     }
 
-    if (route.type === "multiplayer-lobby") {
-      mount(createMultiplayerLobbyScreen({ onBack: () => navigate({ type: "home" }) }));
-      return;
-    }
-
-    mount(createHomeScreen({ hasSave: false, onContinue: () => undefined, onSolo: () => navigate({ type: "mode-select" }), onMultiplayer: () => navigate({ type: "multiplayer-lobby" }) }));
+    const save = readSoloSave(options.storage);
+    const savedModeId = save?.modeId ? (save.modeId as GameModeId) : "classic";
+    startSolo(savedModeId, undefined, save !== null);
   }
 
   return {
-    start: () => navigate({ type: "home" }),
+    start: () => navigate({ type: "solo-game", modeId: "classic", continueSaved: true }),
     navigate,
   };
 }
