@@ -1,8 +1,8 @@
-# Flag Rush
+# locale
 
-Flag Rush is a lightweight TypeScript flag guessing game built for fast solo play and future multiplayer modes.
+locale is a minimal dark-mode geography game about reading flags, naming places, and clearing a world board one country at a time.
 
-The current app uses a pure browser-independent game engine, typed country indexing, deterministic seeded rounds, local save persistence, and a vanilla DOM UI. Multiplayer is represented by a typed protocol and mock lobby shell so a real server can be added without changing UI contracts.
+The app uses a pure browser-independent game engine, typed country indexing, deterministic seeded rounds, local save persistence, and a vanilla DOM UI. Multiplayer is represented by a typed protocol and mock lobby shell so a real server can be added without changing UI contracts.
 
 ## Run locally
 
@@ -28,7 +28,7 @@ src/
   app/            App routing/controller layer
   ui/             Vanilla DOM screens and renderers
   storage/        Versioned local persistence and settings
-  styles/         CSS design system and responsive layout
+  styles/         Brutal minimalist dark UI with geo/earth color tokens
 public/assets/    Static flag SVG files
 ```
 

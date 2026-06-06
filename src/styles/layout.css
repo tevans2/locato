@@ -1,28 +1,81 @@
 .app-shell {
-  width: min(1280px, calc(100% - clamp(24px, 6vw, 68px)));
+  width: min(1220px, calc(100% - clamp(24px, 6vw, 72px)));
   min-height: 100vh;
   margin: 0 auto;
-  padding: clamp(22px, 4vw, 42px) 0;
+  padding: clamp(22px, 4vw, 46px) 0;
+}
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.brand-lockup.compact { margin-bottom: 8px; }
+
+.brand-name {
+  color: var(--text);
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 1000;
+  letter-spacing: -0.08em;
+  text-transform: lowercase;
+}
+
+.map-pin-logo {
+  width: 34px;
+  height: 34px;
+  display: inline-block;
+  position: relative;
+  border: 3px solid var(--accent);
+  background: var(--surface);
+  transform: rotate(45deg);
+  box-shadow: 4px 4px 0 #000;
+}
+
+.map-pin-logo::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 3px solid var(--line);
+  background: var(--accent-2);
+}
+
+.map-pin-logo::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 3px;
+  right: -18px;
+  bottom: 2px;
+  background: var(--accent);
+  transform: rotate(-45deg);
+  transform-origin: left center;
 }
 
 .eyebrow {
   color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 950;
-  letter-spacing: 0.18em;
+  font-size: 0.76rem;
+  font-weight: 1000;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   margin-bottom: 14px;
 }
 
 .lede {
-  max-width: 760px;
+  max-width: 720px;
   color: var(--muted);
-  font-size: clamp(1rem, 2vw, 1.16rem);
-  font-weight: 650;
-  line-height: 1.65;
+  font-size: clamp(1rem, 2vw, 1.13rem);
+  font-weight: 700;
+  line-height: 1.55;
 }
 
-.screen-heading { margin-bottom: 24px; }
+.screen-heading { margin-bottom: 26px; }
+.screen-heading h1 {
+  max-width: 760px;
+  font-size: clamp(3rem, 7vw, 6.4rem);
+  letter-spacing: -0.095em;
+}
 
 .actions, .home-actions {
   display: flex;
@@ -30,9 +83,9 @@
   gap: 12px;
 }
 
-.mode-screen, .multiplayer-screen, .home-screen, .game-screen { animation: enter 460ms ease both; }
+.mode-screen, .multiplayer-screen, .home-screen, .game-screen { animation: enter 240ms ease both; }
 
 @keyframes enter {
-  from { opacity: 0; transform: translateY(14px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

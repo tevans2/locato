@@ -6,7 +6,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
   const messageHandlers = new Set<(message: ServerMessage) => void>();
   const statusHandlers = new Set<(status: TransportStatus) => void>();
   const room: PublicRoomState = {
-    roomCode: "RUSH42",
+    roomCode: "PIN42",
     hostPlayerId: "host",
     modeId: "classic",
     status: "lobby",

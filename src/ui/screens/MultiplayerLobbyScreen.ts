@@ -65,7 +65,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     className: "multiplayer-screen",
     children: [
       el("button", { className: "ghost-action", text: "← Home", on: { click: options.onBack } }),
-      el("div", { className: "screen-heading", children: [el("p", { className: "eyebrow", text: "Multiplayer foundation" }), el("h1", { text: "Room preview" }), el("p", { className: "lede", text: "This shell is wired to a typed mock transport. The real WebSocket server can plug into the same protocol without changing UI contracts." })] }),
+      el("div", { className: "screen-heading", children: [el("p", { className: "eyebrow", text: "Shared coordinates" }), el("h1", { text: "Room preview" }), el("p", { className: "lede", text: "A typed multiplayer shell for future live rooms: same map, same flag, server-verified answers." })] }),
       el("div", { className: "connection-card", children: [el("span", { text: "Connection" }), status] }),
       roomSlot,
       el("div", { className: "actions", children: [readyButton, startButton] }),

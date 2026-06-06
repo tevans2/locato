@@ -160,6 +160,14 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const country = countryIndex.byId[countryId];
     if (country) revealCountryOnBoard(board, country);
   }
+  const logo = el("div", {
+    className: "brand-lockup compact",
+    children: [
+      el("span", { className: "map-pin-logo", attrs: { "aria-hidden": "true" } }),
+      el("span", { className: "brand-name", text: "locale" }),
+    ],
+  });
+
 
   const element = el("section", {
     className: "game-screen",
@@ -168,7 +176,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         className: "game-header",
         children: [
           el("button", { className: "ghost-action", text: "← Home", on: { click: options.onHome } }),
-          el("div", { children: [el("p", { className: "eyebrow", text: mode.label }), el("h1", { text: "Flag Rush" })] }),
+          el("div", { children: [logo, el("p", { className: "eyebrow", text: mode.label })] }),
         ],
       }),
       stats.element,
@@ -179,7 +187,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           el("aside", {
             className: "answer-panel",
             children: [
-              el("div", { className: "panel-title", children: [el("h2", { text: "What country is this?" }), el("p", { text: mode.description })] }),
+              el("div", { className: "panel-title", children: [el("h2", { text: "Name the locale." }), el("p", { text: mode.description })] }),
               form,
               feedback.element,
               el("div", { className: "actions", children: [hintButton, skipButton, resetButton] }),
@@ -187,7 +195,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           }),
         ],
       }),
-      el("section", { className: "board-panel", children: [el("div", { className: "board-heading", children: [el("h2", { text: "Continent board" }), el("span", { text: "Correct guesses reveal countries by region." })] }), board.element] }),
+      el("section", { className: "board-panel", children: [el("div", { className: "board-heading", children: [el("h2", { text: "World board" }), el("span", { text: "Solved places reveal themselves by region." })] }), board.element] }),
     ],
   });
 

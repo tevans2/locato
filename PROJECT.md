@@ -1,4 +1,4 @@
-# Flag Rush Refactor Plan
+# locale Refactor Plan
 
 ## Goal
 
@@ -479,8 +479,8 @@ export interface SoloSaveV1 {
 Storage keys:
 
 ```text
-flagrush:solo:v1
-flagrush:settings:v1
+locale:solo:v1
+locale:settings:v1
 ```
 
 Bad or outdated save data must not crash the app.
