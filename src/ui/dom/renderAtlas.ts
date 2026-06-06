@@ -68,6 +68,8 @@ export function createAtlasView(countries: readonly Country[]): AtlasView {
       el("section", { className: "atlas-section", children: [el("h3", { text: "Revealed" }), revealedList] }),
     ],
   });
+  overlay.hidden = true;
+  drawer.hidden = true;
   const element = el("div", { className: "atlas-shell", children: [openButton, overlay, drawer] });
 
   return { element, openButton, closeButton, overlay, drawer, progressByContinent, revealedList };
@@ -77,6 +79,8 @@ export function setAtlasOpen(view: AtlasView, open: boolean): void {
   view.element.classList.toggle("open", open);
   view.openButton.setAttribute("aria-expanded", String(open));
   view.overlay.setAttribute("aria-hidden", String(!open));
+  view.overlay.hidden = !open;
+  view.drawer.hidden = !open;
   if (open) view.drawer.focus();
 }
 

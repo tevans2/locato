@@ -7,7 +7,8 @@
 }
 
 .atlas-shell {
-  display: contents;
+  display: block;
+  height: 100%;
 }
 
 .atlas-open {
@@ -16,6 +17,9 @@
   align-self: stretch;
 }
 
+.atlas-overlay[hidden], .atlas-drawer[hidden] {
+  display: none !important;
+}
 .atlas-overlay {
   position: fixed;
   inset: 0;
