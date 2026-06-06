@@ -1,0 +1,17 @@
+.board-panel { margin-top: 18px; overflow: hidden; }
+.board-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.board-heading h2 { margin-bottom: 0; }
+.board-heading span { color: var(--muted); font-weight: 750; }
+.board-scroll { max-height: 42vh; overflow: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+th { position: sticky; top: 0; z-index: 1; background: rgba(11,18,36,0.97); color: var(--soft); text-transform: uppercase; letter-spacing: 0.11em; font-size: 0.75rem; }
+.slot-number { width: 68px; color: #72839d; font-weight: 950; font-variant-numeric: tabular-nums; }
+.code-column { width: 24%; }
+.continent-row td { background: linear-gradient(90deg, rgba(64,224,208,0.15), rgba(139,92,246,0.1)); color: var(--text); font-weight: 950; }
+.continent-count { color: var(--muted); margin-left: 10px; font-size: 0.9rem; }
+.empty-slot td { height: 48px; background: rgba(255,255,255,0.024); }
+.empty-slot td:not(.slot-number)::after { content: ""; display: block; width: min(100%, 210px); height: 10px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.12), rgba(255,255,255,0.04)); }
+.revealed-slot td { background: rgba(74,222,128,0.035); }
+.mini-flag { width: 42px; height: 28px; display: inline-grid; place-items: center; vertical-align: middle; margin-right: 12px; border-radius: 7px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.26); }
+.mini-flag img { width: 100%; height: 100%; object-fit: contain; display: block; }

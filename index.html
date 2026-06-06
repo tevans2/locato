@@ -3,115 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Country Flag Guessing Game</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#060913">
+  <title>Flag Rush</title>
 </head>
 <body>
-  <main class="app">
-    <header class="hero" aria-label="Game introduction">
-      <div>
-        <div class="brand-row">
-          <div class="logo-mark" aria-hidden="true">🌍</div>
-          <p class="eyebrow">GeoQuest Arcade</p>
-        </div>
-        <h1><span class="title-gradient">Flag Rush</span><br>World Challenge</h1>
-        <p class="subcopy">A faster, punchier take on the country flag guessing game. Decode the flag, build your streak, and fill the continent board.</p>
-      </div>
-      <div class="stat-rail" aria-label="Game statistics">
-        <div class="stat-card">
-          <span class="stat-label">Score</span>
-          <span class="stat-value" id="counter">0 / 196</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Streak</span>
-          <span class="stat-value" id="streakStat">0</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Accuracy</span>
-          <span class="stat-value" id="accuracyStat">100%</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Remaining</span>
-          <span class="stat-value" id="remaining">196</span>
-        </div>
-      </div>
-    </header>
-
-    <section class="game-shell" aria-label="Country flag guessing game">
-      <div class="flag-stage">
-        <div class="stage-topline">
-          <span class="status-pill" id="statusPill">Mystery flag selected</span>
-          <span class="stage-number">196 flags loaded</span>
-        </div>
-        <div class="flag-wrap" id="flagWrap" aria-live="polite"></div>
-        <div class="stage-footer">
-          <span class="stage-tip">Tip: country code guesses also work when you press Guess.</span>
-          <span class="stage-tip">Auto-submit triggers on exact country names.</span>
-        </div>
-      </div>
-
-      <aside class="answer-panel">
-        <div class="panel-title">
-          <h2>What country is this?</h2>
-          <p>Type the name as soon as you know it. The board below reveals each correct country in its continent group.</p>
-        </div>
-
-        <div class="progress-card" aria-label="Game progress">
-          <div class="progress-meta">
-            <span>Board completion</span>
-            <span id="progressText">0 guessed</span>
-          </div>
-          <div class="progress-track" aria-hidden="true">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-        </div>
-
-        <form id="guessForm" autocomplete="off">
-          <label for="guessInput">Your guess</label>
-          <div class="input-row">
-            <input id="guessInput" name="guess" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Brazil, Japan, ZA..." required>
-            <button type="submit">Lock in</button>
-          </div>
-        </form>
-
-        <p class="feedback" id="feedback">The first flag is on deck. Trust your geography instincts.</p>
-
-        <div class="actions">
-          <button class="secondary" type="button" id="hintButton">Reveal hint</button>
-          <button class="secondary" type="button" id="skipButton">Next flag</button>
-          <button class="secondary" type="button" id="resetButton">Restart</button>
-        </div>
-      </aside>
-    </section>
-
-    <section class="guessed-panel" aria-label="Guessed countries">
-      <div class="table-head">
-        <div class="table-title">
-          <span class="table-icon" aria-hidden="true">🏁</span>
-          <div>
-            <h2>Continent Board</h2>
-            <span class="table-note">Correct guesses unlock rows below</span>
-          </div>
-        </div>
-        <span class="table-note">Grouped by continent</span>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th class="slot-number">#</th>
-              <th style="width: 62%">Country</th>
-              <th style="width: 30%">Code</th>
-            </tr>
-          </thead>
-          <tbody id="guessedBody">
-            <tr><td class="empty-row" colspan="3">Loading country slots...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-  <script src="data/countries.js"></script>
-  <script src="app.js"></script>
+  <main id="app" class="app-shell" aria-label="Flag Rush"></main>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

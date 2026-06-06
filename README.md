@@ -1,46 +1,43 @@
-# Flaggle
+# Flag Rush
 
-Flaggle is a browser-based country flag guessing game. A flag appears on screen and the player types the matching country name. Correct guesses are tracked in a continent-grouped table with blank slots for missing countries.
+Flag Rush is a lightweight TypeScript flag guessing game built for fast solo play and future multiplayer modes.
 
-## Play
+The current app uses a pure browser-independent game engine, typed country indexing, deterministic seeded rounds, local save persistence, and a vanilla DOM UI. Multiplayer is represented by a typed protocol and mock lobby shell so a real server can be added without changing UI contracts.
 
-Open `index.html` in any modern browser. For the best local experience, run a small static server from the repository root:
+## Run locally
 
 ```sh
-python3 -m http.server 8000
+npm install
+npm run dev
 ```
 
-Then visit `http://localhost:8000`.
+Then visit the Vite URL printed in the terminal.
 
-## Features
+## Build and test
 
-- 196 playable countries
-- Local SVG flag assets in `assets/flags/`
-- Auto-submit when the full displayed country name is typed
-- Hint button with first-letter, letter-count, and word-count clues
-- Continent-grouped progress table with blank slots for missing countries
+```sh
+npm test
+npm run build
+```
 
-## Download
+## Architecture
 
-Download the latest release from the GitHub Releases page:
+```text
+src/
+  core/           Pure country, game, mode, and multiplayer protocol logic
+  app/            App routing/controller layer
+  ui/             Vanilla DOM screens and renderers
+  storage/        Versioned local persistence and settings
+  styles/         CSS design system and responsive layout
+public/assets/    Static flag SVG files
+```
 
-https://github.com/kylianmarceau/Flaggle/releases
+Key rules:
 
-## Project Structure
+- Game rules do not depend on `window`, `document`, localStorage, or WebSocket.
+- Country state uses stable IDs/codes, not display names.
+- Round order is seeded and deterministic.
+- Modes are plugins around shared engine behavior.
+- Multiplayer clients receive public round state only; server-side validation can keep answers private.
 
-- `index.html` - page markup
-- `styles.css` - visual design
-- `app.js` - game logic
-- `data/countries.js` - country names, aliases, continents, and flag paths
-- `assets/flags/` - SVG flag assets
-
-## Publishing With GitHub Pages
-
-After pushing this repository to GitHub, enable Pages from the repository settings:
-
-1. Go to **Settings > Pages**.
-2. Set **Source** to the `main` branch.
-3. Set the folder to `/root`.
-4. Save.
-
-GitHub will publish the game from `index.html`.
+See `PROJECT.md` for the full refactor plan and extension roadmap.

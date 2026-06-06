@@ -1,0 +1,81 @@
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.game-header h1 { margin-bottom: 0; }
+
+.stats-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) minmax(220px, 1.25fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stat-card, .progress-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.08);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+}
+
+.stat-label, .progress-copy { display: block; color: var(--soft); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem; font-weight: 950; }
+.stat-value { display: block; margin-top: 7px; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.progress-track { height: 12px; margin-top: 16px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.progress-fill { width: 100%; height: 100%; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3)); }
+
+.play-layout {
+  display: grid;
+  grid-template-columns: minmax(440px, 1.2fr) minmax(340px, 0.8fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.flag-card, .answer-panel, .board-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(24px);
+}
+
+.flag-card {
+  min-height: 430px;
+  padding: clamp(18px, 4vw, 34px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 18px;
+}
+
+.flag-card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.round-status, .round-kicker { color: var(--muted); font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.78rem; }
+
+.flag-slot {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  border-radius: var(--radius-lg);
+  background: radial-gradient(circle, rgba(64,224,208,0.16), rgba(255,255,255,0.045) 62%);
+}
+
+.flag-image {
+  max-width: min(82%, 620px);
+  max-height: 310px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.42), 0 0 0 1px rgba(255,255,255,0.22);
+}
+
+.complete-card { font-size: 2rem; font-weight: 950; color: var(--accent); }
+.answer-panel { padding: clamp(18px, 3vw, 28px); }
+.panel-title p { color: var(--muted); line-height: 1.55; }
+.guess-form { display: grid; gap: 10px; margin: 18px 0; }
+.guess-form label { color: var(--soft); font-weight: 950; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.74rem; }
+.input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.feedback { min-height: 52px; border-radius: var(--radius-md); padding: 14px 16px; background: rgba(255,255,255,0.07); color: var(--muted); font-weight: 750; line-height: 1.45; }
+.feedback.good { color: var(--good); background: rgba(74,222,128,0.1); }
+.feedback.bad { color: var(--bad); background: rgba(251,113,133,0.1); }

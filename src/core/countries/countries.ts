@@ -1,4 +1,6 @@
-window.COUNTRIES = [
+import type { RawCountry } from "./types";
+
+export const rawCountries = [
   {
     "name": "Afghanistan",
     "code": "AF",
@@ -6,7 +8,7 @@ window.COUNTRIES = [
       "Islamic Republic of Afghanistan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/af.svg"
+    "flagSrc": "assets/flags/af.svg"
   },
   {
     "name": "Albania",
@@ -15,7 +17,7 @@ window.COUNTRIES = [
       "Republic of Albania"
     ],
     "continent": "Europe",
-    "src": "assets/flags/al.svg"
+    "flagSrc": "assets/flags/al.svg"
   },
   {
     "name": "Algeria",
@@ -24,7 +26,7 @@ window.COUNTRIES = [
       "People's Democratic Republic of Algeria"
     ],
     "continent": "Africa",
-    "src": "assets/flags/dz.svg"
+    "flagSrc": "assets/flags/dz.svg"
   },
   {
     "name": "Andorra",
@@ -33,7 +35,7 @@ window.COUNTRIES = [
       "Principality of Andorra"
     ],
     "continent": "Europe",
-    "src": "assets/flags/ad.svg"
+    "flagSrc": "assets/flags/ad.svg"
   },
   {
     "name": "Angola",
@@ -42,14 +44,14 @@ window.COUNTRIES = [
       "Republic of Angola"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ao.svg"
+    "flagSrc": "assets/flags/ao.svg"
   },
   {
     "name": "Antigua and Barbuda",
     "code": "AG",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/ag.svg"
+    "flagSrc": "assets/flags/ag.svg"
   },
   {
     "name": "Argentina",
@@ -58,7 +60,7 @@ window.COUNTRIES = [
       "Argentine Republic"
     ],
     "continent": "South America",
-    "src": "assets/flags/ar.svg"
+    "flagSrc": "assets/flags/ar.svg"
   },
   {
     "name": "Armenia",
@@ -67,7 +69,7 @@ window.COUNTRIES = [
       "Republic of Armenia"
     ],
     "continent": "Asia",
-    "src": "assets/flags/am.svg"
+    "flagSrc": "assets/flags/am.svg"
   },
   {
     "name": "Australia",
@@ -76,7 +78,7 @@ window.COUNTRIES = [
       "Commonwealth of Australia"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/au.svg"
+    "flagSrc": "assets/flags/au.svg"
   },
   {
     "name": "Austria",
@@ -85,7 +87,7 @@ window.COUNTRIES = [
       "Republic of Austria"
     ],
     "continent": "Europe",
-    "src": "assets/flags/at.svg"
+    "flagSrc": "assets/flags/at.svg"
   },
   {
     "name": "Azerbaijan",
@@ -94,7 +96,7 @@ window.COUNTRIES = [
       "Republic of Azerbaijan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/az.svg"
+    "flagSrc": "assets/flags/az.svg"
   },
   {
     "name": "Bahamas",
@@ -105,7 +107,7 @@ window.COUNTRIES = [
       "Bahamas (The)"
     ],
     "continent": "North America",
-    "src": "assets/flags/bs.svg"
+    "flagSrc": "assets/flags/bs.svg"
   },
   {
     "name": "Bahrain",
@@ -114,7 +116,7 @@ window.COUNTRIES = [
       "Kingdom of Bahrain"
     ],
     "continent": "Asia",
-    "src": "assets/flags/bh.svg"
+    "flagSrc": "assets/flags/bh.svg"
   },
   {
     "name": "Bangladesh",
@@ -123,14 +125,14 @@ window.COUNTRIES = [
       "People's Republic of Bangladesh"
     ],
     "continent": "Asia",
-    "src": "assets/flags/bd.svg"
+    "flagSrc": "assets/flags/bd.svg"
   },
   {
     "name": "Barbados",
     "code": "BB",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/bb.svg"
+    "flagSrc": "assets/flags/bb.svg"
   },
   {
     "name": "Belarus",
@@ -139,7 +141,7 @@ window.COUNTRIES = [
       "Republic of Belarus"
     ],
     "continent": "Europe",
-    "src": "assets/flags/by.svg"
+    "flagSrc": "assets/flags/by.svg"
   },
   {
     "name": "Belgium",
@@ -148,14 +150,14 @@ window.COUNTRIES = [
       "Kingdom of Belgium"
     ],
     "continent": "Europe",
-    "src": "assets/flags/be.svg"
+    "flagSrc": "assets/flags/be.svg"
   },
   {
     "name": "Belize",
     "code": "BZ",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/bz.svg"
+    "flagSrc": "assets/flags/bz.svg"
   },
   {
     "name": "Benin",
@@ -164,7 +166,7 @@ window.COUNTRIES = [
       "Republic of Benin"
     ],
     "continent": "Africa",
-    "src": "assets/flags/bj.svg"
+    "flagSrc": "assets/flags/bj.svg"
   },
   {
     "name": "Bhutan",
@@ -173,7 +175,7 @@ window.COUNTRIES = [
       "Kingdom of Bhutan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/bt.svg"
+    "flagSrc": "assets/flags/bt.svg"
   },
   {
     "name": "Bolivia",
@@ -183,7 +185,7 @@ window.COUNTRIES = [
       "Bolivia (Plurinational State of)"
     ],
     "continent": "South America",
-    "src": "assets/flags/bo.svg"
+    "flagSrc": "assets/flags/bo.svg"
   },
   {
     "name": "Bosnia and Herzegovina",
@@ -192,7 +194,7 @@ window.COUNTRIES = [
       "Bosnia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/ba.svg"
+    "flagSrc": "assets/flags/ba.svg"
   },
   {
     "name": "Botswana",
@@ -201,7 +203,7 @@ window.COUNTRIES = [
       "Republic of Botswana"
     ],
     "continent": "Africa",
-    "src": "assets/flags/bw.svg"
+    "flagSrc": "assets/flags/bw.svg"
   },
   {
     "name": "Brazil",
@@ -210,7 +212,7 @@ window.COUNTRIES = [
       "Federative Republic of Brazil"
     ],
     "continent": "South America",
-    "src": "assets/flags/br.svg"
+    "flagSrc": "assets/flags/br.svg"
   },
   {
     "name": "Brunei",
@@ -220,7 +222,7 @@ window.COUNTRIES = [
       "Nation of Brunei"
     ],
     "continent": "Asia",
-    "src": "assets/flags/bn.svg"
+    "flagSrc": "assets/flags/bn.svg"
   },
   {
     "name": "Bulgaria",
@@ -229,14 +231,14 @@ window.COUNTRIES = [
       "Republic of Bulgaria"
     ],
     "continent": "Europe",
-    "src": "assets/flags/bg.svg"
+    "flagSrc": "assets/flags/bg.svg"
   },
   {
     "name": "Burkina Faso",
     "code": "BF",
     "aliases": [],
     "continent": "Africa",
-    "src": "assets/flags/bf.svg"
+    "flagSrc": "assets/flags/bf.svg"
   },
   {
     "name": "Burundi",
@@ -245,7 +247,7 @@ window.COUNTRIES = [
       "Republic of Burundi"
     ],
     "continent": "Africa",
-    "src": "assets/flags/bi.svg"
+    "flagSrc": "assets/flags/bi.svg"
   },
   {
     "name": "Cabo Verde",
@@ -255,7 +257,7 @@ window.COUNTRIES = [
       "Republic of Cabo Verde"
     ],
     "continent": "Africa",
-    "src": "assets/flags/cv.svg"
+    "flagSrc": "assets/flags/cv.svg"
   },
   {
     "name": "Cambodia",
@@ -264,7 +266,7 @@ window.COUNTRIES = [
       "Kingdom of Cambodia"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kh.svg"
+    "flagSrc": "assets/flags/kh.svg"
   },
   {
     "name": "Cameroon",
@@ -273,14 +275,14 @@ window.COUNTRIES = [
       "Republic of Cameroon"
     ],
     "continent": "Africa",
-    "src": "assets/flags/cm.svg"
+    "flagSrc": "assets/flags/cm.svg"
   },
   {
     "name": "Canada",
     "code": "CA",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/ca.svg"
+    "flagSrc": "assets/flags/ca.svg"
   },
   {
     "name": "Central African Republic",
@@ -289,7 +291,7 @@ window.COUNTRIES = [
       "CAR"
     ],
     "continent": "Africa",
-    "src": "assets/flags/cf.svg"
+    "flagSrc": "assets/flags/cf.svg"
   },
   {
     "name": "Chad",
@@ -298,7 +300,7 @@ window.COUNTRIES = [
       "Republic of Chad"
     ],
     "continent": "Africa",
-    "src": "assets/flags/td.svg"
+    "flagSrc": "assets/flags/td.svg"
   },
   {
     "name": "Chile",
@@ -307,7 +309,7 @@ window.COUNTRIES = [
       "Republic of Chile"
     ],
     "continent": "South America",
-    "src": "assets/flags/cl.svg"
+    "flagSrc": "assets/flags/cl.svg"
   },
   {
     "name": "China",
@@ -317,7 +319,7 @@ window.COUNTRIES = [
       "PRC"
     ],
     "continent": "Asia",
-    "src": "assets/flags/cn.svg"
+    "flagSrc": "assets/flags/cn.svg"
   },
   {
     "name": "Colombia",
@@ -326,7 +328,7 @@ window.COUNTRIES = [
       "Republic of Colombia"
     ],
     "continent": "South America",
-    "src": "assets/flags/co.svg"
+    "flagSrc": "assets/flags/co.svg"
   },
   {
     "name": "Comoros",
@@ -335,7 +337,7 @@ window.COUNTRIES = [
       "Union of the Comoros"
     ],
     "continent": "Africa",
-    "src": "assets/flags/km.svg"
+    "flagSrc": "assets/flags/km.svg"
   },
   {
     "name": "Congo",
@@ -346,7 +348,7 @@ window.COUNTRIES = [
       "Congo Brazzaville"
     ],
     "continent": "Africa",
-    "src": "assets/flags/cg.svg"
+    "flagSrc": "assets/flags/cg.svg"
   },
   {
     "name": "Costa Rica",
@@ -355,7 +357,7 @@ window.COUNTRIES = [
       "Republic of Costa Rica"
     ],
     "continent": "North America",
-    "src": "assets/flags/cr.svg"
+    "flagSrc": "assets/flags/cr.svg"
   },
   {
     "name": "Cote d'Ivoire",
@@ -366,7 +368,7 @@ window.COUNTRIES = [
       "Republic of Côte d'Ivoire"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ci.svg"
+    "flagSrc": "assets/flags/ci.svg"
   },
   {
     "name": "Croatia",
@@ -375,7 +377,7 @@ window.COUNTRIES = [
       "Republic of Croatia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/hr.svg"
+    "flagSrc": "assets/flags/hr.svg"
   },
   {
     "name": "Cuba",
@@ -384,7 +386,7 @@ window.COUNTRIES = [
       "Republic of Cuba"
     ],
     "continent": "North America",
-    "src": "assets/flags/cu.svg"
+    "flagSrc": "assets/flags/cu.svg"
   },
   {
     "name": "Cyprus",
@@ -393,7 +395,7 @@ window.COUNTRIES = [
       "Republic of Cyprus"
     ],
     "continent": "Asia",
-    "src": "assets/flags/cy.svg"
+    "flagSrc": "assets/flags/cy.svg"
   },
   {
     "name": "Czechia",
@@ -402,7 +404,7 @@ window.COUNTRIES = [
       "Czech Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/cz.svg"
+    "flagSrc": "assets/flags/cz.svg"
   },
   {
     "name": "Democratic Republic of the Congo",
@@ -415,7 +417,7 @@ window.COUNTRIES = [
       "Democratic Republic of Congo"
     ],
     "continent": "Africa",
-    "src": "assets/flags/cd.svg"
+    "flagSrc": "assets/flags/cd.svg"
   },
   {
     "name": "Denmark",
@@ -424,7 +426,7 @@ window.COUNTRIES = [
       "Kingdom of Denmark"
     ],
     "continent": "Europe",
-    "src": "assets/flags/dk.svg"
+    "flagSrc": "assets/flags/dk.svg"
   },
   {
     "name": "Djibouti",
@@ -433,7 +435,7 @@ window.COUNTRIES = [
       "Republic of Djibouti"
     ],
     "continent": "Africa",
-    "src": "assets/flags/dj.svg"
+    "flagSrc": "assets/flags/dj.svg"
   },
   {
     "name": "Dominica",
@@ -442,14 +444,14 @@ window.COUNTRIES = [
       "Commonwealth of Dominica"
     ],
     "continent": "North America",
-    "src": "assets/flags/dm.svg"
+    "flagSrc": "assets/flags/dm.svg"
   },
   {
     "name": "Dominican Republic",
     "code": "DO",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/do.svg"
+    "flagSrc": "assets/flags/do.svg"
   },
   {
     "name": "Ecuador",
@@ -458,7 +460,7 @@ window.COUNTRIES = [
       "Republic of Ecuador"
     ],
     "continent": "South America",
-    "src": "assets/flags/ec.svg"
+    "flagSrc": "assets/flags/ec.svg"
   },
   {
     "name": "Egypt",
@@ -467,7 +469,7 @@ window.COUNTRIES = [
       "Arab Republic of Egypt"
     ],
     "continent": "Africa",
-    "src": "assets/flags/eg.svg"
+    "flagSrc": "assets/flags/eg.svg"
   },
   {
     "name": "El Salvador",
@@ -476,7 +478,7 @@ window.COUNTRIES = [
       "Republic of El Salvador"
     ],
     "continent": "North America",
-    "src": "assets/flags/sv.svg"
+    "flagSrc": "assets/flags/sv.svg"
   },
   {
     "name": "Equatorial Guinea",
@@ -485,7 +487,7 @@ window.COUNTRIES = [
       "Republic of Equatorial Guinea"
     ],
     "continent": "Africa",
-    "src": "assets/flags/gq.svg"
+    "flagSrc": "assets/flags/gq.svg"
   },
   {
     "name": "Eritrea",
@@ -494,7 +496,7 @@ window.COUNTRIES = [
       "State of Eritrea"
     ],
     "continent": "Africa",
-    "src": "assets/flags/er.svg"
+    "flagSrc": "assets/flags/er.svg"
   },
   {
     "name": "Estonia",
@@ -503,7 +505,7 @@ window.COUNTRIES = [
       "Republic of Estonia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/ee.svg"
+    "flagSrc": "assets/flags/ee.svg"
   },
   {
     "name": "Eswatini",
@@ -513,7 +515,7 @@ window.COUNTRIES = [
       "Kingdom of Eswatini"
     ],
     "continent": "Africa",
-    "src": "assets/flags/sz.svg"
+    "flagSrc": "assets/flags/sz.svg"
   },
   {
     "name": "Ethiopia",
@@ -522,7 +524,7 @@ window.COUNTRIES = [
       "Federal Democratic Republic of Ethiopia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/et.svg"
+    "flagSrc": "assets/flags/et.svg"
   },
   {
     "name": "Fiji",
@@ -531,7 +533,7 @@ window.COUNTRIES = [
       "Republic of Fiji"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/fj.svg"
+    "flagSrc": "assets/flags/fj.svg"
   },
   {
     "name": "Finland",
@@ -540,7 +542,7 @@ window.COUNTRIES = [
       "Republic of Finland"
     ],
     "continent": "Europe",
-    "src": "assets/flags/fi.svg"
+    "flagSrc": "assets/flags/fi.svg"
   },
   {
     "name": "France",
@@ -549,7 +551,7 @@ window.COUNTRIES = [
       "French Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/fr.svg"
+    "flagSrc": "assets/flags/fr.svg"
   },
   {
     "name": "Gabon",
@@ -558,7 +560,7 @@ window.COUNTRIES = [
       "Gabonese Republic"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ga.svg"
+    "flagSrc": "assets/flags/ga.svg"
   },
   {
     "name": "Gambia",
@@ -569,14 +571,14 @@ window.COUNTRIES = [
       "Gambia (The)"
     ],
     "continent": "Africa",
-    "src": "assets/flags/gm.svg"
+    "flagSrc": "assets/flags/gm.svg"
   },
   {
     "name": "Georgia",
     "code": "GE",
     "aliases": [],
     "continent": "Asia",
-    "src": "assets/flags/ge.svg"
+    "flagSrc": "assets/flags/ge.svg"
   },
   {
     "name": "Germany",
@@ -585,7 +587,7 @@ window.COUNTRIES = [
       "Federal Republic of Germany"
     ],
     "continent": "Europe",
-    "src": "assets/flags/de.svg"
+    "flagSrc": "assets/flags/de.svg"
   },
   {
     "name": "Ghana",
@@ -594,7 +596,7 @@ window.COUNTRIES = [
       "Republic of Ghana"
     ],
     "continent": "Africa",
-    "src": "assets/flags/gh.svg"
+    "flagSrc": "assets/flags/gh.svg"
   },
   {
     "name": "Greece",
@@ -603,14 +605,14 @@ window.COUNTRIES = [
       "Hellenic Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/gr.svg"
+    "flagSrc": "assets/flags/gr.svg"
   },
   {
     "name": "Grenada",
     "code": "GD",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/gd.svg"
+    "flagSrc": "assets/flags/gd.svg"
   },
   {
     "name": "Guatemala",
@@ -619,7 +621,7 @@ window.COUNTRIES = [
       "Republic of Guatemala"
     ],
     "continent": "North America",
-    "src": "assets/flags/gt.svg"
+    "flagSrc": "assets/flags/gt.svg"
   },
   {
     "name": "Guinea",
@@ -628,7 +630,7 @@ window.COUNTRIES = [
       "Republic of Guinea"
     ],
     "continent": "Africa",
-    "src": "assets/flags/gn.svg"
+    "flagSrc": "assets/flags/gn.svg"
   },
   {
     "name": "Guinea-Bissau",
@@ -638,7 +640,7 @@ window.COUNTRIES = [
       "Republic of Guinea-Bissau"
     ],
     "continent": "Africa",
-    "src": "assets/flags/gw.svg"
+    "flagSrc": "assets/flags/gw.svg"
   },
   {
     "name": "Guyana",
@@ -648,7 +650,7 @@ window.COUNTRIES = [
       "Cooperative Republic of Guyana"
     ],
     "continent": "South America",
-    "src": "assets/flags/gy.svg"
+    "flagSrc": "assets/flags/gy.svg"
   },
   {
     "name": "Haiti",
@@ -657,7 +659,7 @@ window.COUNTRIES = [
       "Republic of Haiti"
     ],
     "continent": "North America",
-    "src": "assets/flags/ht.svg"
+    "flagSrc": "assets/flags/ht.svg"
   },
   {
     "name": "Honduras",
@@ -666,14 +668,14 @@ window.COUNTRIES = [
       "Republic of Honduras"
     ],
     "continent": "North America",
-    "src": "assets/flags/hn.svg"
+    "flagSrc": "assets/flags/hn.svg"
   },
   {
     "name": "Hungary",
     "code": "HU",
     "aliases": [],
     "continent": "Europe",
-    "src": "assets/flags/hu.svg"
+    "flagSrc": "assets/flags/hu.svg"
   },
   {
     "name": "Iceland",
@@ -682,7 +684,7 @@ window.COUNTRIES = [
       "Republic of Iceland"
     ],
     "continent": "Europe",
-    "src": "assets/flags/is.svg"
+    "flagSrc": "assets/flags/is.svg"
   },
   {
     "name": "India",
@@ -691,7 +693,7 @@ window.COUNTRIES = [
       "Republic of India"
     ],
     "continent": "Asia",
-    "src": "assets/flags/in.svg"
+    "flagSrc": "assets/flags/in.svg"
   },
   {
     "name": "Indonesia",
@@ -700,7 +702,7 @@ window.COUNTRIES = [
       "Republic of Indonesia"
     ],
     "continent": "Asia",
-    "src": "assets/flags/id.svg"
+    "flagSrc": "assets/flags/id.svg"
   },
   {
     "name": "Iran",
@@ -710,7 +712,7 @@ window.COUNTRIES = [
       "Iran (Islamic Republic of)"
     ],
     "continent": "Asia",
-    "src": "assets/flags/ir.svg"
+    "flagSrc": "assets/flags/ir.svg"
   },
   {
     "name": "Iraq",
@@ -719,14 +721,14 @@ window.COUNTRIES = [
       "Republic of Iraq"
     ],
     "continent": "Asia",
-    "src": "assets/flags/iq.svg"
+    "flagSrc": "assets/flags/iq.svg"
   },
   {
     "name": "Ireland",
     "code": "IE",
     "aliases": [],
     "continent": "Europe",
-    "src": "assets/flags/ie.svg"
+    "flagSrc": "assets/flags/ie.svg"
   },
   {
     "name": "Israel",
@@ -735,7 +737,7 @@ window.COUNTRIES = [
       "State of Israel"
     ],
     "continent": "Asia",
-    "src": "assets/flags/il.svg"
+    "flagSrc": "assets/flags/il.svg"
   },
   {
     "name": "Italy",
@@ -744,21 +746,21 @@ window.COUNTRIES = [
       "Italian Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/it.svg"
+    "flagSrc": "assets/flags/it.svg"
   },
   {
     "name": "Jamaica",
     "code": "JM",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/jm.svg"
+    "flagSrc": "assets/flags/jm.svg"
   },
   {
     "name": "Japan",
     "code": "JP",
     "aliases": [],
     "continent": "Asia",
-    "src": "assets/flags/jp.svg"
+    "flagSrc": "assets/flags/jp.svg"
   },
   {
     "name": "Jordan",
@@ -767,7 +769,7 @@ window.COUNTRIES = [
       "Hashemite Kingdom of Jordan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/jo.svg"
+    "flagSrc": "assets/flags/jo.svg"
   },
   {
     "name": "Kazakhstan",
@@ -776,7 +778,7 @@ window.COUNTRIES = [
       "Republic of Kazakhstan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kz.svg"
+    "flagSrc": "assets/flags/kz.svg"
   },
   {
     "name": "Kenya",
@@ -785,7 +787,7 @@ window.COUNTRIES = [
       "Republic of Kenya"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ke.svg"
+    "flagSrc": "assets/flags/ke.svg"
   },
   {
     "name": "Kiribati",
@@ -794,7 +796,7 @@ window.COUNTRIES = [
       "Republic of Kiribati"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/ki.svg"
+    "flagSrc": "assets/flags/ki.svg"
   },
   {
     "name": "Kuwait",
@@ -803,7 +805,7 @@ window.COUNTRIES = [
       "State of Kuwait"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kw.svg"
+    "flagSrc": "assets/flags/kw.svg"
   },
   {
     "name": "Kyrgyzstan",
@@ -812,7 +814,7 @@ window.COUNTRIES = [
       "Kyrgyz Republic"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kg.svg"
+    "flagSrc": "assets/flags/kg.svg"
   },
   {
     "name": "Laos",
@@ -822,7 +824,7 @@ window.COUNTRIES = [
       "Lao PDR"
     ],
     "continent": "Asia",
-    "src": "assets/flags/la.svg"
+    "flagSrc": "assets/flags/la.svg"
   },
   {
     "name": "Latvia",
@@ -831,7 +833,7 @@ window.COUNTRIES = [
       "Republic of Latvia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/lv.svg"
+    "flagSrc": "assets/flags/lv.svg"
   },
   {
     "name": "Lebanon",
@@ -840,7 +842,7 @@ window.COUNTRIES = [
       "Lebanese Republic"
     ],
     "continent": "Asia",
-    "src": "assets/flags/lb.svg"
+    "flagSrc": "assets/flags/lb.svg"
   },
   {
     "name": "Lesotho",
@@ -849,7 +851,7 @@ window.COUNTRIES = [
       "Kingdom of Lesotho"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ls.svg"
+    "flagSrc": "assets/flags/ls.svg"
   },
   {
     "name": "Liberia",
@@ -858,7 +860,7 @@ window.COUNTRIES = [
       "Republic of Liberia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/lr.svg"
+    "flagSrc": "assets/flags/lr.svg"
   },
   {
     "name": "Libya",
@@ -867,7 +869,7 @@ window.COUNTRIES = [
       "State of Libya"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ly.svg"
+    "flagSrc": "assets/flags/ly.svg"
   },
   {
     "name": "Liechtenstein",
@@ -876,7 +878,7 @@ window.COUNTRIES = [
       "Principality of Liechtenstein"
     ],
     "continent": "Europe",
-    "src": "assets/flags/li.svg"
+    "flagSrc": "assets/flags/li.svg"
   },
   {
     "name": "Lithuania",
@@ -885,7 +887,7 @@ window.COUNTRIES = [
       "Republic of Lithuania"
     ],
     "continent": "Europe",
-    "src": "assets/flags/lt.svg"
+    "flagSrc": "assets/flags/lt.svg"
   },
   {
     "name": "Luxembourg",
@@ -894,7 +896,7 @@ window.COUNTRIES = [
       "Grand Duchy of Luxembourg"
     ],
     "continent": "Europe",
-    "src": "assets/flags/lu.svg"
+    "flagSrc": "assets/flags/lu.svg"
   },
   {
     "name": "Madagascar",
@@ -903,7 +905,7 @@ window.COUNTRIES = [
       "Republic of Madagascar"
     ],
     "continent": "Africa",
-    "src": "assets/flags/mg.svg"
+    "flagSrc": "assets/flags/mg.svg"
   },
   {
     "name": "Malawi",
@@ -912,14 +914,14 @@ window.COUNTRIES = [
       "Republic of Malawi"
     ],
     "continent": "Africa",
-    "src": "assets/flags/mw.svg"
+    "flagSrc": "assets/flags/mw.svg"
   },
   {
     "name": "Malaysia",
     "code": "MY",
     "aliases": [],
     "continent": "Asia",
-    "src": "assets/flags/my.svg"
+    "flagSrc": "assets/flags/my.svg"
   },
   {
     "name": "Maldives",
@@ -928,7 +930,7 @@ window.COUNTRIES = [
       "Republic of Maldives"
     ],
     "continent": "Asia",
-    "src": "assets/flags/mv.svg"
+    "flagSrc": "assets/flags/mv.svg"
   },
   {
     "name": "Mali",
@@ -937,7 +939,7 @@ window.COUNTRIES = [
       "Republic of Mali"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ml.svg"
+    "flagSrc": "assets/flags/ml.svg"
   },
   {
     "name": "Malta",
@@ -946,7 +948,7 @@ window.COUNTRIES = [
       "Republic of Malta"
     ],
     "continent": "Europe",
-    "src": "assets/flags/mt.svg"
+    "flagSrc": "assets/flags/mt.svg"
   },
   {
     "name": "Marshall Islands",
@@ -955,7 +957,7 @@ window.COUNTRIES = [
       "Republic of the Marshall Islands"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/mh.svg"
+    "flagSrc": "assets/flags/mh.svg"
   },
   {
     "name": "Mauritania",
@@ -964,7 +966,7 @@ window.COUNTRIES = [
       "Islamic Republic of Mauritania"
     ],
     "continent": "Africa",
-    "src": "assets/flags/mr.svg"
+    "flagSrc": "assets/flags/mr.svg"
   },
   {
     "name": "Mauritius",
@@ -973,7 +975,7 @@ window.COUNTRIES = [
       "Republic of Mauritius"
     ],
     "continent": "Africa",
-    "src": "assets/flags/mu.svg"
+    "flagSrc": "assets/flags/mu.svg"
   },
   {
     "name": "Mexico",
@@ -982,7 +984,7 @@ window.COUNTRIES = [
       "United Mexican States"
     ],
     "continent": "North America",
-    "src": "assets/flags/mx.svg"
+    "flagSrc": "assets/flags/mx.svg"
   },
   {
     "name": "Micronesia",
@@ -991,7 +993,7 @@ window.COUNTRIES = [
       "Federated States of Micronesia"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/fm.svg"
+    "flagSrc": "assets/flags/fm.svg"
   },
   {
     "name": "Moldova",
@@ -1000,7 +1002,7 @@ window.COUNTRIES = [
       "Republic of Moldova"
     ],
     "continent": "Europe",
-    "src": "assets/flags/md.svg"
+    "flagSrc": "assets/flags/md.svg"
   },
   {
     "name": "Monaco",
@@ -1009,21 +1011,21 @@ window.COUNTRIES = [
       "Principality of Monaco"
     ],
     "continent": "Europe",
-    "src": "assets/flags/mc.svg"
+    "flagSrc": "assets/flags/mc.svg"
   },
   {
     "name": "Mongolia",
     "code": "MN",
     "aliases": [],
     "continent": "Asia",
-    "src": "assets/flags/mn.svg"
+    "flagSrc": "assets/flags/mn.svg"
   },
   {
     "name": "Montenegro",
     "code": "ME",
     "aliases": [],
     "continent": "Europe",
-    "src": "assets/flags/me.svg"
+    "flagSrc": "assets/flags/me.svg"
   },
   {
     "name": "Morocco",
@@ -1032,7 +1034,7 @@ window.COUNTRIES = [
       "Kingdom of Morocco"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ma.svg"
+    "flagSrc": "assets/flags/ma.svg"
   },
   {
     "name": "Mozambique",
@@ -1041,7 +1043,7 @@ window.COUNTRIES = [
       "Republic of Mozambique"
     ],
     "continent": "Africa",
-    "src": "assets/flags/mz.svg"
+    "flagSrc": "assets/flags/mz.svg"
   },
   {
     "name": "Myanmar",
@@ -1051,7 +1053,7 @@ window.COUNTRIES = [
       "Republic of the Union of Myanmar"
     ],
     "continent": "Asia",
-    "src": "assets/flags/mm.svg"
+    "flagSrc": "assets/flags/mm.svg"
   },
   {
     "name": "Namibia",
@@ -1060,7 +1062,7 @@ window.COUNTRIES = [
       "Republic of Namibia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/na.svg"
+    "flagSrc": "assets/flags/na.svg"
   },
   {
     "name": "Nauru",
@@ -1069,7 +1071,7 @@ window.COUNTRIES = [
       "Republic of Nauru"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/nr.svg"
+    "flagSrc": "assets/flags/nr.svg"
   },
   {
     "name": "Nepal",
@@ -1078,7 +1080,7 @@ window.COUNTRIES = [
       "Federal Democratic Republic of Nepal"
     ],
     "continent": "Asia",
-    "src": "assets/flags/np.svg"
+    "flagSrc": "assets/flags/np.svg"
   },
   {
     "name": "Netherlands",
@@ -1088,14 +1090,14 @@ window.COUNTRIES = [
       "Holland"
     ],
     "continent": "Europe",
-    "src": "assets/flags/nl.svg"
+    "flagSrc": "assets/flags/nl.svg"
   },
   {
     "name": "New Zealand",
     "code": "NZ",
     "aliases": [],
     "continent": "Oceania",
-    "src": "assets/flags/nz.svg"
+    "flagSrc": "assets/flags/nz.svg"
   },
   {
     "name": "Nicaragua",
@@ -1104,7 +1106,7 @@ window.COUNTRIES = [
       "Republic of Nicaragua"
     ],
     "continent": "North America",
-    "src": "assets/flags/ni.svg"
+    "flagSrc": "assets/flags/ni.svg"
   },
   {
     "name": "Niger",
@@ -1113,7 +1115,7 @@ window.COUNTRIES = [
       "Republic of the Niger"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ne.svg"
+    "flagSrc": "assets/flags/ne.svg"
   },
   {
     "name": "Nigeria",
@@ -1122,7 +1124,7 @@ window.COUNTRIES = [
       "Federal Republic of Nigeria"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ng.svg"
+    "flagSrc": "assets/flags/ng.svg"
   },
   {
     "name": "North Korea",
@@ -1133,7 +1135,7 @@ window.COUNTRIES = [
       "Korea DPR"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kp.svg"
+    "flagSrc": "assets/flags/kp.svg"
   },
   {
     "name": "North Macedonia",
@@ -1143,7 +1145,7 @@ window.COUNTRIES = [
       "Macedonia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/mk.svg"
+    "flagSrc": "assets/flags/mk.svg"
   },
   {
     "name": "Norway",
@@ -1152,7 +1154,7 @@ window.COUNTRIES = [
       "Kingdom of Norway"
     ],
     "continent": "Europe",
-    "src": "assets/flags/no.svg"
+    "flagSrc": "assets/flags/no.svg"
   },
   {
     "name": "Oman",
@@ -1161,7 +1163,7 @@ window.COUNTRIES = [
       "Sultanate of Oman"
     ],
     "continent": "Asia",
-    "src": "assets/flags/om.svg"
+    "flagSrc": "assets/flags/om.svg"
   },
   {
     "name": "Pakistan",
@@ -1170,7 +1172,7 @@ window.COUNTRIES = [
       "Islamic Republic of Pakistan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/pk.svg"
+    "flagSrc": "assets/flags/pk.svg"
   },
   {
     "name": "Palau",
@@ -1179,7 +1181,7 @@ window.COUNTRIES = [
       "Republic of Palau"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/pw.svg"
+    "flagSrc": "assets/flags/pw.svg"
   },
   {
     "name": "Panama",
@@ -1188,14 +1190,14 @@ window.COUNTRIES = [
       "Republic of Panama"
     ],
     "continent": "North America",
-    "src": "assets/flags/pa.svg"
+    "flagSrc": "assets/flags/pa.svg"
   },
   {
     "name": "Papua New Guinea",
     "code": "PG",
     "aliases": [],
     "continent": "Oceania",
-    "src": "assets/flags/pg.svg"
+    "flagSrc": "assets/flags/pg.svg"
   },
   {
     "name": "Paraguay",
@@ -1204,7 +1206,7 @@ window.COUNTRIES = [
       "Republic of Paraguay"
     ],
     "continent": "South America",
-    "src": "assets/flags/py.svg"
+    "flagSrc": "assets/flags/py.svg"
   },
   {
     "name": "Peru",
@@ -1213,7 +1215,7 @@ window.COUNTRIES = [
       "Republic of Peru"
     ],
     "continent": "South America",
-    "src": "assets/flags/pe.svg"
+    "flagSrc": "assets/flags/pe.svg"
   },
   {
     "name": "Philippines",
@@ -1222,7 +1224,7 @@ window.COUNTRIES = [
       "Republic of the Philippines"
     ],
     "continent": "Asia",
-    "src": "assets/flags/ph.svg"
+    "flagSrc": "assets/flags/ph.svg"
   },
   {
     "name": "Poland",
@@ -1231,7 +1233,7 @@ window.COUNTRIES = [
       "Republic of Poland"
     ],
     "continent": "Europe",
-    "src": "assets/flags/pl.svg"
+    "flagSrc": "assets/flags/pl.svg"
   },
   {
     "name": "Portugal",
@@ -1240,7 +1242,7 @@ window.COUNTRIES = [
       "Portuguese Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/pt.svg"
+    "flagSrc": "assets/flags/pt.svg"
   },
   {
     "name": "Qatar",
@@ -1249,14 +1251,14 @@ window.COUNTRIES = [
       "State of Qatar"
     ],
     "continent": "Asia",
-    "src": "assets/flags/qa.svg"
+    "flagSrc": "assets/flags/qa.svg"
   },
   {
     "name": "Romania",
     "code": "RO",
     "aliases": [],
     "continent": "Europe",
-    "src": "assets/flags/ro.svg"
+    "flagSrc": "assets/flags/ro.svg"
   },
   {
     "name": "Russia",
@@ -1265,7 +1267,7 @@ window.COUNTRIES = [
       "Russian Federation"
     ],
     "continent": "Europe",
-    "src": "assets/flags/ru.svg"
+    "flagSrc": "assets/flags/ru.svg"
   },
   {
     "name": "Rwanda",
@@ -1274,7 +1276,7 @@ window.COUNTRIES = [
       "Republic of Rwanda"
     ],
     "continent": "Africa",
-    "src": "assets/flags/rw.svg"
+    "flagSrc": "assets/flags/rw.svg"
   },
   {
     "name": "Saint Kitts and Nevis",
@@ -1284,7 +1286,7 @@ window.COUNTRIES = [
       "St. Kitts and Nevis"
     ],
     "continent": "North America",
-    "src": "assets/flags/kn.svg"
+    "flagSrc": "assets/flags/kn.svg"
   },
   {
     "name": "Saint Lucia",
@@ -1294,7 +1296,7 @@ window.COUNTRIES = [
       "St. Lucia"
     ],
     "continent": "North America",
-    "src": "assets/flags/lc.svg"
+    "flagSrc": "assets/flags/lc.svg"
   },
   {
     "name": "Saint Vincent and the Grenadines",
@@ -1304,7 +1306,7 @@ window.COUNTRIES = [
       "St. Vincent and the Grenadines"
     ],
     "continent": "North America",
-    "src": "assets/flags/vc.svg"
+    "flagSrc": "assets/flags/vc.svg"
   },
   {
     "name": "Samoa",
@@ -1313,7 +1315,7 @@ window.COUNTRIES = [
       "Independent State of Samoa"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/ws.svg"
+    "flagSrc": "assets/flags/ws.svg"
   },
   {
     "name": "San Marino",
@@ -1322,7 +1324,7 @@ window.COUNTRIES = [
       "Republic of San Marino"
     ],
     "continent": "Europe",
-    "src": "assets/flags/sm.svg"
+    "flagSrc": "assets/flags/sm.svg"
   },
   {
     "name": "Sao Tome and Principe",
@@ -1333,7 +1335,7 @@ window.COUNTRIES = [
       "São Tomé"
     ],
     "continent": "Africa",
-    "src": "assets/flags/st.svg"
+    "flagSrc": "assets/flags/st.svg"
   },
   {
     "name": "Saudi Arabia",
@@ -1342,7 +1344,7 @@ window.COUNTRIES = [
       "Kingdom of Saudi Arabia"
     ],
     "continent": "Asia",
-    "src": "assets/flags/sa.svg"
+    "flagSrc": "assets/flags/sa.svg"
   },
   {
     "name": "Senegal",
@@ -1351,7 +1353,7 @@ window.COUNTRIES = [
       "Republic of Senegal"
     ],
     "continent": "Africa",
-    "src": "assets/flags/sn.svg"
+    "flagSrc": "assets/flags/sn.svg"
   },
   {
     "name": "Serbia",
@@ -1360,7 +1362,7 @@ window.COUNTRIES = [
       "Republic of Serbia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/rs.svg"
+    "flagSrc": "assets/flags/rs.svg"
   },
   {
     "name": "Seychelles",
@@ -1369,7 +1371,7 @@ window.COUNTRIES = [
       "Republic of Seychelles"
     ],
     "continent": "Africa",
-    "src": "assets/flags/sc.svg"
+    "flagSrc": "assets/flags/sc.svg"
   },
   {
     "name": "Sierra Leone",
@@ -1378,7 +1380,7 @@ window.COUNTRIES = [
       "Republic of Sierra Leone"
     ],
     "continent": "Africa",
-    "src": "assets/flags/sl.svg"
+    "flagSrc": "assets/flags/sl.svg"
   },
   {
     "name": "Singapore",
@@ -1387,7 +1389,7 @@ window.COUNTRIES = [
       "Republic of Singapore"
     ],
     "continent": "Asia",
-    "src": "assets/flags/sg.svg"
+    "flagSrc": "assets/flags/sg.svg"
   },
   {
     "name": "Slovakia",
@@ -1396,7 +1398,7 @@ window.COUNTRIES = [
       "Slovak Republic"
     ],
     "continent": "Europe",
-    "src": "assets/flags/sk.svg"
+    "flagSrc": "assets/flags/sk.svg"
   },
   {
     "name": "Slovenia",
@@ -1405,14 +1407,14 @@ window.COUNTRIES = [
       "Republic of Slovenia"
     ],
     "continent": "Europe",
-    "src": "assets/flags/si.svg"
+    "flagSrc": "assets/flags/si.svg"
   },
   {
     "name": "Solomon Islands",
     "code": "SB",
     "aliases": [],
     "continent": "Oceania",
-    "src": "assets/flags/sb.svg"
+    "flagSrc": "assets/flags/sb.svg"
   },
   {
     "name": "Somalia",
@@ -1421,7 +1423,7 @@ window.COUNTRIES = [
       "Federal Republic of Somalia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/so.svg"
+    "flagSrc": "assets/flags/so.svg"
   },
   {
     "name": "South Africa",
@@ -1430,7 +1432,7 @@ window.COUNTRIES = [
       "Republic of South Africa"
     ],
     "continent": "Africa",
-    "src": "assets/flags/za.svg"
+    "flagSrc": "assets/flags/za.svg"
   },
   {
     "name": "South Korea",
@@ -1441,7 +1443,7 @@ window.COUNTRIES = [
       "Korea Republic"
     ],
     "continent": "Asia",
-    "src": "assets/flags/kr.svg"
+    "flagSrc": "assets/flags/kr.svg"
   },
   {
     "name": "South Sudan",
@@ -1450,7 +1452,7 @@ window.COUNTRIES = [
       "Republic of South Sudan"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ss.svg"
+    "flagSrc": "assets/flags/ss.svg"
   },
   {
     "name": "Spain",
@@ -1459,7 +1461,7 @@ window.COUNTRIES = [
       "Kingdom of Spain"
     ],
     "continent": "Europe",
-    "src": "assets/flags/es.svg"
+    "flagSrc": "assets/flags/es.svg"
   },
   {
     "name": "Sri Lanka",
@@ -1468,7 +1470,7 @@ window.COUNTRIES = [
       "Democratic Socialist Republic of Sri Lanka"
     ],
     "continent": "Asia",
-    "src": "assets/flags/lk.svg"
+    "flagSrc": "assets/flags/lk.svg"
   },
   {
     "name": "Sudan",
@@ -1477,7 +1479,7 @@ window.COUNTRIES = [
       "Republic of the Sudan"
     ],
     "continent": "Africa",
-    "src": "assets/flags/sd.svg"
+    "flagSrc": "assets/flags/sd.svg"
   },
   {
     "name": "Suriname",
@@ -1486,7 +1488,7 @@ window.COUNTRIES = [
       "Republic of Suriname"
     ],
     "continent": "South America",
-    "src": "assets/flags/sr.svg"
+    "flagSrc": "assets/flags/sr.svg"
   },
   {
     "name": "Sweden",
@@ -1495,7 +1497,7 @@ window.COUNTRIES = [
       "Kingdom of Sweden"
     ],
     "continent": "Europe",
-    "src": "assets/flags/se.svg"
+    "flagSrc": "assets/flags/se.svg"
   },
   {
     "name": "Switzerland",
@@ -1504,7 +1506,7 @@ window.COUNTRIES = [
       "Swiss Confederation"
     ],
     "continent": "Europe",
-    "src": "assets/flags/ch.svg"
+    "flagSrc": "assets/flags/ch.svg"
   },
   {
     "name": "Syria",
@@ -1513,7 +1515,7 @@ window.COUNTRIES = [
       "Syrian Arab Republic"
     ],
     "continent": "Asia",
-    "src": "assets/flags/sy.svg"
+    "flagSrc": "assets/flags/sy.svg"
   },
   {
     "name": "Tajikistan",
@@ -1522,7 +1524,7 @@ window.COUNTRIES = [
       "Republic of Tajikistan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/tj.svg"
+    "flagSrc": "assets/flags/tj.svg"
   },
   {
     "name": "Tanzania",
@@ -1531,7 +1533,7 @@ window.COUNTRIES = [
       "United Republic of Tanzania"
     ],
     "continent": "Africa",
-    "src": "assets/flags/tz.svg"
+    "flagSrc": "assets/flags/tz.svg"
   },
   {
     "name": "Thailand",
@@ -1540,7 +1542,7 @@ window.COUNTRIES = [
       "Kingdom of Thailand"
     ],
     "continent": "Asia",
-    "src": "assets/flags/th.svg"
+    "flagSrc": "assets/flags/th.svg"
   },
   {
     "name": "Timor-Leste",
@@ -1550,7 +1552,7 @@ window.COUNTRIES = [
       "Democratic Republic of Timor-Leste"
     ],
     "continent": "Asia",
-    "src": "assets/flags/tl.svg"
+    "flagSrc": "assets/flags/tl.svg"
   },
   {
     "name": "Togo",
@@ -1559,7 +1561,7 @@ window.COUNTRIES = [
       "Togolese Republic"
     ],
     "continent": "Africa",
-    "src": "assets/flags/tg.svg"
+    "flagSrc": "assets/flags/tg.svg"
   },
   {
     "name": "Tonga",
@@ -1568,14 +1570,14 @@ window.COUNTRIES = [
       "Kingdom of Tonga"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/to.svg"
+    "flagSrc": "assets/flags/to.svg"
   },
   {
     "name": "Trinidad and Tobago",
     "code": "TT",
     "aliases": [],
     "continent": "North America",
-    "src": "assets/flags/tt.svg"
+    "flagSrc": "assets/flags/tt.svg"
   },
   {
     "name": "Tunisia",
@@ -1584,7 +1586,7 @@ window.COUNTRIES = [
       "Republic of Tunisia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/tn.svg"
+    "flagSrc": "assets/flags/tn.svg"
   },
   {
     "name": "Turkiye",
@@ -1595,21 +1597,21 @@ window.COUNTRIES = [
       "Republic of Türkiye"
     ],
     "continent": "Asia",
-    "src": "assets/flags/tr.svg"
+    "flagSrc": "assets/flags/tr.svg"
   },
   {
     "name": "Turkmenistan",
     "code": "TM",
     "aliases": [],
     "continent": "Asia",
-    "src": "assets/flags/tm.svg"
+    "flagSrc": "assets/flags/tm.svg"
   },
   {
     "name": "Tuvalu",
     "code": "TV",
     "aliases": [],
     "continent": "Oceania",
-    "src": "assets/flags/tv.svg"
+    "flagSrc": "assets/flags/tv.svg"
   },
   {
     "name": "Uganda",
@@ -1618,14 +1620,14 @@ window.COUNTRIES = [
       "Republic of Uganda"
     ],
     "continent": "Africa",
-    "src": "assets/flags/ug.svg"
+    "flagSrc": "assets/flags/ug.svg"
   },
   {
     "name": "Ukraine",
     "code": "UA",
     "aliases": [],
     "continent": "Europe",
-    "src": "assets/flags/ua.svg"
+    "flagSrc": "assets/flags/ua.svg"
   },
   {
     "name": "United Arab Emirates",
@@ -1634,7 +1636,7 @@ window.COUNTRIES = [
       "UAE"
     ],
     "continent": "Asia",
-    "src": "assets/flags/ae.svg"
+    "flagSrc": "assets/flags/ae.svg"
   },
   {
     "name": "United Kingdom",
@@ -1646,7 +1648,7 @@ window.COUNTRIES = [
       "United Kingdom of Great Britain and Northern Ireland"
     ],
     "continent": "Europe",
-    "src": "assets/flags/gb.svg"
+    "flagSrc": "assets/flags/gb.svg"
   },
   {
     "name": "United States",
@@ -1659,7 +1661,7 @@ window.COUNTRIES = [
       "United States of America"
     ],
     "continent": "North America",
-    "src": "assets/flags/us.svg"
+    "flagSrc": "assets/flags/us.svg"
   },
   {
     "name": "Uruguay",
@@ -1668,7 +1670,7 @@ window.COUNTRIES = [
       "Oriental Republic of Uruguay"
     ],
     "continent": "South America",
-    "src": "assets/flags/uy.svg"
+    "flagSrc": "assets/flags/uy.svg"
   },
   {
     "name": "Uzbekistan",
@@ -1677,7 +1679,7 @@ window.COUNTRIES = [
       "Republic of Uzbekistan"
     ],
     "continent": "Asia",
-    "src": "assets/flags/uz.svg"
+    "flagSrc": "assets/flags/uz.svg"
   },
   {
     "name": "Vanuatu",
@@ -1686,7 +1688,7 @@ window.COUNTRIES = [
       "Republic of Vanuatu"
     ],
     "continent": "Oceania",
-    "src": "assets/flags/vu.svg"
+    "flagSrc": "assets/flags/vu.svg"
   },
   {
     "name": "Venezuela",
@@ -1696,7 +1698,7 @@ window.COUNTRIES = [
       "Venezuela (Bolivarian Republic of)"
     ],
     "continent": "South America",
-    "src": "assets/flags/ve.svg"
+    "flagSrc": "assets/flags/ve.svg"
   },
   {
     "name": "Vietnam",
@@ -1706,7 +1708,7 @@ window.COUNTRIES = [
       "Socialist Republic of Viet Nam"
     ],
     "continent": "Asia",
-    "src": "assets/flags/vn.svg"
+    "flagSrc": "assets/flags/vn.svg"
   },
   {
     "name": "Yemen",
@@ -1715,7 +1717,7 @@ window.COUNTRIES = [
       "Republic of Yemen"
     ],
     "continent": "Asia",
-    "src": "assets/flags/ye.svg"
+    "flagSrc": "assets/flags/ye.svg"
   },
   {
     "name": "Zambia",
@@ -1724,7 +1726,7 @@ window.COUNTRIES = [
       "Republic of Zambia"
     ],
     "continent": "Africa",
-    "src": "assets/flags/zm.svg"
+    "flagSrc": "assets/flags/zm.svg"
   },
   {
     "name": "Zimbabwe",
@@ -1733,7 +1735,7 @@ window.COUNTRIES = [
       "Republic of Zimbabwe"
     ],
     "continent": "Africa",
-    "src": "assets/flags/zw.svg"
+    "flagSrc": "assets/flags/zw.svg"
   },
   {
     "name": "Holy See",
@@ -1744,7 +1746,7 @@ window.COUNTRIES = [
       "Holy See (Vatican City State)"
     ],
     "continent": "Europe",
-    "src": "assets/flags/va.svg"
+    "flagSrc": "assets/flags/va.svg"
   },
   {
     "name": "Palestine",
@@ -1754,7 +1756,7 @@ window.COUNTRIES = [
       "Palestinian State"
     ],
     "continent": "Asia",
-    "src": "assets/flags/ps.svg"
+    "flagSrc": "assets/flags/ps.svg"
   },
   {
     "name": "Taiwan",
@@ -1764,6 +1766,6 @@ window.COUNTRIES = [
       "Chinese Taipei"
     ],
     "continent": "Asia",
-    "src": "assets/flags/tw.svg"
+    "flagSrc": "assets/flags/tw.svg"
   }
-];
+] as const satisfies readonly RawCountry[];

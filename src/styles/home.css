@@ -1,0 +1,43 @@
+.home-screen {
+  min-height: calc(100vh - 84px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  align-items: center;
+  gap: clamp(28px, 6vw, 86px);
+}
+
+.hero-copy h1 {
+  max-width: 760px;
+  background: linear-gradient(90deg, #fff, #b7fff7 46%, #dccdff 84%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.home-actions {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  flex-direction: column;
+}
+
+.home-actions button { width: 100%; }
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.mode-card, .connection-card, .room-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 22px;
+}
+
+.mode-card p { color: var(--muted); line-height: 1.55; }
+.mode-card button, .mode-card select { margin-top: 12px; }
