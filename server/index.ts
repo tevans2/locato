@@ -3,8 +3,12 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexCountries, rawCountries, validateCountries } from "../src/core/countries";
 import { RoomManager } from "./rooms/RoomManager";
+import { AuthService, bunPasswordHasher, handleAuthRequest, readSessionToken, type AuthUser } from "./auth";
+import { openDatabase, SqliteUserStore } from "./db/database";
 
-interface WebSocketData {}
+interface WebSocketData {
+  readonly user: AuthUser | null;
+}
 
 const DEFAULT_PORT = 3000;
 // Drives round timeouts and result→next-round transitions, so it must tick well under one
@@ -83,18 +87,32 @@ const origins = allowedOrigins();
 
 setInterval(() => roomManager.sweep(Date.now()), TICK_INTERVAL_MS).unref?.();
 
+const SESSION_TTL_MS = readIntegerEnv("SESSION_TTL_DAYS", 30) * 24 * 60 * 60 * 1000;
+const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/locato.db");
+const userStore = new SqliteUserStore(openDatabase(databasePath));
+const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS });
+const cookieOptions = { secure: process.env.NODE_ENV === "production" };
+
+// Hourly cleanup of expired session rows; cheap and keeps the table from growing unbounded.
+setInterval(() => authService.pruneExpiredSessions(), 60 * 60 * 1000).unref?.();
+
 const server = Bun.serve<WebSocketData>({
   port: readIntegerEnv("PORT", DEFAULT_PORT),
-  fetch(request, serverInstance) {
+  async fetch(request, serverInstance) {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
 
     if (url.pathname === "/ws") {
       if (!isAllowedOrigin(request, origins)) return new Response("Forbidden", { status: 403 });
-      const upgraded = serverInstance.upgrade(request, { data: {} });
+      // Authenticate the upgrade from the session cookie so the socket carries the real identity.
+      const user = authService.authenticate(readSessionToken(request));
+      const upgraded = serverInstance.upgrade(request, { data: { user } });
       return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
     }
+
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions);
+    if (authResponse) return authResponse;
 
     return serveStatic(url.pathname);
   },
