@@ -1,5 +1,6 @@
 import type { FinalResult, PlayerId, PublicRoomState, PublicRoundState, RoundResult } from "../../core/multiplayer";
 import { el } from "../dom/createElement";
+import { promptImageClass } from "../dom/renderPrompt";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -181,7 +182,7 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
       if (visibleRound) {
         flagSlot.replaceChildren(
           visibleRound.prompt.kind === "image"
-            ? el("img", { className: "flag-image", attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } })
+            ? el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } })
             : el("div", { className: "prompt-text", text: visibleRound.prompt.value }),
         );
       } else {

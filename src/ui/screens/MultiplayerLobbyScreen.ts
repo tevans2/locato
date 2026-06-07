@@ -2,6 +2,7 @@ import type { MultiplayerTransport, PublicRoomState, PublicRoundState, RoundResu
 import { createMockMultiplayerTransport } from "../../core/multiplayer";
 import { allCategories } from "../../core/categories";
 import type { Screen } from "../../app/router";
+import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
@@ -108,16 +109,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: "Player" } });
   const joinCodeInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: "12", placeholder: "Room code" } });
-  const categoryChecks = allCategories.map((category) => {
-    const checkbox = el("input", { attrs: { type: "checkbox", value: category.id } });
-    checkbox.checked = category.id === "flags";
-    return { id: category.id, checkbox, label: el("label", { className: "category-option", attrs: { title: category.description }, children: [checkbox, el("span", { text: category.label })] }) };
-  });
-  function selectedCategoryIds(): string[] {
-    const ids = categoryChecks.filter((option) => option.checkbox.checked).map((option) => option.id);
-    return ids.length > 0 ? ids : ["flags"];
-  }
-  const categoryGroup = el("div", { className: "category-row", children: [el("span", { className: "category-row-label", text: "Categories" }), ...categoryChecks.map((option) => option.label)] });
+  const categoryDropdown = createCategoryDropdown({ categories: allCategories, selectedIds: ["flags"], signal: controller.signal });
   const statusText = el("p", { className: "multiplayer-status", text: feedback });
   const roomCode = el("strong", { className: "room-code", text: "----" });
   const playerList = el("ul", { className: "player-list" });
@@ -136,7 +128,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("p", { className: "eyebrow", text: "MULTIPLAYER" }),
       el("h1", { text: "Host or join a flag room" }),
       el("p", { className: "muted", text: "The server owns rooms, answers, scoring, round timing, and final results. Clients only submit input and render public state." }),
-      el("div", { className: "multiplayer-form-grid", children: [nameInput, categoryGroup, joinCodeInput] }),
+      el("div", { className: "multiplayer-form-grid", children: [nameInput, categoryDropdown.element, joinCodeInput] }),
       el("div", { className: "actions", children: [createButton, joinButton, demoButton] }),
     ],
   });
@@ -307,7 +299,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     () => {
       allowSessionPersistence = true;
       const playerName = nameInput.value.trim() || "Player";
-      connectWith(options.createOnlineTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: selectedCategoryIds() }));
+      connectWith(options.createOnlineTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryDropdown.selectedIds() }));
     },
     { signal: controller.signal },
   );
@@ -334,7 +326,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       allowSessionPersistence = false;
       clearStoredSession();
       const playerName = nameInput.value.trim() || "Player";
-      connectWith(createMockMultiplayerTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: selectedCategoryIds() }));
+      connectWith(createMockMultiplayerTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryDropdown.selectedIds() }));
     },
     { signal: controller.signal },
   );

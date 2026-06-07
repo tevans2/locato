@@ -9,6 +9,9 @@ const STREAK_SCORE_CAP = 10;
 const CORRECT_BASE_POINTS = 100;
 const STREAK_BONUS_POINTS = 10;
 
+// Number of distinct hints before the hint button flips to "Reveal answer".
+export const TOTAL_HINTS = 3;
+
 function correctGuessPoints(streak: number): number {
   return CORRECT_BASE_POINTS + Math.min(streak, STREAK_SCORE_CAP) * STREAK_BONUS_POINTS;
 }
@@ -22,7 +25,7 @@ function countNameWords(name: string): number {
 }
 
 function createHint(country: Country, level: number): Hint {
-  const hintLevel = Math.min(level, 2);
+  const hintLevel = Math.min(level, TOTAL_HINTS - 1);
   if (hintLevel === 0) {
     return {
       title: "Country note",
@@ -180,6 +183,22 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
           lastResult: { type: "skipped", countryId: currentCountry.id, message: `Skipped ${category.reveal(currentCountry)}.` },
         };
         events.push({ type: "ROUND_SKIPPED", previousCountryId: currentCountry.id, nextCountryId: state.currentCountryId });
+        completeIfNeeded(events, command.now);
+        return events;
+      }
+
+      if (command.type === "REVEAL_ANSWER") {
+        const guessedCountryIds = new Set(state.guessedCountryIds);
+        guessedCountryIds.add(currentCountry.id);
+        const advanced = advanceToNextCountry({ ...state, guessedCountryIds }, assignments, command.now);
+        state = {
+          ...state,
+          ...advanced,
+          guessedCountryIds,
+          streak: 0,
+          lastResult: { type: "revealed", countryId: currentCountry.id, message: `Answer: ${category.reveal(currentCountry)}.` },
+        };
+        events.push({ type: "ANSWER_REVEALED", countryId: currentCountry.id, nextCountryId: state.currentCountryId });
         completeIfNeeded(events, command.now);
         return events;
       }

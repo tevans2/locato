@@ -1,10 +1,11 @@
 import type { CountryIndex } from "../countries";
 import { createSeededRandom } from "../game/random";
-import { codesCategory, flagsCategory } from "./builtins";
+import { codesCategory, flagsCategory, shapesCategory } from "./builtins";
 import type { PromptCategory, PromptSlot } from "./types";
 
 export const promptCategories = {
   flags: flagsCategory,
+  shapes: shapesCategory,
   codes: codesCategory,
 } as const;
 

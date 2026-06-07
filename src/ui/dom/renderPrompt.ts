@@ -8,6 +8,11 @@ export interface PromptView {
   readonly kicker: HTMLElement;
 }
 
+
+export function promptImageClass(src: string): string {
+  return src.includes("/country-shapes/") ? "flag-image country-shape-image" : "flag-image";
+}
+
 export function createPromptView(): PromptView {
   const imageSlot = el("div", { className: "flag-slot", attrs: { "aria-live": "polite" } });
   const status = el("span", { className: "round-status", text: "Ready" });
@@ -31,7 +36,7 @@ export function updatePromptView(view: PromptView, content: PromptContent | null
   }
 
   if (content.kind === "image") {
-    view.imageSlot.replaceChildren(el("img", { className: "flag-image", attrs: { src: content.value, alt: "Prompt to guess" } }));
+    view.imageSlot.replaceChildren(el("img", { className: promptImageClass(content.value), attrs: { src: content.value, alt: "Prompt to guess" } }));
     return;
   }
 

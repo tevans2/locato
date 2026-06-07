@@ -7,7 +7,7 @@ export interface Hint {
 }
 
 export interface GuessResult {
-  readonly type: "correct" | "wrong" | "skipped" | "hint" | "complete";
+  readonly type: "correct" | "wrong" | "skipped" | "hint" | "revealed" | "complete";
   readonly countryId: CountryId | null;
   readonly message: string;
 }
@@ -58,6 +58,7 @@ export type GameCommand =
   | { readonly type: "REQUEST_HINT"; readonly now: number }
   | { readonly type: "SKIP_ROUND"; readonly now: number }
   | { readonly type: "RESET_GAME"; readonly now: number }
+  | { readonly type: "REVEAL_ANSWER"; readonly now: number }
   | { readonly type: "TICK"; readonly now: number };
 
 export type GameEvent =
@@ -67,7 +68,8 @@ export type GameEvent =
   | { readonly type: "ROUND_SKIPPED"; readonly previousCountryId: CountryId; readonly nextCountryId: CountryId | null }
   | { readonly type: "HINT_REVEALED"; readonly countryId: CountryId; readonly hint: Hint }
   | { readonly type: "GAME_COMPLETED" }
-  | { readonly type: "GAME_RESET" };
+  | { readonly type: "GAME_RESET" }
+  | { readonly type: "ANSWER_REVEALED"; readonly countryId: CountryId; readonly nextCountryId: CountryId | null };
 
 export interface GameStats {
   readonly totalCountries: number;

@@ -10,10 +10,11 @@ const DEMO_RESULT_MS = 2_000;
 
 // A tiny scripted game so the local demo exercises the full arc — rounds, the intermission
 // gap, and the end-of-game leaderboard — without a server.
-// A tiny scripted, category-mixed game: round 1 is a flag, round 2 is an ISO code — proving
-// Flags + Codes interleave in one deck, plus the intermission gap and end-of-game leaderboard.
+// A tiny scripted, category-mixed game: rounds cover flags, country outlines, and ISO codes —
+// proving prompt categories interleave in one deck, plus the intermission gap and leaderboard.
 const DEMO_ROUNDS: ReadonlyArray<{ readonly prompt: PublicPromptContent; readonly answer: string; readonly reveal: string }> = [
   { prompt: { kind: "image", value: "assets/flags/jp.svg" }, answer: "japan", reveal: "Japan" },
+  { prompt: { kind: "image", value: "assets/country-shapes/ca.svg" }, answer: "canada", reveal: "Canada" },
   { prompt: { kind: "text", value: "BR" }, answer: "brazil", reveal: "Brazil (BR)" },
 ];
 
@@ -28,7 +29,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
   let assignedPlayerId = HOST_PLAYER_ID;
   let roundIndex = -1;
   let advanceTimer: ReturnType<typeof setTimeout> | null = null;
-  let room: PublicRoomState = lobbyRoom(["flags", "codes"], "You");
+  let room: PublicRoomState = lobbyRoom(["flags", "shapes", "codes"], "You");
 
   function lobbyRoom(categoryIds: readonly string[], hostName: string): PublicRoomState {
     return {
@@ -125,7 +126,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         room = {
           roomCode: message.roomCode || DEMO_ROOM_CODE,
           hostPlayerId: HOST_PLAYER_ID,
-          categoryIds: ["flags", "codes"],
+          categoryIds: ["flags", "shapes", "codes"],
           status: "lobby",
           players: [createPlayer(HOST_PLAYER_ID, "Host", true), createPlayer("guest", message.playerName, false)],
           round: null,

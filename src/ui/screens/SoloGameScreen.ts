@@ -1,7 +1,8 @@
 import { type Country, type CountryIndex } from "../../core/countries";
 import { allCategories, getCategory } from "../../core/categories";
-import { getCurrentCountry, type GameEngine, type GameEvent, type GameState } from "../../core/game";
+import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { Screen } from "../../app/router";
+import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/renderFeedback";
@@ -53,6 +54,12 @@ function applyEvents(events: readonly GameEvent[], views: SoloViews, index: Coun
       continue;
     }
 
+    if (event.type === "ANSWER_REVEALED") {
+      const country = index.byId[event.countryId];
+      if (country) showFeedback(views.feedback, `Answer: ${country.name}.`, "bad");
+      continue;
+    }
+
     if (event.type === "GAME_COMPLETED") {
       showFeedback(views.feedback, "Complete. Every prompt in this mix has been solved.", "good");
       continue;
@@ -79,36 +86,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
 
-  const categoryOptions = allCategories.map((category) => {
-    const checkbox = el("input", { attrs: { type: "checkbox", value: category.id } });
-    checkbox.checked = options.categoryIds.includes(category.id);
-    const label = el("label", {
-      className: "category-option",
-      attrs: { title: category.description },
-      children: [checkbox, el("span", { text: category.label })],
-    });
-    return { id: category.id, checkbox, label };
-  });
-
-  function selectedCategoryIds(): string[] {
-    return categoryOptions.filter((option) => option.checkbox.checked).map((option) => option.id);
-  }
-
-  for (const option of categoryOptions) {
-    option.checkbox.addEventListener(
-      "change",
-      () => {
-        const selected = selectedCategoryIds();
-        // Always keep at least one category active; revert the box that emptied the set.
-        if (selected.length === 0) {
-          option.checkbox.checked = true;
-          return;
-        }
-        options.onCategoryChange(selected);
-      },
-      { signal: controller.signal },
-    );
-  }
+  const categoryDropdown = createCategoryDropdown({ categories: allCategories, selectedIds: options.categoryIds, signal: controller.signal, onChange: options.onCategoryChange });
 
   const form = el("form", {
     className: "guess-form",
@@ -127,6 +105,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     input.disabled = !playing;
     submitButton.disabled = !playing;
     hintButton.disabled = !playing;
+    hintButton.textContent = state.hintLevel >= TOTAL_HINTS ? "Reveal answer" : "Hint";
     skipButton.disabled = !playing;
     if (persist) options.onStateChange(state);
   }
@@ -157,7 +136,14 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     { signal: controller.signal },
   );
 
-  hintButton.addEventListener("click", () => dispatchAndRender(engine.dispatch({ type: "REQUEST_HINT", now: Date.now() })), { signal: controller.signal });
+  hintButton.addEventListener(
+    "click",
+    () => {
+      const command = engine.getState().hintLevel >= TOTAL_HINTS ? ({ type: "REVEAL_ANSWER", now: Date.now() } as const) : ({ type: "REQUEST_HINT", now: Date.now() } as const);
+      dispatchAndRender(engine.dispatch(command));
+    },
+    { signal: controller.signal },
+  );
   skipButton.addEventListener("click", () => dispatchAndRender(engine.dispatch({ type: "SKIP_ROUND", now: Date.now() })), { signal: controller.signal });
   resetButton.addEventListener(
     "click",
@@ -208,7 +194,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           el("div", {
             className: "mode-controls",
             children: [
-              el("div", { className: "category-row", children: [el("span", { className: "category-row-label", text: "Categories" }), ...categoryOptions.map((option) => option.label)] }),
+              categoryDropdown.element,
               el("div", { className: "mode-select-row", children: [multiplayerButton] }),
             ],
           }),

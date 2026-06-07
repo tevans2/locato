@@ -5,20 +5,136 @@
 }
 
 @media (max-width: 700px) {
-  .app-shell { width: min(100% - 20px, 100%); padding-block: 12px; }
-  .game-header { align-items: stretch; flex-direction: column; }
-  .mode-controls { width: 100%; justify-items: stretch; }
-  .mode-description { text-align: left; }
-  .mode-select-row { justify-content: stretch; flex-direction: column; }
-  .mode-select { width: 100%; }
-  .stats-panel { grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
-  .progress-card { grid-column: 1 / -1; }
-  .atlas-open { width: 100%; min-height: 38px; }
-  .stat-card { justify-content: space-between; }
-  .input-row { grid-template-columns: 1fr auto; }
-  .actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
-  .actions .atlas-shell { margin-left: 0; }
-  button { width: 100%; }
+  /* Mobile: drop the fixed-viewport desktop shell and let the document scroll, so the prompt,
+     input, actions, and scoreboard are never clipped behind the fold or the on-screen keyboard. */
+  html,
+  body {
+    overflow: visible;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+
+  .app-shell {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    display: block;
+    padding: 10px 12px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .game-screen {
+    overflow: visible;
+    min-height: 0;
+    animation: none;
+  }
+
+  .game-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mode-controls {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .category-dropdown {
+    width: 100%;
+  }
+
+  .category-dropdown-menu {
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  .mode-select-row {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  /* Let the prompt and answer panel size to their content; the page scrolls instead of cramming. */
+  .play-layout {
+    flex: 0 0 auto;
+  }
+
+  .flag-card {
+    flex: 0 0 auto;
+  }
+
+  .flag-slot {
+    min-height: clamp(220px, 42dvh, 340px);
+  }
+
+  .stats-panel {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 7px;
+  }
+
+  .progress-card {
+    grid-column: 1 / -1;
+  }
+
+  .stat-card {
+    justify-content: space-between;
+  }
+
+  .input-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+
+  .actions .atlas-shell {
+    margin-left: 0;
+  }
+
+  button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Multiplayer in-game: stack the round + scoreboard panels and let the view grow/scroll. */
+  .multiplayer-layout {
+    overflow: visible;
+  }
+
+  .multiplayer-game-layout {
+    height: auto;
+    overflow: visible;
+    grid-template-rows: auto auto;
+  }
+
+  .multiplayer-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .multiplayer-round-panel,
+  .multiplayer-score-panel {
+    overflow: visible;
+  }
+
+  .multiplayer-flag-slot {
+    min-height: clamp(200px, 36dvh, 300px);
+  }
+
+  .multiplayer-modal {
+    width: 100%;
+    max-height: 88dvh;
+  }
+
+  .atlas-open {
+    width: 100%;
+    min-height: 44px;
+  }
+
   .atlas-drawer {
     top: auto;
     bottom: 0;
@@ -28,7 +144,10 @@
     border-top: 1px solid var(--border-strong);
     transform: translateY(100%);
   }
-  .atlas-shell.open .atlas-drawer { transform: translateY(0); }
+
+  .atlas-shell.open .atlas-drawer {
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

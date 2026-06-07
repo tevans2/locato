@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { indexCountries, type RawCountry } from "../src/core/countries";
-import { createGameEngine, getCurrentCountry } from "../src/core/game";
+import { getCategory } from "../src/core/categories";
+import { createGameEngine, getCurrentCountry, TOTAL_HINTS } from "../src/core/game";
 
 const fixtureCountries = [
   { name: "Japan", code: "JP", aliases: ["Nippon"], continent: "Asia", flagSrc: "assets/flags/jp.svg" },
@@ -143,9 +144,22 @@ describe("game engine", () => {
     expect(events[0]?.type).toBe("GUESS_CORRECT");
   });
 
+  it("plays a country-outline category answered by country name", () => {
+    const countryIndex = indexCountries(fixtureCountries);
+    const engine = createGameEngine({ countryIndex, categoryIds: ["shapes"], seed: "shapes", now: 1000 });
+
+    expect(engine.getState().currentCategoryId).toBe("shapes");
+    const current = getCurrentCountry(countryIndex, engine.getState());
+    const category = getCategory("shapes");
+    expect(category?.prompt(current!).value).toBe(`assets/country-shapes/${current!.code.toLowerCase()}.svg`);
+    const events = engine.dispatch({ type: "SUBMIT_GUESS", value: current!.name, now: 1100 });
+
+    expect(events[0]?.type).toBe("GUESS_CORRECT");
+  });
+
   it("mixes only the selected categories across the deck", () => {
     const countryIndex = indexCountries(fixtureCountries);
-    const engine = createGameEngine({ countryIndex, categoryIds: ["flags", "codes"], seed: "mix", now: 1000 });
+    const engine = createGameEngine({ countryIndex, categoryIds: ["flags", "shapes", "codes"], seed: "mix", now: 1000 });
     const seenCategories = new Set<string>();
 
     while (engine.getState().status === "playing") {
@@ -157,6 +171,22 @@ describe("game engine", () => {
     }
 
     expect(engine.getState().status).toBe("complete");
-    for (const categoryId of seenCategories) expect(["flags", "codes"]).toContain(categoryId);
+    for (const categoryId of seenCategories) expect(["flags", "shapes", "codes"]).toContain(categoryId);
+  });
+
+  it("reveals the answer and resolves the round after all hints are exhausted", () => {
+    const { countryIndex, engine } = createFixtureGame();
+    const current = getCurrentCountry(countryIndex, engine.getState())!;
+    for (let i = 0; i < TOTAL_HINTS; i += 1) engine.dispatch({ type: "REQUEST_HINT", now: 1010 + i });
+    expect(engine.getState().hintLevel).toBe(TOTAL_HINTS);
+
+    const events = engine.dispatch({ type: "REVEAL_ANSWER", now: 1100 });
+    const state = engine.getState();
+
+    expect(events.some((event) => event.type === "ANSWER_REVEALED")).toBe(true);
+    expect(state.guessedCountryIds.has(current.id)).toBe(true);
+    expect(state.correctAnswers).toBe(0);
+    expect(state.streak).toBe(0);
+    expect(state.currentCountryId).not.toBe(current.id);
   });
 });

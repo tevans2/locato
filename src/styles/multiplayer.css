@@ -60,13 +60,14 @@
   margin: 18px 0 16px;
 }
 
-.multiplayer-form-grid input:first-child {
+.multiplayer-form-grid > input:first-child,
+.multiplayer-form-grid .category-dropdown {
   grid-column: 1 / -1;
 }
 
-.multiplayer-form-grid .category-row {
-  grid-column: 1 / -1;
-  justify-content: flex-start;
+.multiplayer-form-grid .category-dropdown {
+  justify-self: stretch;
+  width: 100%;
 }
 
 .room-code-row {

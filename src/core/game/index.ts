@@ -1,4 +1,4 @@
-export { createGameEngine } from "./GameEngine";
+export { createGameEngine, TOTAL_HINTS } from "./GameEngine";
 export { createRandomSeed, createSeededRandom, hashSeed, shuffle } from "./random";
 export { createRoundQueue, restoreRoundQueue, takeNextCountry } from "./roundQueue";
 export { getCurrentCountry, getGameStats, getGuessedCountriesByContinent } from "./selectors";

@@ -11,6 +11,16 @@ export const flagsCategory: PromptCategory = {
   reveal: (country) => country.name,
 };
 
+export const shapesCategory: PromptCategory = {
+  id: "shapes",
+  label: "Country outlines",
+  description: "Name the country from its outline.",
+  eligible: () => true,
+  prompt: (country) => ({ kind: "image", value: `assets/country-shapes/${country.code.toLowerCase()}.svg` }),
+  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, true),
+  reveal: (country) => country.name,
+};
+
 export const codesCategory: PromptCategory = {
   id: "codes",
   label: "Country codes",
