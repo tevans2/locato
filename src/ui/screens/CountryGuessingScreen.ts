@@ -3,7 +3,7 @@ import { detectCountryGuess, type WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
-import { createWorldMapView, updateWorldMapView } from "../dom/renderWorldMap";
+import { createWorldMapView, setWorldMapMissingMarkersVisible, updateWorldMapView } from "../dom/renderWorldMap";
 
 export interface CountryGuessingScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -30,9 +30,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   });
   const submitButton = el("button", { className: "primary-action", text: "Check", attrs: { type: "submit" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
+  const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
   const soloButton = el("button", { className: "ghost-action", text: "Prompt game", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const lastCountryName = el("strong", { text: "None yet" });
+  let showMissingCountries = false;
 
   function complete(): boolean {
     return guessedCountryIds.size >= countryIndex.countries.length;
@@ -43,6 +45,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const finished = complete();
     input.disabled = finished;
     submitButton.disabled = finished;
+    showMissingButton.textContent = showMissingCountries ? "Hide missing" : "Show missing";
+    showMissingButton.setAttribute("aria-pressed", String(showMissingCountries));
+    setWorldMapMissingMarkersVisible(map, showMissingCountries);
   }
 
   function recordGuess(country: Country): void {
@@ -83,6 +88,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     (event) => {
       event.preventDefault();
       checkInput(true);
+    },
+    { signal: controller.signal },
+  );
+  showMissingButton.addEventListener(
+    "click",
+    () => {
+      showMissingCountries = !showMissingCountries;
+      render();
     },
     { signal: controller.signal },
   );
@@ -130,7 +143,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
                 ],
               }),
               feedback.element,
-              el("div", { className: "actions", children: [resetButton] }),
+              el("div", { className: "actions", children: [showMissingButton, resetButton] }),
             ],
           }),
         ],

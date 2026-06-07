@@ -368,6 +368,43 @@
   height: 100%;
   min-height: clamp(300px, calc(100dvh - 310px), 620px);
   display: block;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.world-map-svg.is-panning {
+  cursor: grabbing;
+}
+
+.world-map-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.world-map-control-button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid rgba(232, 226, 211, 0.16);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 8, 6, 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.world-map-control-button:hover,
+.world-map-control-button:focus-visible {
+  border-color: rgba(184, 227, 109, 0.48);
+  background: rgba(184, 227, 109, 0.12);
 }
 
 .world-map-country {
@@ -387,6 +424,31 @@
 .world-map-country-unplayable {
   fill: rgba(232, 226, 211, 0.04);
   stroke: rgba(232, 226, 211, 0.14);
+}
+
+.world-map-marker-layer {
+  pointer-events: none;
+}
+
+.world-map-missing-dot {
+  opacity: 0;
+  fill: #ffffff;
+  stroke: rgba(6, 8, 6, 0.88);
+  stroke-width: 0.85;
+  vector-effect: non-scaling-stroke;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.world-map-panel.show-missing-countries .world-map-missing-dot:not(.is-guessed) {
+  opacity: 0.95;
+}
+
+.world-map-panel.show-missing-countries .world-map-missing-dot:not(.is-guessed):hover {
+  opacity: 1;
+}
+
+.world-map-missing-dot.is-guessed {
+  opacity: 0;
 }
 
 .world-map-meta {
