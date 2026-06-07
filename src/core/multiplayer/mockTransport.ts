@@ -4,6 +4,9 @@ import type { PublicPlayerState, PublicRoomState, PublicRoundState } from "./roo
 const HOST_PLAYER_ID = "host";
 const RIVAL_PLAYER_ID = "rival";
 const DEMO_ROOM_CODE = "PIN42";
+const DEMO_SESSION_TOKEN = "demo-session";
+const DEMO_ROUND_MS = 30_000;
+const DEMO_RESULT_MS = 2_000;
 
 function createPlayer(id: string, name: string, ready: boolean): PublicPlayerState {
   return { id, name, connected: true, ready, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0 };
@@ -21,6 +24,8 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
     status: "lobby",
     players: [createPlayer(HOST_PLAYER_ID, "You", false), createPlayer(RIVAL_PLAYER_ID, "Rival", true)],
     round: null,
+    phaseStartedAt: null,
+    phaseEndsAt: null,
   };
 
   function setStatus(nextStatus: TransportStatus): void {
@@ -34,7 +39,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
 
   function assign(playerId: string): void {
     assignedPlayerId = playerId;
-    emit({ type: "SESSION_ASSIGNED", playerId: assignedPlayerId, roomCode: room.roomCode });
+    emit({ type: "SESSION_ASSIGNED", playerId: assignedPlayerId, roomCode: room.roomCode, sessionToken: DEMO_SESSION_TOKEN });
   }
 
   function emitSnapshot(): void {
@@ -64,6 +69,8 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           status: "lobby",
           players: [createPlayer(HOST_PLAYER_ID, message.playerName, false), createPlayer(RIVAL_PLAYER_ID, "Rival", true)],
           round: null,
+          phaseStartedAt: null,
+          phaseEndsAt: null,
         };
         assign(HOST_PLAYER_ID);
         emitSnapshot();
@@ -79,15 +86,23 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           status: "lobby",
           players: [createPlayer(HOST_PLAYER_ID, "Host", true), createPlayer("guest", message.playerName, false)],
           round: null,
+          phaseStartedAt: null,
+          phaseEndsAt: null,
         };
         assign("guest");
         emitSnapshot();
         return;
       }
 
+      if (message.type === "REJOIN_ROOM") {
+        assign(assignedPlayerId);
+        emitSnapshot();
+        return;
+      }
+
       if (message.type === "LEAVE_ROOM") {
         room = { ...room, players: room.players.filter((player) => player.id !== assignedPlayerId) };
-        emit({ type: "PLAYER_LEFT", playerId: assignedPlayerId });
+        emit({ type: "PLAYER_LEFT", playerId: assignedPlayerId, name: "You" });
         emitSnapshot();
         return;
       }
@@ -99,8 +114,9 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
       }
 
       if (message.type === "START_GAME") {
-        const round: PublicRoundState = { roundNumber: 1, flagSrc: "assets/flags/jp.svg", startedAt: Date.now(), endsAt: Date.now() + 30_000 };
-        room = { ...room, status: "playing", round };
+        const startedAt = Date.now();
+        const round: PublicRoundState = { roundNumber: 1, flagSrc: "assets/flags/jp.svg", startedAt, endsAt: startedAt + DEMO_ROUND_MS };
+        room = { ...room, status: "playing", round, phaseStartedAt: startedAt, phaseEndsAt: round.endsAt };
         emit({ type: "GAME_STARTED", round });
         emitSnapshot();
         return;
@@ -110,19 +126,19 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         if (message.answer.trim().toLowerCase() !== "japan") {
           updateAssignedPlayer((player) => ({ ...player, wrongAnswers: player.wrongAnswers + 1, streak: 0 }));
           emit({ type: "ANSWER_REJECTED", reason: "Not quite. Try again before the round ends." });
-          emitSnapshot();
           return;
         }
 
         const points = 120;
+        const closedAt = Date.now();
         updateAssignedPlayer((player) => ({ ...player, score: player.score + points, streak: player.streak + 1, correctAnswers: player.correctAnswers + 1 }));
-        room = { ...room, status: "round-result" };
+        room = { ...room, status: "round-result", phaseStartedAt: closedAt, phaseEndsAt: closedAt + DEMO_RESULT_MS };
         emit({ type: "ANSWER_ACCEPTED", playerId: assignedPlayerId, points });
         emit({
           type: "ROUND_ENDED",
           countryCode: "JP",
           countryName: "Japan",
-          results: room.players.map((player) => ({ playerId: player.id, correct: player.id === assignedPlayerId, points: player.id === assignedPlayerId ? points : 0, answeredAt: player.id === assignedPlayerId ? Date.now() : null })),
+          results: room.players.map((player) => ({ playerId: player.id, correct: player.id === assignedPlayerId, points: player.id === assignedPlayerId ? points : 0, answeredAt: player.id === assignedPlayerId ? closedAt : null })),
         });
         emitSnapshot();
       }

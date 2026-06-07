@@ -11,6 +11,44 @@ export interface MultiplayerLobbyScreenOptions {
   readonly onBackToSolo: () => void;
 }
 
+// Ephemeral reconnect credentials. Kept in sessionStorage so a page reload or a dropped socket
+// can reclaim the same server-side player slot (and score) instead of spawning a new identity.
+const SESSION_STORAGE_KEY = "locato.mp.session";
+
+interface StoredSession {
+  readonly roomCode: string;
+  readonly playerId: string;
+  readonly sessionToken: string;
+}
+
+function readStoredSession(): StoredSession | null {
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredSession>;
+    if (typeof parsed.roomCode !== "string" || typeof parsed.playerId !== "string" || typeof parsed.sessionToken !== "string") return null;
+    return { roomCode: parsed.roomCode, playerId: parsed.playerId, sessionToken: parsed.sessionToken };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(session: StoredSession): void {
+  try {
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Storage may be unavailable (private mode); reconnect simply degrades to a fresh join.
+  }
+}
+
+function clearStoredSession(): void {
+  try {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore: nothing actionable if storage is unavailable.
+  }
+}
+
 interface RoundReveal {
   readonly countryCode: string;
   readonly countryName: string;
@@ -62,6 +100,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   let activeRound: PublicRoundState | null = null;
   let roundReveal: RoundReveal | null = null;
   let finalResults: readonly FinalResult[] | null = null;
+  let sessionToken: string | null = null;
+  let joinedRoomCode: string | null = null;
+  // Only online create/join flows are worth persisting; the local demo must never leave a
+  // ghost session that a reload would try to rejoin against the real server.
+  let allowSessionPersistence = false;
   let feedback = "Create a room, join with a code, or try the local demo transport.";
 
   const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: "Player" } });
@@ -79,6 +122,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const createButton = el("button", { className: "primary-action", text: "Create online room", attrs: { type: "button" } });
   const joinButton = el("button", { className: "secondary-action", text: "Join online room", attrs: { type: "button" } });
   const demoButton = el("button", { className: "ghost-action", text: "Try local demo", attrs: { type: "button" } });
+  const copyButton = el("button", { className: "ghost-action copy-code", text: "Copy code", attrs: { type: "button" } });
   const backButton = el("button", { className: "ghost-action", text: "Back to solo", attrs: { type: "button" } });
 
   const setupPanel = el("section", {
@@ -96,7 +140,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     className: "multiplayer-card lobby-panel",
     children: [
       el("p", { className: "eyebrow", text: "ROOM" }),
-      el("div", { className: "room-code-row", children: [el("span", { text: "Code" }), roomCode] }),
+      el("div", { className: "room-code-row", children: [el("span", { text: "Code" }), roomCode, copyButton] }),
       playerList,
       el("div", { className: "actions", children: [readyButton, startButton, leaveButton] }),
     ],
@@ -115,12 +159,26 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     transport = null;
   }
 
+  function playerName(playerId: string): string {
+    return room?.players.find((player) => player.id === playerId)?.name ?? "A player";
+  }
+
+  function resetMultiplayerState(): void {
+    room = null;
+    activeRound = null;
+    roundReveal = null;
+    finalResults = null;
+    localPlayerId = null;
+    sessionToken = null;
+    joinedRoomCode = null;
+  }
+
   function render(): void {
     statusText.textContent = `${status}: ${feedback}`;
     const hasRoom = room !== null;
     setupPanel.hidden = hasRoom;
-    lobbyPanel.hidden = !hasRoom || (room?.status !== "lobby" && room?.status !== "countdown");
-    gameView.element.hidden = !hasRoom || room?.status === "lobby" || room?.status === "countdown";
+    lobbyPanel.hidden = !hasRoom || room?.status !== "lobby";
+    gameView.element.hidden = !hasRoom || room?.status === "lobby";
 
     if (!room) return;
 
@@ -133,13 +191,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
     const canSubmit = room.status === "playing" && status === "connected";
     gameView.update({ room, localPlayerId, round: activeRound, roundResult: roundReveal, finalResults, feedback, canSubmit });
-    if (canSubmit) gameView.answerInput.focus();
   }
 
   function handleMessage(message: ServerMessage): void {
     switch (message.type) {
       case "SESSION_ASSIGNED":
         localPlayerId = message.playerId;
+        sessionToken = message.sessionToken;
+        joinedRoomCode = message.roomCode;
+        if (allowSessionPersistence) writeStoredSession({ roomCode: message.roomCode, playerId: message.playerId, sessionToken: message.sessionToken });
         feedback = `Connected to room ${message.roomCode}.`;
         break;
       case "ROOM_SNAPSHOT":
@@ -155,15 +215,17 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         feedback = `Round ${message.round.roundNumber} is live.`;
         break;
       case "ANSWER_ACCEPTED":
-        feedback = message.playerId === localPlayerId ? `Answer accepted for ${message.points} points.` : "Another player found the country.";
+        feedback = message.playerId === localPlayerId ? `You took the round for ${message.points} points.` : `${playerName(message.playerId)} took the round.`;
         break;
       case "ANSWER_REJECTED":
         feedback = message.reason;
         break;
-      case "ROUND_ENDED":
+      case "ROUND_ENDED": {
         roundReveal = { countryCode: message.countryCode, countryName: message.countryName, results: message.results };
-        feedback = `Round ended: ${message.countryName}.`;
+        const winner = message.results.find((result) => result.correct);
+        feedback = winner ? `${message.countryName} — ${playerName(winner.playerId)} took it.` : `${message.countryName} — nobody got it.`;
         break;
+      }
       case "GAME_COMPLETED":
         finalResults = message.results;
         feedback = "Game complete.";
@@ -172,10 +234,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         feedback = `${message.player.name} joined.`;
         break;
       case "PLAYER_LEFT":
-        feedback = `Player ${message.playerId} left.`;
+        feedback = `${message.name} left.`;
         break;
       case "ERROR":
         feedback = message.message;
+        // A failed (re)join must drop us back to setup instead of looping against a dead seat.
+        if (message.code === "session-expired" || message.code === "room-not-found") {
+          clearStoredSession();
+          resetMultiplayerState();
+        }
         break;
     }
     render();
@@ -187,6 +254,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     cleanupMessageHandler = nextTransport.onMessage(handleMessage);
     cleanupStatusHandler = nextTransport.onStatusChange((nextStatus) => {
       status = nextStatus;
+      // A reconnect lands here with credentials already in hand: reclaim the seat automatically.
+      // The initial connect has no token yet, so the create/join path is left untouched.
+      if (nextStatus === "connected" && sessionToken && joinedRoomCode && localPlayerId) {
+        nextTransport.send({ type: "REJOIN_ROOM", roomCode: joinedRoomCode, playerId: localPlayerId, sessionToken });
+      }
       render();
     });
   }
@@ -202,6 +274,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   createButton.addEventListener(
     "click",
     () => {
+      allowSessionPersistence = true;
       const playerName = nameInput.value.trim() || "Player";
       connectWith(options.createOnlineTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, modeId: modeSelect.value }));
     },
@@ -211,6 +284,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   joinButton.addEventListener(
     "click",
     () => {
+      allowSessionPersistence = true;
       const playerName = nameInput.value.trim() || "Player";
       const roomCodeValue = joinCodeInput.value.trim();
       if (!roomCodeValue) {
@@ -226,8 +300,35 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   demoButton.addEventListener(
     "click",
     () => {
+      allowSessionPersistence = false;
+      clearStoredSession();
       const playerName = nameInput.value.trim() || "Player";
       connectWith(createMockMultiplayerTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, modeId: modeSelect.value }));
+    },
+    { signal: controller.signal },
+  );
+
+  copyButton.addEventListener(
+    "click",
+    () => {
+      const code = room?.roomCode;
+      if (!code) return;
+      const clipboard = navigator.clipboard;
+      if (!clipboard) {
+        feedback = "Clipboard unavailable — copy the code manually.";
+        render();
+        return;
+      }
+      void clipboard.writeText(code).then(
+        () => {
+          feedback = "Room code copied.";
+          render();
+        },
+        () => {
+          feedback = "Copy failed — copy the code manually.";
+          render();
+        },
+      );
     },
     { signal: controller.signal },
   );
@@ -247,11 +348,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     () => {
       transport?.send({ type: "LEAVE_ROOM" });
       disconnectCurrentTransport();
-      localPlayerId = null;
-      room = null;
-      activeRound = null;
-      roundReveal = null;
-      finalResults = null;
+      clearStoredSession();
+      resetMultiplayerState();
+      allowSessionPersistence = false;
       status = "idle";
       feedback = "Left the room.";
       render();
@@ -262,6 +361,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     "click",
     () => {
       disconnectCurrentTransport();
+      clearStoredSession();
       options.onBackToSolo();
     },
     { signal: controller.signal },
@@ -276,6 +376,17 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     ],
   });
 
+  const storedSession = readStoredSession();
+  if (storedSession) {
+    allowSessionPersistence = true;
+    localPlayerId = storedSession.playerId;
+    sessionToken = storedSession.sessionToken;
+    joinedRoomCode = storedSession.roomCode;
+    feedback = `Reconnecting to room ${storedSession.roomCode}…`;
+    // bindTransport's status handler fires REJOIN_ROOM the moment the socket opens.
+    connectWith(options.createOnlineTransport(), () => {});
+  }
+
   render();
 
   return {
@@ -283,6 +394,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     destroy: () => {
       controller.abort();
       disconnectCurrentTransport();
+      gameView.destroy();
     },
   };
 }

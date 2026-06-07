@@ -66,10 +66,17 @@
 
 .room-code-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: end;
   gap: 18px;
   margin-bottom: 16px;
+}
+
+.copy-code {
+  align-self: center;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  padding: 6px 12px;
 }
 
 .room-code-row > span {
@@ -190,6 +197,28 @@
   font-size: clamp(1.15rem, 2.4vw, 1.8rem);
   line-height: 1.18;
   text-align: center;
+}
+
+/* Round/intermission countdown. Driven by requestAnimationFrame from the game view; width is set
+   imperatively via scaleX so there is no CSS transition to lag behind the live deadline. */
+.multiplayer-timer {
+  height: 5px;
+  width: 100%;
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.multiplayer-timer-fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  transform: scaleX(1);
+  background: linear-gradient(90deg, var(--accent), var(--earth));
+}
+
+.multiplayer-timer.is-intermission .multiplayer-timer-fill {
+  background: linear-gradient(90deg, var(--subtle), var(--muted));
 }
 
 .multiplayer-round-panel,

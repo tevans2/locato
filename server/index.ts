@@ -7,7 +7,9 @@ import { RoomManager } from "./rooms/RoomManager";
 interface WebSocketData {}
 
 const DEFAULT_PORT = 3000;
-const CLEANUP_INTERVAL_MS = 5_000;
+// Drives round timeouts and result→next-round transitions, so it must tick well under one
+// second to keep pacing tight; it also doubles as the room TTL/cleanup pass.
+const TICK_INTERVAL_MS = 250;
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(SERVER_DIR, "..");
 const DIST_DIR = resolve(PROJECT_ROOT, "dist");
@@ -79,7 +81,7 @@ const roomManager = new RoomManager({
 });
 const origins = allowedOrigins();
 
-setInterval(() => roomManager.sweep(Date.now()), CLEANUP_INTERVAL_MS).unref?.();
+setInterval(() => roomManager.sweep(Date.now()), TICK_INTERVAL_MS).unref?.();
 
 const server = Bun.serve<WebSocketData>({
   port: readIntegerEnv("PORT", DEFAULT_PORT),

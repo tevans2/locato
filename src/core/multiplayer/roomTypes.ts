@@ -23,9 +23,14 @@ export interface PublicRoomState {
   readonly roomCode: RoomCode;
   readonly hostPlayerId: PlayerId;
   readonly modeId: string;
-  readonly status: "lobby" | "countdown" | "playing" | "round-result" | "complete";
+  readonly status: "lobby" | "playing" | "round-result" | "complete";
   readonly players: readonly PublicPlayerState[];
   readonly round: PublicRoundState | null;
+  // Start/end of the current time-boxed phase, in server epoch ms. During "playing"
+  // this tracks the live round deadline; during "round-result" it tracks the gap until
+  // the next round. Null when the phase has no deadline (lobby/complete/untimed round).
+  readonly phaseStartedAt: number | null;
+  readonly phaseEndsAt: number | null;
 }
 
 export interface RoundResult {

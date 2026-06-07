@@ -21,6 +21,7 @@ export interface RoomOptions {
   readonly maxPlayers?: number;
   readonly roundLimit?: number;
   readonly roundDurationMs?: number;
+  readonly resultDisplayMs?: number;
 }
 
 interface PrivatePlayerState extends PublicPlayerState {}
@@ -33,11 +34,11 @@ interface PrivateRoundState {
 }
 
 export type RoomResult =
-  | { readonly ok: true; readonly messages: readonly ServerMessage[] }
+  | { readonly ok: true; readonly messages: readonly ServerMessage[]; readonly reply?: readonly ServerMessage[] }
   | { readonly ok: false; readonly code: string; readonly message: string; readonly messages?: readonly ServerMessage[] };
 
-function ok(messages: readonly ServerMessage[] = []): RoomResult {
-  return { ok: true, messages };
+function ok(messages: readonly ServerMessage[] = [], reply: readonly ServerMessage[] = []): RoomResult {
+  return reply.length > 0 ? { ok: true, messages, reply } : { ok: true, messages };
 }
 
 function fail(code: string, message: string, messages: readonly ServerMessage[] = []): RoomResult {
@@ -66,6 +67,7 @@ export class Room {
   readonly maxPlayers: number;
   readonly roundLimit: number;
   readonly roundDurationMs: number;
+  readonly resultDisplayMs: number;
   readonly countryIndex: CountryIndex;
 
   private hostPlayerId: PlayerId;
@@ -75,6 +77,8 @@ export class Room {
   private currentRound: PrivateRoundState | null = null;
   private roundAnswers = new Map<PlayerId, RoundResult>();
   private completedRounds = 0;
+  private resultStartedAt: number | null = null;
+  private resultEndsAt: number | null = null;
   private touchedAt: number;
 
   constructor(options: RoomOptions) {
@@ -84,6 +88,7 @@ export class Room {
     this.maxPlayers = options.maxPlayers ?? DEFAULT_MAX_PLAYERS_PER_ROOM;
     this.roundLimit = Math.min(options.roundLimit ?? DEFAULT_MULTIPLAYER_ROUND_LIMIT, this.mode.createCountryPool(options.countryIndex.countries).length);
     this.roundDurationMs = options.roundDurationMs ?? DEFAULT_ROUND_DURATION_MS;
+    this.resultDisplayMs = options.resultDisplayMs ?? DEFAULT_RESULT_DISPLAY_MS;
     this.countryIndex = options.countryIndex;
     this.hostPlayerId = options.hostPlayerId;
     const pool = this.mode.createCountryPool(options.countryIndex.countries);
@@ -108,6 +113,21 @@ export class Room {
     return this.status;
   }
 
+  // Epoch ms when the current auto-advancing phase ends: the round deadline while
+  // "playing", the result-display deadline while "round-result", null otherwise.
+  // Doubles as the public phaseEndsAt and the RoomManager's transition trigger.
+  get pendingTransitionAt(): number | null {
+    if (this.status === "playing") return this.currentRound?.endsAt ?? null;
+    if (this.status === "round-result") return this.resultEndsAt;
+    return null;
+  }
+
+  private get phaseStartedAt(): number | null {
+    if (this.status === "playing") return this.currentRound?.startedAt ?? null;
+    if (this.status === "round-result") return this.resultStartedAt;
+    return null;
+  }
+
   snapshot(): PublicRoomState {
     return {
       roomCode: this.code,
@@ -116,6 +136,8 @@ export class Room {
       status: this.status,
       players: [...this.players.values()].map(toPublicPlayer),
       round: this.publicRound,
+      phaseStartedAt: this.phaseStartedAt,
+      phaseEndsAt: this.pendingTransitionAt,
     };
   }
 
@@ -136,10 +158,19 @@ export class Room {
 
   removePlayer(playerId: PlayerId, now: number): RoomResult {
     this.touch(now);
-    if (!this.players.has(playerId)) return fail("not-in-room", "Player is not in this room.");
+    const player = this.players.get(playerId);
+    if (!player) return fail("not-in-room", "Player is not in this room.");
     this.players.delete(playerId);
     this.transferHostIfNeeded();
-    return ok([{ type: "PLAYER_LEFT", playerId }, this.snapshotMessage()]);
+    return ok([{ type: "PLAYER_LEFT", playerId, name: player.name }, this.snapshotMessage()]);
+  }
+
+  reconnectPlayer(playerId: PlayerId, now: number): RoomResult {
+    this.touch(now);
+    const player = this.players.get(playerId);
+    if (!player) return fail("session-expired", "Your seat in this room is no longer available.");
+    this.players.set(playerId, { ...player, connected: true });
+    return ok([this.snapshotMessage()]);
   }
 
   disconnectPlayer(playerId: PlayerId, now: number): RoomResult {
@@ -186,25 +217,24 @@ export class Room {
       const updatedPlayer = { ...player, wrongAnswers: player.wrongAnswers + 1, streak: 0 };
       this.players.set(playerId, updatedPlayer);
       if (!this.roundAnswers.has(playerId)) this.roundAnswers.set(playerId, { playerId, correct: false, points: 0, answeredAt: now });
-      return ok([{ type: "ANSWER_REJECTED", reason: "Not quite. Try again before the round ends." }, this.snapshotMessage()]);
+      // Rejection is private to the guesser: broadcasting it would flash "Not quite" on every
+      // screen. No state other than this player's private streak/wrong tally changes, so there
+      // is nothing to broadcast either.
+      return ok([], [{ type: "ANSWER_REJECTED", reason: "Not quite. Try again before the round ends." }]);
     }
 
     const points = this.calculatePoints(player, now);
     const updatedPlayer = { ...player, score: player.score + points, streak: player.streak + 1, correctAnswers: player.correctAnswers + 1 };
     this.players.set(playerId, updatedPlayer);
     this.roundAnswers.set(playerId, { playerId, correct: true, points, answeredAt: now });
-    this.status = "round-result";
-    this.completedRounds += 1;
-
-    return ok([{ type: "ANSWER_ACCEPTED", playerId, points }, this.roundEndedMessage(), this.snapshotMessage()]);
+    // First correct answer takes the round and the points; the round closes immediately.
+    return ok([{ type: "ANSWER_ACCEPTED", playerId, points }, ...this.closeRound(now)]);
   }
 
   endRound(now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round can be ended.");
-    this.status = "round-result";
-    this.completedRounds += 1;
-    return ok([this.roundEndedMessage(), this.snapshotMessage()]);
+    return ok(this.closeRound(now));
   }
 
   advanceAfterResult(now: number): RoomResult {
@@ -243,6 +273,8 @@ export class Room {
     }
 
     this.roundAnswers = new Map();
+    this.resultStartedAt = null;
+    this.resultEndsAt = null;
     this.status = "playing";
     this.currentRound = {
       roundNumber: this.completedRounds + 1,
@@ -256,6 +288,18 @@ export class Room {
   private calculatePoints(player: PrivatePlayerState, now: number): number {
     const timeBonus = this.currentRound?.endsAt ? Math.max(0, Math.ceil((this.currentRound.endsAt - now) / 1000)) : 0;
     return 100 + Math.min(player.streak, 10) * 10 + timeBonus;
+  }
+
+  // Closes the live round into the result-reveal phase. Reads the reveal/results while the
+  // round state is still intact, then arms the result-display deadline the RoomManager uses
+  // to schedule the next round.
+  private closeRound(now: number): readonly ServerMessage[] {
+    const reveal = this.roundEndedMessage();
+    this.status = "round-result";
+    this.completedRounds += 1;
+    this.resultStartedAt = now;
+    this.resultEndsAt = this.resultDisplayMs > 0 ? now + this.resultDisplayMs : now;
+    return [reveal, this.snapshotMessage()];
   }
 
   private roundResults(): readonly RoundResult[] {
@@ -273,6 +317,8 @@ export class Room {
     this.touch(now);
     this.status = "complete";
     this.currentRound = null;
+    this.resultStartedAt = null;
+    this.resultEndsAt = null;
     return ok([{ type: "GAME_COMPLETED", results: this.finalResults() }, this.snapshotMessage()]);
   }
 }

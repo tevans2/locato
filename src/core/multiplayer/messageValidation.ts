@@ -65,6 +65,12 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isNonEmptyString(value.playerName, MAX_PLAYER_NAME_LENGTH)) return reject("invalid-player-name", "Player name is required.");
       return { ok: true, message: { type: "JOIN_ROOM", roomCode: normalizeRoomCode(value.roomCode), playerName: normalizePlayerName(value.playerName) } };
     }
+    case "REJOIN_ROOM": {
+      if (!isNonEmptyString(value.roomCode, MAX_ROOM_CODE_LENGTH)) return reject("invalid-room-code", "Room code is required.");
+      if (!isNonEmptyString(value.playerId, 64)) return reject("invalid-session", "Player id is required.");
+      if (!isNonEmptyString(value.sessionToken, 128)) return reject("invalid-session", "Session token is required.");
+      return { ok: true, message: { type: "REJOIN_ROOM", roomCode: normalizeRoomCode(value.roomCode), playerId: value.playerId, sessionToken: value.sessionToken } };
+    }
     case "LEAVE_ROOM":
       return { ok: true, message: { type: "LEAVE_ROOM" } };
     case "SET_READY":
@@ -114,10 +120,12 @@ function isRoom(value: unknown): value is PublicRoomState {
     typeof value.roomCode === "string" &&
     typeof value.hostPlayerId === "string" &&
     typeof value.modeId === "string" &&
-    (value.status === "lobby" || value.status === "countdown" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
+    (value.status === "lobby" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&
-    (value.round === null || isRound(value.round))
+    (value.round === null || isRound(value.round)) &&
+    (value.phaseStartedAt === null || isFiniteNumber(value.phaseStartedAt)) &&
+    (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt))
   );
 }
 
@@ -134,8 +142,8 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
 
   switch (value.type) {
     case "SESSION_ASSIGNED":
-      if (typeof value.playerId !== "string" || typeof value.roomCode !== "string") return reject("invalid-session", "Session assignment is invalid.");
-      return { ok: true, message: { type: "SESSION_ASSIGNED", playerId: value.playerId, roomCode: value.roomCode } };
+      if (typeof value.playerId !== "string" || typeof value.roomCode !== "string" || typeof value.sessionToken !== "string") return reject("invalid-session", "Session assignment is invalid.");
+      return { ok: true, message: { type: "SESSION_ASSIGNED", playerId: value.playerId, roomCode: value.roomCode, sessionToken: value.sessionToken } };
     case "ROOM_SNAPSHOT":
       if (!isRoom(value.room)) return reject("invalid-room", "Room snapshot is invalid.");
       return { ok: true, message: { type: "ROOM_SNAPSHOT", room: value.room } };
@@ -143,8 +151,8 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
       if (!isPlayer(value.player)) return reject("invalid-player", "Joined player is invalid.");
       return { ok: true, message: { type: "PLAYER_JOINED", player: value.player } };
     case "PLAYER_LEFT":
-      if (typeof value.playerId !== "string") return reject("invalid-player", "Player id is invalid.");
-      return { ok: true, message: { type: "PLAYER_LEFT", playerId: value.playerId } };
+      if (typeof value.playerId !== "string" || typeof value.name !== "string") return reject("invalid-player", "Player id is invalid.");
+      return { ok: true, message: { type: "PLAYER_LEFT", playerId: value.playerId, name: value.name } };
     case "GAME_STARTED":
     case "ROUND_STARTED":
       if (!isRound(value.round)) return reject("invalid-round", "Round state is invalid.");

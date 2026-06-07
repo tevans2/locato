@@ -16,6 +16,7 @@ export interface MultiplayerGameView {
   readonly answerInput: HTMLInputElement;
   readonly submitButton: HTMLButtonElement;
   readonly update: (state: MultiplayerGameViewState) => void;
+  readonly destroy: () => void;
 }
 
 function formatScore(value: number): string {
@@ -64,6 +65,8 @@ function createFinalRows(room: PublicRoomState, results: readonly FinalResult[])
 export function createMultiplayerGameView(onSubmit: (answer: string) => void): MultiplayerGameView {
   const flagSlot = el("div", { className: "multiplayer-flag-slot" });
   const roundKicker = el("p", { className: "round-kicker", text: "Waiting for the next round" });
+  const timerFill = el("div", { className: "multiplayer-timer-fill" });
+  const timerBar = el("div", { className: "multiplayer-timer", attrs: { role: "presentation" }, children: [timerFill] });
   const roundTitle = el("h2", { text: "Multiplayer round" });
   const feedback = el("p", { className: "multiplayer-feedback", text: "Submit answers before the server closes the round." });
   const resultList = el("ul", { className: "result-list" });
@@ -78,6 +81,42 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
   });
 
   let renderedRoundKey: string | null = null;
+  let focusedRoundKey: string | null = null;
+  let phaseStartedAt: number | null = null;
+  let phaseEndsAt: number | null = null;
+  let rafId: number | null = null;
+
+  // The bar is driven by its own animation frame, not by server messages, so it drains smoothly
+  // between snapshots. The server stays authoritative; the bar only clamps to [0,1] to stay sane
+  // under client/server clock skew.
+  function renderTimer(): void {
+    if (phaseStartedAt === null || phaseEndsAt === null || phaseEndsAt <= phaseStartedAt) {
+      timerBar.hidden = true;
+      return;
+    }
+    timerBar.hidden = false;
+    const total = phaseEndsAt - phaseStartedAt;
+    const remaining = phaseEndsAt - Date.now();
+    const fraction = Math.max(0, Math.min(1, remaining / total));
+    timerFill.style.transform = `scaleX(${fraction})`;
+  }
+
+  function ensureTimerLoop(): void {
+    if (rafId !== null) return;
+    const loop = (): void => {
+      renderTimer();
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function stopTimerLoop(): void {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    timerBar.hidden = true;
+  }
 
   answerForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -92,7 +131,7 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     children: [
       el("section", {
         className: "flag-card multiplayer-flag-card",
-        children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot],
+        children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot, timerBar],
       }),
       el("div", {
         className: "multiplayer-bottom-grid",
@@ -117,18 +156,45 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     update: (state) => {
       const visibleRound = state.round ?? state.room.round;
       const roundKey = visibleRound ? `${state.room.roomCode}:${visibleRound.roundNumber}:${visibleRound.startedAt}:${visibleRound.flagSrc}` : null;
-      if (roundKey && roundKey !== renderedRoundKey) answerInput.value = "";
+      const isNewRound = roundKey !== null && roundKey !== renderedRoundKey;
+      if (isNewRound) answerInput.value = "";
       renderedRoundKey = roundKey;
-      roundKicker.textContent = visibleRound ? `Round ${visibleRound.roundNumber}` : "Waiting for the next round";
+
+      const intermission = state.room.status === "round-result";
+      roundKicker.textContent = state.room.status === "complete"
+        ? "Final results"
+        : intermission
+          ? "Next round starting…"
+          : visibleRound
+            ? `Round ${visibleRound.roundNumber}`
+            : "Waiting for the next round";
       roundTitle.textContent = state.room.status === "complete" ? "Game complete" : "Your answer";
       feedback.textContent = state.feedback;
       answerInput.disabled = !state.canSubmit;
       submitButton.disabled = !state.canSubmit;
+      // Focus the first time a round becomes submittable, not on round identity alone: the
+      // ROUND_STARTED/GAME_STARTED frame arrives while status is still round-result/lobby
+      // (canSubmit false), and the playing snapshot follows separately. Keying focus off
+      // canSubmit handles that split, and once-per-round avoids stealing the caret mid-type.
+      if (state.canSubmit && roundKey !== null && roundKey !== focusedRoundKey) {
+        answerInput.focus();
+        focusedRoundKey = roundKey;
+      }
 
       if (visibleRound) {
         flagSlot.replaceChildren(el("img", { className: "flag-image", attrs: { src: visibleRound.flagSrc, alt: "Flag to guess" } }));
       } else {
         flagSlot.replaceChildren(el("div", { className: "complete-card", text: "The server will reveal the next flag when the room starts." }));
+      }
+
+      phaseStartedAt = state.room.phaseStartedAt;
+      phaseEndsAt = state.room.phaseEndsAt;
+      timerBar.classList.toggle("is-intermission", intermission);
+      if ((state.room.status === "playing" || intermission) && phaseEndsAt !== null) {
+        renderTimer();
+        ensureTimerLoop();
+      } else {
+        stopTimerLoop();
       }
 
       if (state.finalResults) resultList.replaceChildren(...createFinalRows(state.room, state.finalResults));
@@ -141,5 +207,6 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
 
       scoreList.replaceChildren(...createScoreRows(state.room, state.localPlayerId));
     },
+    destroy: stopTimerLoop,
   };
 }

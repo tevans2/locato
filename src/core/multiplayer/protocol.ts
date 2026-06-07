@@ -3,6 +3,7 @@ import type { FinalResult, PublicPlayerState, PublicRoomState, PublicRoundState,
 export type ClientMessage =
   | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly modeId: string }
   | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string }
+  | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
   | { readonly type: "LEAVE_ROOM" }
   | { readonly type: "SET_READY"; readonly ready: boolean }
   | { readonly type: "START_GAME" }
@@ -10,10 +11,10 @@ export type ClientMessage =
   | { readonly type: "REQUEST_HINT" };
 
 export type ServerMessage =
-  | { readonly type: "SESSION_ASSIGNED"; readonly playerId: string; readonly roomCode: string }
+  | { readonly type: "SESSION_ASSIGNED"; readonly playerId: string; readonly roomCode: string; readonly sessionToken: string }
   | { readonly type: "ROOM_SNAPSHOT"; readonly room: PublicRoomState }
   | { readonly type: "PLAYER_JOINED"; readonly player: PublicPlayerState }
-  | { readonly type: "PLAYER_LEFT"; readonly playerId: string }
+  | { readonly type: "PLAYER_LEFT"; readonly playerId: string; readonly name: string }
   | { readonly type: "GAME_STARTED"; readonly round: PublicRoundState }
   | { readonly type: "ROUND_STARTED"; readonly round: PublicRoundState }
   | { readonly type: "ANSWER_ACCEPTED"; readonly playerId: string; readonly points: number }

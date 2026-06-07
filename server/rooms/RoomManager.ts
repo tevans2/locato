@@ -12,6 +12,7 @@ export interface MultiplayerConnection {
 export interface PlayerSession {
   readonly playerId: string;
   readonly roomCode: RoomCode;
+  readonly sessionToken: string;
   readonly answerWindowStartedAt: number;
   readonly answerCount: number;
 }
@@ -79,6 +80,9 @@ export class RoomManager {
   private readonly rooms = new Map<RoomCode, Room>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
   private readonly connectionByPlayerId = new Map<string, MultiplayerConnection>();
+  // Survives disconnects so a reconnecting client can reclaim its player slot/score within the
+  // empty-room TTL window. Keyed by the opaque token handed out in SESSION_ASSIGNED.
+  private readonly sessionsByToken = new Map<string, { readonly playerId: string; readonly roomCode: RoomCode }>();
 
   constructor(options: RoomManagerOptions = {}) {
     this.countryIndex = options.countryIndex ?? defaultCountryIndex();
@@ -103,9 +107,9 @@ export class RoomManager {
     this.sessionByConnection.delete(connection);
     const room = this.rooms.get(session.roomCode);
     if (room) {
-      const result = room.disconnectPlayer(session.playerId, now);
-      this.broadcastResult(room, result);
-      if (room.isEmpty) this.rooms.delete(room.code);
+      // Keep the room and the token alive: a dropped connection may be a brief blip, and the
+      // player can REJOIN_ROOM to reclaim their slot. Empty rooms are reaped by the TTL sweep.
+      this.broadcastResult(room, room.disconnectPlayer(session.playerId, now));
     }
   }
 
@@ -129,13 +133,12 @@ export class RoomManager {
 
   sweep(now = Date.now()): void {
     for (const room of this.rooms.values()) {
-      const round = room.publicRound;
-      if (room.state === "playing" && round?.endsAt !== null && round?.endsAt !== undefined && round.endsAt <= now) {
-        this.broadcastResult(room, room.endRound(now));
-      }
-
-      if (room.state === "round-result" && room.updatedAt + this.resultDisplayMs <= now) {
-        this.broadcastResult(room, room.advanceAfterResult(now));
+      // A single deadline drives both the round timeout and the result-display gap, so a fast
+      // tick lands transitions within the tick interval instead of the old multi-second jitter.
+      const dueAt = room.pendingTransitionAt;
+      if (dueAt !== null && dueAt <= now) {
+        if (room.state === "playing") this.broadcastResult(room, room.endRound(now));
+        else if (room.state === "round-result") this.broadcastResult(room, room.advanceAfterResult(now));
       }
 
       const ttl = room.isEmpty ? this.emptyRoomTtlMs : this.roomTtlMs;
@@ -150,6 +153,9 @@ export class RoomManager {
         return;
       case "JOIN_ROOM":
         this.joinRoom(connection, message.roomCode, message.playerName, now);
+        return;
+      case "REJOIN_ROOM":
+        this.rejoinRoom(connection, message.roomCode, message.playerId, message.sessionToken, now);
         return;
       case "LEAVE_ROOM":
         this.leaveRoom(connection, now);
@@ -203,10 +209,12 @@ export class RoomManager {
       seed: createId("seed"),
       now,
       maxPlayers: this.maxPlayersPerRoom,
+      resultDisplayMs: this.resultDisplayMs,
     });
     this.rooms.set(roomCode, room);
-    this.assignSession(connection, { playerId, roomCode, answerWindowStartedAt: now, answerCount: 0 });
-    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode });
+    const sessionToken = this.issueToken(playerId, roomCode);
+    this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
+    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
     send(connection, { type: "ROOM_SNAPSHOT", room: room.snapshot() });
   }
 
@@ -225,8 +233,36 @@ export class RoomManager {
       return;
     }
 
-    this.assignSession(connection, { playerId, roomCode, answerWindowStartedAt: now, answerCount: 0 });
-    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode });
+    const sessionToken = this.issueToken(playerId, roomCode);
+    this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
+    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
+    this.broadcastMessages(room, result.messages);
+  }
+
+  private rejoinRoom(connection: MultiplayerConnection, roomCode: RoomCode, playerId: string, sessionToken: string, now: number): void {
+    const claim = this.sessionsByToken.get(sessionToken);
+    if (!claim || claim.playerId !== playerId || claim.roomCode !== roomCode) {
+      sendError(connection, "session-expired", "Your previous session has expired. Rejoin with the room code.");
+      return;
+    }
+
+    const room = this.rooms.get(roomCode);
+    if (!room) {
+      this.sessionsByToken.delete(sessionToken);
+      sendError(connection, "room-not-found", "The room no longer exists.");
+      return;
+    }
+
+    const result = room.reconnectPlayer(playerId, now);
+    if (!result.ok) {
+      this.sessionsByToken.delete(sessionToken);
+      sendError(connection, result.code, result.message);
+      return;
+    }
+
+    this.detach(connection, now);
+    this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
+    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
     this.broadcastMessages(room, result.messages);
   }
 
@@ -236,15 +272,22 @@ export class RoomManager {
     const room = this.rooms.get(session.roomCode);
     this.connectionByPlayerId.delete(session.playerId);
     this.sessionByConnection.delete(connection);
+    this.sessionsByToken.delete(session.sessionToken);
     if (room) {
       this.broadcastResult(room, room.removePlayer(session.playerId, now));
-      if (room.isEmpty) this.rooms.delete(room.code);
+      if (room.isEmpty) this.deleteRoom(room.code);
     }
   }
 
   private assignSession(connection: MultiplayerConnection, session: PlayerSession): void {
     this.sessionByConnection.set(connection, session);
     this.connectionByPlayerId.set(session.playerId, connection);
+  }
+
+  private issueToken(playerId: string, roomCode: RoomCode): string {
+    const token = createId("session");
+    this.sessionsByToken.set(token, { playerId, roomCode });
+    return token;
   }
 
   private withSessionRoom(connection: MultiplayerConnection, action: (room: Room, session: PlayerSession) => void): void {
@@ -279,6 +322,7 @@ export class RoomManager {
       sendError(connection, result.code, result.message);
       return;
     }
+    if (result.reply) for (const message of result.reply) send(connection, message);
     this.broadcastMessages(room, result.messages);
   }
 
@@ -300,6 +344,7 @@ export class RoomManager {
     const room = this.rooms.get(roomCode);
     if (!room) return;
     for (const player of room.snapshot().players) this.connectionByPlayerId.delete(player.id);
+    for (const [token, claim] of this.sessionsByToken) if (claim.roomCode === roomCode) this.sessionsByToken.delete(token);
     this.rooms.delete(roomCode);
   }
 }
