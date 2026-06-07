@@ -77,6 +77,8 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     children: [el("label", { text: "Your answer" }), el("div", { className: "input-row", children: [answerInput, submitButton] })],
   });
 
+  let renderedRoundKey: string | null = null;
+
   answerForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const answer = answerInput.value.trim();
@@ -114,6 +116,9 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     submitButton,
     update: (state) => {
       const visibleRound = state.round ?? state.room.round;
+      const roundKey = visibleRound ? `${state.room.roomCode}:${visibleRound.roundNumber}:${visibleRound.startedAt}:${visibleRound.flagSrc}` : null;
+      if (roundKey && roundKey !== renderedRoundKey) answerInput.value = "";
+      renderedRoundKey = roundKey;
       roundKicker.textContent = visibleRound ? `Round ${visibleRound.roundNumber}` : "Waiting for the next round";
       roundTitle.textContent = state.room.status === "complete" ? "Game complete" : "Your answer";
       feedback.textContent = state.feedback;
