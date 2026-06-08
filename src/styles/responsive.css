@@ -83,8 +83,24 @@
   }
 
   .country-guess-panel {
-    grid-template-columns: 1fr;
-    align-items: stretch;
+    width: 100%;
+  }
+
+  .country-guess-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .country-guess-mode-card {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+
+  .country-guess-form,
+  .country-guess-stats,
+  .country-guess-panel .feedback,
+  .country-guess-panel .actions {
+    width: 100%;
+    min-width: 0;
   }
 
   .flag-card {

@@ -317,6 +317,7 @@
 
 .feedback {
   min-height: 38px;
+  margin: 0;
   border: 1px solid rgba(232, 226, 211, 0.12);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
@@ -477,35 +478,46 @@
 }
 
 .country-guess-panel {
-  grid-template-columns: minmax(0, 1fr) minmax(148px, auto) minmax(240px, 0.75fr) auto;
-  align-items: end;
-  width: 100%;
+  width: min(860px, 100%);
 }
 
-.country-guess-form {
+.country-guess-stats {
+  grid-template-columns: repeat(7, auto) minmax(0, 1fr);
+}
+
+.country-guess-stats .stat-card {
   min-width: 0;
 }
 
-.country-guess-summary {
-  min-height: clamp(52px, 6.4dvh, 60px);
-  padding: 8px 11px;
-  border: 1px solid rgba(232, 226, 211, 0.12);
-  border-radius: var(--radius-sm);
-  display: grid;
-  align-content: center;
-  background: rgba(255, 255, 255, 0.022);
-}
-
-.country-guess-summary span {
-  color: var(--muted);
-  font-size: 0.73rem;
-  font-weight: 620;
-}
-
-.country-guess-summary strong {
-  color: var(--text);
-  font-size: 0.92rem;
+.country-guess-stats .stat-value {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.country-guess-mode-card {
+  gap: 8px;
+}
+
+.country-guess-mode-card .stat-label {
+  margin-right: 0;
+}
+
+.country-guess-timer-select {
+  min-height: 28px;
+  min-width: 96px;
+  padding: 0 7px;
+  font-size: 0.76rem;
+  font-weight: 720;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.country-guess-stats.timer-is-active .country-guess-mode-card {
+  border-color: rgba(184, 227, 109, 0.34);
+  background: rgba(184, 227, 109, 0.06);
+}
+
+.country-guess-panel .actions {
+  justify-content: flex-start;
 }
