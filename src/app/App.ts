@@ -85,18 +85,28 @@ export function createApp(options: AppOptions): App {
 
     try {
       const worldCountryFeatures = await loadWorldCountryFeatures();
-      if (run !== navigationRun) return;
-      mount(createCountryGuessingScreen({
-        countryIndex: options.countryIndex,
-        worldCountryFeatures,
-        onBackToSolo: () => {
-          const save = readSoloSave(options.storage);
-          startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
-        },
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
-      }));
+
+      if (run !== navigationRun) {
+        return;
+      }
+
+      mount(
+        createCountryGuessingScreen({
+          countryIndex: options.countryIndex,
+          worldCountryFeatures,
+          storage: options.storage,
+          onBackToSolo: () => {
+            const save = readSoloSave(options.storage);
+            startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
+          },
+          onMultiplayer: () => navigate({ type: "multiplayer" }),
+        }),
+      );
     } catch (error) {
-      if (run !== navigationRun) return;
+      if (run !== navigationRun) {
+        return;
+      }
+
       loading.element.textContent = error instanceof Error ? error.message : "Unable to load world map data.";
     }
   }
