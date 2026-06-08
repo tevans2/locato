@@ -1,5 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
-import { detectCountryGuess, type WorldCountryFeature } from "../../core/map";
+import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
@@ -219,7 +219,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   function checkInput(showMiss = false): void {
-    const country = detectCountryGuess(countryIndex, input.value, guessedCountryIds);
+    const country = showMiss
+      ? submitCountryGuess(countryIndex, input.value, guessedCountryIds)
+      : detectCountryGuess(countryIndex, input.value, guessedCountryIds);
     if (country) {
       recordGuess(country);
       return;
