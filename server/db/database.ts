@@ -23,6 +23,7 @@ function migrate(db: Database): void {
       display_name TEXT NOT NULL,
       password_hash TEXT,
       avatar_url TEXT,
+      avatar_emoji TEXT,
       created_at INTEGER NOT NULL
     );
 
@@ -50,6 +51,8 @@ function migrate(db: Database): void {
       best_streak INTEGER NOT NULL DEFAULT 0
     );
   `);
+  // Non-destructive additive migration: add avatar_emoji column to existing databases.
+  try { db.exec("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;"); } catch { /* column already exists */ }
 }
 
 // Column aliases map snake_case storage to camelCase domain types so rows are returned ready to use.
@@ -58,20 +61,20 @@ export class SqliteUserStore implements UserStore {
 
   createUser(input: CreateUserInput): StoredUser {
     this.db
-      .query("INSERT INTO users (id, email, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .query("INSERT INTO users (id, email, display_name, password_hash, avatar_url, avatar_emoji, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)")
       .run(input.id, input.email, input.displayName, input.passwordHash, input.avatarUrl, input.createdAt);
-    return { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, avatarUrl: input.avatarUrl, createdAt: input.createdAt };
+    return { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, avatarUrl: input.avatarUrl, avatarEmoji: null, createdAt: input.createdAt };
   }
 
   findUserByEmail(email: string): StoredUser | null {
     return this.db
-      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, created_at AS createdAt FROM users WHERE email = ?")
+      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, avatar_emoji AS avatarEmoji, created_at AS createdAt FROM users WHERE email = ?")
       .get(email);
   }
 
   findUserById(id: string): StoredUser | null {
     return this.db
-      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, created_at AS createdAt FROM users WHERE id = ?")
+      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, avatar_emoji AS avatarEmoji, created_at AS createdAt FROM users WHERE id = ?")
       .get(id);
   }
 
@@ -79,7 +82,7 @@ export class SqliteUserStore implements UserStore {
     return this.db
       .query<StoredUser>(
         `SELECT u.id, u.email, u.display_name AS displayName, u.password_hash AS passwordHash,
-                u.avatar_url AS avatarUrl, u.created_at AS createdAt
+                u.avatar_url AS avatarUrl, u.avatar_emoji AS avatarEmoji, u.created_at AS createdAt
          FROM users u JOIN oauth_accounts oa ON oa.user_id = u.id
          WHERE oa.provider = ? AND oa.provider_id = ?`,
       )
@@ -88,6 +91,10 @@ export class SqliteUserStore implements UserStore {
 
   linkOAuthAccount(userId: string, provider: string, providerId: string): void {
     this.db.query("INSERT OR IGNORE INTO oauth_accounts (provider, provider_id, user_id) VALUES (?, ?, ?)").run(provider, providerId, userId);
+  }
+
+  updateAvatarEmoji(userId: string, emoji: string | null): void {
+    this.db.query("UPDATE users SET avatar_emoji = ? WHERE id = ?").run(emoji, userId);
   }
 
   createSession(input: CreateSessionInput): Session {

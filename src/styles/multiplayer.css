@@ -128,7 +128,7 @@
 }
 
 .player-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .player-row.is-local,
@@ -144,6 +144,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 760;
+}
+
+.player-emoji,
+.score-emoji {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .player-status,
@@ -335,11 +342,11 @@
 }
 
 .score-row {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
 }
 
 .score-meta {
-  grid-column: 2 / -1;
+  grid-column: 3 / -1;
 }
 
 .score-value {
@@ -411,11 +418,15 @@
 
   .player-row,
   .score-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .score-meta {
-    grid-column: auto;
+    grid-column: 2 / -1;
+  }
+
+  .score-meta {
+    grid-column: 2 / -1;
   }
 }
 

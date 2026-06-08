@@ -3,6 +3,7 @@ export interface AuthUser {
   readonly email: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
+  readonly avatarEmoji: string | null;
   readonly createdAt: number;
 }
 
@@ -54,6 +55,7 @@ export interface UserStore {
   findUserById(id: string): StoredUser | null;
   findUserByOAuth(provider: string, providerId: string): StoredUser | null;
   linkOAuthAccount(userId: string, provider: string, providerId: string): void;
+  updateAvatarEmoji(userId: string, emoji: string | null): void;
   createSession(input: CreateSessionInput): Session;
   findSession(id: string): Session | null;
   deleteSession(id: string): void;

@@ -127,6 +127,10 @@ export class AuthService {
     return this.store.recordGame(userId, result);
   }
 
+  updateAvatarEmoji(userId: string, emoji: string | null): void {
+    this.store.updateAvatarEmoji(userId, emoji);
+  }
+
   pruneExpiredSessions(): void {
     this.store.deleteExpiredSessions(this.clock());
   }
@@ -141,6 +145,6 @@ export class AuthService {
   }
 
   private toAuthUser(user: StoredUser): AuthUser {
-    return { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl, createdAt: user.createdAt };
+    return { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl, avatarEmoji: user.avatarEmoji, createdAt: user.createdAt };
   }
 }

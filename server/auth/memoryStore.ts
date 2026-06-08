@@ -19,6 +19,7 @@ export function createMemoryUserStore(): UserStore {
         displayName: input.displayName,
         passwordHash: input.passwordHash,
         avatarUrl: input.avatarUrl,
+        avatarEmoji: null,
         createdAt: input.createdAt,
       };
       usersById.set(user.id, user);
@@ -31,6 +32,13 @@ export function createMemoryUserStore(): UserStore {
     linkOAuthAccount(userId, provider, providerId) {
       const user = usersById.get(userId);
       if (user) usersByOAuth.set(`${provider}:${providerId}`, user);
+    },
+    updateAvatarEmoji(userId: string, emoji: string | null): void {
+      const user = usersById.get(userId);
+      if (!user) return;
+      const updated = { ...user, avatarEmoji: emoji };
+      usersById.set(userId, updated);
+      usersByEmail.set(user.email, updated);
     },
     createSession(input: CreateSessionInput): Session {
       const session: Session = { id: input.id, userId: input.userId, expiresAt: input.expiresAt, createdAt: input.createdAt };

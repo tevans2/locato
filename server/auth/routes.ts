@@ -80,6 +80,16 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json({ ok: true }, 200, { "set-cookie": serializeClearCookie(cookieOptions) });
   }
 
+  if (pathname === "/auth/avatar" && method === "PATCH") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readJsonBody(request);
+    const emoji = typeof body?.emoji === "string" && body.emoji.length > 0 ? body.emoji : null;
+    service.updateAvatarEmoji(user.id, emoji);
+    log("info", "avatar.update", { ip: ip(request), userId: user.id });
+    return json({ ok: true });
+  }
+
   if (pathname === "/auth/me" && method === "GET") {
     const user = service.authenticate(readSessionToken(request));
     if (!user) return json({ error: "Not authenticated." }, 401);

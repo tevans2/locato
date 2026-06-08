@@ -1,6 +1,7 @@
 import type { FinalResult, PlayerId, PublicRoomState, PublicRoundState, RoundResult } from "../../core/multiplayer";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
+import { getPlayerEmoji } from "../../core/auth/avatars";
 import { el } from "../dom/createElement";
 import { promptImageClass } from "../dom/renderPrompt";
 import { createWorldMapView } from "../dom/renderWorldMap";
@@ -38,17 +39,19 @@ function sortPlayers(room: PublicRoomState) {
 }
 
 function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null): readonly HTMLElement[] {
-  return sortPlayers(room).map((player, index) =>
-    el("li", {
+  return sortPlayers(room).map((player, index) => {
+    const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
+    return el("li", {
       className: player.id === localPlayerId ? "score-row is-local" : "score-row",
       children: [
         el("span", { className: "score-rank", text: `#${index + 1}` }),
+        el("span", { className: "player-emoji score-emoji", text: emoji, attrs: { "aria-hidden": "true" } }),
         el("span", { className: "score-name", text: `${player.name}${player.connected ? "" : " · offline"}` }),
         el("span", { className: "score-value", text: formatScore(player.score) }),
         el("span", { className: "score-meta", text: `${player.correctAnswers} correct · ${player.streak} streak` }),
       ],
-    }),
-  );
+    });
+  });
 }
 
 function createResultRows(results: readonly RoundResult[]): readonly HTMLElement[] {

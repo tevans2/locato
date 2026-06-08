@@ -38,17 +38,20 @@ export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
 
-  // Auth controls persist across navigation (sign-in state shouldn't reset when switching screens).
-  // The trigger lives in each screen's header; the panel is a fixed overlay attached to the root.
+  // Account controls persist across navigation and are fixed to the top-right of the viewport.
   const authControls = createAuthControls({ onAuthChange: () => undefined });
-  options.root.appendChild(authControls.panel);
+
+  function attachGlobalControls(): void {
+    options.root.append(authControls.trigger, authControls.panel);
+  }
+
+  attachGlobalControls();
 
   function mount(screen: Screen): void {
     activeScreen?.destroy();
     activeScreen = screen;
     options.root.replaceChildren(screen.element);
-    // Keep the auth panel attached (it was appended to root, not inside the screen element).
-    options.root.appendChild(authControls.panel);
+    attachGlobalControls();
   }
 
   function startSolo(categoryIds: readonly string[], continueSaved = false): void {
@@ -71,7 +74,6 @@ export function createApp(options: AppOptions): App {
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
         onCountryGuessing: () => navigate({ type: "country-guessing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
-        authControls,
       }),
     );
   }

@@ -6,6 +6,7 @@ export interface AuthUser {
   readonly email: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
+  readonly avatarEmoji: string | null;
   readonly createdAt: number;
 }
 
@@ -76,3 +77,11 @@ export async function recordGame(result: GameResult): Promise<UserStats | null> 
     return null;
   }
 }
+
+// Fire-and-forget: saves the emoji to the user's account so it persists across devices.
+// Silently ignored when not authenticated or offline.
+export function saveAvatarToServer(emoji: string): void {
+  void fetch("/auth/avatar", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ emoji }) }).catch(() => undefined);
+}
+
+export { AVATAR_OPTIONS, getPlayerEmoji, getStoredAvatar, storeAvatar } from "./avatars";

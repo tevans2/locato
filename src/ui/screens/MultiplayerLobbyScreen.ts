@@ -5,6 +5,7 @@ import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
+import { getPlayerEmoji } from "../../core/auth/avatars";
 import { recordGame } from "../../core/auth";
 import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
@@ -78,15 +79,17 @@ function allConnectedPlayersReady(room: PublicRoomState): boolean {
 }
 
 function createPlayerRows(room: PublicRoomState, localPlayerId: string | null): readonly HTMLElement[] {
-  return room.players.map((player) =>
-    el("li", {
+  return room.players.map((player) => {
+    const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
+    return el("li", {
       className: player.id === localPlayerId ? "player-row is-local" : "player-row",
       children: [
+        el("span", { className: "player-emoji", text: emoji, attrs: { "aria-hidden": "true" } }),
         el("span", { className: "player-name", text: `${player.name}${player.id === room.hostPlayerId ? " · host" : ""}` }),
         el("span", { className: player.connected ? "player-status" : "player-status offline", text: player.connected ? (player.ready ? "ready" : "not ready") : "offline" }),
       ],
-    }),
-  );
+    });
+  });
 }
 
 function safeConnect(transport: MultiplayerTransport, afterConnect: () => void, onError: (message: string) => void): void {
