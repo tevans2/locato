@@ -61,6 +61,48 @@
     flex: 0 0 auto;
   }
 
+  .country-guess-layout {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto;
+  }
+
+  .world-map-svg {
+    min-height: clamp(260px, 48dvh, 430px);
+  }
+
+  .world-map-meta {
+    position: static;
+    padding: 8px;
+    flex-wrap: wrap;
+    background: rgba(6, 8, 6, 0.72);
+  }
+
+  .world-map-meta span {
+    flex: 1 1 118px;
+  }
+
+  .country-guess-panel {
+    width: 100%;
+  }
+
+  .country-guess-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .country-guess-mode-card {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+
+  .country-guess-form,
+  .country-guess-stats,
+  .country-guess-panel .feedback,
+  .country-guess-panel .actions {
+    width: 100%;
+    min-width: 0;
+  }
+
   .flag-card {
     flex: 0 0 auto;
   }
@@ -156,5 +198,11 @@
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .country-guess-category-dropdown {
+    justify-self: stretch;
   }
 }

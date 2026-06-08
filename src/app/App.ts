@@ -3,6 +3,8 @@ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } f
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
+import { loadWorldCountryFeatures } from "../core/map";
+import { createCountryGuessingScreen } from "../ui/screens/CountryGuessingScreen";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import type { AppRoute, Screen } from "./router";
@@ -33,6 +35,7 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
 
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
+  let navigationRun = 0;
 
   function mount(screen: Screen): void {
     activeScreen?.destroy();
@@ -58,9 +61,54 @@ export function createApp(options: AppOptions): App {
         },
         onReset: () => clearSoloSave(options.storage),
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
+        onCountryGuessing: () => navigate({ type: "country-guessing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
       }),
     );
+  }
+
+  function createLoadingScreen(message: string): Screen {
+    const element = document.createElement("section");
+    element.className = "game-screen loading-screen";
+    element.textContent = message;
+
+    return {
+      element,
+      destroy: () => undefined,
+    };
+  }
+
+  async function startCountryGuessing(): Promise<void> {
+    const run = navigationRun;
+    const loading = createLoadingScreen("Loading world map...");
+    mount(loading);
+
+    try {
+      const worldCountryFeatures = await loadWorldCountryFeatures();
+
+      if (run !== navigationRun) {
+        return;
+      }
+
+      mount(
+        createCountryGuessingScreen({
+          countryIndex: options.countryIndex,
+          worldCountryFeatures,
+          storage: options.storage,
+          onBackToSolo: () => {
+            const save = readSoloSave(options.storage);
+            startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
+          },
+          onMultiplayer: () => navigate({ type: "multiplayer" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) {
+        return;
+      }
+
+      loading.element.textContent = error instanceof Error ? error.message : "Unable to load world map data.";
+    }
   }
 
   function startMultiplayer(): void {
@@ -76,8 +124,15 @@ export function createApp(options: AppOptions): App {
   }
 
   function navigate(route: AppRoute): void {
+    navigationRun += 1;
+
     if (route.type === "solo-game") {
       startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
+      return;
+    }
+
+    if (route.type === "country-guessing") {
+      startCountryGuessing();
       return;
     }
 

@@ -16,6 +16,7 @@ export interface SoloGameScreenOptions {
   readonly onCategoryChange: (categoryIds: readonly string[]) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
+  readonly onCountryGuessing: () => void;
   readonly onMultiplayer: () => void;
 }
 
@@ -84,6 +85,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const hintButton = el("button", { className: "secondary-action", text: "Hint", attrs: { type: "button" } });
   const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
+  const countryGuessingButton = el("button", { className: "ghost-action", text: "World map", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
 
   const categoryDropdown = createCategoryDropdown({ categories: allCategories, selectedIds: options.categoryIds, signal: controller.signal, onChange: options.onCategoryChange });
@@ -157,6 +159,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     { signal: controller.signal },
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  countryGuessingButton.addEventListener("click", options.onCountryGuessing, { signal: controller.signal });
 
   document.addEventListener(
     "keydown",
@@ -193,10 +196,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           logo,
           el("div", {
             className: "mode-controls",
-            children: [
-              categoryDropdown.element,
-              el("div", { className: "mode-select-row", children: [multiplayerButton] }),
-            ],
+            children: [el("div", { className: "mode-select-row", children: [categoryDropdown.element, countryGuessingButton, multiplayerButton] })],
           }),
         ],
       }),
