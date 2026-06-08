@@ -273,7 +273,7 @@ export class Room {
 
   finalResults(): readonly FinalResult[] {
     const sorted = [...this.players.values()].sort((left, right) => right.score - left.score || right.correctAnswers - left.correctAnswers || left.name.localeCompare(right.name));
-    return sorted.map((player, index) => ({ playerId: player.id, name: player.name, rank: index + 1, score: player.score, correctAnswers: player.correctAnswers }));
+    return sorted.map((player, index) => ({ playerId: player.id, name: player.name, rank: index + 1, score: player.score, correctAnswers: player.correctAnswers, wrongAnswers: player.wrongAnswers }));
   }
 
   private transferHostIfNeeded(): void {

@@ -4,6 +4,8 @@ import { multiplayerPromptCategories } from "../../core/categories";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
+import type { AuthControls } from "../components/AuthPanel";
+import { recordGame } from "../../core/auth";
 import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
@@ -14,6 +16,7 @@ export interface MultiplayerLobbyScreenOptions {
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly createOnlineTransport: () => MultiplayerTransport;
   readonly onBackToSolo: () => void;
+  readonly authControls?: AuthControls;
 }
 
 // Ephemeral reconnect credentials. Kept in sessionStorage so a page reload or a dropped socket
@@ -257,10 +260,19 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         feedback = winner ? `${message.answer} — ${winner.name} took it.` : `${message.answer} — nobody got it.`;
         break;
       }
-      case "GAME_COMPLETED":
+      case "GAME_COMPLETED": {
         finalResults = message.results;
         feedback = "Game complete.";
+        // Record this player's stats to their account if they're signed in.
+        // The server has already validated the results; we just forward our own row.
+        const myResult = message.results.find((result) => result.playerId === localPlayerId);
+        if (myResult) {
+          void recordGame({ correctAnswers: myResult.correctAnswers, wrongAnswers: myResult.wrongAnswers, bestStreak: 0 }).then((stats) => {
+            if (stats) options.authControls?.refreshStats(stats);
+          });
+        }
         break;
+      }
       case "PLAYER_JOINED":
         feedback = `${message.player.name} joined.`;
         break;

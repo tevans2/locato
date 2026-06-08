@@ -88,7 +88,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
   function finalStandings(): readonly FinalResult[] {
     return [...room.players]
       .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name))
-      .map((player, index) => ({ playerId: player.id, name: player.name, rank: index + 1, score: player.score, correctAnswers: player.correctAnswers }));
+      .map((player, index) => ({ playerId: player.id, name: player.name, rank: index + 1, score: player.score, correctAnswers: player.correctAnswers, wrongAnswers: player.wrongAnswers }));
   }
 
   function completeGame(): void {

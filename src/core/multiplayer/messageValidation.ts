@@ -144,7 +144,7 @@ function isRoundResult(value: unknown): value is RoundResult {
 }
 
 function isFinalResult(value: unknown): value is FinalResult {
-  return isRecord(value) && typeof value.playerId === "string" && typeof value.name === "string" && isFiniteNumber(value.rank) && isFiniteNumber(value.score) && isFiniteNumber(value.correctAnswers);
+  return isRecord(value) && typeof value.playerId === "string" && typeof value.name === "string" && isFiniteNumber(value.rank) && isFiniteNumber(value.score) && isFiniteNumber(value.correctAnswers) && isFiniteNumber(value.wrongAnswers);
 }
 
 export function parseServerMessage(value: unknown): MessageParseResult<ServerMessage> {

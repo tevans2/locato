@@ -7,18 +7,31 @@ const EMPTY_STATS: UserStats = { games: 0, correctAnswers: 0, wrongAnswers: 0, b
 export function createMemoryUserStore(): UserStore {
   const usersById = new Map<string, StoredUser>();
   const usersByEmail = new Map<string, StoredUser>();
+  const usersByOAuth = new Map<string, StoredUser>();
   const sessions = new Map<string, Session>();
   const stats = new Map<string, UserStats>();
 
   return {
     createUser(input: CreateUserInput): StoredUser {
-      const user: StoredUser = { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, createdAt: input.createdAt };
+      const user: StoredUser = {
+        id: input.id,
+        email: input.email,
+        displayName: input.displayName,
+        passwordHash: input.passwordHash,
+        avatarUrl: input.avatarUrl,
+        createdAt: input.createdAt,
+      };
       usersById.set(user.id, user);
       usersByEmail.set(user.email, user);
       return user;
     },
     findUserByEmail: (email) => usersByEmail.get(email) ?? null,
     findUserById: (id) => usersById.get(id) ?? null,
+    findUserByOAuth: (provider, providerId) => usersByOAuth.get(`${provider}:${providerId}`) ?? null,
+    linkOAuthAccount(userId, provider, providerId) {
+      const user = usersById.get(userId);
+      if (user) usersByOAuth.set(`${provider}:${providerId}`, user);
+    },
     createSession(input: CreateSessionInput): Session {
       const session: Session = { id: input.id, userId: input.userId, expiresAt: input.expiresAt, createdAt: input.createdAt };
       sessions.set(session.id, session);

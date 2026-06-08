@@ -5,6 +5,7 @@ import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { createCountryGuessingScreen } from "../ui/screens/CountryGuessingScreen";
+import { createAuthControls } from "../ui/components/AuthPanel";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import type { AppRoute, Screen } from "./router";
@@ -37,10 +38,17 @@ export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
 
+  // Auth controls persist across navigation (sign-in state shouldn't reset when switching screens).
+  // The trigger lives in each screen's header; the panel is a fixed overlay attached to the root.
+  const authControls = createAuthControls({ onAuthChange: () => undefined });
+  options.root.appendChild(authControls.panel);
+
   function mount(screen: Screen): void {
     activeScreen?.destroy();
     activeScreen = screen;
     options.root.replaceChildren(screen.element);
+    // Keep the auth panel attached (it was appended to root, not inside the screen element).
+    options.root.appendChild(authControls.panel);
   }
 
   function startSolo(categoryIds: readonly string[], continueSaved = false): void {
@@ -63,6 +71,7 @@ export function createApp(options: AppOptions): App {
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
         onCountryGuessing: () => navigate({ type: "country-guessing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
+        authControls,
       }),
     );
   }
@@ -136,6 +145,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        authControls,
       }),
     );
   }

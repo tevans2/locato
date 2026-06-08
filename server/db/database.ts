@@ -1,9 +1,8 @@
+// This module imports bun:sqlite — never import from Node/vitest test graph.
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type { CreateSessionInput, CreateUserInput, GameResult, Session, StoredUser, UserStats, UserStore } from "../auth/types";
-
-const EMPTY_STATS: UserStats = { games: 0, correctAnswers: 0, wrongAnswers: 0, bestStreak: 0 };
 
 export function openDatabase(path: string): Database {
   mkdirSync(dirname(path), { recursive: true });
@@ -22,16 +21,27 @@ function migrate(db: Database): void {
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       display_name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
+      avatar_url TEXT,
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS oauth_accounts (
+      provider TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (provider, provider_id)
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+
     CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions(user_id);
+
     CREATE TABLE IF NOT EXISTS user_stats (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       games INTEGER NOT NULL DEFAULT 0,
@@ -42,27 +52,42 @@ function migrate(db: Database): void {
   `);
 }
 
-// Column aliases map snake_case storage to the camelCase domain types so rows are returned ready to use.
+// Column aliases map snake_case storage to camelCase domain types so rows are returned ready to use.
 export class SqliteUserStore implements UserStore {
   constructor(private readonly db: Database) {}
 
   createUser(input: CreateUserInput): StoredUser {
     this.db
-      .query("INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(input.id, input.email, input.displayName, input.passwordHash, input.createdAt);
-    return { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, createdAt: input.createdAt };
+      .query("INSERT INTO users (id, email, display_name, password_hash, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(input.id, input.email, input.displayName, input.passwordHash, input.avatarUrl, input.createdAt);
+    return { id: input.id, email: input.email, displayName: input.displayName, passwordHash: input.passwordHash, avatarUrl: input.avatarUrl, createdAt: input.createdAt };
   }
 
   findUserByEmail(email: string): StoredUser | null {
     return this.db
-      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, created_at AS createdAt FROM users WHERE email = ?")
+      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, created_at AS createdAt FROM users WHERE email = ?")
       .get(email);
   }
 
   findUserById(id: string): StoredUser | null {
     return this.db
-      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, created_at AS createdAt FROM users WHERE id = ?")
+      .query<StoredUser>("SELECT id, email, display_name AS displayName, password_hash AS passwordHash, avatar_url AS avatarUrl, created_at AS createdAt FROM users WHERE id = ?")
       .get(id);
+  }
+
+  findUserByOAuth(provider: string, providerId: string): StoredUser | null {
+    return this.db
+      .query<StoredUser>(
+        `SELECT u.id, u.email, u.display_name AS displayName, u.password_hash AS passwordHash,
+                u.avatar_url AS avatarUrl, u.created_at AS createdAt
+         FROM users u JOIN oauth_accounts oa ON oa.user_id = u.id
+         WHERE oa.provider = ? AND oa.provider_id = ?`,
+      )
+      .get(provider, providerId);
+  }
+
+  linkOAuthAccount(userId: string, provider: string, providerId: string): void {
+    this.db.query("INSERT OR IGNORE INTO oauth_accounts (provider, provider_id, user_id) VALUES (?, ?, ?)").run(provider, providerId, userId);
   }
 
   createSession(input: CreateSessionInput): Session {
@@ -86,7 +111,7 @@ export class SqliteUserStore implements UserStore {
     return (
       this.db
         .query<UserStats>("SELECT games, correct_answers AS correctAnswers, wrong_answers AS wrongAnswers, best_streak AS bestStreak FROM user_stats WHERE user_id = ?")
-        .get(userId) ?? EMPTY_STATS
+        .get(userId) ?? { games: 0, correctAnswers: 0, wrongAnswers: 0, bestStreak: 0 }
     );
   }
 

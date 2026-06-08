@@ -1,11 +1,17 @@
 import type { AuthService } from "./AuthService";
 import { readSessionToken, serializeClearCookie, serializeSessionCookie, type CookieOptions } from "./cookies";
+import { buildAuthUrl, consumeOAuthState, exchangeOAuthCode, saveOAuthState } from "./oauth";
+import { createOAuthState } from "./tokens";
 import type { GameResult } from "./types";
 
 const MAX_STAT_VALUE = 1_000_000;
 
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
+}
+
+function redirect(location: string): Response {
+  return new Response(null, { status: 302, headers: { Location: location } });
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
@@ -18,9 +24,7 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
 }
 
 function parseGameResult(body: Record<string, unknown>): GameResult | null {
-  const correctAnswers = body.correctAnswers;
-  const wrongAnswers = body.wrongAnswers;
-  const bestStreak = body.bestStreak;
+  const { correctAnswers, wrongAnswers, bestStreak } = body;
   const valid = [correctAnswers, wrongAnswers, bestStreak].every(
     (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_STAT_VALUE,
   );
@@ -28,9 +32,9 @@ function parseGameResult(body: Record<string, unknown>): GameResult | null {
   return { correctAnswers: correctAnswers as number, wrongAnswers: wrongAnswers as number, bestStreak: bestStreak as number };
 }
 
-// Returns a Response for any /auth/* or /api/* route it owns, or null so the caller can fall
+// Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
-export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions): Promise<Response | null> {
+export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string): Promise<Response | null> {
   const { pathname } = url;
   const { method } = request;
 
@@ -69,6 +73,48 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const result = parseGameResult(body);
     if (!result) return json({ error: "Invalid game result." }, 400);
     return json({ stats: service.recordGame(user.id, result) });
+  }
+
+  if (pathname === "/auth/github" && method === "GET") {
+    const state = createOAuthState();
+    saveOAuthState(state, "github", Date.now());
+    return redirect(buildAuthUrl("github", state, baseUrl));
+  }
+
+  if (pathname === "/auth/github/callback" && method === "GET") {
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const provider = state ? consumeOAuthState(state, Date.now()) : null;
+    if (!provider || !code) return redirect("/?error=auth");
+    try {
+      const profile = await exchangeOAuthCode("github", code, baseUrl);
+      const authUser = service.upsertOAuthUser("github", profile.id, profile);
+      const session = service.createSessionFor(authUser.id);
+      return new Response(null, { status: 302, headers: { Location: "/", "set-cookie": serializeSessionCookie(session.id, service.sessionMaxAgeSeconds, cookieOptions) } });
+    } catch {
+      return redirect("/?error=auth");
+    }
+  }
+
+  if (pathname === "/auth/google" && method === "GET") {
+    const state = createOAuthState();
+    saveOAuthState(state, "google", Date.now());
+    return redirect(buildAuthUrl("google", state, baseUrl));
+  }
+
+  if (pathname === "/auth/google/callback" && method === "GET") {
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const provider = state ? consumeOAuthState(state, Date.now()) : null;
+    if (!provider || !code) return redirect("/?error=auth");
+    try {
+      const profile = await exchangeOAuthCode("google", code, baseUrl);
+      const authUser = service.upsertOAuthUser("google", profile.id, profile);
+      const session = service.createSessionFor(authUser.id);
+      return new Response(null, { status: 302, headers: { Location: "/", "set-cookie": serializeSessionCookie(session.id, service.sessionMaxAgeSeconds, cookieOptions) } });
+    } catch {
+      return redirect("/?error=auth");
+    }
   }
 
   return null;

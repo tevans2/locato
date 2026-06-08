@@ -52,4 +52,5 @@ export interface FinalResult {
   readonly rank: number;
   readonly score: number;
   readonly correctAnswers: number;
+  readonly wrongAnswers: number;
 }

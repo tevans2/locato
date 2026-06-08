@@ -2,6 +2,7 @@ import { type Country, type CountryIndex } from "../../core/countries";
 import { getCategory, soloPromptCategories } from "../../core/categories";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { Screen } from "../../app/router";
+import type { AuthControls } from "../components/AuthPanel";
 import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
@@ -18,6 +19,7 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   readonly onCountryGuessing: () => void;
   readonly onMultiplayer: () => void;
+  readonly authControls?: AuthControls;
 }
 
 interface SoloViews {
@@ -196,7 +198,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           logo,
           el("div", {
             className: "mode-controls",
-            children: [el("div", { className: "mode-select-row", children: [categoryDropdown.element, countryGuessingButton, multiplayerButton] })],
+            children: [
+              categoryDropdown.element,
+              el("div", { className: "mode-select-row", children: [countryGuessingButton, multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])] }),
+            ],
           }),
         ],
       }),

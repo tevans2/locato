@@ -13,6 +13,7 @@ const fixtureCountries = [
 const countryIndex = indexCountries(fixtureCountries);
 
 class TestConnection implements MultiplayerConnection {
+  readonly authenticatedName: string | null = null;
   readonly messages: ServerMessage[] = [];
 
   send(message: string): void {

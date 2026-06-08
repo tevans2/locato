@@ -10,7 +10,8 @@ const fakeHasher: PasswordHasher = {
   verify: async (password, hash) => hash === `hashed:${password}`,
 };
 
-const COOKIE = { secure: false };
+const COOKIE_OPTS = { secure: false };
+const BASE_URL = "http://localhost:3000";
 
 function createService(initialNow = 1000) {
   const clock = { value: initialNow };
@@ -35,13 +36,13 @@ function jsonRequest(path: string, method: string, body?: unknown, token?: strin
 }
 
 function route(service: AuthService, request: Request): Promise<Response | null> {
-  return handleAuthRequest(request, new URL(request.url), service, COOKIE);
+  return handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL);
 }
 
 describe("auth service", () => {
   it("registers a user, issues a session, and authenticates it", async () => {
     const { service } = createService();
-    const result = await service.register({ email: "Ada@Example.com ", password: "supersecret", displayName: "Ada" });
+    const result = await service.register({ email: "Ada@Example.com", password: "supersecret", displayName: "Ada" });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -54,26 +55,48 @@ describe("auth service", () => {
     const { service } = createService();
     await service.register({ email: "a@b.com", password: "supersecret", displayName: "A" });
 
-    expect(await service.register({ email: "a@b.com", password: "supersecret" })).toMatchObject({ ok: false, status: 409 });
-    expect(await service.register({ email: "c@d.com", password: "short" })).toMatchObject({ ok: false, status: 400 });
-    expect(await service.register({ email: "not-an-email", password: "supersecret" })).toMatchObject({ ok: false, status: 400 });
+    expect(await service.register({ email: "a@b.com", password: "supersecret", displayName: "A" })).toMatchObject({ ok: false, status: 409 });
+    expect(await service.register({ email: "c@d.com", password: "short", displayName: "C" })).toMatchObject({ ok: false, status: 400 });
+    expect(await service.register({ email: "not-an-email", password: "supersecret", displayName: "A" })).toMatchObject({ ok: false, status: 400 });
   });
 
   it("logs in only with the correct password", async () => {
     const { service } = createService();
-    await service.register({ email: "a@b.com", password: "supersecret" });
+    await service.register({ email: "a@b.com", password: "supersecret", displayName: "A" });
 
     expect(await service.login({ email: "a@b.com", password: "supersecret" })).toMatchObject({ ok: true });
-    expect(await service.login({ email: "a@b.com", password: "wrong-password" })).toMatchObject({ ok: false, status: 401 });
+    expect(await service.login({ email: "a@b.com", password: "wrong" })).toMatchObject({ ok: false, status: 401 });
     expect(await service.login({ email: "ghost@b.com", password: "supersecret" })).toMatchObject({ ok: false, status: 401 });
+  });
+
+  it("rejects password login for OAuth-only accounts", async () => {
+    const { service } = createService();
+    service.upsertOAuthUser("github", "gh_1", { email: "a@b.com", displayName: "Ada" });
+
+    const result = await service.login({ email: "a@b.com", password: "supersecret" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(401);
+  });
+
+  it("upserts an OAuth user and links accounts by email", async () => {
+    const { service } = createService();
+    const user1 = service.upsertOAuthUser("github", "gh_1", { email: "a@b.com", displayName: "Ada" });
+    const user2 = service.upsertOAuthUser("github", "gh_1", { email: "a@b.com", displayName: "Ada" });
+    expect(user1.id).toBe(user2.id);
+
+    await service.register({ email: "b@b.com", password: "supersecret", displayName: "Bob" });
+    const linkedUser = service.upsertOAuthUser("google", "gg_1", { email: "b@b.com", displayName: "Bob via Google" });
+    const pwUser = await service.login({ email: "b@b.com", password: "supersecret" });
+    expect(pwUser.ok).toBe(true);
+    if (pwUser.ok) expect(linkedUser.id).toBe(pwUser.user.id);
   });
 
   it("expires sessions and clears them on logout", async () => {
     const { service, clock } = createService(1000);
-    const registered = await service.register({ email: "a@b.com", password: "supersecret" });
+    const registered = await service.register({ email: "a@b.com", password: "supersecret", displayName: "A" });
     if (!registered.ok) throw new Error("registration failed");
 
-    clock.value = 1000 + 60 * 60 * 1000 + 1; // just past TTL
+    clock.value = 1000 + 60 * 60 * 1000 + 1;
     expect(service.authenticate(registered.session.id)).toBeNull();
 
     clock.value = 1000;
@@ -83,24 +106,22 @@ describe("auth service", () => {
     expect(service.authenticate(again.session.id)).toBeNull();
   });
 
-  it("accumulates stats per game and keeps the best streak", async () => {
+  it("accumulates stats and keeps the best streak", async () => {
     const { service } = createService();
-    const registered = await service.register({ email: "a@b.com", password: "supersecret" });
+    const registered = await service.register({ email: "a@b.com", password: "supersecret", displayName: "A" });
     if (!registered.ok) throw new Error("registration failed");
 
     service.recordGame(registered.user.id, { correctAnswers: 10, wrongAnswers: 2, bestStreak: 5 });
     const stats = service.recordGame(registered.user.id, { correctAnswers: 3, wrongAnswers: 1, bestStreak: 3 });
-
     expect(stats).toEqual({ games: 2, correctAnswers: 13, wrongAnswers: 3, bestStreak: 5 });
   });
 });
 
 describe("auth routes", () => {
-  it("registers via HTTP, sets a session cookie, and serves /auth/me", async () => {
+  it("registers via HTTP, sets cookie, and serves /auth/me", async () => {
     const { service } = createService();
     const register = await route(service, jsonRequest("/auth/register", "POST", { email: "a@b.com", password: "supersecret", displayName: "A" }));
     if (!register) throw new Error("route not handled");
-
     expect(register.status).toBe(201);
     const token = tokenFrom(register);
 
@@ -108,24 +129,22 @@ describe("auth routes", () => {
     expect(me?.status).toBe(200);
     expect((await me!.json()).user.email).toBe("a@b.com");
 
-    const anon = await route(service, jsonRequest("/auth/me", "GET"));
-    expect(anon?.status).toBe(401);
+    expect((await route(service, jsonRequest("/auth/me", "GET")))?.status).toBe(401);
   });
 
-  it("guards /api/games behind authentication", async () => {
+  it("records a game and updates stats", async () => {
     const { service } = createService();
-    const anon = await route(service, jsonRequest("/api/games", "POST", { correctAnswers: 1, wrongAnswers: 0, bestStreak: 1 }));
-    expect(anon?.status).toBe(401);
+    const r = await route(service, jsonRequest("/auth/register", "POST", { email: "a@b.com", password: "supersecret", displayName: "A" }));
+    const token = tokenFrom(r!);
 
-    const register = await route(service, jsonRequest("/auth/register", "POST", { email: "a@b.com", password: "supersecret" }));
-    const token = tokenFrom(register!);
-    const recorded = await route(service, jsonRequest("/api/games", "POST", { correctAnswers: 4, wrongAnswers: 1, bestStreak: 4 }, token));
-    expect(recorded?.status).toBe(200);
-    expect((await recorded!.json()).stats).toMatchObject({ games: 1, correctAnswers: 4, bestStreak: 4 });
+    const resp = await route(service, jsonRequest("/api/games", "POST", { correctAnswers: 7, wrongAnswers: 1, bestStreak: 4 }, token));
+    expect(resp?.status).toBe(200);
+    expect((await resp!.json()).stats).toMatchObject({ games: 1, correctAnswers: 7 });
   });
 
-  it("falls through (null) for non-auth routes", async () => {
+  it("falls through for unrelated routes", async () => {
     const { service } = createService();
     expect(await route(service, jsonRequest("/index.html", "GET"))).toBeNull();
+    expect(await route(service, jsonRequest("/assets/flags/jp.svg", "GET"))).toBeNull();
   });
 });

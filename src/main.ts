@@ -7,6 +7,7 @@ import "./styles/game.css";
 import "./styles/board.css";
 import "./styles/multiplayer.css";
 import "./styles/responsive.css";
+import "./styles/auth.css";
 
 const root = document.getElementById("app");
 

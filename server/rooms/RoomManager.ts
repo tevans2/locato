@@ -7,6 +7,10 @@ import { getCategory, resolveCategoryIds } from "../../src/core/categories";
 export interface MultiplayerConnection {
   readonly send: (message: string) => unknown;
   readonly close?: (code?: number, reason?: string) => void;
+  // Set from the session cookie at WebSocket upgrade time; null for guests.
+  // Guests supply a name via CREATE_ROOM/JOIN_ROOM; authenticated users have
+  // their account display name used instead so it can't be spoofed by the client.
+  readonly authenticatedName: string | null;
 }
 
 export interface PlayerSession {
@@ -206,7 +210,7 @@ export class RoomManager {
     const room = new Room({
       code: roomCode,
       hostPlayerId: playerId,
-      hostName: playerName,
+      hostName: connection.authenticatedName ?? playerName,
       countryIndex: this.countryIndex,
       categoryIds: resolveCategoryIds(categoryIds),
       seed: createId("seed"),
@@ -230,7 +234,7 @@ export class RoomManager {
 
     this.detach(connection, now);
     const playerId = createId("player");
-    const result = room.addPlayer(playerId, playerName, now);
+    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now);
     if (!result.ok) {
       sendError(connection, result.code, result.message);
       return;
