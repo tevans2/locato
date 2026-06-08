@@ -26,6 +26,12 @@ interface PanState {
   readonly clientX: number;
   readonly clientY: number;
   readonly viewBox: ViewBoxState;
+  readonly countryId: CountryId | null;
+  hasMoved: boolean;
+}
+
+export interface WorldMapViewOptions {
+  readonly onCountryClick?: (countryId: CountryId) => void;
 }
 
 export interface WorldMapView {
@@ -186,7 +192,14 @@ function zoomAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, c
   });
 }
 
-export function createWorldMapView(features: readonly WorldCountryFeature[], countryIndex: CountryIndex): WorldMapView {
+function countryIdFromEventTarget(target: EventTarget | null): CountryId | null {
+  const element = target instanceof Element ? target : null;
+  const countryPath = element?.closest<SVGPathElement>(".world-map-country[data-country-id]");
+  const countryId = Number(countryPath?.dataset.countryId);
+  return Number.isInteger(countryId) ? countryId : null;
+}
+
+export function createWorldMapView(features: readonly WorldCountryFeature[], countryIndex: CountryIndex, options: WorldMapViewOptions = {}): WorldMapView {
   const svg = createSvgElement("svg");
   applyViewBox(svg, DEFAULT_VIEWBOX);
   svg.setAttribute("role", "img");
@@ -201,6 +214,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   const missingDotByCountryId = new Map<CountryId, SVGCircleElement>();
   let viewBox: ViewBoxState = { ...DEFAULT_VIEWBOX };
   let panState: PanState | null = null;
+  let suppressNextCountryClick = false;
 
   for (const feature of features) {
     const country = countryIndex.byCode.get(feature.code.toUpperCase());
@@ -264,7 +278,14 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
-    panState = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, viewBox: { ...viewBox } };
+    panState = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      viewBox: { ...viewBox },
+      countryId: countryIdFromEventTarget(event.target),
+      hasMoved: false,
+    };
     svg.setPointerCapture(event.pointerId);
     svg.classList.add("is-panning");
   });
@@ -272,20 +293,38 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   svg.addEventListener("pointermove", (event) => {
     if (!panState || panState.pointerId !== event.pointerId) return;
     const rect = svg.getBoundingClientRect();
-    const deltaX = rect.width > 0 ? ((event.clientX - panState.clientX) / rect.width) * panState.viewBox.width : 0;
-    const deltaY = rect.height > 0 ? ((event.clientY - panState.clientY) / rect.height) * panState.viewBox.height : 0;
+    const rawDeltaX = event.clientX - panState.clientX;
+    const rawDeltaY = event.clientY - panState.clientY;
+    if (rawDeltaX * rawDeltaX + rawDeltaY * rawDeltaY > 16) panState.hasMoved = true;
+    const deltaX = rect.width > 0 ? (rawDeltaX / rect.width) * panState.viewBox.width : 0;
+    const deltaY = rect.height > 0 ? (rawDeltaY / rect.height) * panState.viewBox.height : 0;
     setViewBox({ ...panState.viewBox, x: panState.viewBox.x - deltaX, y: panState.viewBox.y - deltaY });
   });
 
   function finishPan(event: PointerEvent): void {
     if (!panState || panState.pointerId !== event.pointerId) return;
+
+    const clickedCountryId = !panState.hasMoved ? panState.countryId : null;
+    suppressNextCountryClick = true;
     panState = null;
     svg.classList.remove("is-panning");
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+
+    if (clickedCountryId !== null) options.onCountryClick?.(clickedCountryId);
   }
 
   svg.addEventListener("pointerup", finishPan);
   svg.addEventListener("pointercancel", finishPan);
+  svg.addEventListener("click", (event) => {
+    if (suppressNextCountryClick) {
+      suppressNextCountryClick = false;
+      return;
+    }
+
+    const countryId = countryIdFromEventTarget(event.target);
+    if (countryId === null) return;
+    options.onCountryClick?.(countryId);
+  });
   svg.addEventListener("dblclick", resetViewBox);
   zoomInButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
   zoomOutButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
