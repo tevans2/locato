@@ -1,0 +1,25 @@
+app = "locato-staging"
+primary_region = "jnb"
+
+[env]
+  NODE_ENV = "production"
+  ROOM_TTL_SECONDS = "7200"
+  MAX_PLAYERS_PER_ROOM = "8"
+  MAX_ROOMS = "500"
+  ANSWER_RATE_LIMIT_PER_SECOND = "5"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Staging idles at $0: scale to zero when unused, cold-start on the next request.
+  # Trade-off vs prod — a cold start resets in-memory multiplayer rooms. Set
+  # auto_stop_machines = "off" and min_machines_running = 1 to keep staging warm.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

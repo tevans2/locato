@@ -191,10 +191,21 @@
   display: grid;
   place-items: center;
   overflow: hidden;
+  position: relative;
 }
 
 .multiplayer-flag-slot .flag-image {
-  max-height: clamp(190px, 30dvh, 320px);
+  /* Out of flow + sized against the slot's own (track-driven) height. In-flow the image defined
+     the slot's content height, so a "max-height: 100%" was circular and never shrank — letting the
+     flag clip when the result panel grew at round end and squeezed the flag row. Absolute keeps the
+     slot height equal to its grid track, so the cap below always resolves and the flag scales to fit. */
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
 }
 
 .multiplayer-flag-slot .complete-card {
