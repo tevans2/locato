@@ -41,3 +41,14 @@ export const pickCountryCategory: PromptCategory = {
   accepts: (country, guess) => guess.trim().toUpperCase() === country.code,
   reveal: (country) => country.name,
 };
+
+export const capitalsCategory: PromptCategory = {
+  id: "capitals",
+  label: "Capitals",
+  description: "Name the country whose capital city is shown.",
+  eligible: (country) => country.capital.length > 0,
+  prompt: (country) => ({ kind: "text", value: country.capital }),
+  // The capital city is the prompt — only accept the country name, not the city itself.
+  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, false),
+  reveal: (country) => `${country.name} (capital: ${country.capital})`,
+};

@@ -4,8 +4,8 @@ import { createGameEngine } from "../src/core/game";
 import { createSoloSave, hydrateGameState } from "../src/storage/localSave";
 
 const countries = [
-  { name: "Japan", code: "JP", aliases: [], continent: "Asia", flagSrc: "assets/flags/jp.svg" },
-  { name: "Brazil", code: "BR", aliases: [], continent: "South America", flagSrc: "assets/flags/br.svg" },
+  { name: "Japan", code: "JP", aliases: [], continent: "Asia", flagSrc: "assets/flags/jp.svg", capital: "Tokyo", capitalAliases: [] },
+  { name: "Brazil", code: "BR", aliases: [], continent: "South America", flagSrc: "assets/flags/br.svg", capital: "Brasília", capitalAliases: ["Brasilia"] },
 ] as const satisfies readonly RawCountry[];
 
 describe("local save", () => {

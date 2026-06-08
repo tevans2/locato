@@ -51,6 +51,8 @@ export function indexCountries(
     flagSrc: country.flagSrc,
     normalizedName: normalizeAnswer(country.name),
     acceptedAnswers: buildAcceptedAnswers(country, options),
+    capital: country.capital,
+    capitalAliases: [...country.capitalAliases],
   }));
 
   const byCode = new Map<string, Country>();
