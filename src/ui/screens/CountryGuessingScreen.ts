@@ -43,7 +43,7 @@ const WORLD_MAP_MODE_OPTIONS: readonly WorldMapModeOption[] = [
   {
     id: "puzzle",
     label: "Puzzle",
-    description: "Choose a continent, then drag country cutouts into the matching outline.",
+    description: "Choose a continent, place every country by hand, then check your accuracy.",
   },
 ];
 
@@ -180,6 +180,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let puzzleContinent: Continent = "Africa";
   let puzzlePlacedCount = 0;
   let puzzleTotalCount = countryIndex.countries.filter((country) => country.continent === puzzleContinent).length;
+  let puzzleAccuracyPercent: number | null = null;
+  let puzzleChecked = false;
 
   function complete(): boolean {
     if (playMode === "puzzle") return puzzleTotalCount > 0 && puzzlePlacedCount >= puzzleTotalCount;
@@ -278,6 +280,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     foundCount.textContent = String(puzzleModeActive ? puzzlePlacedCount : guessedCountryIds.size);
     remainingCount.textContent = String(puzzleModeActive ? Math.max(0, puzzleTotalCount - puzzlePlacedCount) : Math.max(0, countryIndex.countries.length - guessedCountryIds.size));
     showMissingButton.hidden = puzzleModeActive;
+    checkPuzzleButton.hidden = !puzzleModeActive;
+    checkPuzzleButton.disabled = !puzzleModeActive || !finished;
+    checkPuzzleButton.textContent = puzzleAccuracyPercent === null ? "Check accuracy" : `Accuracy ${puzzleAccuracyPercent}%`;
     showMissingButton.textContent = showMissingCountries ? "Hide missing" : "Show missing";
     showMissingButton.setAttribute("aria-pressed", String(showMissingCountries));
     setWorldMapMissingMarkersVisible(map, showMissingCountries && !puzzleModeActive);
@@ -291,12 +296,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     guessedCountryIds.clear();
     input.value = "";
     lastCountryName.textContent = "None";
+    puzzleAccuracyPercent = null;
+    puzzleChecked = false;
     targetCountryId = playMode === "click-country" ? chooseNextTargetCountryId() : null;
     if (playMode === "puzzle") {
       puzzle.reset();
       const initialPuzzleState = puzzle.getState();
-  puzzlePlacedCount = initialPuzzleState.placedCount;
-  puzzleTotalCount = initialPuzzleState.totalCount;
+      puzzlePlacedCount = initialPuzzleState.placedCount;
+      puzzleTotalCount = initialPuzzleState.totalCount;
     }
     resetTimer();
     render();
@@ -379,26 +386,39 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   function handlePuzzleProgress(progress: PuzzleMapProgress): void {
     puzzlePlacedCount = progress.placedCount;
     puzzleTotalCount = progress.totalCount;
+    puzzleAccuracyPercent = null;
     if (progress.lastCountry) lastCountryName.textContent = progress.lastCountry.name;
     render();
   }
 
-  function handlePuzzleComplete(progress: PuzzleMapProgress): void {
-    handlePuzzleProgress(progress);
+  function handlePuzzleCheck(): void {
+    if (playMode !== "puzzle") return;
 
-    if (timerMode === "count-up") {
-      const finalTimeMs = stopTimer();
-      const isNewBest = updateStoredTimerTimesForCurrentMode(finalTimeMs);
-      renderTimer();
-      showFeedback(
-        feedback,
-        `${puzzleContinent} complete. All ${progress.totalCount} countries placed in ${formatElapsedTime(finalTimeMs)}${isNewBest ? " — new best time." : "."}`,
-        "good",
-      );
+    const accuracy = puzzle.checkAccuracy();
+    puzzlePlacedCount = accuracy.placedCount;
+    puzzleTotalCount = accuracy.totalCount;
+
+    if (!accuracy.complete) {
+      render();
+      showFeedback(feedback, `Place all ${accuracy.totalCount} countries before checking accuracy.`, "neutral");
       return;
     }
 
-    showFeedback(feedback, `${puzzleContinent} complete. All ${progress.totalCount} countries snapped into place.`, "good");
+    const alreadyChecked = puzzleChecked;
+    puzzleChecked = true;
+    puzzleAccuracyPercent = accuracy.accuracyPercent;
+    const baseMessage = `${puzzleContinent} accuracy: ${accuracy.accuracyPercent}%. ${accuracy.closeCount}/${accuracy.totalCount} countries are very close to the correct spot.`;
+
+    if (timerMode === "count-up" && !alreadyChecked) {
+      const finalTimeMs = stopTimer();
+      const isNewBest = updateStoredTimerTimesForCurrentMode(finalTimeMs);
+      render();
+      showFeedback(feedback, `${baseMessage} Time: ${formatElapsedTime(finalTimeMs)}${isNewBest ? " — new best time." : "."}`, accuracy.accuracyPercent >= 75 ? "good" : "neutral");
+      return;
+    }
+
+    render();
+    showFeedback(feedback, baseMessage, accuracy.accuracyPercent >= 75 ? "good" : "neutral");
   }
 
   function setPlayMode(nextMode: CountryGuessPlayMode): void {
@@ -411,7 +431,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       playMode === "click-country"
         ? "Click mode ready. Click the named country on the map; the timer starts on your first correct country."
         : playMode === "puzzle"
-          ? `Puzzle mode ready. Choose a continent, then drag each cutout into ${puzzleContinent}.`
+          ? `Puzzle mode ready. Choose a continent, place every cutout, then check your accuracy.`
           : "Name all countries mode ready. Start typing country names to reveal the map.",
     );
   }
@@ -460,7 +480,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     children: [
       el("label", { className: "country-click-target-label", text: "Puzzle continent", attrs: { for: "puzzle-continent" } }),
       puzzleContinentSelect,
-      el("p", { text: "Drag country cutouts from the tray into the continent outline. Close drops snap into place." }),
+      el("p", { text: "Drag every cutout onto the continent. Nothing snaps into place; press Check accuracy when you are done." }),
     ],
   });
   const timerModeCard = el("div", {
@@ -480,6 +500,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     ],
   });
   const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
+  const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const soloButton = el("button", { className: "ghost-action", text: "Prompt game", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const modeDropdown = createWorldMapModeDropdown({ selectedMode: playMode, signal: controller.signal, onChange: setPlayMode });
@@ -488,9 +509,10 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     onFirstPlacement: startTimerIfNeeded,
     onProgress: (progress) => {
       handlePuzzleProgress(progress);
-      if (playMode === "puzzle" && progress.lastCountry && !progress.complete) showFeedback(feedback, `${progress.lastCountry.name} snapped into place.`, "good");
+      if (playMode === "puzzle" && progress.lastCountry) {
+        showFeedback(feedback, progress.complete ? "All pieces are on the board. Press Check accuracy when you are ready." : `${progress.lastCountry.name} placed.`, "good");
+      }
     },
-    onComplete: handlePuzzleComplete,
   });
   const initialPuzzleState = puzzle.getState();
   puzzlePlacedCount = initialPuzzleState.placedCount;
@@ -518,6 +540,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
+  checkPuzzleButton.addEventListener("click", handlePuzzleCheck, { signal: controller.signal });
 
   puzzleContinentSelect.addEventListener(
     "change",
@@ -528,7 +551,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       handlePuzzleProgress(puzzle.getState());
       resetTimer();
       render();
-      showFeedback(feedback, `${puzzleContinent} puzzle loaded. Drag each country cutout into its outline.`, "neutral");
+      puzzleAccuracyPercent = null;
+      puzzleChecked = false;
+      showFeedback(feedback, `${puzzleContinent} puzzle loaded. Place every country cutout, then check your accuracy.`, "neutral");
     },
     { signal: controller.signal },
   );
@@ -588,7 +613,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
               form,
               statsPanel,
               feedback.element,
-              el("div", { className: "actions", children: [showMissingButton, resetButton, atlas.element] }),
+              el("div", { className: "actions", children: [showMissingButton, checkPuzzleButton, resetButton, atlas.element] }),
             ],
           }),
         ],

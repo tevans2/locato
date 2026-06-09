@@ -4,10 +4,10 @@ import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../
 const SVG_NS = "http://www.w3.org/2000/svg";
 const VIEWBOX_WIDTH = 1000;
 const VIEWBOX_HEIGHT = 500;
-const INITIAL_VIEWBOX_Y = -18;
-const VIEWBOX_VERTICAL_MARGIN = 28;
+const INITIAL_VIEWBOX_Y = 0;
+const VIEWBOX_VERTICAL_MARGIN = 20;
 const DEFAULT_VIEWBOX: ViewBoxState = { x: 0, y: INITIAL_VIEWBOX_Y, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT };
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 24;
 const ZOOM_IN_FACTOR = 0.78;
 const ZOOM_OUT_FACTOR = 1.22;
 const MISSING_DOT_BASE_RADIUS = 2;
@@ -16,6 +16,13 @@ const WHEEL_DELTA_LINE_PIXELS = 40;
 const WHEEL_DELTA_PAGE_PIXELS = 800;
 const MAX_WHEEL_DELTA_PIXELS = 140;
 const MIN_WHEEL_DELTA_PIXELS = 0.35;
+
+const MIN_LONGITUDE = -180;
+const MAX_LONGITUDE = 180;
+const MIN_LATITUDE = -60;
+const MAX_LATITUDE = 85;
+const LONGITUDE_SPAN = MAX_LONGITUDE - MIN_LONGITUDE;
+const LATITUDE_SPAN = MAX_LATITUDE - MIN_LATITUDE;
 
 type ProjectedPoint = readonly [number, number];
 
@@ -52,7 +59,13 @@ function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVG
 }
 
 function project([longitude, latitude]: WorldMapPosition): ProjectedPoint {
-  return [((longitude + 180) / 360) * VIEWBOX_WIDTH, ((90 - latitude) / 180) * VIEWBOX_HEIGHT];
+  const clampedLongitude = clampNumber(longitude, MIN_LONGITUDE, MAX_LONGITUDE);
+  const clampedLatitude = clampNumber(latitude, MIN_LATITUDE, MAX_LATITUDE);
+
+  return [
+    ((clampedLongitude - MIN_LONGITUDE) / LONGITUDE_SPAN) * VIEWBOX_WIDTH,
+    ((MAX_LATITUDE - clampedLatitude) / LATITUDE_SPAN) * VIEWBOX_HEIGHT,
+  ];
 }
 
 function formatPoint(point: WorldMapPosition): string {
@@ -225,7 +238,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   const svg = createSvgElement("svg");
   applyViewBox(svg, DEFAULT_VIEWBOX);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Unlabeled world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("aria-label", "Unlabeled flat world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.setAttribute("class", "world-map-svg");
 
   const mapLayer = createSvgElement("g");
@@ -320,6 +334,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    event.preventDefault();
     panState = {
       pointerId: event.pointerId,
       clientX: event.clientX,
@@ -334,6 +349,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointermove", (event) => {
     if (!panState || panState.pointerId !== event.pointerId) return;
+    event.preventDefault();
     const rect = svg.getBoundingClientRect();
     const rawDeltaX = event.clientX - panState.clientX;
     const rawDeltaY = event.clientY - panState.clientY;
@@ -367,6 +383,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     if (countryId === null) return;
     options.onCountryClick?.(countryId);
   });
+  svg.addEventListener("dragstart", (event) => event.preventDefault());
   svg.addEventListener("dblclick", resetViewBox);
   zoomInButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
   zoomOutButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));

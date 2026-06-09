@@ -368,6 +368,8 @@
     radial-gradient(circle at 50% 44%, rgba(184, 227, 109, 0.08), transparent 56%),
     #090d0a;
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg {
@@ -378,6 +380,7 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg.is-panning {
@@ -680,8 +683,20 @@
 .puzzle-country-piece.is-placed {
   fill: rgba(184, 227, 109, 0.88);
   stroke: rgba(245, 244, 206, 0.98);
-  cursor: default;
+  cursor: grab;
   filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.34));
+}
+
+.puzzle-country-piece.is-accuracy-close {
+  fill: rgba(184, 227, 109, 0.92);
+  stroke: rgba(245, 244, 206, 1);
+  filter: drop-shadow(0 0 10px rgba(184, 227, 109, 0.44));
+}
+
+.puzzle-country-piece.is-accuracy-far {
+  fill: rgba(242, 144, 96, 0.78);
+  stroke: rgba(255, 220, 190, 0.96);
+  filter: drop-shadow(0 0 8px rgba(242, 144, 96, 0.34));
 }
 
 .puzzle-map-hint {

@@ -5,8 +5,10 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const BOARD_WIDTH = 820;
 const BOARD_HEIGHT = 560;
 const BOARD_PADDING = 34;
-const PIECE_SNAP_DISTANCE = 28;
 const MINI_PATH_PADDING_RATIO = 0.16;
+const PERFECT_PLACEMENT_DISTANCE = 6;
+const ZERO_ACCURACY_DISTANCE = 130;
+const CLOSE_PLACEMENT_DISTANCE = 28;
 
 type Point = readonly [number, number];
 
@@ -45,6 +47,15 @@ export interface PuzzleMapProgress {
   readonly complete: boolean;
 }
 
+export interface PuzzleMapAccuracy {
+  readonly placedCount: number;
+  readonly totalCount: number;
+  readonly accuracyPercent: number;
+  readonly averageDistance: number;
+  readonly closeCount: number;
+  readonly complete: boolean;
+}
+
 export interface PuzzleMapViewOptions {
   readonly signal?: AbortSignal;
   readonly onFirstPlacement?: () => void;
@@ -57,6 +68,7 @@ export interface PuzzleMapView {
   readonly setContinent: (continent: Continent) => void;
   readonly reset: () => void;
   readonly getState: () => PuzzleMapProgress;
+  readonly checkAccuracy: () => PuzzleMapAccuracy;
   readonly destroy: () => void;
 }
 
@@ -173,6 +185,38 @@ function pieceProgress(pieces: readonly PuzzlePiece[], lastCountry: Country | nu
   };
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function scorePieceDistance(distance: number): number {
+  if (distance <= PERFECT_PLACEMENT_DISTANCE) return 1;
+  const adjustedDistance = distance - PERFECT_PLACEMENT_DISTANCE;
+  const scoringRange = ZERO_ACCURACY_DISTANCE - PERFECT_PLACEMENT_DISTANCE;
+  return clampNumber(1 - adjustedDistance / scoringRange, 0, 1);
+}
+
+function pieceDistanceFromTarget(piece: PuzzlePiece): number {
+  return piece.placed ? Math.hypot(piece.dx, piece.dy) : ZERO_ACCURACY_DISTANCE;
+}
+
+function pieceAccuracy(pieces: readonly PuzzlePiece[]): PuzzleMapAccuracy {
+  const placedCount = pieces.filter((piece) => piece.placed).length;
+  const totalDistance = pieces.reduce((sum, piece) => sum + pieceDistanceFromTarget(piece), 0);
+  const totalScore = pieces.reduce((sum, piece) => sum + scorePieceDistance(pieceDistanceFromTarget(piece)), 0);
+  const closeCount = pieces.filter((piece) => piece.placed && pieceDistanceFromTarget(piece) <= CLOSE_PLACEMENT_DISTANCE).length;
+  const totalCount = pieces.length;
+
+  return {
+    placedCount,
+    totalCount,
+    accuracyPercent: totalCount > 0 ? Math.round((totalScore / totalCount) * 100) : 0,
+    averageDistance: totalCount > 0 ? totalDistance / totalCount : 0,
+    closeCount,
+    complete: totalCount > 0 && placedCount >= totalCount,
+  };
+}
+
 function createMiniSvg(feature: WorldCountryFeature, countryName: string): SVGSVGElement {
   const svg = createSvgElement("svg");
   svg.setAttribute("aria-hidden", "true");
@@ -237,7 +281,7 @@ export function createPuzzleMapView(
   svg.setAttribute("class", "puzzle-board-svg");
   svg.setAttribute("viewBox", `0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Continent puzzle board. Drag country cutouts into their matching outlines.");
+  svg.setAttribute("aria-label", "Continent puzzle board. Drag country cutouts into position, then check your accuracy.");
 
   const continentLayer = createSvgElement("g");
   continentLayer.setAttribute("class", "puzzle-continent-layer");
@@ -263,7 +307,7 @@ export function createPuzzleMapView(
 
   const hint = document.createElement("p");
   hint.className = "puzzle-map-hint";
-  hint.textContent = "Tip: drag a cutout near its outline and it will snap into place. Turn on borders for an easier guide.";
+  hint.textContent = "Tip: place every cutout where you think it belongs, then use Check accuracy. Turn on borders for an easier guide.";
 
   boardShell.append(svg, borderToggleLabel, hint);
   element.append(boardShell, tray);
@@ -305,25 +349,17 @@ export function createPuzzleMapView(
     const piece = activeDrag.piece;
     cancelActiveDrag();
 
-    const distanceFromHome = Math.hypot(piece.dx, piece.dy);
-    if (distanceFromHome > PIECE_SNAP_DISTANCE) {
-      piece.path.classList.add("is-loose");
-      piece.card.classList.add("is-in-play");
-      return;
-    }
-
-    piece.dx = 0;
-    piece.dy = 0;
+    const wasPlaced = piece.placed;
     piece.visible = true;
     piece.placed = true;
     updatePieceTransform(piece);
-    piece.path.classList.remove("is-loose");
+    piece.path.classList.remove("is-loose", "is-accuracy-close", "is-accuracy-far");
     piece.path.classList.add("is-placed");
     piece.card.hidden = true;
     lastCountry = piece.country;
-    options.onFirstPlacement?.();
-    const progress = emitProgress(piece.country);
-    if (progress.complete) options.onComplete?.(progress);
+
+    if (!wasPlaced) options.onFirstPlacement?.();
+    emitProgress(piece.country);
   }
 
   function moveDrag(event: PointerEvent): void {
@@ -331,13 +367,14 @@ export function createPuzzleMapView(
     event.preventDefault();
     const piece = activeDrag.piece;
     const [x, y] = pointerToSvgPosition(svg, event.clientX, event.clientY);
-    piece.dx = x - activeDrag.pointerOffsetX - piece.correctCenter[0];
-    piece.dy = y - activeDrag.pointerOffsetY - piece.correctCenter[1];
+    const nextCenterX = clampNumber(x - activeDrag.pointerOffsetX, 0, BOARD_WIDTH);
+    const nextCenterY = clampNumber(y - activeDrag.pointerOffsetY, 0, BOARD_HEIGHT);
+    piece.dx = nextCenterX - piece.correctCenter[0];
+    piece.dy = nextCenterY - piece.correctCenter[1];
     updatePieceTransform(piece);
   }
 
   function startDrag(piece: PuzzlePiece, event: PointerEvent): void {
-    if (piece.placed) return;
     event.preventDefault();
     event.stopPropagation();
     cancelActiveDrag();
@@ -354,7 +391,7 @@ export function createPuzzleMapView(
 
     pieceLayer.append(piece.path);
     piece.path.classList.add("is-dragging");
-    piece.path.classList.remove("is-loose");
+    piece.path.classList.remove("is-loose", "is-accuracy-close", "is-accuracy-far");
 
     const abortController = new AbortController();
     const dragSignal = signalAny([abortController.signal, controller.signal, ...(options.signal ? [options.signal] : [])]) ?? abortController.signal;
@@ -441,11 +478,22 @@ export function createPuzzleMapView(
 
   buildContinent(initialContinent);
 
+  function checkAccuracy(): PuzzleMapAccuracy {
+    const accuracy = pieceAccuracy(pieces);
+    for (const piece of pieces) {
+      const isClose = piece.placed && pieceDistanceFromTarget(piece) <= CLOSE_PLACEMENT_DISTANCE;
+      piece.path.classList.toggle("is-accuracy-close", isClose);
+      piece.path.classList.toggle("is-accuracy-far", piece.placed && !isClose);
+    }
+    return accuracy;
+  }
+
   return {
     element,
     setContinent: (nextContinent) => buildContinent(nextContinent),
     reset: () => buildContinent(continent),
     getState: () => currentProgress(),
+    checkAccuracy,
     destroy: () => {
       cancelActiveDrag();
       controller.abort();
