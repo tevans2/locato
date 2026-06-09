@@ -30,7 +30,7 @@
 .mode-select {
   width: auto;
   min-width: 172px;
-  background: rgba(255,255,255,0.035);
+  background-color: rgba(255,255,255,0.035);
 }
 
 .mode-description {
@@ -53,12 +53,25 @@
   gap: 12px;
   min-height: 42px;
   padding: 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.16);
   border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.08), transparent 55%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   user-select: none;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.category-dropdown-summary:hover,
+.category-dropdown[open] .category-dropdown-summary {
+  border-color: rgba(184, 227, 109, 0.42);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.12), transparent 58%),
+    rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .category-dropdown-summary::-webkit-details-marker {
@@ -67,11 +80,15 @@
 
 .category-dropdown-summary::after {
   content: "▾";
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 0.78rem;
+  line-height: 1;
+  transition: transform 140ms ease, color 140ms ease;
 }
 
 .category-dropdown[open] .category-dropdown-summary::after {
+  color: var(--accent);
   transform: rotate(180deg);
 }
 
@@ -85,20 +102,35 @@
 }
 
 .category-dropdown-menu {
-  position: absolute;
-  right: 0;
-  z-index: 20;
-  width: min(300px, calc(100vw - 32px));
-  margin-top: 8px;
+  position: fixed;
+  top: var(--dropdown-top, 0);
+  left: var(--dropdown-left, 0);
+  z-index: 1000;
+  width: var(--dropdown-width, min(300px, calc(100vw - 24px)));
+  max-height: var(--dropdown-max-height, min(360px, calc(100dvh - 24px)));
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-md);
   display: grid;
-  gap: 6px;
-  background: rgba(20, 25, 20, 0.98);
-  box-shadow: var(--shadow);
+  gap: 7px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
+    rgba(16, 20, 16, 0.98);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  animation: dropdown-pop 120ms ease-out;
 }
 
+.dropdown-opens-above .category-dropdown-menu {
+  transform-origin: bottom right;
+}
+
+@keyframes dropdown-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .category-row-label {
   color: var(--muted);
@@ -110,14 +142,30 @@
 .category-option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
   border-radius: var(--radius-sm);
   cursor: pointer;
   user-select: none;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.category-option:hover {
+  border-color: rgba(184, 227, 109, 0.38);
+  background: rgba(184, 227, 109, 0.075);
+}
+
+.category-option:active {
+  transform: translateY(1px);
+}
+
+.category-option:has(input:checked) {
+  border-color: rgba(184, 227, 109, 0.52);
+  background: rgba(184, 227, 109, 0.12);
 }
 
 .category-option input {
@@ -533,12 +581,12 @@
 }
 
 .country-guess-timer-select {
-  min-height: 28px;
-  min-width: 96px;
-  padding: 0 7px;
+  min-height: 30px;
+  min-width: 112px;
+  padding: 0 34px 0 10px;
   font-size: 0.76rem;
   font-weight: 720;
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.045);
 }
 
 .country-guess-stats.timer-is-active .country-guess-mode-card {
@@ -557,10 +605,6 @@
 .country-guess-category-dropdown {
   justify-self: end;
   width: min(300px, 100%);
-}
-
-.country-guess-category-dropdown .category-dropdown-menu {
-  width: min(300px, calc(100vw - 32px));
 }
 
 .country-guess-category-dropdown .category-dropdown-selected {
@@ -821,10 +865,10 @@
 
 .puzzle-continent-select {
   min-height: 42px;
-  padding: 0 10px;
+  padding: 0 38px 0 12px;
   border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.045);
   color: var(--text);
   font: inherit;
   font-weight: 780;
