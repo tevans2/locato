@@ -9,6 +9,7 @@ import { getPlayerEmoji } from "../../core/auth/avatars";
 import { recordGame } from "../../core/auth";
 import { createCategoryDropdown } from "../dom/categoryDropdown";
 import { el } from "../dom/createElement";
+import { enhanceDropdown } from "../dom/dropdown";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
 
@@ -118,6 +119,7 @@ function createMultiplayerModeDropdown(options: {
     ],
   });
   setMode(selectedMode);
+  enhanceDropdown(element, { signal: options.signal, closeOnSelect: true });
 
   return { element, selectedMode: () => selectedMode };
 }

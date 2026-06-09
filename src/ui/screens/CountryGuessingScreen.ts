@@ -2,6 +2,7 @@ import { CONTINENTS, type Continent, type Country, type CountryId, type CountryI
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
+import { enhanceDropdown } from "../dom/dropdown";
 import { createAtlasView, setAtlasOpen, updateAtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
@@ -169,6 +170,7 @@ function createWorldMapModeDropdown(options: {
     ],
   });
   setSelectedMode(selectedMode);
+  enhanceDropdown(element, { signal: options.signal, closeOnSelect: true });
 
   return { element, setSelectedMode };
 }
