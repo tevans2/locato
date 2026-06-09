@@ -1,9 +1,17 @@
 import type { CountryId, CountryIndex } from "../../core/countries";
-import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import {
+  MAP_VIEWBOX_HEIGHT,
+  MAP_VIEWBOX_WIDTH,
+  projectWorldMapPosition,
+  type ProjectedPoint,
+  type WorldCountryFeature,
+  type WorldMapPolygon,
+  type WorldMapPosition,
+} from "../../core/map";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const VIEWBOX_WIDTH = 1000;
-const VIEWBOX_HEIGHT = 500;
+const VIEWBOX_WIDTH = MAP_VIEWBOX_WIDTH;
+const VIEWBOX_HEIGHT = MAP_VIEWBOX_HEIGHT;
 const INITIAL_VIEWBOX_Y = 0;
 const VIEWBOX_VERTICAL_MARGIN = 20;
 const DEFAULT_VIEWBOX: ViewBoxState = { x: 0, y: INITIAL_VIEWBOX_Y, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT };
@@ -16,15 +24,6 @@ const WHEEL_DELTA_LINE_PIXELS = 40;
 const WHEEL_DELTA_PAGE_PIXELS = 800;
 const MAX_WHEEL_DELTA_PIXELS = 140;
 const MIN_WHEEL_DELTA_PIXELS = 0.35;
-
-const MIN_LONGITUDE = -180;
-const MAX_LONGITUDE = 180;
-const MIN_LATITUDE = -60;
-const MAX_LATITUDE = 85;
-const LONGITUDE_SPAN = MAX_LONGITUDE - MIN_LONGITUDE;
-const LATITUDE_SPAN = MAX_LATITUDE - MIN_LATITUDE;
-
-type ProjectedPoint = readonly [number, number];
 
 interface ViewBoxState {
   x: number;
@@ -58,18 +57,8 @@ function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVG
   return document.createElementNS(SVG_NS, tagName);
 }
 
-function project([longitude, latitude]: WorldMapPosition): ProjectedPoint {
-  const clampedLongitude = clampNumber(longitude, MIN_LONGITUDE, MAX_LONGITUDE);
-  const clampedLatitude = clampNumber(latitude, MIN_LATITUDE, MAX_LATITUDE);
-
-  return [
-    ((clampedLongitude - MIN_LONGITUDE) / LONGITUDE_SPAN) * VIEWBOX_WIDTH,
-    ((MAX_LATITUDE - clampedLatitude) / LATITUDE_SPAN) * VIEWBOX_HEIGHT,
-  ];
-}
-
 function formatPoint(point: WorldMapPosition): string {
-  const [x, y] = project(point);
+  const [x, y] = projectWorldMapPosition(point);
   return `${x.toFixed(3)} ${y.toFixed(3)}`;
 }
 
@@ -131,7 +120,7 @@ function centerOfBounds(points: readonly ProjectedPoint[]): ProjectedPoint {
 function polygonArea(polygon: WorldMapPolygon): number {
   const outerRing = polygon[0];
   if (!outerRing) return 0;
-  return Math.abs(ringArea(outerRing.map(project)));
+  return Math.abs(ringArea(outerRing.map(projectWorldMapPosition)));
 }
 
 function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
@@ -150,7 +139,7 @@ function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
   const outerRing = largestPolygon?.[0];
   if (!outerRing || outerRing.length === 0) return null;
 
-  const points = outerRing.map(project);
+  const points = outerRing.map(projectWorldMapPosition);
   return ringCentroid(points) ?? centerOfBounds(points);
 }
 
