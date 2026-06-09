@@ -63,6 +63,69 @@ interface RoundReveal {
   readonly results: readonly RoundResult[];
 }
 
+type MultiplayerPlayMode = "prompt-race" | "spot-country";
+
+const MULTIPLAYER_MODE_OPTIONS: ReadonlyArray<{ readonly id: MultiplayerPlayMode; readonly label: string; readonly description: string }> = [
+  { id: "prompt-race", label: "Mode 1: Prompt race", description: "Race to name countries from flags, outlines, codes, and more." },
+  { id: "spot-country", label: "Mode 2: Spot the country", description: "A country flashes on the map — race to type its name." },
+];
+
+function createMultiplayerModeDropdown(options: {
+  readonly selectedMode: MultiplayerPlayMode;
+  readonly signal: AbortSignal;
+  readonly onChange: (mode: MultiplayerPlayMode) => void;
+}): { readonly element: HTMLElement; readonly selectedMode: () => MultiplayerPlayMode } {
+  let selectedMode = options.selectedMode;
+  const selectedText = el("span", { className: "category-dropdown-selected" });
+
+  const modeControls = MULTIPLAYER_MODE_OPTIONS.map((modeOption) => {
+    const radio = el("input", { attrs: { type: "radio", name: "multiplayer-mode", value: modeOption.id } });
+    radio.checked = modeOption.id === selectedMode;
+    const label = el("label", {
+      className: "category-option",
+      attrs: { title: modeOption.description },
+      children: [radio, el("span", { text: modeOption.label })],
+    });
+    return { modeOption, radio, label };
+  });
+
+  function setMode(mode: MultiplayerPlayMode): void {
+    selectedMode = mode;
+    selectedText.textContent = MULTIPLAYER_MODE_OPTIONS.find((option) => option.id === mode)?.label ?? mode;
+    for (const control of modeControls) control.radio.checked = control.modeOption.id === selectedMode;
+  }
+
+  for (const control of modeControls) {
+    control.radio.addEventListener(
+      "change",
+      () => {
+        if (!control.radio.checked) return;
+        setMode(control.modeOption.id);
+        options.onChange(control.modeOption.id);
+      },
+      { signal: options.signal },
+    );
+  }
+
+  const element = el("details", {
+    className: "category-dropdown",
+    children: [
+      el("summary", {
+        className: "category-dropdown-summary",
+        children: [el("span", { className: "category-row-label", text: "Mode" }), selectedText],
+      }),
+      el("div", { className: "category-dropdown-menu", attrs: { role: "radiogroup", "aria-label": "Multiplayer modes" }, children: modeControls.map((control) => control.label) }),
+    ],
+  });
+  setMode(selectedMode);
+
+  return { element, selectedMode: () => selectedMode };
+}
+
+function categoryIdsForMode(mode: MultiplayerPlayMode, promptCategoryIds: readonly string[]): readonly string[] {
+  return mode === "spot-country" ? ["spot-country"] : promptCategoryIds;
+}
+
 function createBrand(): HTMLElement {
   return el("div", {
     className: "brand-lockup compact",
@@ -119,7 +182,31 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: "Player" } });
   const joinCodeInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: "12", placeholder: "Room code" } });
-  const categoryDropdown = createCategoryDropdown({ categories: multiplayerPromptCategories, selectedIds: ["flags"], signal: controller.signal });
+  const setupTitle = el("h1", { text: "Host or join a flag room" });
+  const setupDescription = el("p", {
+    className: "muted",
+    text: "The server owns rooms, answers, scoring, round timing, and final results. Clients only submit input and render public state.",
+  });
+  const categoryDropdown = createCategoryDropdown({
+    categories: multiplayerPromptCategories.filter((category) => category.id !== "spot-country"),
+    selectedIds: ["flags"],
+    signal: controller.signal,
+  });
+  let playMode: MultiplayerPlayMode = "prompt-race";
+  const modeDropdown = createMultiplayerModeDropdown({
+    selectedMode: playMode,
+    signal: controller.signal,
+    onChange: (mode) => {
+      playMode = mode;
+      categoryDropdown.element.hidden = mode === "spot-country";
+      setupTitle.textContent = mode === "spot-country" ? "Host or join a map race" : "Host or join a flag room";
+      setupDescription.textContent =
+        mode === "spot-country"
+          ? "Countries flash on the world map. Race to type the correct name before your opponents."
+          : "The server owns rooms, answers, scoring, round timing, and final results. Clients only submit input and render public state.";
+      render();
+    },
+  });
   const statusText = el("p", { className: "multiplayer-status", text: feedback });
   const roomCode = el("strong", { className: "room-code", text: "----" });
   const playerList = el("ul", { className: "player-list" });
@@ -136,9 +223,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     className: "multiplayer-card multiplayer-setup",
     children: [
       el("p", { className: "eyebrow", text: "MULTIPLAYER" }),
-      el("h1", { text: "Host or join a flag room" }),
-      el("p", { className: "muted", text: "The server owns rooms, answers, scoring, round timing, and final results. Clients only submit input and render public state." }),
-      el("div", { className: "multiplayer-form-grid", children: [nameInput, categoryDropdown.element, joinCodeInput] }),
+      setupTitle,
+      setupDescription,
+      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, categoryDropdown.element, joinCodeInput] }),
       el("div", { className: "actions", children: [createButton, joinButton, demoButton] }),
     ],
   });
@@ -322,7 +409,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     () => {
       allowSessionPersistence = true;
       const playerName = nameInput.value.trim() || "Player";
-      connectWith(options.createOnlineTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryDropdown.selectedIds() }));
+      connectWith(options.createOnlineTransport(), () =>
+        transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryIdsForMode(modeDropdown.selectedMode(), categoryDropdown.selectedIds()) }),
+      );
     },
     { signal: controller.signal },
   );
@@ -349,7 +438,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       allowSessionPersistence = false;
       clearStoredSession();
       const playerName = nameInput.value.trim() || "Player";
-      connectWith(createMockMultiplayerTransport(), () => transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryDropdown.selectedIds() }));
+      connectWith(createMockMultiplayerTransport(), () =>
+        transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryIdsForMode(modeDropdown.selectedMode(), categoryDropdown.selectedIds()) }),
+      );
     },
     { signal: controller.signal },
   );

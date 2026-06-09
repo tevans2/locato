@@ -17,6 +17,7 @@ const DEMO_ROUNDS: ReadonlyArray<{ readonly prompt: PublicPromptContent; readonl
   { prompt: { kind: "image", value: "assets/country-shapes/ca.svg" }, answer: "canada", reveal: "Canada" },
   { prompt: { kind: "text", value: "BR" }, answer: "brazil", reveal: "Brazil (BR)" },
   { prompt: { kind: "map-click", value: "Japan" }, answer: "jp", reveal: "Japan" },
+  { prompt: { kind: "map-highlight", value: "CA" }, answer: "canada", reveal: "Canada" },
 ];
 
 function createPlayer(id: string, name: string, ready: boolean): PublicPlayerState {

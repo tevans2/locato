@@ -61,7 +61,7 @@
 }
 
 .multiplayer-form-grid > input:first-child,
-.multiplayer-form-grid .category-dropdown {
+.multiplayer-form-grid > .category-dropdown {
   grid-column: 1 / -1;
 }
 
@@ -270,6 +270,17 @@
 
 .multiplayer-map-panel.is-disabled .world-map-svg {
   pointer-events: none;
+}
+
+.multiplayer-map-highlight-prompt {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.multiplayer-map-highlight-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+  text-align: center;
 }
 
 /* Round/intermission countdown. Driven by requestAnimationFrame from the game view; width is set

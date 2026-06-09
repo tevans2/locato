@@ -26,12 +26,45 @@ function latestRoomMessage(connection: TestConnection) {
 }
 
 function countryNameForRound(round: PublicRoundState): string {
-  const country = countryIndex.countries.find((candidate) => (round.prompt.kind === "image" ? candidate.flagSrc === round.prompt.value : candidate.code === round.prompt.value));
+  const country = countryIndex.countries.find((candidate) => {
+    if (round.prompt.kind === "image") return candidate.flagSrc === round.prompt.value;
+    if (round.prompt.kind === "map-highlight") return candidate.code === round.prompt.value;
+    return candidate.code === round.prompt.value;
+  });
   if (!country) throw new Error(`No fixture country for ${round.prompt.value}`);
   return country.name;
 }
 
 describe("multiplayer room", () => {
+  it("races typed country names for map-highlight spot-country rounds without leaking the answer", () => {
+    const room = new Room({
+      code: "ABCDE",
+      hostPlayerId: "host",
+      hostName: "Host",
+      countryIndex,
+      categoryIds: ["spot-country"],
+      seed: "spot-country-seed",
+      now: 1000,
+      roundLimit: 1,
+      roundDurationMs: 30_000,
+    });
+
+    const start = room.startGame("host", 1010);
+    expect(start.ok).toBe(true);
+    const startedRound = start.ok ? start.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
+    expect(startedRound?.prompt.kind).toBe("map-highlight");
+    expect(startedRound?.prompt.value).toMatch(/^[A-Z]{2}$/);
+    expect(startedRound?.prompt.value).not.toBe(countryNameForRound(startedRound!));
+
+    const correctAnswer = countryNameForRound(startedRound!);
+    const correct = room.submitAnswer("host", correctAnswer, 1020);
+    expect(correct.ok).toBe(true);
+    const reveal = correct.ok ? correct.messages.find((message) => message.type === "ROUND_ENDED") : null;
+    expect(reveal?.type).toBe("ROUND_ENDED");
+    if (reveal?.type !== "ROUND_ENDED") throw new Error("Expected round reveal.");
+    expect(reveal.answer).toBe(correctAnswer);
+  });
+
   it("keeps answers private until a round is ended by the authoritative room", () => {
     const room = new Room({
       code: "ABCDE",
