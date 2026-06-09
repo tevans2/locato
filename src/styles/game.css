@@ -431,6 +431,25 @@
   filter: drop-shadow(0 0 5px rgba(184, 227, 109, 0.35));
 }
 
+.world-map-country.is-target {
+  fill: rgba(184, 227, 109, 0.88);
+  stroke: rgba(245, 244, 206, 0.95);
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+  animation: country-flash 1.4s ease-in-out infinite;
+}
+
+@keyframes country-flash {
+  0%, 100% {
+    fill: rgba(184, 227, 109, 0.88);
+    filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+  }
+  50% {
+    fill: rgba(245, 244, 206, 0.92);
+    filter: drop-shadow(0 0 14px rgba(245, 244, 206, 0.7));
+  }
+}
+
 .world-map-country-unplayable {
   fill: rgba(232, 226, 211, 0.04);
   stroke: rgba(232, 226, 211, 0.14);

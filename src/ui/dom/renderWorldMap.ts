@@ -401,6 +401,12 @@ export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: bo
   view.element.classList.toggle("show-missing-countries", visible);
 }
 
+export function setWorldMapTargetCountry(view: WorldMapView, countryId: CountryId | null): void {
+  for (const [id, path] of view.pathByCountryId) {
+    path.classList.toggle("is-target", id === countryId);
+  }
+}
+
 export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>, totalCountries: number): void {
   for (const [countryId, path] of view.pathByCountryId.entries()) {
     const guessed = guessedCountryIds.has(countryId);

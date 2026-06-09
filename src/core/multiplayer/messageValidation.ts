@@ -56,7 +56,7 @@ function isCategoryIdList(value: unknown): value is readonly string[] {
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight") && typeof value.value === "string";
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
