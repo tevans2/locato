@@ -90,6 +90,8 @@ const userStore = new SqliteUserStore(openDatabase(databasePath));
 const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
+// Out-of-band admin credential. When unset, the /api/admin surface is disabled entirely.
+const adminToken = process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.length > 0 ? process.env.ADMIN_TOKEN : null;
 
 // Hourly cleanup of expired session rows; cheap and keeps the table from growing unbounded.
 setInterval(() => authService.pruneExpiredSessions(), 60 * 60 * 1000).unref?.();
@@ -115,7 +117,7 @@ const server = Bun.serve<WebSocketData>({
       return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
     }
 
-    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl);
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, adminToken);
     if (authResponse) return authResponse;
 
     return serveStatic(url.pathname);

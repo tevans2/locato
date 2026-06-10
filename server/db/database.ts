@@ -3,6 +3,8 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type {
+  AdminUserList,
+  AdminUserListQuery,
   CreateSessionInput,
   CreateUserInput,
   GameResult,
@@ -226,5 +228,39 @@ export class SqliteUserStore implements UserStore {
       .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
 
     return { rank: rankRow?.rank ?? 1, timeMs: row.timeMs };
+  }
+
+  listUsers(query: AdminUserListQuery): AdminUserList {
+    const filter = query.query ? "WHERE u.email LIKE $like OR u.display_name LIKE $like" : "";
+    const like = query.query ? `%${query.query}%` : "";
+    const total = this.db
+      .query<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${filter}`)
+      .get(query.query ? { $like: like } : {})!.n;
+    const rows = this.db
+      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; createdAt: number; games: number }>(
+        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+                (u.password_hash IS NOT NULL) AS hasPassword, u.created_at AS createdAt,
+                COALESCE(s.games, 0) AS games
+         FROM users u LEFT JOIN user_stats s ON s.user_id = u.id
+         ${filter}
+         ORDER BY u.created_at DESC
+         LIMIT $limit OFFSET $offset`,
+      )
+      .all(query.query ? { $like: like, $limit: query.limit, $offset: query.offset } : { $limit: query.limit, $offset: query.offset });
+    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, createdAt: row.createdAt, games: row.games })) };
+  }
+
+  // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
+  // user_stats, and mode_best_times.
+  deleteUser(id: string): boolean {
+    if (!this.findUserById(id)) return false;
+    this.db.query("DELETE FROM users WHERE id = ?").run(id);
+    return true;
+  }
+
+  deleteUserSessions(userId: string): number {
+    const count = this.db.query<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?").get(userId)?.n ?? 0;
+    this.db.query("DELETE FROM sessions WHERE user_id = ?").run(userId);
+    return count;
   }
 }

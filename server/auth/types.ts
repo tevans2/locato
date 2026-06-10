@@ -64,6 +64,28 @@ export interface UserLeaderboardRank {
   readonly timeMs: number;
 }
 
+// Admin account controls. Never carries password hashes.
+export interface AdminUserSummary {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly hasPassword: boolean;
+  readonly createdAt: number;
+  readonly games: number;
+}
+
+export interface AdminUserListQuery {
+  readonly query: string | null;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface AdminUserList {
+  readonly users: readonly AdminUserSummary[];
+  readonly total: number;
+}
+
 export interface CreateUserInput {
   readonly id: string;
   readonly email: string;
@@ -98,6 +120,10 @@ export interface UserStore {
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
+  // Admin account controls.
+  listUsers(query: AdminUserListQuery): AdminUserList;
+  deleteUser(id: string): boolean;
+  deleteUserSessions(userId: string): number;
 }
 
 export interface PasswordHasher {

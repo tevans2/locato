@@ -8,6 +8,7 @@ import {
   normalizeLeaderboardVariant,
 } from "../leaderboard/validation";
 import type {
+  AdminUserList,
   AuthUser,
   GameResult,
   LeaderboardEntry,
@@ -26,6 +27,8 @@ const MAX_PASSWORD_LENGTH = 200;
 const MAX_DISPLAY_NAME_LENGTH = 32;
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_ADMIN_PAGE = 50;
+const MAX_ADMIN_PAGE = 200;
 
 export interface AuthServiceOptions {
   readonly sessionTtlMs: number;
@@ -185,6 +188,28 @@ export class AuthService {
 
   getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
     return this.store.getUserRank(userId, gameMode, variant);
+  }
+
+  // --- Admin account controls ---
+
+  listUsers(query: { q?: unknown; limit?: unknown; offset?: unknown }): AdminUserList {
+    const search = typeof query.q === "string" && query.q.trim().length > 0 ? query.q.trim() : null;
+    const limit = typeof query.limit === "number" && Number.isInteger(query.limit) ? Math.min(Math.max(query.limit, 1), MAX_ADMIN_PAGE) : DEFAULT_ADMIN_PAGE;
+    const offset = typeof query.offset === "number" && Number.isInteger(query.offset) && query.offset > 0 ? query.offset : 0;
+    return this.store.listUsers({ query: search, limit, offset });
+  }
+
+  getUserDetail(id: string): { user: AuthUser; stats: UserStats } | null {
+    const user = this.store.findUserById(id);
+    return user ? { user: this.toAuthUser(user), stats: this.store.getStats(id) } : null;
+  }
+
+  deleteUser(id: string): boolean {
+    return this.store.deleteUser(id);
+  }
+
+  revokeUserSessions(id: string): number {
+    return this.store.deleteUserSessions(id);
   }
 
   private allowSubmit(userId: string): boolean {

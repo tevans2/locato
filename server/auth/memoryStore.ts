@@ -1,4 +1,6 @@
 import type {
+  AdminUserList,
+  AdminUserListQuery,
   CreateSessionInput,
   CreateUserInput,
   GameResult,
@@ -118,6 +120,46 @@ export function createMemoryUserStore(): UserStore {
           .filter((entry) => entry.timeMs < row.timeMs || (entry.timeMs === row.timeMs && entry.achievedAt < row.achievedAt)).length + 1;
 
       return { rank, timeMs: row.timeMs };
+    },
+    listUsers(query: AdminUserListQuery): AdminUserList {
+      const needle = query.query?.toLowerCase() ?? null;
+      const matched = [...usersById.values()]
+        .filter((user) => needle === null || user.email.toLowerCase().includes(needle) || user.displayName.toLowerCase().includes(needle))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      const page = matched.slice(query.offset, query.offset + query.limit);
+      return {
+        total: matched.length,
+        users: page.map((user) => ({
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          avatarEmoji: user.avatarEmoji,
+          hasPassword: user.passwordHash !== null,
+          createdAt: user.createdAt,
+          games: (stats.get(user.id) ?? EMPTY_STATS).games,
+        })),
+      };
+    },
+    deleteUser(id: string): boolean {
+      const user = usersById.get(id);
+      if (!user) return false;
+      usersById.delete(id);
+      usersByEmail.delete(user.email);
+      for (const [key, value] of usersByOAuth) if (value.id === id) usersByOAuth.delete(key);
+      for (const [key, session] of sessions) if (session.userId === id) sessions.delete(key);
+      for (const [key, entry] of bestTimes) if (entry.userId === id) bestTimes.delete(key);
+      stats.delete(id);
+      return true;
+    },
+    deleteUserSessions(userId: string): number {
+      let removed = 0;
+      for (const [key, session] of sessions) {
+        if (session.userId === userId) {
+          sessions.delete(key);
+          removed += 1;
+        }
+      }
+      return removed;
     },
   };
 }
