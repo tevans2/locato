@@ -1,9 +1,10 @@
 import { type Country, type CountryIndex } from "../../core/countries";
-import { getCategory, soloPromptCategories } from "../../core/categories";
+import { getCategory } from "../../core/categories";
+import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
-import { createCategoryDropdown } from "../dom/categoryDropdown";
+import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/renderFeedback";
@@ -13,11 +14,10 @@ import { createStatsView, updateStatsView, type StatsView } from "../dom/renderS
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
-  readonly categoryIds: readonly string[];
-  readonly onCategoryChange: (categoryIds: readonly string[]) => void;
+  readonly selectedGameMode: GameModeId;
+  readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
-  readonly onCountryGuessing: () => void;
   readonly onMultiplayer: () => void;
   readonly authControls?: AuthControls;
 }
@@ -87,10 +87,16 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const hintButton = el("button", { className: "secondary-action", text: "Hint", attrs: { type: "button" } });
   const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
-  const countryGuessingButton = el("button", { className: "ghost-action", text: "World map", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
 
-  const categoryDropdown = createCategoryDropdown({ categories: soloPromptCategories, selectedIds: options.categoryIds, signal: controller.signal, onChange: options.onCategoryChange });
+  const gameModeDropdown = createGameModeDropdown({
+    selectedMode: options.selectedGameMode,
+    signal: controller.signal,
+    onChange: (gameMode) => {
+      if (isPromptGameModeId(gameMode) && gameMode === engine.getState().categoryIds[0] && engine.getState().categoryIds.length === 1) return;
+      options.onGameModeChange(gameMode);
+    },
+  });
 
   const form = el("form", {
     className: "guess-form",
@@ -161,7 +167,6 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     { signal: controller.signal },
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
-  countryGuessingButton.addEventListener("click", options.onCountryGuessing, { signal: controller.signal });
 
   document.addEventListener(
     "keydown",
@@ -195,16 +200,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("header", {
         className: "game-header",
         children: [
-          logo,
-          el("div", {
-            className: "mode-controls",
-            children: [
-              el("div", {
-                className: "mode-select-row",
-                children: [categoryDropdown.element, countryGuessingButton, multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])],
-              }),
-            ],
-          }),
+          el("div", { className: "game-header-left", children: [logo, gameModeDropdown.element] }),
+          el("div", { className: "game-header-actions", children: [multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])] }),
         ],
       }),
       el("div", {

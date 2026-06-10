@@ -1,6 +1,7 @@
 import { type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
+import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
@@ -65,17 +66,26 @@ export function createApp(options: AppOptions): App {
       createSoloGameScreen({
         countryIndex: options.countryIndex,
         engine,
-        categoryIds: activeCategories,
-        onCategoryChange: (nextCategoryIds) => {
-          clearSoloSave(options.storage);
-          startSolo(nextCategoryIds, false);
-        },
+        selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onReset: () => clearSoloSave(options.storage),
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
-        onCountryGuessing: () => navigate({ type: "country-guessing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
       }),
     );
+  }
+
+  function handleGameModeChange(gameMode: GameModeId): void {
+    clearSoloSave(options.storage);
+
+    if (isPromptGameModeId(gameMode)) {
+      startSolo([gameMode], false);
+      return;
+    }
+
+    if (isWorldMapGameModeId(gameMode)) {
+      navigate({ type: "country-guessing", mode: gameMode });
+    }
   }
 
   function createLoadingScreen(message: string): Screen {
@@ -89,7 +99,7 @@ export function createApp(options: AppOptions): App {
     };
   }
 
-  async function startCountryGuessing(): Promise<void> {
+  async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all"): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading world map...");
     mount(loading);
@@ -106,10 +116,8 @@ export function createApp(options: AppOptions): App {
           countryIndex: options.countryIndex,
           worldCountryFeatures,
           storage: options.storage,
-          onBackToSolo: () => {
-            const save = readSoloSave(options.storage);
-            startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
-          },
+          initialMode,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
         }),
       );
@@ -161,7 +169,7 @@ export function createApp(options: AppOptions): App {
     }
 
     if (route.type === "country-guessing") {
-      startCountryGuessing();
+      void startCountryGuessing(route.mode ?? "name-all");
       return;
     }
 

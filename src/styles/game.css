@@ -873,3 +873,65 @@
   font: inherit;
   font-weight: 780;
 }
+
+.game-header-left,
+.game-header-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.game-header-left {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+.game-header-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.game-mode-dropdown {
+  width: min(340px, 100%);
+}
+
+.game-mode-dropdown .category-dropdown-menu {
+  width: var(--dropdown-width, min(380px, calc(100vw - 24px)));
+}
+
+.game-mode-group-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  padding: 4px 4px 0;
+  text-transform: uppercase;
+}
+
+.game-mode-option {
+  align-items: flex-start;
+  min-height: 52px;
+}
+
+.game-mode-option input {
+  margin-top: 3px;
+}
+
+.game-mode-option-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.game-mode-option-label {
+  color: var(--text);
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.game-mode-option-description {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
