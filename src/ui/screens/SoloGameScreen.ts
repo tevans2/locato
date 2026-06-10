@@ -1,7 +1,11 @@
+import type { AuthUser } from "../../core/auth";
+import { submitBestTime } from "../../core/auth";
 import { type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
+import { timerKeysForMode } from "../../core/timer/keys";
+import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
@@ -15,10 +19,13 @@ export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly selectedGameMode: GameModeId;
+  readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
   readonly onMultiplayer: () => void;
+  readonly onLeaderboard: () => void;
+  readonly getAuthUser: () => AuthUser | null;
   readonly authControls?: AuthControls;
 }
 
@@ -32,42 +39,6 @@ interface SoloViews {
 function visibleCountries(index: CountryIndex, state: GameState): readonly Country[] {
   const ids = new Set(state.poolCountryIds);
   return index.countries.filter((country) => ids.has(country.id));
-}
-
-function applyEvents(events: readonly GameEvent[], views: SoloViews, index: CountryIndex): void {
-  for (const event of events) {
-    if (event.type === "GUESS_CORRECT") {
-      const country = index.byId[event.countryId];
-      if (country) showFeedback(views.feedback, `Correct: ${country.name}. +${event.points} points.`, "good");
-      continue;
-    }
-
-    if (event.type === "GUESS_WRONG") {
-      showFeedback(views.feedback, "Not quite. Streak reset, prompt still live.", "bad");
-      continue;
-    }
-
-    if (event.type === "ROUND_SKIPPED") {
-      showFeedback(views.feedback, "Skipped. Streak reset — this prompt can return later.", "neutral");
-      continue;
-    }
-
-    if (event.type === "HINT_REVEALED") {
-      showFeedback(views.feedback, `${event.hint.title}: ${event.hint.message}`, "neutral");
-      continue;
-    }
-
-    if (event.type === "ANSWER_REVEALED") {
-      const country = index.byId[event.countryId];
-      if (country) showFeedback(views.feedback, `Answer: ${country.name}.`, "bad");
-      continue;
-    }
-
-    if (event.type === "GAME_COMPLETED") {
-      showFeedback(views.feedback, "Complete. Every prompt in this mix has been solved.", "good");
-      continue;
-    }
-  }
 }
 
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
@@ -88,6 +59,99 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
+  const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
+  const timerModeSelect = el("select", {
+    className: "country-guess-timer-select",
+    attrs: { id: "solo-timer-mode", name: "timerMode", "aria-label": "Solo timer mode" },
+    children: [
+      el("option", { text: "Practice", attrs: { value: "off" } }),
+      el("option", { text: "Timer", attrs: { value: "count-up" } }),
+    ],
+  });
+  const timerElapsed = el("strong", { className: "stat-value", text: "—" });
+  const timerLast = el("strong", { className: "stat-value", text: "—" });
+  const timerBest = el("strong", { className: "stat-value", text: "—" });
+  const timerPanel = el("div", {
+    className: "stats-panel country-guess-stats solo-timer-stats",
+    children: [
+      el("div", {
+        className: "stat-card country-guess-mode-card",
+        children: [el("label", { className: "stat-label", text: "Mode", attrs: { for: "solo-timer-mode" } }), timerModeSelect],
+      }),
+      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Time" }), timerElapsed] }),
+      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Previous" }), timerLast] }),
+      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
+    ],
+  });
+
+  let playTimer: PlayTimer;
+
+  function renderTimer(): void {
+    timerModeSelect.value = playTimer.mode;
+    timerPanel.classList.toggle("timer-is-active", playTimer.mode === "count-up");
+    timerElapsed.textContent = playTimer.mode === "count-up" ? formatElapsedTime(playTimer.currentElapsedMs()) : "—";
+    timerLast.textContent = formatStoredTime(playTimer.readLast());
+    timerBest.textContent = formatStoredTime(playTimer.readBest());
+  }
+
+  function finishTimerRun(finalTimeMs: number): boolean {
+    const isNewBest = playTimer.writeCompletion(finalTimeMs);
+    if (isNewBest && options.getAuthUser()) {
+      void submitBestTime({
+        gameMode: options.selectedGameMode,
+        variant: "",
+        timeMs: finalTimeMs,
+      });
+    }
+    return isNewBest;
+  }
+
+  function applyEvents(events: readonly GameEvent[]): void {
+    for (const event of events) {
+      if (event.type === "GUESS_CORRECT") {
+        playTimer.startIfNeeded();
+        const country = countryIndex.byId[event.countryId];
+        if (country) showFeedback(views.feedback, `Correct: ${country.name}. +${event.points} points.`, "good");
+        continue;
+      }
+
+      if (event.type === "GUESS_WRONG") {
+        showFeedback(views.feedback, "Not quite. Streak reset, prompt still live.", "bad");
+        continue;
+      }
+
+      if (event.type === "ROUND_SKIPPED") {
+        showFeedback(views.feedback, "Skipped. Streak reset — this prompt can return later.", "neutral");
+        continue;
+      }
+
+      if (event.type === "HINT_REVEALED") {
+        showFeedback(views.feedback, `${event.hint.title}: ${event.hint.message}`, "neutral");
+        continue;
+      }
+
+      if (event.type === "ANSWER_REVEALED") {
+        const country = countryIndex.byId[event.countryId];
+        if (country) showFeedback(views.feedback, `Answer: ${country.name}.`, "bad");
+        continue;
+      }
+
+      if (event.type === "GAME_COMPLETED") {
+        if (playTimer.mode === "count-up") {
+          const finalTimeMs = playTimer.stop();
+          const isNewBest = finishTimerRun(finalTimeMs);
+          const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
+          showFeedback(
+            views.feedback,
+            `Complete. Every prompt solved in ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`,
+            "good",
+          );
+        } else {
+          showFeedback(views.feedback, "Complete. Every prompt in this mix has been solved.", "good");
+        }
+      }
+    }
+  }
 
   const gameModeDropdown = createGameModeDropdown({
     selectedMode: options.selectedGameMode,
@@ -103,6 +167,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     children: [el("label", { text: "Your guess", attrs: { for: "guess-input" } }), el("div", { className: "input-row", children: [input, submitButton] })],
   });
 
+  function resetRun(message: string): void {
+    setAtlasOpen(atlas, false);
+    updateAtlasView(atlas, countries, new Set());
+    options.onReset();
+    playTimer.reset();
+    dispatchAndRender(engine.dispatch({ type: "RESET_GAME", now: Date.now() }));
+    showFeedback(feedback, message, "neutral");
+  }
+
   function render(persist = true): void {
     const state = engine.getState();
     const current = getCurrentCountry(countryIndex, state);
@@ -117,15 +190,23 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     hintButton.disabled = !playing;
     hintButton.textContent = state.hintLevel >= TOTAL_HINTS ? "Reveal answer" : "Hint";
     skipButton.disabled = !playing;
+    renderTimer();
     if (persist) options.onStateChange(state);
   }
 
   function dispatchAndRender(events: readonly GameEvent[], persist = true): void {
-    applyEvents(events, views, countryIndex);
+    applyEvents(events);
     render(persist);
     if (events.some((event) => event.type === "GUESS_CORRECT")) input.value = "";
     if (engine.getState().status === "playing") input.focus();
   }
+
+  playTimer = createPlayTimer({
+    storage: options.storage,
+    keys: timerKeysForMode(options.selectedGameMode),
+    isComplete: () => engine.getState().status === "complete",
+    onTick: renderTimer,
+  });
 
   form.addEventListener(
     "submit",
@@ -158,15 +239,21 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   resetButton.addEventListener(
     "click",
     () => {
-      setAtlasOpen(atlas, false);
-      updateAtlasView(atlas, countries, new Set());
-      options.onReset();
-      dispatchAndRender(engine.dispatch({ type: "RESET_GAME", now: Date.now() }));
-      showFeedback(feedback, "Fresh run started.", "neutral");
+      resetRun(playTimer.mode === "count-up" ? "Timer reset. Start with your first correct answer." : "Fresh run started.");
+    },
+    { signal: controller.signal },
+  );
+  timerModeSelect.addEventListener(
+    "change",
+    () => {
+      const nextMode: PlayTimerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
+      playTimer.setMode(nextMode);
+      resetRun(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct answer." : "Practice mode ready.");
     },
     { signal: controller.signal },
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
 
   document.addEventListener(
     "keydown",
@@ -201,7 +288,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [logo, gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])] }),
+          el("div", {
+            className: "game-header-actions",
+            children: [leaderboardButton, multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])],
+          }),
         ],
       }),
       el("div", {
@@ -213,6 +303,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             children: [
               el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" })] }),
               form,
+              timerPanel,
               stats.element,
               feedback.element,
               el("div", { className: "actions", children: [hintButton, skipButton, resetButton, atlas.element] }),
@@ -229,6 +320,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   return {
     element,
     destroy: () => {
+      playTimer.destroy();
       controller.abort();
     },
   };

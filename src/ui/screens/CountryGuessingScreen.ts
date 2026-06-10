@@ -1,6 +1,10 @@
+import type { AuthUser } from "../../core/auth";
+import { submitBestTime } from "../../core/auth";
 import { CONTINENTS, type Continent, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../../core/gameModes";
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
+import { timerKeysForMode } from "../../core/timer/keys";
+import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
@@ -16,68 +20,11 @@ export interface CountryGuessingScreenOptions {
   readonly initialMode: WorldMapGameModeId;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onMultiplayer: () => void;
+  readonly onLeaderboard: () => void;
+  readonly getAuthUser: () => AuthUser | null;
 }
 
 type CountryGuessPlayMode = WorldMapGameModeId;
-type CountryGuessTimerMode = "off" | "count-up";
-
-const COUNTRY_GUESS_TIMER_KEYS: Record<CountryGuessPlayMode, { readonly last: string; readonly best: string }> = {
-  "name-all": {
-    last: "locato:country-guessing:timer-last-ms:v1",
-    best: "locato:country-guessing:timer-best-ms:v1",
-  },
-  "click-country": {
-    last: "locato:country-guessing:click-country:timer-last-ms:v1",
-    best: "locato:country-guessing:click-country:timer-best-ms:v1",
-  },
-  "spot-country": {
-    last: "locato:country-guessing:spot-country:timer-last-ms:v1",
-    best: "locato:country-guessing:spot-country:timer-best-ms:v1",
-  },
-  puzzle: {
-    last: "locato:country-guessing:puzzle:timer-last-ms:v1",
-    best: "locato:country-guessing:puzzle:timer-best-ms:v1",
-  },
-};
-
-function readStoredTime(storage: Storage, key: string): number | null {
-  try {
-    const raw = storage.getItem(key);
-    if (!raw) return null;
-
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredTime(storage: Storage, key: string, elapsedMs: number): void {
-  try {
-    storage.setItem(key, String(Math.max(1, Math.round(elapsedMs))));
-  } catch {
-    // Ignore storage failures so the game still works in private or locked-down browsers.
-  }
-}
-
-function formatElapsedTime(elapsedMs: number): string {
-  const safeElapsedMs = Math.max(0, Math.floor(elapsedMs));
-  const totalSeconds = Math.floor(safeElapsedMs / 1000);
-  const tenths = Math.floor((safeElapsedMs % 1000) / 100);
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths}`;
-}
-
-function formatStoredTime(elapsedMs: number | null): string {
-  return elapsedMs === null ? "—" : formatElapsedTime(elapsedMs);
-}
 
 function createLogo(): HTMLElement {
   return el("div", {
@@ -92,12 +39,6 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const { countryIndex } = options;
   let playMode: CountryGuessPlayMode = options.initialMode;
   let showMissingCountries = false;
-  let timerMode: CountryGuessTimerMode = "off";
-  let timerStartedAt: number | null = null;
-  let timerElapsedMs = 0;
-  let timerIntervalId: number | null = null;
-  let lastTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].last);
-  let bestTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].best);
   let targetCountryId: CountryId | null = null;
   let puzzleContinent: Continent = "Africa";
   let puzzlePlacedCount = 0;
@@ -124,56 +65,24 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     return targetCountryId === null ? null : countryIndex.byId[targetCountryId] ?? null;
   }
 
-  function currentElapsedMs(): number {
-    return timerStartedAt === null ? timerElapsedMs : Date.now() - timerStartedAt;
-  }
+  let playTimer: PlayTimer;
 
   function renderTimer(): void {
-    timerModeSelect.value = timerMode;
-    statsPanel.classList.toggle("timer-is-active", timerMode === "count-up");
-    timerElapsed.textContent = timerMode === "count-up" ? formatElapsedTime(currentElapsedMs()) : "—";
-    timerLast.textContent = formatStoredTime(lastTimerMs);
-    timerBest.textContent = formatStoredTime(bestTimerMs);
+    timerModeSelect.value = playTimer.mode;
+    statsPanel.classList.toggle("timer-is-active", playTimer.mode === "count-up");
+    timerElapsed.textContent = playTimer.mode === "count-up" ? formatElapsedTime(playTimer.currentElapsedMs()) : "—";
+    timerLast.textContent = formatStoredTime(playTimer.readLast());
+    timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
-  function clearTimerInterval(): void {
-    if (timerIntervalId !== null) {
-      window.clearInterval(timerIntervalId);
-      timerIntervalId = null;
-    }
-  }
-
-  function startTimerIfNeeded(): void {
-    if (timerMode !== "count-up" || timerStartedAt !== null || complete()) return;
-
-    timerStartedAt = Date.now() - timerElapsedMs;
-    timerIntervalId = window.setInterval(renderTimer, 100);
-    renderTimer();
-  }
-
-  function stopTimer(): number {
-    timerElapsedMs = currentElapsedMs();
-    timerStartedAt = null;
-    clearTimerInterval();
-    renderTimer();
-    return timerElapsedMs;
-  }
-
-  function resetTimer(): void {
-    timerStartedAt = null;
-    timerElapsedMs = 0;
-    clearTimerInterval();
-    renderTimer();
-  }
-
-  function updateStoredTimerTimesForCurrentMode(finalTimeMs: number): boolean {
-    const keys = COUNTRY_GUESS_TIMER_KEYS[playMode];
-    lastTimerMs = finalTimeMs;
-    writeStoredTime(options.storage, keys.last, finalTimeMs);
-    const isNewBest = bestTimerMs === null || finalTimeMs < bestTimerMs;
-    if (isNewBest) {
-      bestTimerMs = finalTimeMs;
-      writeStoredTime(options.storage, keys.best, finalTimeMs);
+  function finishTimerRun(finalTimeMs: number): boolean {
+    const isNewBest = playTimer.writeCompletion(finalTimeMs);
+    if (isNewBest && options.getAuthUser()) {
+      void submitBestTime({
+        gameMode: playMode,
+        variant: playMode === "puzzle" ? puzzleContinent : "",
+        timeMs: finalTimeMs,
+      });
     }
     return isNewBest;
   }
@@ -238,14 +147,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       puzzlePlacedCount = initialPuzzleState.placedCount;
       puzzleTotalCount = initialPuzzleState.totalCount;
     }
-    resetTimer();
+    playTimer.reset();
     render();
     showFeedback(feedback, feedbackMessage, "neutral");
     if (playMode === "name-all" || playMode === "spot-country") input.focus();
   }
 
   function recordGuess(country: Country): void {
-    startTimerIfNeeded();
+    playTimer.startIfNeeded();
     guessedCountryIds.add(country.id);
     lastCountryName.textContent = country.name;
     if ((playMode === "click-country" || playMode === "spot-country") && !complete()) setNextTargetCountry();
@@ -253,13 +162,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     input.value = "";
 
     if (complete()) {
-      if (timerMode === "count-up") {
-        const finalTimeMs = stopTimer();
-        const isNewBest = updateStoredTimerTimesForCurrentMode(finalTimeMs);
-        renderTimer();
+      if (playTimer.mode === "count-up") {
+        const finalTimeMs = playTimer.stop();
+        const isNewBest = finishTimerRun(finalTimeMs);
+        const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
         showFeedback(
           feedback,
-          `World complete. All ${countryIndex.countries.length} countries found in ${formatElapsedTime(finalTimeMs)}${isNewBest ? " — new best time." : "."}`,
+          `World complete. All ${countryIndex.countries.length} countries found in ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`,
           "good",
         );
         return;
@@ -374,11 +283,12 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     puzzleAccuracyPercent = accuracy.accuracyPercent;
     const baseMessage = `${puzzleContinent} accuracy: ${accuracy.accuracyPercent}%. ${accuracy.closeCount}/${accuracy.totalCount} countries are very close to the correct spot.`;
 
-    if (timerMode === "count-up" && !alreadyChecked) {
-      const finalTimeMs = stopTimer();
-      const isNewBest = updateStoredTimerTimesForCurrentMode(finalTimeMs);
+    if (playTimer.mode === "count-up" && !alreadyChecked) {
+      const finalTimeMs = playTimer.stop();
+      const isNewBest = finishTimerRun(finalTimeMs);
+      const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
       render();
-      showFeedback(feedback, `${baseMessage} Time: ${formatElapsedTime(finalTimeMs)}${isNewBest ? " — new best time." : "."}`, accuracy.accuracyPercent >= 75 ? "good" : "neutral");
+      showFeedback(feedback, `${baseMessage} Time: ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`, accuracy.accuracyPercent >= 75 ? "good" : "neutral");
       return;
     }
 
@@ -390,8 +300,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (playMode === nextMode) return;
     playMode = nextMode;
     gameModeDropdown.setSelectedMode(nextMode);
-    lastTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].last);
-    bestTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].best);
+    playTimer.destroy();
+    playTimer = createPlayTimer({
+      storage: options.storage,
+      keys: timerKeysForMode(playMode),
+      isComplete: complete,
+      onTick: renderTimer,
+    });
     resetGame(
       playMode === "click-country"
         ? "Click mode ready. Click the named country on the map; the timer starts on your first correct country."
@@ -476,6 +391,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
+  const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
   const gameModeDropdown = createGameModeDropdown({
     selectedMode: playMode,
     signal: controller.signal,
@@ -487,9 +403,16 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       options.onGameModeChange(gameMode);
     },
   });
+  playTimer = createPlayTimer({
+    storage: options.storage,
+    keys: timerKeysForMode(playMode),
+    isComplete: complete,
+    onTick: renderTimer,
+  });
+
   const puzzle = createPuzzleMapView(options.worldCountryFeatures, countryIndex, puzzleContinent, {
     signal: controller.signal,
-    onFirstPlacement: startTimerIfNeeded,
+    onFirstPlacement: () => playTimer.startIfNeeded(),
     onProgress: (progress) => {
       handlePuzzleProgress(progress);
       if (playMode === "puzzle" && progress.lastCountry) {
@@ -541,7 +464,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       puzzleContinent = nextContinent;
       puzzle.setContinent(puzzleContinent);
       handlePuzzleProgress(puzzle.getState());
-      resetTimer();
+      playTimer.reset();
       render();
       puzzleAccuracyPercent = null;
       puzzleChecked = false;
@@ -552,8 +475,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   timerModeSelect.addEventListener(
     "change",
     () => {
-      timerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
-      resetGame(timerMode === "count-up" ? "Timer mode ready. The clock starts on your first correct country." : "Practice mode ready.");
+      const nextMode: PlayTimerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
+      playTimer.setMode(nextMode);
+      resetGame(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct country." : "Practice mode ready.");
     },
     { signal: controller.signal },
   );
@@ -561,7 +485,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     "click",
     () => {
       resetGame(
-        timerMode === "count-up"
+        playTimer.mode === "count-up"
           ? "Timer reset. Start with your first correct move."
           : playMode === "click-country"
             ? "Fresh click challenge ready."
@@ -575,6 +499,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     { signal: controller.signal },
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
   atlas.openButton.addEventListener("click", () => setAtlasOpen(atlas, true), { signal: controller.signal });
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
   atlas.overlay.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
@@ -586,7 +511,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [leaderboardButton, multiplayerButton] }),
         ],
       }),
       el("div", {
@@ -629,7 +554,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   return {
     element,
     destroy: () => {
-      clearTimerInterval();
+      playTimer.destroy();
       puzzle.destroy();
       controller.abort();
     },

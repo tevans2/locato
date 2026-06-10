@@ -1,4 +1,17 @@
-import type { CreateSessionInput, CreateUserInput, GameResult, Session, StoredUser, UserStats, UserStore } from "./types";
+import type {
+  CreateSessionInput,
+  CreateUserInput,
+  GameResult,
+  LeaderboardEntry,
+  LeaderboardQuery,
+  Session,
+  StoredUser,
+  SubmitBestTimeInput,
+  SubmitBestTimeResult,
+  UserLeaderboardRank,
+  UserStats,
+  UserStore,
+} from "./types";
 
 const EMPTY_STATS: UserStats = { games: 0, correctAnswers: 0, wrongAnswers: 0, bestStreak: 0 };
 
@@ -10,6 +23,11 @@ export function createMemoryUserStore(): UserStore {
   const usersByOAuth = new Map<string, StoredUser>();
   const sessions = new Map<string, Session>();
   const stats = new Map<string, UserStats>();
+  const bestTimes = new Map<string, { userId: string; gameMode: string; variant: string; timeMs: number; achievedAt: number }>();
+
+  function bestTimeKey(userId: string, gameMode: string, variant: string): string {
+    return `${userId}:${gameMode}:${variant}`;
+  }
 
   return {
     createUser(input: CreateUserInput): StoredUser {
@@ -63,6 +81,43 @@ export function createMemoryUserStore(): UserStore {
       };
       stats.set(userId, next);
       return next;
+    },
+    submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
+      const key = bestTimeKey(userId, input.gameMode, input.variant);
+      const existing = bestTimes.get(key);
+      if (existing && input.timeMs >= existing.timeMs) {
+        return { accepted: false, isPersonalBest: false };
+      }
+      bestTimes.set(key, { userId, gameMode: input.gameMode, variant: input.variant, timeMs: input.timeMs, achievedAt: input.achievedAt });
+      return { accepted: true, isPersonalBest: true };
+    },
+    getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[] {
+      const rows = [...bestTimes.values()]
+        .filter((row) => row.gameMode === query.gameMode && row.variant === query.variant)
+        .sort((a, b) => (a.timeMs !== b.timeMs ? a.timeMs - b.timeMs : a.achievedAt - b.achievedAt));
+
+      return rows.slice(query.offset, query.offset + query.limit).map((row, index) => {
+        const user = usersById.get(row.userId);
+        return {
+          rank: query.offset + index + 1,
+          userId: row.userId,
+          displayName: user?.displayName ?? "Player",
+          avatarEmoji: user?.avatarEmoji ?? null,
+          timeMs: row.timeMs,
+          achievedAt: row.achievedAt,
+        };
+      });
+    },
+    getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
+      const row = bestTimes.get(bestTimeKey(userId, gameMode, variant));
+      if (!row) return null;
+
+      const rank =
+        [...bestTimes.values()]
+          .filter((entry) => entry.gameMode === gameMode && entry.variant === variant)
+          .filter((entry) => entry.timeMs < row.timeMs || (entry.timeMs === row.timeMs && entry.achievedAt < row.achievedAt)).length + 1;
+
+      return { rank, timeMs: row.timeMs };
     },
   };
 }

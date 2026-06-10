@@ -8,6 +8,7 @@ import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map"
 import { createCountryGuessingScreen } from "../ui/screens/CountryGuessingScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
+import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import type { AppRoute, Screen } from "./router";
 
@@ -38,6 +39,7 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
+  let returnRoute: AppRoute = { type: "solo-game", continueSaved: true };
 
   // Account controls persist across navigation and are fixed to the top-right of the viewport.
   const authControls = createAuthControls({ onAuthChange: () => undefined });
@@ -71,6 +73,10 @@ export function createApp(options: AppOptions): App {
         onReset: () => clearSoloSave(options.storage),
         onStateChange: (state) => saveSoloGame(options.storage, options.countryIndex, state),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onLeaderboard: () => navigate({ type: "leaderboard", mode: promptGameModeFromCategoryIds(activeCategories) }),
+        getAuthUser: () => authControls.getUser(),
+        authControls,
+        storage: options.storage,
       }),
     );
   }
@@ -119,6 +125,8 @@ export function createApp(options: AppOptions): App {
           initialMode,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
+          onLeaderboard: () => navigate({ type: "leaderboard", mode: initialMode }),
+          getAuthUser: () => authControls.getUser(),
         }),
       );
     } catch (error) {
@@ -160,8 +168,23 @@ export function createApp(options: AppOptions): App {
     );
   }
 
+  function startLeaderboard(mode?: GameModeId, variant?: string): void {
+    mount(
+      createLeaderboardScreen({
+        ...(mode ? { initialMode: mode } : {}),
+        ...(variant ? { initialVariant: variant } : {}),
+        onBack: () => navigate(returnRoute),
+        onSignIn: () => authControls.openPanel(),
+      }),
+    );
+  }
+
   function navigate(route: AppRoute): void {
     navigationRun += 1;
+
+    if (route.type !== "leaderboard") {
+      returnRoute = route;
+    }
 
     if (route.type === "solo-game") {
       startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
@@ -175,6 +198,11 @@ export function createApp(options: AppOptions): App {
 
     if (route.type === "multiplayer") {
       void startMultiplayer();
+      return;
+    }
+
+    if (route.type === "leaderboard") {
+      startLeaderboard(route.mode, route.variant);
       return;
     }
   }

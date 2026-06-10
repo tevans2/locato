@@ -2,7 +2,20 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
-import type { CreateSessionInput, CreateUserInput, GameResult, Session, StoredUser, UserStats, UserStore } from "../auth/types";
+import type {
+  CreateSessionInput,
+  CreateUserInput,
+  GameResult,
+  LeaderboardEntry,
+  LeaderboardQuery,
+  Session,
+  StoredUser,
+  SubmitBestTimeInput,
+  SubmitBestTimeResult,
+  UserLeaderboardRank,
+  UserStats,
+  UserStore,
+} from "../auth/types";
 
 export function openDatabase(path: string): Database {
   mkdirSync(dirname(path), { recursive: true });
@@ -50,6 +63,18 @@ function migrate(db: Database): void {
       wrong_answers INTEGER NOT NULL DEFAULT 0,
       best_streak INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS mode_best_times (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_mode TEXT NOT NULL,
+      variant TEXT NOT NULL DEFAULT '',
+      best_time_ms INTEGER NOT NULL,
+      achieved_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, game_mode, variant)
+    );
+
+    CREATE INDEX IF NOT EXISTS mode_best_times_rank
+      ON mode_best_times (game_mode, variant, best_time_ms ASC, achieved_at ASC);
   `);
   // Non-destructive additive migration: add avatar_emoji column to existing databases.
   try { db.exec("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;"); } catch { /* column already exists */ }
@@ -135,5 +160,71 @@ export class SqliteUserStore implements UserStore {
       )
       .run(userId, result.correctAnswers, result.wrongAnswers, result.bestStreak);
     return this.getStats(userId);
+  }
+
+  submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
+    const existing = this.db
+      .query<{ bestTimeMs: number }>("SELECT best_time_ms AS bestTimeMs FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?")
+      .get(userId, input.gameMode, input.variant);
+
+    if (existing && input.timeMs >= existing.bestTimeMs) {
+      return { accepted: false, isPersonalBest: false };
+    }
+
+    this.db
+      .query(
+        `INSERT INTO mode_best_times (user_id, game_mode, variant, best_time_ms, achieved_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
+           best_time_ms = excluded.best_time_ms,
+           achieved_at = excluded.achieved_at
+         WHERE excluded.best_time_ms < mode_best_times.best_time_ms`,
+      )
+      .run(userId, input.gameMode, input.variant, input.timeMs, input.achievedAt);
+
+    return { accepted: true, isPersonalBest: true };
+  }
+
+  getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[] {
+    const rows = this.db
+      .query<{ userId: string; displayName: string; avatarEmoji: string | null; timeMs: number; achievedAt: number }>(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+                m.best_time_ms AS timeMs, m.achieved_at AS achievedAt
+         FROM mode_best_times m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.game_mode = ? AND m.variant = ?
+         ORDER BY m.best_time_ms ASC, m.achieved_at ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(query.gameMode, query.variant, query.limit, query.offset);
+
+    return rows.map((row, index) => ({
+      rank: query.offset + index + 1,
+      userId: row.userId,
+      displayName: row.displayName,
+      avatarEmoji: row.avatarEmoji,
+      timeMs: row.timeMs,
+      achievedAt: row.achievedAt,
+    }));
+  }
+
+  getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
+    const row = this.db
+      .query<{ timeMs: number; achievedAt: number }>(
+        "SELECT best_time_ms AS timeMs, achieved_at AS achievedAt FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?",
+      )
+      .get(userId, gameMode, variant);
+    if (!row) return null;
+
+    const rankRow = this.db
+      .query<{ rank: number }>(
+        `SELECT 1 + COUNT(*) AS rank
+         FROM mode_best_times
+         WHERE game_mode = ? AND variant = ?
+           AND (best_time_ms < ? OR (best_time_ms = ? AND achieved_at < ?))`,
+      )
+      .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
+
+    return { rank: rankRow?.rank ?? 1, timeMs: row.timeMs };
   }
 }

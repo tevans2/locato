@@ -106,6 +106,37 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json({ stats: service.recordGame(user.id, result) });
   }
 
+  if (pathname === "/api/leaderboard" && method === "GET") {
+    const gameMode = url.searchParams.get("mode") ?? "";
+    const variant = url.searchParams.get("variant") ?? "";
+    const limit = Number(url.searchParams.get("limit"));
+    const offset = Number(url.searchParams.get("offset"));
+    const result = service.getLeaderboard({
+      gameMode,
+      variant,
+      ...(Number.isFinite(limit) ? { limit } : {}),
+      ...(Number.isFinite(offset) ? { offset } : {}),
+    });
+    if ("error" in result) return json({ error: result.error }, 400);
+
+    const user = service.authenticate(readSessionToken(request));
+    const currentUser =
+      user === null
+        ? null
+        : service.getUserLeaderboardRank(user.id, gameMode, variant === "" ? "" : variant);
+    return json({ entries: result.entries, currentUser });
+  }
+
+  if (pathname === "/api/leaderboard" && method === "POST") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.submitBestTime(user.id, body);
+    if ("error" in result) return json({ error: result.error }, 400);
+    return json(result);
+  }
+
   if (pathname === "/auth/github" && method === "GET") {
     log("info", "oauth.start", { ip: ip(request), provider: "github" });
     const state = createOAuthState();

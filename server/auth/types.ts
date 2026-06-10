@@ -31,6 +31,39 @@ export interface GameResult {
   readonly bestStreak: number;
 }
 
+export interface SubmitBestTimeInput {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+export interface SubmitBestTimeResult {
+  readonly accepted: boolean;
+  readonly isPersonalBest: boolean;
+}
+
+export interface LeaderboardEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+export interface LeaderboardQuery {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface UserLeaderboardRank {
+  readonly rank: number;
+  readonly timeMs: number;
+}
+
 export interface CreateUserInput {
   readonly id: string;
   readonly email: string;
@@ -62,6 +95,9 @@ export interface UserStore {
   deleteExpiredSessions(now: number): void;
   getStats(userId: string): UserStats;
   recordGame(userId: string, result: GameResult): UserStats;
+  submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
+  getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
+  getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
 }
 
 export interface PasswordHasher {

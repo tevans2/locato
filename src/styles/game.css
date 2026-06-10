@@ -935,3 +935,62 @@
   font-size: 0.78rem;
   line-height: 1.25;
 }
+
+.leaderboard-screen .leaderboard-layout {
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 24px 20px 40px;
+  width: 100%;
+}
+
+.leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.leaderboard-filter {
+  display: grid;
+  gap: 6px;
+  min-width: min(220px, 100%);
+}
+
+.leaderboard-mode-select,
+.leaderboard-variant-select {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.leaderboard-status,
+.leaderboard-user-rank {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.global-leaderboard .leaderboard-row {
+  grid-template-columns: 56px 36px minmax(0, 1fr) auto;
+}
+
+.leaderboard-avatar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.leaderboard-avatar.is-emoji {
+  font-size: 1.1rem;
+}
+
+.solo-timer-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
