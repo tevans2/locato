@@ -1,10 +1,10 @@
 import type { AuthUser } from "../../core/auth";
-import { submitBestTime } from "../../core/auth";
 import { type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import { timerKeysForMode } from "../../core/timer/keys";
+import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
@@ -94,16 +94,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
-  function finishTimerRun(finalTimeMs: number): boolean {
-    const isNewBest = playTimer.writeCompletion(finalTimeMs);
-    if (isNewBest && options.getAuthUser()) {
-      void submitBestTime({
-        gameMode: options.selectedGameMode,
-        variant: "",
-        timeMs: finalTimeMs,
-      });
-    }
-    return isNewBest;
+  async function finishTimerRun(finalTimeMs: number): Promise<{ readonly isNewLocalBest: boolean; readonly serverAccepted: boolean | null }> {
+    const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
+    const serverAccepted = await submitTimerToLeaderboard({
+      gameMode: options.selectedGameMode,
+      variant: "",
+      timeMs: finalTimeMs,
+      isLoggedIn: options.getAuthUser() !== null,
+    });
+    return { isNewLocalBest, serverAccepted };
   }
 
   function applyEvents(events: readonly GameEvent[]): void {
@@ -139,15 +138,19 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (event.type === "GAME_COMPLETED") {
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
-          const isNewBest = finishTimerRun(finalTimeMs);
-          const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
+          void finishTimerRun(finalTimeMs).then((result) => {
+            showFeedback(
+              views.feedback,
+              `Complete. Every prompt solved in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`,
+              "good",
+            );
+          });
+        } else {
           showFeedback(
             views.feedback,
-            `Complete. Every prompt solved in ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`,
+            "Complete. Every prompt in this mix has been solved. Switch to Timer mode to post a time to the leaderboard.",
             "good",
           );
-        } else {
-          showFeedback(views.feedback, "Complete. Every prompt in this mix has been solved.", "good");
         }
       }
     }

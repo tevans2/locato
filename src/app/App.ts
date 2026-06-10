@@ -171,6 +171,7 @@ export function createApp(options: AppOptions): App {
   function startLeaderboard(mode?: GameModeId, variant?: string): void {
     mount(
       createLeaderboardScreen({
+        storage: options.storage,
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
         onBack: () => navigate(returnRoute),

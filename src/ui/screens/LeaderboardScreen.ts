@@ -1,13 +1,15 @@
-import { fetchAuthState, fetchLeaderboard, type AuthUser, type LeaderboardEntry } from "../../core/auth";
+import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
 import { CONTINENTS } from "../../core/countries";
 import { gameModeOptions, type GameModeId } from "../../core/gameModes";
-import { formatElapsedTime } from "../../core/timer/playTimer";
+import { timerKeysForMode } from "../../core/timer/keys";
+import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 
 export interface LeaderboardScreenOptions {
   readonly initialMode?: GameModeId;
   readonly initialVariant?: string;
+  readonly storage: Storage;
   readonly onBack: () => void;
   readonly onSignIn: () => void;
 }
@@ -65,6 +67,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
   const list = el("ol", { className: "leaderboard global-leaderboard" });
   const backButton = el("button", { className: "ghost-action", text: "Back to game", attrs: { type: "button" } });
   const signInButton = el("button", { className: "secondary-action", text: "Sign in", attrs: { type: "button", hidden: "true" } });
+  const postLocalBestButton = el("button", { className: "secondary-action", text: "Post saved best", attrs: { type: "button", hidden: "true" } });
 
   const variantFilter = el("label", {
     className: "leaderboard-filter leaderboard-filter-variant",
@@ -99,10 +102,22 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
 
     list.replaceChildren(...renderRows(response.entries, currentUser?.id ?? null));
 
+    postLocalBestButton.hidden = true;
+
     if (currentUser && response.currentUser) {
       userRankText.textContent = `Your best: ${formatElapsedTime(response.currentUser.timeMs)} — rank #${response.currentUser.rank}`;
     } else if (currentUser) {
-      userRankText.textContent = "You have not posted a time for this board yet.";
+      const variant = selectedMode === "puzzle" ? selectedVariant : "";
+      const localBest = readStoredTime(options.storage, timerKeysForMode(selectedMode).best);
+      if (localBest) {
+        userRankText.textContent = `You have a saved best of ${formatElapsedTime(localBest)} on this device that is not on the board yet.`;
+        postLocalBestButton.hidden = false;
+        postLocalBestButton.textContent = `Post saved best (${formatElapsedTime(localBest)})`;
+        postLocalBestButton.dataset.timeMs = String(localBest);
+        postLocalBestButton.dataset.variant = variant;
+      } else {
+        userRankText.textContent = "You have not posted a time for this board yet. Finish a run in Timer mode.";
+      }
     } else {
       userRankText.textContent = "Sign in to post your timer runs and track your rank.";
     }
@@ -132,6 +147,26 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
 
   backButton.addEventListener("click", options.onBack, { signal: controller.signal });
   signInButton.addEventListener("click", options.onSignIn, { signal: controller.signal });
+  postLocalBestButton.addEventListener(
+    "click",
+    async () => {
+      const timeMs = Number(postLocalBestButton.dataset.timeMs);
+      if (!currentUser || !Number.isFinite(timeMs)) return;
+      postLocalBestButton.disabled = true;
+      const result = await submitBestTime({
+        gameMode: selectedMode,
+        variant: postLocalBestButton.dataset.variant ?? "",
+        timeMs,
+      });
+      postLocalBestButton.disabled = false;
+      if (result?.accepted) {
+        void loadBoard();
+        return;
+      }
+      statusText.textContent = "Could not post that saved time.";
+    },
+    { signal: controller.signal },
+  );
 
   const element = el("section", {
     className: "game-screen leaderboard-screen",
@@ -146,7 +181,13 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
       el("div", {
         className: "leaderboard-layout",
         children: [
-          el("div", { className: "panel-title", children: [el("h2", { text: "Leaderboards" }), el("p", { text: "Fastest timer-mode completions worldwide." })] }),
+          el("div", {
+            className: "panel-title",
+            children: [
+              el("h2", { text: "Leaderboards" }),
+              el("p", { text: "Only Timer mode runs count. Practice mode saves progress but does not post times." }),
+            ],
+          }),
           el("div", {
             className: "leaderboard-filters",
             children: [
@@ -159,6 +200,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
           }),
           statusText,
           userRankText,
+          postLocalBestButton,
           list,
         ],
       }),

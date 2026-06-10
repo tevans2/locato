@@ -1,9 +1,9 @@
 import type { AuthUser } from "../../core/auth";
-import { submitBestTime } from "../../core/auth";
 import { CONTINENTS, type Continent, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../../core/gameModes";
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
+import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
@@ -75,16 +75,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
-  function finishTimerRun(finalTimeMs: number): boolean {
-    const isNewBest = playTimer.writeCompletion(finalTimeMs);
-    if (isNewBest && options.getAuthUser()) {
-      void submitBestTime({
-        gameMode: playMode,
-        variant: playMode === "puzzle" ? puzzleContinent : "",
-        timeMs: finalTimeMs,
-      });
-    }
-    return isNewBest;
+  async function finishTimerRun(finalTimeMs: number): Promise<{ readonly isNewLocalBest: boolean; readonly serverAccepted: boolean | null }> {
+    const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
+    const serverAccepted = await submitTimerToLeaderboard({
+      gameMode: playMode,
+      variant: playMode === "puzzle" ? puzzleContinent : "",
+      timeMs: finalTimeMs,
+      isLoggedIn: options.getAuthUser() !== null,
+    });
+    return { isNewLocalBest, serverAccepted };
   }
 
   function renderTargetPrompt(): void {
@@ -164,17 +163,21 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (complete()) {
       if (playTimer.mode === "count-up") {
         const finalTimeMs = playTimer.stop();
-        const isNewBest = finishTimerRun(finalTimeMs);
-        const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
-        showFeedback(
-          feedback,
-          `World complete. All ${countryIndex.countries.length} countries found in ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`,
-          "good",
-        );
+        void finishTimerRun(finalTimeMs).then((result) => {
+          showFeedback(
+            feedback,
+            `World complete. All ${countryIndex.countries.length} countries found in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`,
+            "good",
+          );
+        });
         return;
       }
 
-      showFeedback(feedback, `World complete. All ${countryIndex.countries.length} countries found.`, "good");
+      showFeedback(
+        feedback,
+        `World complete. All ${countryIndex.countries.length} countries found. Switch to Timer mode to post a time to the leaderboard.`,
+        "good",
+      );
       return;
     }
 
@@ -285,10 +288,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     if (playTimer.mode === "count-up" && !alreadyChecked) {
       const finalTimeMs = playTimer.stop();
-      const isNewBest = finishTimerRun(finalTimeMs);
-      const signInHint = isNewBest && !options.getAuthUser() ? " Sign in to post your time." : "";
-      render();
-      showFeedback(feedback, `${baseMessage} Time: ${formatElapsedTime(finalTimeMs)}${isNewBest ? ` — new best time.${signInHint}` : "."}`, accuracy.accuracyPercent >= 75 ? "good" : "neutral");
+      void finishTimerRun(finalTimeMs).then((result) => {
+        render();
+        showFeedback(
+          feedback,
+          `${baseMessage} Time: ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`,
+          accuracy.accuracyPercent >= 75 ? "good" : "neutral",
+        );
+      });
       return;
     }
 
