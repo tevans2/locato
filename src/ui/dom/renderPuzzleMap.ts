@@ -1,16 +1,42 @@
 import type { Continent, Country, CountryId, CountryIndex } from "../../core/countries";
-import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import { projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon, type WorldMapPosition } from "../../core/map";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOARD_WIDTH = 820;
 const BOARD_HEIGHT = 560;
 const BOARD_PADDING = 34;
-const PIECE_SNAP_DISTANCE = 28;
 const MINI_PATH_PADDING_RATIO = 0.16;
+const PERFECT_PLACEMENT_DISTANCE = 6;
+const ZERO_ACCURACY_DISTANCE = 130;
+const CLOSE_PLACEMENT_DISTANCE = 28;
+const MAX_ZOOM = 12;
+const ZOOM_IN_FACTOR = 0.78;
+const ZOOM_OUT_FACTOR = 1.22;
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
+const WHEEL_DELTA_LINE_PIXELS = 40;
+const WHEEL_DELTA_PAGE_PIXELS = 800;
+const MAX_WHEEL_DELTA_PIXELS = 140;
+const MIN_WHEEL_DELTA_PIXELS = 0.35;
+const DEFAULT_BOARD_VIEWBOX: ViewBoxState = { x: 0, y: 0, width: BOARD_WIDTH, height: BOARD_HEIGHT };
 
 type Point = readonly [number, number];
 
 type ProjectTransform = (point: WorldMapPosition) => Point;
+
+interface ViewBoxState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface BoardPanState {
+  readonly pointerId: number;
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly viewBox: ViewBoxState;
+  hasMoved: boolean;
+}
 
 interface Bounds {
   readonly minX: number;
@@ -45,6 +71,15 @@ export interface PuzzleMapProgress {
   readonly complete: boolean;
 }
 
+export interface PuzzleMapAccuracy {
+  readonly placedCount: number;
+  readonly totalCount: number;
+  readonly accuracyPercent: number;
+  readonly averageDistance: number;
+  readonly closeCount: number;
+  readonly complete: boolean;
+}
+
 export interface PuzzleMapViewOptions {
   readonly signal?: AbortSignal;
   readonly onFirstPlacement?: () => void;
@@ -57,6 +92,7 @@ export interface PuzzleMapView {
   readonly setContinent: (continent: Continent) => void;
   readonly reset: () => void;
   readonly getState: () => PuzzleMapProgress;
+  readonly checkAccuracy: () => PuzzleMapAccuracy;
   readonly destroy: () => void;
 }
 
@@ -64,8 +100,71 @@ function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVG
   return document.createElementNS(SVG_NS, tagName);
 }
 
-function project([longitude, latitude]: WorldMapPosition): Point {
-  return [((longitude + 180) / 360) * 1000, ((90 - latitude) / 180) * 500];
+function project(point: WorldMapPosition): Point {
+  return projectWorldMapPosition(point);
+}
+
+function createButton(text: string, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.className = "world-map-control-button";
+  button.type = "button";
+  button.textContent = text;
+  button.setAttribute("aria-label", label);
+  return button;
+}
+
+function applyViewBox(svg: SVGSVGElement, viewBox: ViewBoxState): void {
+  svg.setAttribute("viewBox", `${viewBox.x.toFixed(3)} ${viewBox.y.toFixed(3)} ${viewBox.width.toFixed(3)} ${viewBox.height.toFixed(3)}`);
+}
+
+function clampBoardViewBox(viewBox: ViewBoxState): ViewBoxState {
+  const minWidth = BOARD_WIDTH / MAX_ZOOM;
+  const width = Math.min(BOARD_WIDTH, Math.max(minWidth, viewBox.width));
+  const height = width * (BOARD_HEIGHT / BOARD_WIDTH);
+  const maxX = BOARD_WIDTH - width;
+  const maxY = BOARD_HEIGHT - height;
+
+  return {
+    x: Math.min(maxX, Math.max(0, viewBox.x)),
+    y: Math.min(maxY, Math.max(0, viewBox.y)),
+    width,
+    height,
+  };
+}
+
+function pointerToViewBoxPosition(svg: SVGSVGElement, viewBox: ViewBoxState, clientX: number, clientY: number): Point {
+  const rect = svg.getBoundingClientRect();
+  const relativeX = rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
+  const relativeY = rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
+  return [viewBox.x + relativeX * viewBox.width, viewBox.y + relativeY * viewBox.height];
+}
+
+function zoomBoardAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, clientX: number, clientY: number): ViewBoxState {
+  const [mapX, mapY] = pointerToViewBoxPosition(svg, viewBox, clientX, clientY);
+  const nextWidth = viewBox.width * factor;
+  const nextHeight = viewBox.height * factor;
+  const widthRatio = nextWidth / viewBox.width;
+  const heightRatio = nextHeight / viewBox.height;
+
+  return clampBoardViewBox({
+    x: mapX - (mapX - viewBox.x) * widthRatio,
+    y: mapY - (mapY - viewBox.y) * heightRatio,
+    width: nextWidth,
+    height: nextHeight,
+  });
+}
+
+function wheelDeltaYToPixels(event: WheelEvent): number {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * WHEEL_DELTA_LINE_PIXELS;
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * WHEEL_DELTA_PAGE_PIXELS;
+  return event.deltaY;
+}
+
+function zoomFactorFromWheelDelta(deltaPixels: number): number | null {
+  if (Math.abs(deltaPixels) < MIN_WHEEL_DELTA_PIXELS) return null;
+
+  const boundedDelta = clampNumber(deltaPixels, -MAX_WHEEL_DELTA_PIXELS, MAX_WHEEL_DELTA_PIXELS);
+  return Math.exp(boundedDelta * WHEEL_ZOOM_SENSITIVITY);
 }
 
 function expandBounds(bounds: Bounds | null, [x, y]: Point): Bounds {
@@ -173,6 +272,38 @@ function pieceProgress(pieces: readonly PuzzlePiece[], lastCountry: Country | nu
   };
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function scorePieceDistance(distance: number): number {
+  if (distance <= PERFECT_PLACEMENT_DISTANCE) return 1;
+  const adjustedDistance = distance - PERFECT_PLACEMENT_DISTANCE;
+  const scoringRange = ZERO_ACCURACY_DISTANCE - PERFECT_PLACEMENT_DISTANCE;
+  return clampNumber(1 - adjustedDistance / scoringRange, 0, 1);
+}
+
+function pieceDistanceFromTarget(piece: PuzzlePiece): number {
+  return piece.placed ? Math.hypot(piece.dx, piece.dy) : ZERO_ACCURACY_DISTANCE;
+}
+
+function pieceAccuracy(pieces: readonly PuzzlePiece[]): PuzzleMapAccuracy {
+  const placedCount = pieces.filter((piece) => piece.placed).length;
+  const totalDistance = pieces.reduce((sum, piece) => sum + pieceDistanceFromTarget(piece), 0);
+  const totalScore = pieces.reduce((sum, piece) => sum + scorePieceDistance(pieceDistanceFromTarget(piece)), 0);
+  const closeCount = pieces.filter((piece) => piece.placed && pieceDistanceFromTarget(piece) <= CLOSE_PLACEMENT_DISTANCE).length;
+  const totalCount = pieces.length;
+
+  return {
+    placedCount,
+    totalCount,
+    accuracyPercent: totalCount > 0 ? Math.round((totalScore / totalCount) * 100) : 0,
+    averageDistance: totalCount > 0 ? totalDistance / totalCount : 0,
+    closeCount,
+    complete: totalCount > 0 && placedCount >= totalCount,
+  };
+}
+
 function createMiniSvg(feature: WorldCountryFeature, countryName: string): SVGSVGElement {
   const svg = createSvgElement("svg");
   svg.setAttribute("aria-hidden", "true");
@@ -237,7 +368,7 @@ export function createPuzzleMapView(
   svg.setAttribute("class", "puzzle-board-svg");
   svg.setAttribute("viewBox", `0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Continent puzzle board. Drag country cutouts into their matching outlines.");
+  svg.setAttribute("aria-label", "Continent puzzle board. Drag country cutouts into position, then check your accuracy.");
 
   const continentLayer = createSvgElement("g");
   continentLayer.setAttribute("class", "puzzle-continent-layer");
@@ -261,11 +392,14 @@ export function createPuzzleMapView(
   borderToggleText.textContent = "Show country borders";
   borderToggleLabel.append(borderToggle, borderToggleText);
 
-  const hint = document.createElement("p");
-  hint.className = "puzzle-map-hint";
-  hint.textContent = "Tip: drag a cutout near its outline and it will snap into place. Turn on borders for an easier guide.";
+  const zoomInButton = createButton("+", "Zoom in");
+  const zoomOutButton = createButton("−", "Zoom out");
+  const resetViewButton = createButton("Reset", "Reset puzzle board zoom and position");
+  const controls = document.createElement("div");
+  controls.className = "world-map-controls puzzle-board-controls";
+  controls.append(zoomInButton, zoomOutButton, resetViewButton);
 
-  boardShell.append(svg, borderToggleLabel, hint);
+  boardShell.append(svg, controls, borderToggleLabel);
   element.append(boardShell, tray);
 
   let continent: Continent = initialContinent;
@@ -273,6 +407,88 @@ export function createPuzzleMapView(
   let pieces: PuzzlePiece[] = [];
   let activeDrag: ActiveDrag | null = null;
   let lastCountry: Country | null = null;
+  let viewBox: ViewBoxState = { ...DEFAULT_BOARD_VIEWBOX };
+  let boardPanState: BoardPanState | null = null;
+  let pendingWheelDelta = 0;
+  let pendingWheelClientX = 0;
+  let pendingWheelClientY = 0;
+  let wheelAnimationFrame: number | null = null;
+
+  function setViewBox(nextViewBox: ViewBoxState): void {
+    viewBox = clampBoardViewBox(nextViewBox);
+    applyViewBox(svg, viewBox);
+  }
+
+  function resetViewBox(): void {
+    setViewBox(DEFAULT_BOARD_VIEWBOX);
+  }
+
+  function applyPendingWheelZoom(): void {
+    wheelAnimationFrame = null;
+    const deltaPixels = pendingWheelDelta;
+    pendingWheelDelta = 0;
+
+    const factor = zoomFactorFromWheelDelta(deltaPixels);
+    if (factor === null) return;
+
+    setViewBox(zoomBoardAround(svg, viewBox, factor, pendingWheelClientX, pendingWheelClientY));
+  }
+
+  function isPuzzlePieceTarget(target: EventTarget | null): boolean {
+    const element = target instanceof Element ? target : null;
+    return element?.closest(".puzzle-country-piece") !== null;
+  }
+
+  svg.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    pendingWheelDelta += wheelDeltaYToPixels(event);
+    pendingWheelClientX = event.clientX;
+    pendingWheelClientY = event.clientY;
+
+    if (wheelAnimationFrame === null) {
+      wheelAnimationFrame = window.requestAnimationFrame(applyPendingWheelZoom);
+    }
+  }, { passive: false, signal });
+
+  svg.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || isPuzzlePieceTarget(event.target)) return;
+    event.preventDefault();
+    boardPanState = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      viewBox: { ...viewBox },
+      hasMoved: false,
+    };
+    svg.setPointerCapture(event.pointerId);
+    svg.classList.add("is-panning");
+  }, { signal });
+
+  svg.addEventListener("pointermove", (event) => {
+    if (!boardPanState || boardPanState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const rawDeltaX = event.clientX - boardPanState.clientX;
+    const rawDeltaY = event.clientY - boardPanState.clientY;
+    if (rawDeltaX * rawDeltaX + rawDeltaY * rawDeltaY > 16) boardPanState.hasMoved = true;
+    const deltaX = rect.width > 0 ? (rawDeltaX / rect.width) * boardPanState.viewBox.width : 0;
+    const deltaY = rect.height > 0 ? (rawDeltaY / rect.height) * boardPanState.viewBox.height : 0;
+    setViewBox({ ...boardPanState.viewBox, x: boardPanState.viewBox.x - deltaX, y: boardPanState.viewBox.y - deltaY });
+  }, { signal });
+
+  function finishBoardPan(event: PointerEvent): void {
+    if (!boardPanState || boardPanState.pointerId !== event.pointerId) return;
+    boardPanState = null;
+    svg.classList.remove("is-panning");
+    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+  }
+
+  svg.addEventListener("pointerup", finishBoardPan, { signal });
+  svg.addEventListener("pointercancel", finishBoardPan, { signal });
+  svg.addEventListener("dblclick", resetViewBox, { signal });
+  zoomInButton.addEventListener("click", () => setViewBox(zoomBoardAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)), { signal });
+  zoomOutButton.addEventListener("click", () => setViewBox(zoomBoardAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)), { signal });
+  resetViewButton.addEventListener("click", resetViewBox, { signal });
 
   function setShowCountryBorders(nextValue: boolean): void {
     showCountryBorders = nextValue;
@@ -305,25 +521,17 @@ export function createPuzzleMapView(
     const piece = activeDrag.piece;
     cancelActiveDrag();
 
-    const distanceFromHome = Math.hypot(piece.dx, piece.dy);
-    if (distanceFromHome > PIECE_SNAP_DISTANCE) {
-      piece.path.classList.add("is-loose");
-      piece.card.classList.add("is-in-play");
-      return;
-    }
-
-    piece.dx = 0;
-    piece.dy = 0;
+    const wasPlaced = piece.placed;
     piece.visible = true;
     piece.placed = true;
     updatePieceTransform(piece);
-    piece.path.classList.remove("is-loose");
+    piece.path.classList.remove("is-loose", "is-accuracy-close", "is-accuracy-far");
     piece.path.classList.add("is-placed");
     piece.card.hidden = true;
     lastCountry = piece.country;
-    options.onFirstPlacement?.();
-    const progress = emitProgress(piece.country);
-    if (progress.complete) options.onComplete?.(progress);
+
+    if (!wasPlaced) options.onFirstPlacement?.();
+    emitProgress(piece.country);
   }
 
   function moveDrag(event: PointerEvent): void {
@@ -331,13 +539,14 @@ export function createPuzzleMapView(
     event.preventDefault();
     const piece = activeDrag.piece;
     const [x, y] = pointerToSvgPosition(svg, event.clientX, event.clientY);
-    piece.dx = x - activeDrag.pointerOffsetX - piece.correctCenter[0];
-    piece.dy = y - activeDrag.pointerOffsetY - piece.correctCenter[1];
+    const nextCenterX = clampNumber(x - activeDrag.pointerOffsetX, 0, BOARD_WIDTH);
+    const nextCenterY = clampNumber(y - activeDrag.pointerOffsetY, 0, BOARD_HEIGHT);
+    piece.dx = nextCenterX - piece.correctCenter[0];
+    piece.dy = nextCenterY - piece.correctCenter[1];
     updatePieceTransform(piece);
   }
 
   function startDrag(piece: PuzzlePiece, event: PointerEvent): void {
-    if (piece.placed) return;
     event.preventDefault();
     event.stopPropagation();
     cancelActiveDrag();
@@ -354,7 +563,7 @@ export function createPuzzleMapView(
 
     pieceLayer.append(piece.path);
     piece.path.classList.add("is-dragging");
-    piece.path.classList.remove("is-loose");
+    piece.path.classList.remove("is-loose", "is-accuracy-close", "is-accuracy-far");
 
     const abortController = new AbortController();
     const dragSignal = signalAny([abortController.signal, controller.signal, ...(options.signal ? [options.signal] : [])]) ?? abortController.signal;
@@ -375,6 +584,7 @@ export function createPuzzleMapView(
     continent = nextContinent;
     lastCountry = null;
     pieces = [];
+    resetViewBox();
     continentLayer.replaceChildren();
     outlineLayer.replaceChildren();
     pieceLayer.replaceChildren();
@@ -441,11 +651,22 @@ export function createPuzzleMapView(
 
   buildContinent(initialContinent);
 
+  function checkAccuracy(): PuzzleMapAccuracy {
+    const accuracy = pieceAccuracy(pieces);
+    for (const piece of pieces) {
+      const isClose = piece.placed && pieceDistanceFromTarget(piece) <= CLOSE_PLACEMENT_DISTANCE;
+      piece.path.classList.toggle("is-accuracy-close", isClose);
+      piece.path.classList.toggle("is-accuracy-far", piece.placed && !isClose);
+    }
+    return accuracy;
+  }
+
   return {
     element,
     setContinent: (nextContinent) => buildContinent(nextContinent),
     reset: () => buildContinent(continent),
     getState: () => currentProgress(),
+    checkAccuracy,
     destroy: () => {
       cancelActiveDrag();
       controller.abort();

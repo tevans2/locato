@@ -1,5 +1,6 @@
 import type { PromptCategory } from "../../core/categories";
 import { el } from "./createElement";
+import { enhanceDropdown } from "./dropdown";
 
 export interface CategoryDropdownOptions {
   readonly categories: readonly PromptCategory[];
@@ -70,6 +71,7 @@ export function createCategoryDropdown(options: CategoryDropdownOptions): Catego
     ],
   });
   updateSummary();
+  enhanceDropdown(element, { signal: options.signal, closeOnSelect: true });
 
   return { element, selectedIds: getSelectedIds };
 }

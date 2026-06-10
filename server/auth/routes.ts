@@ -10,6 +10,30 @@ function ip(request: Request): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
+// Constant-time string comparison so the admin token can't be recovered via response timing.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Admin requests authenticate with the out-of-band ADMIN_TOKEN, not a user session. Accepts
+// either `Authorization: Bearer <token>` or `x-admin-token: <token>`.
+function isAuthorizedAdmin(request: Request, adminToken: string): boolean {
+  const header = request.headers.get("authorization");
+  const bearer = header && header.startsWith("Bearer ") ? header.slice(7) : null;
+  const provided = bearer ?? request.headers.get("x-admin-token");
+  return provided !== null && safeEqual(provided, adminToken);
+}
+
+function intParam(url: URL, name: string): number | undefined {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function log(level: "info" | "warn", action: string, details: Record<string, unknown>): void {
   const entry = { time: new Date().toISOString(), level, action, ...details };
   // eslint-disable-next-line no-console
@@ -62,7 +86,7 @@ function parseGameResult(body: Record<string, unknown>): GameResult | null {
 
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
-export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string): Promise<Response | null> {
+export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, adminToken: string | null = null): Promise<Response | null> {
   const { pathname } = url;
   const { method } = request;
 
@@ -129,6 +153,75 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const user = service.authenticate(readSessionToken(request));
     if (!user) return json({ error: "Not authenticated." }, 401);
     return json(service.getFullStats(user.id));
+  }
+
+  if (pathname === "/api/leaderboard" && method === "GET") {
+    const gameMode = url.searchParams.get("mode") ?? "";
+    const variant = url.searchParams.get("variant") ?? "";
+    const limit = Number(url.searchParams.get("limit"));
+    const offset = Number(url.searchParams.get("offset"));
+    const result = service.getLeaderboard({
+      gameMode,
+      variant,
+      ...(Number.isFinite(limit) ? { limit } : {}),
+      ...(Number.isFinite(offset) ? { offset } : {}),
+    });
+    if ("error" in result) return json({ error: result.error }, 400);
+
+    const user = service.authenticate(readSessionToken(request));
+    const currentUser =
+      user === null
+        ? null
+        : service.getUserLeaderboardRank(user.id, gameMode, variant === "" ? "" : variant);
+    return json({ entries: result.entries, currentUser });
+  }
+
+  if (pathname === "/api/leaderboard" && method === "POST") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.submitBestTime(user.id, body);
+    if ("error" in result) return json({ error: result.error }, 400);
+    return json(result);
+  }
+
+  // --- Admin account controls (gated by ADMIN_TOKEN; the surface stays hidden when unset) ---
+  if (pathname.startsWith("/api/admin/")) {
+    if (!adminToken) return null; // not configured → fall through to static (404), surface hidden
+    if (!isAuthorizedAdmin(request, adminToken)) {
+      log("warn", "admin.unauthorized", { ip: ip(request), path: pathname });
+      return json({ error: "Forbidden." }, 403);
+    }
+
+    if (pathname === "/api/admin/users" && method === "GET") {
+      const result = service.listUsers({ q: url.searchParams.get("q") ?? undefined, limit: intParam(url, "limit"), offset: intParam(url, "offset") });
+      return json(result);
+    }
+
+    const userMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+    if (userMatch) {
+      const id = decodeURIComponent(userMatch[1]!);
+      if (method === "GET") {
+        const detail = service.getUserDetail(id);
+        return detail ? json(detail) : json({ error: "User not found." }, 404);
+      }
+      if (method === "DELETE") {
+        const deleted = service.deleteUser(id);
+        log("info", "admin.user.delete", { ip: ip(request), targetUserId: id, deleted });
+        return deleted ? json({ ok: true, deleted: id }) : json({ error: "User not found." }, 404);
+      }
+    }
+
+    const sessionsMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/sessions$/);
+    if (sessionsMatch && method === "DELETE") {
+      const id = decodeURIComponent(sessionsMatch[1]!);
+      const revoked = service.revokeUserSessions(id);
+      log("info", "admin.user.logout", { ip: ip(request), targetUserId: id, revoked });
+      return json({ ok: true, revoked });
+    }
+
+    return json({ error: "Unknown admin route." }, 404);
   }
 
   if (pathname === "/auth/github" && method === "GET") {

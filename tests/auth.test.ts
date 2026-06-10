@@ -35,8 +35,15 @@ function jsonRequest(path: string, method: string, body?: unknown, token?: strin
   return new Request(`http://localhost${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 }
 
-function route(service: AuthService, request: Request): Promise<Response | null> {
-  return handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL);
+function route(service: AuthService, request: Request, adminToken: string | null = null): Promise<Response | null> {
+  return handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, adminToken);
+}
+
+// Builds a request carrying the admin bearer token.
+function adminRequest(path: string, method: string, token: string, body?: unknown): Request {
+  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+  if (body !== undefined) headers["content-type"] = "application/json";
+  return new Request(`http://localhost${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 }
 
 describe("auth service", () => {
@@ -182,5 +189,93 @@ describe("auth routes", () => {
     const { service } = createService();
     expect(await route(service, jsonRequest("/index.html", "GET"))).toBeNull();
     expect(await route(service, jsonRequest("/assets/flags/jp.svg", "GET"))).toBeNull();
+  });
+});
+
+describe("admin account controls", () => {
+  const ADMIN = "secret-admin-token";
+
+  async function seedUser(service: AuthService, email: string): Promise<{ id: string; token: string }> {
+    const r = await route(service, jsonRequest("/auth/register", "POST", { email, password: "supersecret", displayName: email.split("@")[0] }));
+    const token = tokenFrom(r!);
+    const me = await route(service, jsonRequest("/auth/me", "GET", undefined, token));
+    return { id: (await me!.json()).user.id, token };
+  }
+
+  it("is hidden when no admin token is configured", async () => {
+    const { service } = createService();
+    // adminToken defaults to null → routes fall through to static handling.
+    expect(await route(service, jsonRequest("/api/admin/users", "GET"))).toBeNull();
+  });
+
+  it("rejects missing or wrong admin credentials", async () => {
+    const { service } = createService();
+    expect((await route(service, jsonRequest("/api/admin/users", "GET"), ADMIN))?.status).toBe(403);
+    expect((await route(service, adminRequest("/api/admin/users", "GET", "wrong"), ADMIN))?.status).toBe(403);
+  });
+
+  it("lists and searches users", async () => {
+    const { service } = createService();
+    await seedUser(service, "alice@b.com");
+    await seedUser(service, "bob@b.com");
+
+    const all = await route(service, adminRequest("/api/admin/users", "GET", ADMIN), ADMIN);
+    const allBody = await all!.json();
+    expect(allBody.total).toBe(2);
+    expect(allBody.users).toHaveLength(2);
+    expect(allBody.users[0]).not.toHaveProperty("passwordHash");
+    expect(allBody.users[0].hasPassword).toBe(true);
+
+    const filtered = await route(service, adminRequest("/api/admin/users?q=alice", "GET", ADMIN), ADMIN);
+    const filteredBody = await filtered!.json();
+    expect(filteredBody.total).toBe(1);
+    expect(filteredBody.users[0].email).toBe("alice@b.com");
+  });
+
+  it("returns user detail with stats", async () => {
+    const { service } = createService();
+    const { id } = await seedUser(service, "carol@b.com");
+    service.recordGame(id, { mode: "solo", categoryIds: ["flags"], correctAnswers: 3, wrongAnswers: 1, score: 0, bestStreak: 2 });
+
+    const resp = await route(service, adminRequest(`/api/admin/users/${id}`, "GET", ADMIN), ADMIN);
+    expect(resp?.status).toBe(200);
+    const body = await resp!.json();
+    expect(body.user.email).toBe("carol@b.com");
+    expect(body.user).not.toHaveProperty("passwordHash");
+    expect(body.stats).toMatchObject({ totalGames: 1, totalCorrect: 3 });
+
+    const missing = await route(service, adminRequest("/api/admin/users/nope", "GET", ADMIN), ADMIN);
+    expect(missing?.status).toBe(404);
+  });
+
+  it("deletes a user and cascades their data", async () => {
+    const { service } = createService();
+    const { id, token } = await seedUser(service, "dave@b.com");
+    service.recordGame(id, { mode: "solo", categoryIds: ["flags"], correctAnswers: 5, wrongAnswers: 0, score: 0, bestStreak: 5 });
+    expect((await route(service, jsonRequest("/auth/me", "GET", undefined, token)))?.status).toBe(200);
+
+    const del = await route(service, adminRequest(`/api/admin/users/${id}`, "DELETE", ADMIN), ADMIN);
+    expect(del?.status).toBe(200);
+    expect((await del!.json()).deleted).toBe(id);
+
+    // Session no longer authenticates; detail is gone.
+    expect((await route(service, jsonRequest("/auth/me", "GET", undefined, token)))?.status).toBe(401);
+    expect((await route(service, adminRequest(`/api/admin/users/${id}`, "GET", ADMIN), ADMIN))?.status).toBe(404);
+
+    // Deleting again reports not found.
+    expect((await route(service, adminRequest(`/api/admin/users/${id}`, "DELETE", ADMIN), ADMIN))?.status).toBe(404);
+  });
+
+  it("revokes a user's sessions without deleting the account", async () => {
+    const { service } = createService();
+    const { id, token } = await seedUser(service, "erin@b.com");
+
+    const resp = await route(service, adminRequest(`/api/admin/users/${id}/sessions`, "DELETE", ADMIN), ADMIN);
+    expect(resp?.status).toBe(200);
+    expect((await resp!.json()).revoked).toBe(1);
+
+    // The old session is dead, but the account still exists.
+    expect((await route(service, jsonRequest("/auth/me", "GET", undefined, token)))?.status).toBe(401);
+    expect((await route(service, adminRequest(`/api/admin/users/${id}`, "GET", ADMIN), ADMIN))?.status).toBe(200);
   });
 });

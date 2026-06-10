@@ -88,6 +88,61 @@ export interface FullStats extends UserStats {
   readonly recentGames: readonly GameRecord[];
 }
 
+export interface SubmitBestTimeInput {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+export interface SubmitBestTimeResult {
+  readonly accepted: boolean;
+  readonly isPersonalBest: boolean;
+}
+
+export interface LeaderboardEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+export interface LeaderboardQuery {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface UserLeaderboardRank {
+  readonly rank: number;
+  readonly timeMs: number;
+}
+
+// Admin account controls. Never carries password hashes.
+export interface AdminUserSummary {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly hasPassword: boolean;
+  readonly createdAt: number;
+  readonly games: number;
+}
+
+export interface AdminUserListQuery {
+  readonly query: string | null;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface AdminUserList {
+  readonly users: readonly AdminUserSummary[];
+  readonly total: number;
+}
+
 export interface CreateUserInput {
   readonly id: string;
   readonly email: string;
@@ -118,6 +173,13 @@ export interface UserStore {
   getStats(userId: string): UserStats;
   getFullStats(userId: string): FullStats;
   recordGame(userId: string, result: GameResult, now: number): UserStats;
+  submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
+  getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
+  getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
+  // Admin account controls.
+  listUsers(query: AdminUserListQuery): AdminUserList;
+  deleteUser(id: string): boolean;
+  deleteUserSessions(userId: string): number;
 }
 
 export interface PasswordHasher {

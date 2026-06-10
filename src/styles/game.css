@@ -30,7 +30,7 @@
 .mode-select {
   width: auto;
   min-width: 172px;
-  background: rgba(255,255,255,0.035);
+  background-color: rgba(255,255,255,0.035);
 }
 
 .mode-description {
@@ -53,12 +53,25 @@
   gap: 12px;
   min-height: 42px;
   padding: 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.16);
   border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.08), transparent 55%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   user-select: none;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.category-dropdown-summary:hover,
+.category-dropdown[open] .category-dropdown-summary {
+  border-color: rgba(184, 227, 109, 0.42);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.12), transparent 58%),
+    rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .category-dropdown-summary::-webkit-details-marker {
@@ -67,11 +80,15 @@
 
 .category-dropdown-summary::after {
   content: "▾";
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 0.78rem;
+  line-height: 1;
+  transition: transform 140ms ease, color 140ms ease;
 }
 
 .category-dropdown[open] .category-dropdown-summary::after {
+  color: var(--accent);
   transform: rotate(180deg);
 }
 
@@ -85,20 +102,35 @@
 }
 
 .category-dropdown-menu {
-  position: absolute;
-  right: 0;
-  z-index: 20;
-  width: min(300px, calc(100vw - 32px));
-  margin-top: 8px;
+  position: fixed;
+  top: var(--dropdown-top, 0);
+  left: var(--dropdown-left, 0);
+  z-index: 1000;
+  width: var(--dropdown-width, min(300px, calc(100vw - 24px)));
+  max-height: var(--dropdown-max-height, min(360px, calc(100dvh - 24px)));
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-md);
   display: grid;
-  gap: 6px;
-  background: rgba(20, 25, 20, 0.98);
-  box-shadow: var(--shadow);
+  gap: 7px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
+    rgba(16, 20, 16, 0.98);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  animation: dropdown-pop 120ms ease-out;
 }
 
+.dropdown-opens-above .category-dropdown-menu {
+  transform-origin: bottom right;
+}
+
+@keyframes dropdown-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .category-row-label {
   color: var(--muted);
@@ -110,14 +142,30 @@
 .category-option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
   border-radius: var(--radius-sm);
   cursor: pointer;
   user-select: none;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.category-option:hover {
+  border-color: rgba(184, 227, 109, 0.38);
+  background: rgba(184, 227, 109, 0.075);
+}
+
+.category-option:active {
+  transform: translateY(1px);
+}
+
+.category-option:has(input:checked) {
+  border-color: rgba(184, 227, 109, 0.52);
+  background: rgba(184, 227, 109, 0.12);
 }
 
 .category-option input {
@@ -368,6 +416,8 @@
     radial-gradient(circle at 50% 44%, rgba(184, 227, 109, 0.08), transparent 56%),
     #090d0a;
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg {
@@ -378,6 +428,7 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg.is-panning {
@@ -426,6 +477,25 @@
   stroke: rgba(245, 244, 206, 0.9);
   stroke-width: 0.9;
   filter: drop-shadow(0 0 5px rgba(184, 227, 109, 0.35));
+}
+
+.world-map-country.is-target {
+  fill: rgba(184, 227, 109, 0.88);
+  stroke: rgba(245, 244, 206, 0.95);
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+  animation: country-flash 1.4s ease-in-out infinite;
+}
+
+@keyframes country-flash {
+  0%, 100% {
+    fill: rgba(184, 227, 109, 0.88);
+    filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+  }
+  50% {
+    fill: rgba(245, 244, 206, 0.92);
+    filter: drop-shadow(0 0 14px rgba(245, 244, 206, 0.7));
+  }
 }
 
 .world-map-country-unplayable {
@@ -511,12 +581,12 @@
 }
 
 .country-guess-timer-select {
-  min-height: 28px;
-  min-width: 96px;
-  padding: 0 7px;
+  min-height: 30px;
+  min-width: 112px;
+  padding: 0 34px 0 10px;
   font-size: 0.76rem;
   font-weight: 720;
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.045);
 }
 
 .country-guess-stats.timer-is-active .country-guess-mode-card {
@@ -535,10 +605,6 @@
 .country-guess-category-dropdown {
   justify-self: end;
   width: min(300px, 100%);
-}
-
-.country-guess-category-dropdown .category-dropdown-menu {
-  width: min(300px, calc(100vw - 32px));
 }
 
 .country-guess-category-dropdown .category-dropdown-selected {
@@ -680,24 +746,30 @@
 .puzzle-country-piece.is-placed {
   fill: rgba(184, 227, 109, 0.88);
   stroke: rgba(245, 244, 206, 0.98);
-  cursor: default;
+  cursor: grab;
   filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.34));
 }
 
-.puzzle-map-hint {
-  position: absolute;
-  left: 12px;
+.puzzle-country-piece.is-accuracy-close {
+  fill: rgba(184, 227, 109, 0.92);
+  stroke: rgba(245, 244, 206, 1);
+  filter: drop-shadow(0 0 10px rgba(184, 227, 109, 0.44));
+}
+
+.puzzle-country-piece.is-accuracy-far {
+  fill: rgba(242, 144, 96, 0.78);
+  stroke: rgba(255, 220, 190, 0.96);
+  filter: drop-shadow(0 0 8px rgba(242, 144, 96, 0.34));
+}
+
+.puzzle-board-controls {
+  top: auto;
   bottom: 12px;
-  max-width: min(440px, calc(100% - 24px));
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(232, 226, 211, 0.12);
-  border-radius: var(--radius-sm);
-  background: rgba(6, 8, 6, 0.72);
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-  backdrop-filter: blur(10px);
+  right: 12px;
+}
+
+.puzzle-board-svg.is-panning {
+  cursor: grabbing;
 }
 
 .puzzle-border-toggle {
@@ -793,11 +865,132 @@
 
 .puzzle-continent-select {
   min-height: 42px;
-  padding: 0 10px;
+  padding: 0 38px 0 12px;
   border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.045);
   color: var(--text);
   font: inherit;
   font-weight: 780;
+}
+
+.game-header-left,
+.game-header-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.game-header-left {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+.game-header-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.game-mode-dropdown {
+  width: min(340px, 100%);
+}
+
+.game-mode-dropdown .category-dropdown-menu {
+  width: var(--dropdown-width, min(380px, calc(100vw - 24px)));
+}
+
+.game-mode-group-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  padding: 4px 4px 0;
+  text-transform: uppercase;
+}
+
+.game-mode-option {
+  align-items: flex-start;
+  min-height: 52px;
+}
+
+.game-mode-option input {
+  margin-top: 3px;
+}
+
+.game-mode-option-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.game-mode-option-label {
+  color: var(--text);
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.game-mode-option-description {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.leaderboard-screen .leaderboard-layout {
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 24px 20px 40px;
+  width: 100%;
+}
+
+.leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.leaderboard-filter {
+  display: grid;
+  gap: 6px;
+  min-width: min(220px, 100%);
+}
+
+.leaderboard-mode-select,
+.leaderboard-variant-select {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.leaderboard-status,
+.leaderboard-user-rank {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.global-leaderboard .leaderboard-row {
+  grid-template-columns: 56px 36px minmax(0, 1fr) auto;
+}
+
+.leaderboard-avatar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.leaderboard-avatar.is-emoji {
+  font-size: 1.1rem;
+}
+
+.solo-timer-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
 }

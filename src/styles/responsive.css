@@ -36,12 +36,19 @@
     gap: 10px;
   }
 
+  .game-header-left,
+  .game-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
   .mode-controls {
     width: 100%;
     justify-items: stretch;
   }
 
-  .category-dropdown {
+  .category-dropdown,
+  .game-mode-dropdown {
     width: 100%;
   }
 

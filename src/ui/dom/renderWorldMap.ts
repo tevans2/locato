@@ -1,13 +1,21 @@
 import type { CountryId, CountryIndex } from "../../core/countries";
-import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import {
+  MAP_VIEWBOX_HEIGHT,
+  MAP_VIEWBOX_WIDTH,
+  projectWorldMapPosition,
+  type ProjectedPoint,
+  type WorldCountryFeature,
+  type WorldMapPolygon,
+  type WorldMapPosition,
+} from "../../core/map";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const VIEWBOX_WIDTH = 1000;
-const VIEWBOX_HEIGHT = 500;
-const INITIAL_VIEWBOX_Y = -18;
-const VIEWBOX_VERTICAL_MARGIN = 28;
+const VIEWBOX_WIDTH = MAP_VIEWBOX_WIDTH;
+const VIEWBOX_HEIGHT = MAP_VIEWBOX_HEIGHT;
+const INITIAL_VIEWBOX_Y = 0;
+const VIEWBOX_VERTICAL_MARGIN = 20;
 const DEFAULT_VIEWBOX: ViewBoxState = { x: 0, y: INITIAL_VIEWBOX_Y, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT };
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 24;
 const ZOOM_IN_FACTOR = 0.78;
 const ZOOM_OUT_FACTOR = 1.22;
 const MISSING_DOT_BASE_RADIUS = 2;
@@ -16,8 +24,6 @@ const WHEEL_DELTA_LINE_PIXELS = 40;
 const WHEEL_DELTA_PAGE_PIXELS = 800;
 const MAX_WHEEL_DELTA_PIXELS = 140;
 const MIN_WHEEL_DELTA_PIXELS = 0.35;
-
-type ProjectedPoint = readonly [number, number];
 
 interface ViewBoxState {
   x: number;
@@ -51,12 +57,8 @@ function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVG
   return document.createElementNS(SVG_NS, tagName);
 }
 
-function project([longitude, latitude]: WorldMapPosition): ProjectedPoint {
-  return [((longitude + 180) / 360) * VIEWBOX_WIDTH, ((90 - latitude) / 180) * VIEWBOX_HEIGHT];
-}
-
 function formatPoint(point: WorldMapPosition): string {
-  const [x, y] = project(point);
+  const [x, y] = projectWorldMapPosition(point);
   return `${x.toFixed(3)} ${y.toFixed(3)}`;
 }
 
@@ -118,7 +120,7 @@ function centerOfBounds(points: readonly ProjectedPoint[]): ProjectedPoint {
 function polygonArea(polygon: WorldMapPolygon): number {
   const outerRing = polygon[0];
   if (!outerRing) return 0;
-  return Math.abs(ringArea(outerRing.map(project)));
+  return Math.abs(ringArea(outerRing.map(projectWorldMapPosition)));
 }
 
 function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
@@ -137,7 +139,7 @@ function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
   const outerRing = largestPolygon?.[0];
   if (!outerRing || outerRing.length === 0) return null;
 
-  const points = outerRing.map(project);
+  const points = outerRing.map(projectWorldMapPosition);
   return ringCentroid(points) ?? centerOfBounds(points);
 }
 
@@ -225,7 +227,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   const svg = createSvgElement("svg");
   applyViewBox(svg, DEFAULT_VIEWBOX);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Unlabeled world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("aria-label", "Unlabeled flat world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.setAttribute("class", "world-map-svg");
 
   const mapLayer = createSvgElement("g");
@@ -320,6 +323,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    event.preventDefault();
     panState = {
       pointerId: event.pointerId,
       clientX: event.clientX,
@@ -334,6 +338,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointermove", (event) => {
     if (!panState || panState.pointerId !== event.pointerId) return;
+    event.preventDefault();
     const rect = svg.getBoundingClientRect();
     const rawDeltaX = event.clientX - panState.clientX;
     const rawDeltaY = event.clientY - panState.clientY;
@@ -367,6 +372,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     if (countryId === null) return;
     options.onCountryClick?.(countryId);
   });
+  svg.addEventListener("dragstart", (event) => event.preventDefault());
   svg.addEventListener("dblclick", resetViewBox);
   zoomInButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
   zoomOutButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
@@ -393,6 +399,12 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {
   view.element.classList.toggle("show-missing-countries", visible);
+}
+
+export function setWorldMapTargetCountry(view: WorldMapView, countryId: CountryId | null): void {
+  for (const [id, path] of view.pathByCountryId) {
+    path.classList.toggle("is-target", id === countryId);
+  }
 }
 
 export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>, totalCountries: number): void {

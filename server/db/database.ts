@@ -2,7 +2,25 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
-import type { CategoryStats, CreateSessionInput, CreateUserInput, FullStats, GameRecord, GameResult, Session, StoredUser, UserStats, UserStore } from "../auth/types";
+import type {
+  AdminUserList,
+  AdminUserListQuery,
+  CategoryStats,
+  CreateSessionInput,
+  CreateUserInput,
+  FullStats,
+  GameRecord,
+  GameResult,
+  LeaderboardEntry,
+  LeaderboardQuery,
+  Session,
+  StoredUser,
+  SubmitBestTimeInput,
+  SubmitBestTimeResult,
+  UserLeaderboardRank,
+  UserStats,
+  UserStore,
+} from "../auth/types";
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
 
@@ -92,6 +110,18 @@ function migrate(db: Database): void {
       play_mode TEXT
     );
     CREATE INDEX IF NOT EXISTS game_records_user_played ON game_records(user_id, played_at DESC);
+
+    CREATE TABLE IF NOT EXISTS mode_best_times (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_mode TEXT NOT NULL,
+      variant TEXT NOT NULL DEFAULT '',
+      best_time_ms INTEGER NOT NULL,
+      achieved_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, game_mode, variant)
+    );
+
+    CREATE INDEX IF NOT EXISTS mode_best_times_rank
+      ON mode_best_times (game_mode, variant, best_time_ms ASC, achieved_at ASC);
   `);
 
   // Additive migrations: columns added after initial schema deployment.
@@ -281,5 +311,105 @@ export class SqliteUserStore implements UserStore {
     );
 
     return this.getStats(userId);
+  }
+
+  submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
+    const existing = this.db
+      .query<{ bestTimeMs: number }>("SELECT best_time_ms AS bestTimeMs FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?")
+      .get(userId, input.gameMode, input.variant);
+
+    if (existing && input.timeMs >= existing.bestTimeMs) {
+      return { accepted: false, isPersonalBest: false };
+    }
+
+    this.db
+      .query(
+        `INSERT INTO mode_best_times (user_id, game_mode, variant, best_time_ms, achieved_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
+           best_time_ms = excluded.best_time_ms,
+           achieved_at = excluded.achieved_at
+         WHERE excluded.best_time_ms < mode_best_times.best_time_ms`,
+      )
+      .run(userId, input.gameMode, input.variant, input.timeMs, input.achievedAt);
+
+    return { accepted: true, isPersonalBest: true };
+  }
+
+  getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[] {
+    const rows = this.db
+      .query<{ userId: string; displayName: string; avatarEmoji: string | null; timeMs: number; achievedAt: number }>(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+                m.best_time_ms AS timeMs, m.achieved_at AS achievedAt
+         FROM mode_best_times m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.game_mode = ? AND m.variant = ?
+         ORDER BY m.best_time_ms ASC, m.achieved_at ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(query.gameMode, query.variant, query.limit, query.offset);
+
+    return rows.map((row, index) => ({
+      rank: query.offset + index + 1,
+      userId: row.userId,
+      displayName: row.displayName,
+      avatarEmoji: row.avatarEmoji,
+      timeMs: row.timeMs,
+      achievedAt: row.achievedAt,
+    }));
+  }
+
+  getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
+    const row = this.db
+      .query<{ timeMs: number; achievedAt: number }>(
+        "SELECT best_time_ms AS timeMs, achieved_at AS achievedAt FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?",
+      )
+      .get(userId, gameMode, variant);
+    if (!row) return null;
+
+    const rankRow = this.db
+      .query<{ rank: number }>(
+        `SELECT 1 + COUNT(*) AS rank
+         FROM mode_best_times
+         WHERE game_mode = ? AND variant = ?
+           AND (best_time_ms < ? OR (best_time_ms = ? AND achieved_at < ?))`,
+      )
+      .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
+
+    return { rank: rankRow?.rank ?? 1, timeMs: row.timeMs };
+  }
+
+  listUsers(query: AdminUserListQuery): AdminUserList {
+    const filter = query.query ? "WHERE u.email LIKE $like OR u.display_name LIKE $like" : "";
+    const like = query.query ? `%${query.query}%` : "";
+    const total = this.db
+      .query<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${filter}`)
+      .get(query.query ? { $like: like } : {})!.n;
+    const rows = this.db
+      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; createdAt: number; games: number }>(
+        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+                (u.password_hash IS NOT NULL) AS hasPassword, u.created_at AS createdAt,
+                COALESCE(s.total_games, 0) AS games
+         FROM users u LEFT JOIN user_stats s ON s.user_id = u.id
+         ${filter}
+         ORDER BY u.created_at DESC
+         LIMIT $limit OFFSET $offset`,
+      )
+      .all(query.query ? { $like: like, $limit: query.limit, $offset: query.offset } : { $limit: query.limit, $offset: query.offset });
+    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, createdAt: row.createdAt, games: row.games })) };
+  }
+
+  // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
+  // user_stats, and mode_best_times.
+  deleteUser(id: string): boolean {
+    if (!this.findUserById(id)) return false;
+    this.db.query("DELETE FROM users WHERE id = ?").run(id);
+    return true;
+  }
+
+  deleteUserSessions(userId: string): number {
+    const count = this.db.query<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?").get(userId)?.n ?? 0;
+    this.db.query("DELETE FROM sessions WHERE user_id = ?").run(userId);
+    return count;
   }
 }

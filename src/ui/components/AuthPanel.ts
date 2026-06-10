@@ -26,6 +26,8 @@ export interface AuthControls {
   readonly panel: HTMLElement;
   // Call after a multiplayer game completes so the panel stats refreshes.
   readonly refreshStats: (stats: UserStats) => void;
+  readonly getUser: () => AuthState["user"];
+  readonly openPanel: () => void;
   readonly destroy: () => void;
 }
 
@@ -392,6 +394,8 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
       currentState = { ...currentState, stats };
       if (currentState.user) renderAccount(currentState);
     },
+    getUser: () => currentState.user,
+    openPanel: () => openPanel(),
     destroy: () => controller.abort(),
   };
 }

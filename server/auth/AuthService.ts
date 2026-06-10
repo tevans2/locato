@@ -1,11 +1,35 @@
 import { createSessionToken, createUserId } from "./tokens";
-import type { AuthUser, FullStats, GameResult, PasswordHasher, Session, StoredUser, UserStats, UserStore } from "./types";
+import {
+  DEFAULT_LEADERBOARD_LIMIT,
+  MAX_LEADERBOARD_LIMIT,
+  MAX_TIME_MS,
+  MIN_TIME_MS,
+  isLeaderboardGameMode,
+  normalizeLeaderboardVariant,
+} from "../leaderboard/validation";
+import type {
+  AdminUserList,
+  AuthUser,
+  FullStats,
+  GameResult,
+  LeaderboardEntry,
+  LeaderboardQuery,
+  PasswordHasher,
+  Session,
+  StoredUser,
+  SubmitBestTimeResult,
+  UserLeaderboardRank,
+  UserStats,
+  UserStore,
+} from "./types";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 200;
 const MAX_DISPLAY_NAME_LENGTH = 32;
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_ADMIN_PAGE = 50;
+const MAX_ADMIN_PAGE = 200;
 
 export interface AuthServiceOptions {
   readonly sessionTtlMs: number;
@@ -27,9 +51,13 @@ function normalizeDisplayName(value: unknown, fallback: string): string {
   return name.slice(0, MAX_DISPLAY_NAME_LENGTH);
 }
 
+const SUBMIT_RATE_LIMIT = 10;
+const SUBMIT_RATE_WINDOW_MS = 60_000;
+
 export class AuthService {
   private readonly clock: () => number;
   private readonly ttlMs: number;
+  private readonly submitTimestamps = new Map<string, number[]>();
 
   constructor(
     private readonly store: UserStore,
@@ -129,6 +157,73 @@ export class AuthService {
 
   recordGame(userId: string, result: GameResult): UserStats {
     return this.store.recordGame(userId, result, this.clock());
+  }
+
+  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): SubmitBestTimeResult | { error: string } {
+    if (!this.allowSubmit(userId)) return { error: "Too many submissions. Try again shortly." };
+
+    const gameMode = typeof input.gameMode === "string" ? input.gameMode : "";
+    if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+
+    const variantRaw = typeof input.variant === "string" ? input.variant : "";
+    const variant = normalizeLeaderboardVariant(gameMode, variantRaw);
+    if (variant === null) return { error: "Invalid leaderboard variant." };
+
+    const timeMs = input.timeMs;
+    if (typeof timeMs !== "number" || !Number.isInteger(timeMs) || timeMs < MIN_TIME_MS || timeMs > MAX_TIME_MS) {
+      return { error: "Invalid completion time." };
+    }
+
+    return this.store.submitBestTime(userId, { gameMode, variant, timeMs, achievedAt: this.clock() });
+  }
+
+  getLeaderboard(query: { gameMode?: unknown; variant?: unknown; limit?: unknown; offset?: unknown }): { entries: readonly LeaderboardEntry[] } | { error: string } {
+    const gameMode = typeof query.gameMode === "string" ? query.gameMode : "";
+    if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+
+    const variantRaw = typeof query.variant === "string" ? query.variant : "";
+    const variant = normalizeLeaderboardVariant(gameMode, variantRaw);
+    if (variant === null) return { error: "Invalid leaderboard variant." };
+
+    const limit = typeof query.limit === "number" && Number.isInteger(query.limit) ? Math.min(Math.max(query.limit, 1), MAX_LEADERBOARD_LIMIT) : DEFAULT_LEADERBOARD_LIMIT;
+    const offset = typeof query.offset === "number" && Number.isInteger(query.offset) && query.offset >= 0 ? query.offset : 0;
+    const boardQuery: LeaderboardQuery = { gameMode, variant, limit, offset };
+    return { entries: this.store.getLeaderboard(boardQuery) };
+  }
+
+  getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
+    return this.store.getUserRank(userId, gameMode, variant);
+  }
+
+  // --- Admin account controls ---
+
+  listUsers(query: { q?: unknown; limit?: unknown; offset?: unknown }): AdminUserList {
+    const search = typeof query.q === "string" && query.q.trim().length > 0 ? query.q.trim() : null;
+    const limit = typeof query.limit === "number" && Number.isInteger(query.limit) ? Math.min(Math.max(query.limit, 1), MAX_ADMIN_PAGE) : DEFAULT_ADMIN_PAGE;
+    const offset = typeof query.offset === "number" && Number.isInteger(query.offset) && query.offset > 0 ? query.offset : 0;
+    return this.store.listUsers({ query: search, limit, offset });
+  }
+
+  getUserDetail(id: string): { user: AuthUser; stats: UserStats } | null {
+    const user = this.store.findUserById(id);
+    return user ? { user: this.toAuthUser(user), stats: this.store.getStats(id) } : null;
+  }
+
+  deleteUser(id: string): boolean {
+    return this.store.deleteUser(id);
+  }
+
+  revokeUserSessions(id: string): number {
+    return this.store.deleteUserSessions(id);
+  }
+
+  private allowSubmit(userId: string): boolean {
+    const now = this.clock();
+    const recent = (this.submitTimestamps.get(userId) ?? []).filter((timestamp) => now - timestamp < SUBMIT_RATE_WINDOW_MS);
+    if (recent.length >= SUBMIT_RATE_LIMIT) return false;
+    recent.push(now);
+    this.submitTimestamps.set(userId, recent);
+    return true;
   }
 
   updateAvatarEmoji(userId: string, emoji: string | null): void {

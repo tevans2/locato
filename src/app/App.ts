@@ -1,6 +1,7 @@
 import { type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
+import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
@@ -9,6 +10,7 @@ import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/scree
 import { createAuthControls } from "../ui/components/AuthPanel";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
 import { createStatsScreen } from "../ui/screens/StatsScreen";
+import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import type { AppRoute, Screen } from "./router";
 
@@ -39,6 +41,7 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
+  let returnRoute: AppRoute = { type: "solo-game", continueSaved: true };
 
   // Tracks the in-flight solo session so it can be recorded when it ends (completion, reset,
   // category change, or navigating away) — not only on full 196-country completion.
@@ -112,13 +115,10 @@ export function createApp(options: AppOptions): App {
       createSoloGameScreen({
         countryIndex: options.countryIndex,
         engine,
-        categoryIds: activeCategories,
-        onCategoryChange: (nextCategoryIds) => {
-          clearSoloSave(options.storage);
-          startSolo(nextCategoryIds, false);
-        },
+        selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onReset: () => {
-          // The reset button records the finished run before starting a fresh one.
+          // Record the finished run before starting a fresh one.
           void recordSoloSession(lastSoloState);
           lastSoloState = null;
           clearSoloSave(options.storage);
@@ -131,11 +131,27 @@ export function createApp(options: AppOptions): App {
           // Also record the moment a run is fully completed.
           if (state.status === "complete") void recordSoloSession(state);
         },
-        onCountryGuessing: () => navigate({ type: "country-guessing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onViewStats: () => navigate({ type: "stats" }),
+        onLeaderboard: () => navigate({ type: "leaderboard", mode: promptGameModeFromCategoryIds(activeCategories) }),
+        getAuthUser: () => authControls.getUser(),
+        authControls,
+        storage: options.storage,
       }),
     );
+  }
+
+  function handleGameModeChange(gameMode: GameModeId): void {
+    clearSoloSave(options.storage);
+
+    if (isPromptGameModeId(gameMode)) {
+      startSolo([gameMode], false);
+      return;
+    }
+
+    if (isWorldMapGameModeId(gameMode)) {
+      navigate({ type: "country-guessing", mode: gameMode });
+    }
   }
 
   function createLoadingScreen(message: string): Screen {
@@ -149,7 +165,7 @@ export function createApp(options: AppOptions): App {
     };
   }
 
-  async function startCountryGuessing(): Promise<void> {
+  async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all"): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading world map...");
     mount(loading);
@@ -166,12 +182,12 @@ export function createApp(options: AppOptions): App {
           countryIndex: options.countryIndex,
           worldCountryFeatures,
           storage: options.storage,
-          onBackToSolo: () => {
-            const save = readSoloSave(options.storage);
-            startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
-          },
+          initialMode,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onRecordGame: (r) => void recordWorldMapGame(r),
+          onLeaderboard: () => navigate({ type: "leaderboard", mode: initialMode }),
+          getAuthUser: () => authControls.getUser(),
         }),
       );
     } catch (error) {
@@ -213,8 +229,24 @@ export function createApp(options: AppOptions): App {
     );
   }
 
+  function startLeaderboard(mode?: GameModeId, variant?: string): void {
+    mount(
+      createLeaderboardScreen({
+        storage: options.storage,
+        ...(mode ? { initialMode: mode } : {}),
+        ...(variant ? { initialVariant: variant } : {}),
+        onBack: () => navigate(returnRoute),
+        onSignIn: () => authControls.openPanel(),
+      }),
+    );
+  }
+
   function navigate(route: AppRoute): void {
     navigationRun += 1;
+
+    if (route.type !== "leaderboard") {
+      returnRoute = route;
+    }
     if (route.type === "solo-game") {
       startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
       return;
@@ -223,7 +255,7 @@ export function createApp(options: AppOptions): App {
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
     if (route.type === "country-guessing") {
-      startCountryGuessing();
+      void startCountryGuessing(route.mode ?? "name-all");
       return;
     }
     if (route.type === "multiplayer") {
@@ -233,6 +265,11 @@ export function createApp(options: AppOptions): App {
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
       void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }) })));
+      return;
+    }
+
+    if (route.type === "leaderboard") {
+      startLeaderboard(route.mode, route.variant);
       return;
     }
   }

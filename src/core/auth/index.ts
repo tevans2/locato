@@ -80,6 +80,31 @@ export interface GameResult {
   readonly playMode?: string;
 }
 
+export interface LeaderboardEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+export interface LeaderboardResponse {
+  readonly entries: readonly LeaderboardEntry[];
+  readonly currentUser: { readonly rank: number; readonly timeMs: number } | null;
+}
+
+export interface SubmitBestTimeInput {
+  readonly gameMode: string;
+  readonly variant?: string;
+  readonly timeMs: number;
+}
+
+export interface SubmitBestTimeResponse {
+  readonly accepted: boolean;
+  readonly isPersonalBest: boolean;
+}
+
 async function postJson(path: string, body: unknown): Promise<Response> {
   return fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
@@ -127,6 +152,27 @@ export function signInWithGoogle(): void {
 
 export async function signOut(): Promise<void> {
   await postJson("/auth/logout", {});
+}
+
+export async function fetchLeaderboard(mode: string, variant = "", limit = 50): Promise<LeaderboardResponse | null> {
+  try {
+    const params = new URLSearchParams({ mode, variant, limit: String(limit) });
+    const response = await fetch(`/api/leaderboard?${params.toString()}`);
+    if (!response.ok) return null;
+    return (await response.json()) as LeaderboardResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function submitBestTime(input: SubmitBestTimeInput): Promise<SubmitBestTimeResponse | null> {
+  try {
+    const response = await postJson("/api/leaderboard", input);
+    if (!response.ok) return null;
+    return (await response.json()) as SubmitBestTimeResponse;
+  } catch {
+    return null;
+  }
 }
 
 export async function recordGame(result: GameResult): Promise<UserStats | null> {

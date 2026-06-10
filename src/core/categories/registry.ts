@@ -1,6 +1,6 @@
 import type { CountryIndex } from "../countries";
 import { createSeededRandom } from "../game/random";
-import { capitalsCategory, codesCategory, flagsCategory, pickCountryCategory, shapesCategory } from "./builtins";
+import { capitalsCategory, codesCategory, flagsCategory, pickCountryCategory, shapesCategory, spotCountryCategory } from "./builtins";
 import type { PromptCategory, PromptSlot } from "./types";
 
 export const promptCategories = {
@@ -9,6 +9,7 @@ export const promptCategories = {
   codes: codesCategory,
   capitals: capitalsCategory,
   "pick-country": pickCountryCategory,
+  "spot-country": spotCountryCategory,
 } as const;
 
 export type CategoryId = keyof typeof promptCategories;

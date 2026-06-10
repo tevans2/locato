@@ -42,6 +42,16 @@ export const pickCountryCategory: PromptCategory = {
   reveal: (country) => country.name,
 };
 
+export const spotCountryCategory: PromptCategory = {
+  id: "spot-country",
+  label: "Spot the country",
+  description: "A country flashes on the map — race to type its name.",
+  eligible: () => true,
+  prompt: (country) => ({ kind: "map-highlight", value: country.code }),
+  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, true),
+  reveal: (country) => country.name,
+};
+
 export const capitalsCategory: PromptCategory = {
   id: "capitals",
   label: "Capitals",

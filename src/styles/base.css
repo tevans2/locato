@@ -59,7 +59,28 @@ input, select {
   font-weight: 620;
 }
 
-select option { color: #11160f; background: var(--text); }
+select {
+  appearance: none;
+  color-scheme: dark;
+  padding-right: 38px;
+  background-color: rgba(255, 255, 255, 0.04);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+select:hover {
+  border-color: rgba(184, 227, 109, 0.38);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+select option { color: var(--text); background: #11160f; }
 
 h1, h2, p { margin-top: 0; }
 h1, h2 { letter-spacing: -0.03em; }
