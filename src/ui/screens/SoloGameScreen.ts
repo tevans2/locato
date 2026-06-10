@@ -19,6 +19,7 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   readonly onCountryGuessing: () => void;
   readonly onMultiplayer: () => void;
+  readonly onViewStats?: () => void;
   readonly authControls?: AuthControls;
 }
 

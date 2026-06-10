@@ -8,6 +8,7 @@ import "./styles/board.css";
 import "./styles/multiplayer.css";
 import "./styles/responsive.css";
 import "./styles/auth.css";
+import "./styles/stats.css";
 
 const root = document.getElementById("app");
 

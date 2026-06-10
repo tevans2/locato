@@ -270,7 +270,16 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         // The server has already validated the results; we just forward our own row.
         const myResult = message.results.find((result) => result.playerId === localPlayerId);
         if (myResult) {
-          void recordGame({ correctAnswers: myResult.correctAnswers, wrongAnswers: myResult.wrongAnswers, bestStreak: 0 }).then((stats) => {
+          void recordGame({
+            mode: "multiplayer",
+            categoryIds: room?.categoryIds ?? [],
+            correctAnswers: myResult.correctAnswers,
+            wrongAnswers: myResult.wrongAnswers,
+            score: myResult.score,
+            bestStreak: 0,
+            rank: myResult.rank,
+            totalPlayers: message.results.length,
+          }).then((stats) => {
             if (stats) options.authControls?.refreshStats(stats);
           });
         }

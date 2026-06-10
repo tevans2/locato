@@ -1,5 +1,5 @@
 import { createSessionToken, createUserId } from "./tokens";
-import type { AuthUser, GameResult, PasswordHasher, Session, StoredUser, UserStats, UserStore } from "./types";
+import type { AuthUser, FullStats, GameResult, PasswordHasher, Session, StoredUser, UserStats, UserStore } from "./types";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 200;
@@ -123,8 +123,12 @@ export class AuthService {
     return this.store.getStats(userId);
   }
 
+  getFullStats(userId: string): FullStats {
+    return this.store.getFullStats(userId);
+  }
+
   recordGame(userId: string, result: GameResult): UserStats {
-    return this.store.recordGame(userId, result);
+    return this.store.recordGame(userId, result, this.clock());
   }
 
   updateAvatarEmoji(userId: string, emoji: string | null): void {

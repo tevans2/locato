@@ -18,17 +18,74 @@ export interface Session {
   readonly createdAt: number;
 }
 
-export interface UserStats {
-  readonly games: number;
+// Submitted at the end of every game (solo, multiplayer, or world-map).
+export interface GameResult {
+  readonly mode: "solo" | "multiplayer" | "world-map";
+  readonly categoryIds: readonly string[];
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
+  readonly score: number;
   readonly bestStreak: number;
+  readonly rank?: number;        // multiplayer: 1 = win
+  readonly totalPlayers?: number;
+  // world-map only:
+  readonly durationMs?: number;  // completed timed run time; absent/0 otherwise
+  readonly completed?: boolean;  // whether the run reached its target
+  readonly countriesFound?: number;
+  readonly countriesTotal?: number;
+  readonly playMode?: string;    // "name-all" | "click-country" | "puzzle"
 }
 
-export interface GameResult {
+export interface CategoryStats {
+  readonly categoryId: string;
+  readonly correct: number;
+  readonly wrong: number;
+}
+
+export interface GameRecord {
+  readonly id: string;
+  readonly mode: "solo" | "multiplayer" | "world-map";
+  readonly categoryIds: readonly string[];
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
+  readonly score: number;
   readonly bestStreak: number;
+  readonly rank: number | null;
+  readonly totalPlayers: number | null;
+  readonly playedAt: number;
+  // world-map only (null for solo/multiplayer rows):
+  readonly durationMs: number | null;
+  readonly completed: boolean | null;
+  readonly countriesFound: number | null;
+  readonly countriesTotal: number | null;
+  readonly playMode: string | null;
+}
+
+// Flat aggregate returned by /auth/me (fast, no joins).
+export interface UserStats {
+  readonly totalGames: number;
+  readonly totalCorrect: number;
+  readonly totalWrong: number;
+  readonly bestStreak: number;
+  readonly soloGames: number;
+  readonly soloCorrect: number;
+  readonly soloWrong: number;
+  readonly soloBestStreak: number;
+  readonly multiplayerGames: number;
+  readonly multiplayerWins: number;
+  readonly multiplayerCorrect: number;
+  readonly multiplayerWrong: number;
+  readonly multiplayerBestStreak: number;
+  readonly worldMapGames: number;
+  readonly worldMapCompletions: number;
+  readonly worldBestTimeMs: number;   // 0 = no completed timed run yet
+  readonly worldBestCountries: number; // max countries found in a single full-world run
+}
+
+// Richer object returned by /api/stats — includes per-category + history.
+export interface FullStats extends UserStats {
+  readonly categories: readonly CategoryStats[];
+  readonly recentGames: readonly GameRecord[];
 }
 
 export interface CreateUserInput {
@@ -47,8 +104,6 @@ export interface CreateSessionInput {
   readonly createdAt: number;
 }
 
-// Persistence boundary — synchronous (bun:sqlite is sync) and storage-agnostic so auth logic
-// can be unit-tested against an in-memory store without importing bun:sqlite.
 export interface UserStore {
   createUser(input: CreateUserInput): StoredUser;
   findUserByEmail(email: string): StoredUser | null;
@@ -61,7 +116,8 @@ export interface UserStore {
   deleteSession(id: string): void;
   deleteExpiredSessions(now: number): void;
   getStats(userId: string): UserStats;
-  recordGame(userId: string, result: GameResult): UserStats;
+  getFullStats(userId: string): FullStats;
+  recordGame(userId: string, result: GameResult, now: number): UserStats;
 }
 
 export interface PasswordHasher {

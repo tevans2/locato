@@ -33,13 +33,31 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
   }
 }
 
+function isNonNegInt(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_STAT_VALUE;
+}
+
+// Durations can exceed the small per-game stat cap (a long world-map run is many minutes).
+function isDurationMs(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 86_400_000;
+}
+
 function parseGameResult(body: Record<string, unknown>): GameResult | null {
-  const { correctAnswers, wrongAnswers, bestStreak } = body;
-  const valid = [correctAnswers, wrongAnswers, bestStreak].every(
-    (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_STAT_VALUE,
-  );
-  if (!valid) return null;
-  return { correctAnswers: correctAnswers as number, wrongAnswers: wrongAnswers as number, bestStreak: bestStreak as number };
+  const { mode, categoryIds, correctAnswers, wrongAnswers, score, bestStreak, rank, totalPlayers, durationMs, completed, countriesFound, countriesTotal, playMode } = body;
+  if (mode !== "solo" && mode !== "multiplayer" && mode !== "world-map") return null;
+  if (!Array.isArray(categoryIds) || categoryIds.length === 0) return null;
+  if (![correctAnswers, wrongAnswers, score, bestStreak].every(isNonNegInt)) return null;
+  const result: Record<string, unknown> = { mode, categoryIds: categoryIds.map(String), correctAnswers: correctAnswers as number, wrongAnswers: wrongAnswers as number, score: score as number, bestStreak: bestStreak as number };
+  if (isNonNegInt(rank)) result.rank = rank;
+  if (isNonNegInt(totalPlayers)) result.totalPlayers = totalPlayers;
+  if (mode === "world-map") {
+    if (isDurationMs(durationMs)) result.durationMs = durationMs;
+    if (typeof completed === "boolean") result.completed = completed;
+    if (isNonNegInt(countriesFound)) result.countriesFound = countriesFound;
+    if (isNonNegInt(countriesTotal)) result.countriesTotal = countriesTotal;
+    if (typeof playMode === "string") result.playMode = playMode;
+  }
+  return result as unknown as GameResult;
 }
 
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
@@ -103,7 +121,14 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!body) return json({ error: "Invalid request body." }, 400);
     const result = parseGameResult(body);
     if (!result) return json({ error: "Invalid game result." }, 400);
+    log("info", "game.recorded", { ip: ip(request), userId: user.id, mode: result.mode, correct: result.correctAnswers });
     return json({ stats: service.recordGame(user.id, result) });
+  }
+
+  if (pathname === "/api/stats" && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    return json(service.getFullStats(user.id));
   }
 
   if (pathname === "/auth/github" && method === "GET") {
