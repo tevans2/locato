@@ -1,6 +1,7 @@
 import type { AuthUser } from "../../core/auth";
 import { type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
+import { DAILY_COUNTRY_COUNT, type DailyRoundMark } from "../../core/dailyChallenge";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import { timerKeysForMode } from "../../core/timer/keys";
@@ -24,10 +25,15 @@ export interface SoloGameScreenOptions {
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
   readonly onMultiplayer: () => void;
+  readonly onDailyChallenge: () => void;
   readonly onViewStats?: () => void;
   readonly onLeaderboard: () => void;
   readonly getAuthUser: () => AuthUser | null;
   readonly authControls?: AuthControls;
+  readonly dailyChallenge?: {
+    readonly date: string;
+    readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[] }) => void;
+  };
 }
 
 interface SoloViews {
@@ -45,8 +51,13 @@ function visibleCountries(index: CountryIndex, state: GameState): readonly Count
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
+  const isDailyChallenge = options.dailyChallenge !== undefined;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
+  const dailyMarks: DailyRoundMark[] = [];
+  let dailyHintsUsed = 0;
+  let dailyRoundHadHint = false;
+  let dailyCompleted = false;
   const stats = createStatsView();
   const prompt = createPromptView();
   const feedback = createFeedbackView();
@@ -60,6 +71,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
+  const dailyButton = el("button", { className: "ghost-action daily-action", text: "Daily Challenge", attrs: { type: "button", ...(isDailyChallenge ? { disabled: "" } : {}) } });
   const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
   const timerModeSelect = el("select", {
     className: "country-guess-timer-select",
@@ -199,10 +211,49 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   }
 
   function dispatchAndRender(events: readonly GameEvent[], persist = true): void {
+    if (isDailyChallenge) recordDailyEvents(events);
     applyEvents(events);
     render(persist);
     if (events.some((event) => event.type === "GUESS_CORRECT")) input.value = "";
     if (engine.getState().status === "playing") input.focus();
+    if (isDailyChallenge) completeDailyIfNeeded(events);
+  }
+
+  function recordDailyEvents(events: readonly GameEvent[]): void {
+    for (const event of events) {
+      if (event.type === "HINT_REVEALED") {
+        dailyHintsUsed += 1;
+        dailyRoundHadHint = true;
+        continue;
+      }
+
+      if (event.type === "GUESS_CORRECT") {
+        dailyMarks.push(dailyRoundHadHint ? "hint" : "correct");
+        dailyRoundHadHint = false;
+        continue;
+      }
+
+      if (event.type === "ANSWER_REVEALED" || event.type === "ROUND_SKIPPED") {
+        dailyMarks.push("miss");
+        dailyRoundHadHint = false;
+      }
+    }
+  }
+
+  function completeDailyIfNeeded(events: readonly GameEvent[]): void {
+    if (!options.dailyChallenge || dailyCompleted || !events.some((event) => event.type === "GAME_COMPLETED")) return;
+
+    dailyCompleted = true;
+    const state = engine.getState();
+    const marks = [...dailyMarks];
+    while (marks.length < DAILY_COUNTRY_COUNT) marks.push("miss");
+
+    options.dailyChallenge.onComplete({
+      score: state.correctAnswers,
+      timeMs: Math.max(0, (state.endedAt ?? Date.now()) - (state.startedAt ?? Date.now())),
+      hintsUsed: dailyHintsUsed,
+      marks: marks.slice(0, DAILY_COUNTRY_COUNT),
+    });
   }
 
   playTimer = createPlayTimer({
@@ -239,7 +290,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     },
     { signal: controller.signal },
   );
-  skipButton.addEventListener("click", () => dispatchAndRender(engine.dispatch({ type: "SKIP_ROUND", now: Date.now() })), { signal: controller.signal });
+  skipButton.addEventListener("click", () => dispatchAndRender(engine.dispatch(isDailyChallenge ? { type: "REVEAL_ANSWER", now: Date.now() } : { type: "SKIP_ROUND", now: Date.now() })), { signal: controller.signal });
   resetButton.addEventListener(
     "click",
     () => {
@@ -257,6 +308,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     { signal: controller.signal },
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
 
   document.addEventListener(
@@ -291,10 +343,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [logo, gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [logo, isDailyChallenge ? el("div", { className: "daily-badge", text: `Daily ${options.dailyChallenge?.date ?? ""}` }) : gameModeDropdown.element] }),
           el("div", {
             className: "game-header-actions",
-            children: [leaderboardButton, multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])],
+            children: [dailyButton, leaderboardButton, multiplayerButton, ...(options.authControls ? [options.authControls.trigger] : [])],
           }),
         ],
       }),
@@ -310,7 +362,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
               timerPanel,
               stats.element,
               feedback.element,
-              el("div", { className: "actions", children: [hintButton, skipButton, resetButton, atlas.element] }),
+              el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
             ],
           }),
         ],

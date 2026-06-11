@@ -44,6 +44,7 @@ export interface CreateGameEngineInput {
   readonly categoryIds: readonly string[];
   readonly seed: string;
   readonly now?: number;
+  readonly poolCountryIds?: readonly CountryId[];
   readonly initialState?: GameState;
 }
 
