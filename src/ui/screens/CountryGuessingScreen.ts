@@ -99,6 +99,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let lastTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].last);
   let bestTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].best);
   let targetCountryId: CountryId | null = null;
+  let lastFocusedSpotTargetId: CountryId | null = null;
+  let spotFocusTimeoutId: number | null = null;
   let puzzleContinent: Continent = "Africa";
   let puzzlePlacedCount = 0;
   let puzzleTotalCount = countryIndex.countries.filter((country) => country.continent === puzzleContinent).length;
@@ -118,6 +120,21 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   function setNextTargetCountry(): void {
     targetCountryId = chooseNextTargetCountryId();
+  }
+
+  function clearSpotFocusTimeout(): void {
+    if (spotFocusTimeoutId !== null) {
+      window.clearTimeout(spotFocusTimeoutId);
+      spotFocusTimeoutId = null;
+    }
+  }
+
+  function focusSpotTargetIfNeeded(force = false): void {
+    if (playMode !== "spot-country" || complete() || targetCountryId === null) return;
+    if (!force && lastFocusedSpotTargetId === targetCountryId) return;
+
+    lastFocusedSpotTargetId = targetCountryId;
+    map.focusCountry(targetCountryId);
   }
 
   function getTargetCountry(): Country | null {
@@ -222,9 +239,12 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     map.element.classList.toggle("is-click-country-mode", playMode === "click-country" && !finished);
     renderTargetPrompt();
     renderTimer();
+    focusSpotTargetIfNeeded();
   }
 
   function resetGame(feedbackMessage: string): void {
+    clearSpotFocusTimeout();
+    lastFocusedSpotTargetId = null;
     setAtlasOpen(atlas, false);
     guessedCountryIds.clear();
     input.value = "";
@@ -248,7 +268,42 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     startTimerIfNeeded();
     guessedCountryIds.add(country.id);
     lastCountryName.textContent = country.name;
-    if ((playMode === "click-country" || playMode === "spot-country") && !complete()) setNextTargetCountry();
+
+    if (playMode === "spot-country") {
+      targetCountryId = null;
+      lastFocusedSpotTargetId = null;
+      render();
+      input.value = "";
+      map.resetView();
+
+      if (complete()) {
+        if (timerMode === "count-up") {
+          const finalTimeMs = stopTimer();
+          const isNewBest = updateStoredTimerTimesForCurrentMode(finalTimeMs);
+          renderTimer();
+          showFeedback(
+            feedback,
+            `World complete. All ${countryIndex.countries.length} countries found in ${formatElapsedTime(finalTimeMs)}${isNewBest ? " — new best time." : "."}`,
+            "good",
+          );
+          return;
+        }
+
+        showFeedback(feedback, `World complete. All ${countryIndex.countries.length} countries found.`, "good");
+        return;
+      }
+
+      showFeedback(feedback, `${country.name} found.`, "good");
+      clearSpotFocusTimeout();
+      spotFocusTimeoutId = window.setTimeout(() => {
+        spotFocusTimeoutId = null;
+        setNextTargetCountry();
+        render();
+      }, 520);
+      return;
+    }
+
+    if (playMode === "click-country" && !complete()) setNextTargetCountry();
     render();
     input.value = "";
 
@@ -272,11 +327,6 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (playMode === "click-country") {
       const nextCountry = getTargetCountry();
       showFeedback(feedback, `${country.name} found.${nextCountry ? ` Next: ${nextCountry.name}.` : ""}`, "good");
-      return;
-    }
-
-    if (playMode === "spot-country") {
-      showFeedback(feedback, `${country.name} found.`, "good");
       return;
     }
 
@@ -388,6 +438,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   function setPlayMode(nextMode: CountryGuessPlayMode): void {
     if (playMode === nextMode) return;
+    clearSpotFocusTimeout();
+    lastFocusedSpotTargetId = null;
     playMode = nextMode;
     gameModeDropdown.setSelectedMode(nextMode);
     lastTimerMs = readStoredTime(options.storage, COUNTRY_GUESS_TIMER_KEYS[playMode].last);
@@ -630,6 +682,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     element,
     destroy: () => {
       clearTimerInterval();
+      clearSpotFocusTimeout();
       puzzle.destroy();
       controller.abort();
     },

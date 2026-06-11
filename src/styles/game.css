@@ -177,7 +177,7 @@
 .prompt-text {
   font-size: clamp(3rem, 12vw, 7rem);
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   color: var(--accent);
   text-align: center;
   line-height: 1;
@@ -316,6 +316,82 @@
   font-size: 1.55rem;
   font-weight: 760;
   color: var(--accent);
+}
+
+.daily-badge {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid rgba(232, 226, 211, 0.16);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  font-weight: 760;
+}
+
+.daily-result-screen {
+  justify-content: center;
+}
+
+.daily-result-panel {
+  width: min(620px, 100%);
+  margin: auto;
+  display: grid;
+  gap: 18px;
+}
+
+.daily-result-panel h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(4rem, 16vw, 7rem);
+  line-height: 0.95;
+}
+
+.daily-result-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.daily-result-stats article {
+  border: 1px solid rgba(232, 226, 211, 0.11);
+  border-radius: var(--radius-sm);
+  background: rgba(20, 25, 20, 0.42);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.daily-result-stats span,
+.daily-legend {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 620;
+}
+
+.daily-result-stats strong {
+  color: var(--text);
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-share-text {
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font: 700 0.95rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.daily-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
 }
 
 .answer-panel {
@@ -480,21 +556,21 @@
 }
 
 .world-map-country.is-target {
-  fill: rgba(184, 227, 109, 0.88);
-  stroke: rgba(245, 244, 206, 0.95);
+  fill: rgba(237, 74, 67, 0.9);
+  stroke: rgba(255, 235, 219, 0.96);
   stroke-width: 1.1;
-  filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+  filter: drop-shadow(0 0 8px rgba(237, 74, 67, 0.62));
   animation: country-flash 1.4s ease-in-out infinite;
 }
 
 @keyframes country-flash {
   0%, 100% {
-    fill: rgba(184, 227, 109, 0.88);
-    filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.55));
+    fill: rgba(237, 74, 67, 0.9);
+    filter: drop-shadow(0 0 8px rgba(237, 74, 67, 0.62));
   }
   50% {
-    fill: rgba(245, 244, 206, 0.92);
-    filter: drop-shadow(0 0 14px rgba(245, 244, 206, 0.7));
+    fill: rgba(255, 204, 190, 0.96);
+    filter: drop-shadow(0 0 14px rgba(255, 126, 99, 0.82));
   }
 }
 
