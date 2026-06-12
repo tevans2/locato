@@ -506,6 +506,47 @@
   user-select: none;
   -webkit-user-select: none;
 }
+.globe-map-panel {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(67, 160, 190, 0.18), transparent 54%),
+    radial-gradient(circle at 18% 18%, rgba(184, 227, 109, 0.08), transparent 32%),
+    linear-gradient(135deg, rgba(232, 226, 211, 0.035), transparent 46%),
+    #05080c;
+}
+
+.globe-map-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(232, 226, 211, 0.026) 1px, transparent 1px) 0 0 / 86px 86px,
+    linear-gradient(90deg, rgba(232, 226, 211, 0.02) 1px, transparent 1px) 0 0 / 86px 86px,
+    radial-gradient(circle at 50% 50%, transparent 0 36%, rgba(255, 255, 255, 0.035) 36.2%, transparent 36.8%);
+  opacity: 0.72;
+}
+
+.globe-map-canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: clamp(300px, calc(100dvh - 310px), 620px);
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.globe-map-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.globe-map-meta {
+  z-index: 2;
+}
+
 
 .world-map-svg.is-panning {
   cursor: grabbing;

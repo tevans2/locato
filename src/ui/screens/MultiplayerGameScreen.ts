@@ -105,8 +105,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   });
   mapView.element.classList.add("multiplayer-map-panel");
   const mapPrompt = el("div", { className: "multiplayer-map-prompt", children: [mapTarget] });
-  const mapHighlightLabel = el("p", { className: "multiplayer-map-highlight-label", text: "Name the highlighted country" });
-  const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt", children: [mapHighlightLabel] });
+  const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt" });
 
   function attachMapTo(container: HTMLElement): void {
     if (mapView.element.parentElement !== container) container.append(mapView.element);
@@ -114,6 +113,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
 
   let renderedRoundKey: string | null = null;
   let focusedRoundKey: string | null = null;
+  let focusedMapRoundKey: string | null = null;
   let phaseStartedAt: number | null = null;
   let phaseEndsAt: number | null = null;
   let rafId: number | null = null;
@@ -221,23 +221,35 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       if (visibleRound) {
         if (visibleRound.prompt.kind === "image") {
           setWorldMapTargetCountry(mapView, null);
+          if (isNewRound || focusedMapRoundKey !== null) mapView.resetView();
+          focusedMapRoundKey = null;
           flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
         } else if (visibleRound.prompt.kind === "map-click") {
           setWorldMapTargetCountry(mapView, null);
+          if (isNewRound || focusedMapRoundKey !== null) mapView.resetView();
+          focusedMapRoundKey = null;
           mapTargetName.textContent = visibleRound.prompt.value;
           attachMapTo(mapPrompt);
           flagSlot.replaceChildren(mapPrompt);
         } else if (visibleRound.prompt.kind === "map-highlight") {
           const country = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase());
           setWorldMapTargetCountry(mapView, country?.id ?? null);
+          if (country && roundKey !== null && focusedMapRoundKey !== roundKey) {
+            mapView.focusCountry(country.id);
+            focusedMapRoundKey = roundKey;
+          }
           attachMapTo(mapHighlightPrompt);
           flagSlot.replaceChildren(mapHighlightPrompt);
         } else {
           setWorldMapTargetCountry(mapView, null);
+          if (isNewRound || focusedMapRoundKey !== null) mapView.resetView();
+          focusedMapRoundKey = null;
           flagSlot.replaceChildren(el("div", { className: "prompt-text", text: visibleRound.prompt.value }));
         }
       } else {
         setWorldMapTargetCountry(mapView, null);
+        if (focusedMapRoundKey !== null) mapView.resetView();
+        focusedMapRoundKey = null;
         flagSlot.replaceChildren(el("div", { className: "complete-card", text: "The server will reveal the next prompt when the room starts." }));
       }
 

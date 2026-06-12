@@ -260,7 +260,6 @@
 }
 
 .multiplayer-map-panel .world-map-svg {
-  min-height: 0;
   height: 100%;
 }
 
@@ -273,7 +272,8 @@
 }
 
 .multiplayer-map-highlight-prompt {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
 }
 
 .multiplayer-map-highlight-label {

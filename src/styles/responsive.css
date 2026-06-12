@@ -74,7 +74,8 @@
     grid-template-rows: auto auto;
   }
 
-  .world-map-svg {
+  .world-map-svg,
+  .globe-map-canvas {
     min-height: clamp(260px, 48dvh, 430px);
   }
 
