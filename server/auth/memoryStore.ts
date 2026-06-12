@@ -4,6 +4,7 @@ import type {
   CategoryStats,
   CreateSessionInput,
   CreateUserInput,
+  DailyChallengeResult,
   FriendRequestLists,
   FullStats,
   GameRecord,
@@ -31,6 +32,7 @@ export function createMemoryUserStore(): UserStore {
   const stats = new Map<string, UserStats>();
   const categoryStats = new Map<string, Map<string, CategoryStats>>();
   const gameRecords = new Map<string, GameRecord[]>();
+  const dailyResults = new Map<string, DailyChallengeResult>();
   const bestTimes = new Map<string, { userId: string; gameMode: string; variant: string; timeMs: number; achievedAt: number }>();
 
   // Friendships keyed by canonical "low|high" pair (low < high by id string).
@@ -38,6 +40,10 @@ export function createMemoryUserStore(): UserStore {
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
+  }
+
+  function dailyKey(userId: string, date: string): string {
+    return `${userId}:${date}`;
   }
 
   function pairKey(a: string, b: string): string {
@@ -144,6 +150,16 @@ export function createMemoryUserStore(): UserStore {
       stats.set(userId, next);
       return next;
     },
+    getDailyResult(userId: string, date: string): DailyChallengeResult | null {
+      return dailyResults.get(dailyKey(userId, date)) ?? null;
+    },
+    saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
+      const key = dailyKey(userId, result.date);
+      const existing = dailyResults.get(key);
+      if (existing) return existing;
+      dailyResults.set(key, { ...result, marks: [...result.marks] });
+      return dailyResults.get(key)!;
+    },
     submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
       const key = bestTimeKey(userId, input.gameMode, input.variant);
       const existing = bestTimes.get(key);
@@ -208,6 +224,7 @@ export function createMemoryUserStore(): UserStore {
       for (const [key, value] of usersByOAuth) if (value.id === id) usersByOAuth.delete(key);
       for (const [key, session] of sessions) if (session.userId === id) sessions.delete(key);
       for (const [key, entry] of bestTimes) if (entry.userId === id) bestTimes.delete(key);
+      for (const key of dailyResults.keys()) if (key.startsWith(`${id}:`)) dailyResults.delete(key);
       stats.delete(id);
       categoryStats.delete(id);
       gameRecords.delete(id);

@@ -201,6 +201,55 @@ describe("auth routes", () => {
     expect((await resp!.json()).stats).toMatchObject({ totalGames: 1, totalCorrect: 7, soloGames: 1 });
   });
 
+  it("stores daily challenge results on the authenticated account", async () => {
+    const { service } = createService();
+    const r = await route(service, jsonRequest("/auth/register", "POST", { email: "daily@b.com", password: "supersecret", displayName: "daily" }));
+    const token = tokenFrom(r!);
+    const result = {
+      date: "2026-06-12",
+      seed: "daily:2026-06-12",
+      score: 8,
+      timeMs: 134_000,
+      hintsUsed: 1,
+      marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
+      shareText: "client text is ignored",
+      completedAt: 1_797_000_000_000,
+    };
+
+    const save = await route(service, jsonRequest("/api/daily", "POST", result, token));
+    expect(save?.status).toBe(200);
+    const savedBody = await save!.json();
+    expect(savedBody.result).toMatchObject({ date: "2026-06-12", score: 8, hintsUsed: 1 });
+    expect(savedBody.result.shareText).toContain("Locato Daily 2026-06-12");
+
+    const fetch = await route(service, jsonRequest("/api/daily/2026-06-12", "GET", undefined, token));
+    expect(fetch?.status).toBe(200);
+    expect((await fetch!.json()).result.score).toBe(8);
+  });
+
+  it("does not overwrite an existing daily result for the same account and date", async () => {
+    const { service } = createService();
+    const r = await route(service, jsonRequest("/auth/register", "POST", { email: "once@b.com", password: "supersecret", displayName: "once" }));
+    const token = tokenFrom(r!);
+    const base = {
+      date: "2026-06-12",
+      seed: "daily:2026-06-12",
+      score: 8,
+      timeMs: 134_000,
+      hintsUsed: 1,
+      marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
+      shareText: "",
+      completedAt: 1_797_000_000_000,
+    };
+
+    await route(service, jsonRequest("/api/daily", "POST", base, token));
+    const replay = await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 10, timeMs: 90_000, hintsUsed: 0, marks: Array(10).fill("correct") }, token));
+    expect(replay?.status).toBe(200);
+    const body = await replay!.json();
+    expect(body.result.score).toBe(8);
+    expect(body.result.timeMs).toBe(134_000);
+  });
+
   it("falls through for unrelated routes", async () => {
     const { service } = createService();
     expect(await route(service, jsonRequest("/index.html", "GET"))).toBeNull();

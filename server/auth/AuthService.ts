@@ -10,6 +10,7 @@ import {
 import type {
   AdminUserList,
   AuthUser,
+  DailyChallengeResult,
   FriendRequestLists,
   FullStats,
   GameResult,
@@ -184,6 +185,14 @@ export class AuthService {
 
   recordGame(userId: string, result: GameResult): UserStats {
     return this.store.recordGame(userId, result, this.clock());
+  }
+
+  getDailyResult(userId: string, date: string): DailyChallengeResult | null {
+    return this.store.getDailyResult(userId, date);
+  }
+
+  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
+    return this.store.saveDailyResult(userId, result);
   }
 
   submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): SubmitBestTimeResult | { error: string } {

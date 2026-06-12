@@ -4,10 +4,10 @@ import { createDailyChallenge } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
-import { createDailyResultSave, readDailyResult, saveDailyResult } from "../storage/dailySave";
+import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
-import { recordGame } from "../core/auth";
+import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
 import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
@@ -121,6 +121,28 @@ export function createApp(options: AppOptions): App {
     attachGlobalControls();
   }
 
+  function dailyAccountResultToLocal(result: DailyChallengeResult): DailyResultSave {
+    return { version: 1, ...result };
+  }
+
+  function dailyLocalResultToAccount(result: DailyResultSave): DailyChallengeResult {
+    const { version: _version, ...payload } = result;
+    return payload;
+  }
+
+  function mountDailyResult(result: DailyResultSave): void {
+    mount(
+      createDailyResultScreen({
+        result,
+        onBackToSolo: () => {
+          const save = readSoloSave(options.storage);
+          startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
+        },
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
+      }),
+    );
+  }
+
   function startSolo(categoryIds: readonly string[], continueSaved = false): void {
     const resolved = resolveCategoryIds(categoryIds);
     const save = continueSaved ? readSoloSave(options.storage) : null;
@@ -159,21 +181,35 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  function startDailyChallenge(): void {
+  async function startDailyChallenge(): Promise<void> {
+    const run = navigationRun;
     const challenge = createDailyChallenge(options.countryIndex);
-    const existingResult = readDailyResult(options.storage, challenge.date);
+    const localResult = readDailyResult(options.storage, challenge.date);
 
-    if (existingResult) {
-      mount(
-        createDailyResultScreen({
-          result: existingResult,
-          onBackToSolo: () => {
-            const save = readSoloSave(options.storage);
-            startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
-          },
-          onMultiplayer: () => navigate({ type: "multiplayer" }),
-        }),
-      );
+    if (authControls.getUser()) {
+      mount(createLoadingScreen("Loading Daily Challenge..."));
+      const accountResult = await fetchDailyChallengeResult(challenge.date);
+      if (run !== navigationRun) return;
+
+      if (accountResult) {
+        const result = dailyAccountResultToLocal(accountResult);
+        saveDailyResult(options.storage, result);
+        mountDailyResult(result);
+        return;
+      }
+
+      if (localResult) {
+        mountDailyResult(localResult);
+        void saveDailyChallengeResult(dailyLocalResultToAccount(localResult)).then((synced) => {
+          if (!synced || run !== navigationRun) return;
+          const result = dailyAccountResultToLocal(synced);
+          saveDailyResult(options.storage, result);
+          mountDailyResult(result);
+        });
+        return;
+      }
+    } else if (localResult) {
+      mountDailyResult(localResult);
       return;
     }
 
@@ -211,13 +247,16 @@ export function createApp(options: AppOptions): App {
               marks: dailyResult.marks,
             });
             saveDailyResult(options.storage, result);
-            mount(
-              createDailyResultScreen({
-                result,
-                onBackToSolo: () => startSolo(DEFAULT_CATEGORY_IDS, false),
-                onMultiplayer: () => navigate({ type: "multiplayer" }),
-              }),
-            );
+            mountDailyResult(result);
+            if (authControls.getUser()) {
+              const completionRun = navigationRun;
+              void saveDailyChallengeResult(dailyLocalResultToAccount(result)).then((synced) => {
+                if (!synced || completionRun !== navigationRun) return;
+                const accountResult = dailyAccountResultToLocal(synced);
+                saveDailyResult(options.storage, accountResult);
+                mountDailyResult(accountResult);
+              });
+            }
           },
         },
       }),
@@ -339,7 +378,7 @@ export function createApp(options: AppOptions): App {
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
     if (route.type === "daily-challenge") {
-      startDailyChallenge();
+      void startDailyChallenge();
       return;
     }
 
