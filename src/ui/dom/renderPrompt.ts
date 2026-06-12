@@ -9,8 +9,16 @@ export interface PromptView {
 }
 
 
+function isCountryShapePrompt(src: string): boolean {
+  return src.includes("country-shapes/");
+}
+
+function setBackgroundImage(element: HTMLElement, src: string): void {
+  element.style.backgroundImage = `url("${src.replace(/["\\]/g, "\\$&")}")`;
+}
+
 export function promptImageClass(src: string): string {
-  return src.includes("/country-shapes/") ? "flag-image country-shape-image" : "flag-image";
+  return isCountryShapePrompt(src) ? "flag-image country-shape-image" : "flag-image";
 }
 
 export function createPromptView(): PromptView {
@@ -36,6 +44,13 @@ export function updatePromptView(view: PromptView, content: PromptContent | null
   }
 
   if (content.kind === "image") {
+    if (isCountryShapePrompt(content.value)) {
+      const shapePrompt = el("div", { className: "country-shape-prompt", attrs: { role: "img", "aria-label": "Country outline prompt" } });
+      setBackgroundImage(shapePrompt, content.value);
+      view.imageSlot.replaceChildren(shapePrompt);
+      return;
+    }
+
     view.imageSlot.replaceChildren(el("img", { className: promptImageClass(content.value), attrs: { src: content.value, alt: "Prompt to guess" } }));
     return;
   }
