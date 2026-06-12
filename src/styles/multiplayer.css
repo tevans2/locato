@@ -395,17 +395,13 @@
   gap: 10px;
 }
 
-.flag-color-reveal-image {
+.flag-color-reveal-canvas {
   width: auto;
   height: auto;
   max-width: min(92%, calc(100% - 24px));
   max-height: min(92%, calc(100% - 42px));
-  object-fit: contain;
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(45deg, rgba(255,255,255,0.08) 25%, transparent 25%) 0 0 / 18px 18px,
-    linear-gradient(-45deg, rgba(255,255,255,0.08) 25%, transparent 25%) 0 9px / 18px 18px,
-    #121712;
+  background: #121712;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
 }
 

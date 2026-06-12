@@ -15,7 +15,7 @@ export const promptCategories = {
 
 export type CategoryId = keyof typeof promptCategories;
 
-export const soloPromptCategories: readonly PromptCategory[] = [flagsCategory, shapesCategory, codesCategory, capitalsCategory];
+export const soloPromptCategories: readonly PromptCategory[] = [flagsCategory, flagColorsCategory, shapesCategory, codesCategory, capitalsCategory];
 export const multiplayerPromptCategories: readonly PromptCategory[] = Object.values(promptCategories);
 export const allCategories: readonly PromptCategory[] = soloPromptCategories;
 

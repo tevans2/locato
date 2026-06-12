@@ -1,5 +1,5 @@
 import type { AuthUser } from "../../core/auth";
-import { type Country, type CountryIndex } from "../../core/countries";
+import { isCorrectAnswer, type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { DAILY_COUNTRY_COUNT, type DailyRoundMark } from "../../core/dailyChallenge";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
@@ -15,6 +15,7 @@ import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "
 import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/renderFeedback";
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
+import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -48,6 +49,13 @@ function visibleCountries(index: CountryIndex, state: GameState): readonly Count
   return index.countries.filter((country) => ids.has(country.id));
 }
 
+function countryForGuess(index: CountryIndex, answer: string): Country | null {
+  for (const country of index.countries) {
+    if (isCorrectAnswer(index, country.id, answer)) return country;
+  }
+  return null;
+}
+
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
@@ -60,6 +68,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   let dailyCompleted = false;
   const stats = createStatsView();
   const prompt = createPromptView();
+  const flagColorReveal = createFlagColorRevealView();
   const feedback = createFeedbackView();
   const atlas = createAtlasView(countries);
   const views: SoloViews = { stats, prompt, feedback, atlas };
@@ -98,6 +107,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   });
 
   let playTimer: PlayTimer;
+  let activeFlagColorTarget: string | null = null;
 
   function renderTimer(): void {
     timerModeSelect.value = playTimer.mode;
@@ -198,7 +208,18 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     updateStatsView(stats, countryIndex, state);
-    updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
+    if (content?.kind === "flag-colors") {
+      prompt.status.textContent = `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = category?.label ?? "Flag colours";
+      if (activeFlagColorTarget !== content.value) {
+        activeFlagColorTarget = content.value;
+        flagColorReveal.reset(content.value);
+      }
+      prompt.imageSlot.replaceChildren(flagColorReveal.element);
+    } else {
+      activeFlagColorTarget = null;
+      updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
+    }
     updateAtlasView(atlas, countries, state.guessedCountryIds);
     const playing = state.status === "playing";
     input.disabled = !playing;
@@ -267,6 +288,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "submit",
     (event) => {
       event.preventDefault();
+      if (engine.getState().currentCategoryId === "flag-colors") {
+        const guessedCountry = countryForGuess(countryIndex, input.value);
+        if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
+      }
       dispatchAndRender(engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now() }));
       if (engine.getState().lastResult?.type === "wrong") input.select();
     },

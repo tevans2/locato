@@ -55,7 +55,7 @@ export function updatePromptView(view: PromptView, content: PromptContent | null
     return;
   }
 
-  if (content.kind === "map-click" || content.kind === "map-highlight") {
+  if (content.kind === "map-click" || content.kind === "map-highlight" || content.kind === "flag-colors") {
     view.imageSlot.replaceChildren(el("div", { className: "prompt-text", text: content.value }));
     return;
   }

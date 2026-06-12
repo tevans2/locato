@@ -1,9 +1,9 @@
 import { el } from "./createElement";
 
-const COLOR_ATTRS = ["fill", "stroke"] as const;
-const COLOR_PATTERN = /#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|\b(?:white|black|red|green|blue|yellow|orange|purple|gold|silver|gray|grey)\b/g;
-const HIDDEN_FILL = "rgba(255,255,255,0.055)";
-const HIDDEN_STROKE = "rgba(255,255,255,0.14)";
+const WIDTH = 360;
+const HEIGHT = 240;
+const MATCH_DISTANCE = 82;
+const MIN_ALPHA = 24;
 
 export interface FlagColorRevealView {
   readonly element: HTMLElement;
@@ -11,188 +11,122 @@ export interface FlagColorRevealView {
   readonly addGuess: (flagSrc: string) => void;
 }
 
-type SvgData = {
-  readonly doc: Document;
-  readonly styles: ReadonlyMap<string, ReadonlyMap<string, string>>;
-  readonly colors: ReadonlySet<string>;
+type FlagPixels = {
+  readonly data: Uint8ClampedArray;
 };
 
-const svgCache = new Map<string, Promise<SvgData | null>>();
+const pixelCache = new Map<string, Promise<FlagPixels | null>>();
 
-const NAMED_COLORS: Readonly<Record<string, string>> = {
-  black: "#000000",
-  blue: "#0000ff",
-  gold: "#ffd700",
-  gray: "#808080",
-  green: "#008000",
-  grey: "#808080",
-  orange: "#ffa500",
-  purple: "#800080",
-  red: "#ff0000",
-  silver: "#c0c0c0",
-  white: "#ffffff",
-  yellow: "#ffff00",
-};
+function colorDistance(target: Uint8ClampedArray, guess: Uint8ClampedArray, offset: number): number {
+  const dr = channel(target, offset) - channel(guess, offset);
+  const dg = channel(target, offset + 1) - channel(guess, offset + 1);
+  const db = channel(target, offset + 2) - channel(guess, offset + 2);
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
 
-function canonicalColor(value: string | null): string | null {
-  if (!value) return null;
-  const raw = value.trim().toLowerCase();
-  if (raw === "none" || raw === "transparent" || raw.startsWith("url(") || raw === "currentcolor") return null;
-  if (NAMED_COLORS[raw]) return NAMED_COLORS[raw];
-  if (raw.startsWith("#")) {
-    const hex = raw.slice(1);
-    if (hex.length === 3) return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
-    if (hex.length === 4) return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
-    if (hex.length >= 6) return `#${hex.slice(0, 6)}`;
-  }
-  const rgb = raw.match(/^rgba?\(([^)]+)\)$/);
-  if (rgb) {
-    const parts = rgb[1]!.split(",").map((part) => Number.parseFloat(part.trim()));
-    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
-      return `#${parts.slice(0, 3).map((part) => Math.max(0, Math.min(255, Math.round(part))).toString(16).padStart(2, "0")).join("")}`;
+function channel(data: Uint8ClampedArray, offset: number): number {
+  return data[offset] ?? 0;
+}
+
+function drawHiddenFlag(ctx: CanvasRenderingContext2D): void {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = "#101510";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const tile = 18;
+  for (let y = 0; y < HEIGHT; y += tile) {
+    for (let x = 0; x < WIDTH; x += tile) {
+      ctx.fillStyle = (x / tile + y / tile) % 2 === 0 ? "rgba(255,255,255,0.045)" : "rgba(255,255,255,0.018)";
+      ctx.fillRect(x, y, tile, tile);
     }
   }
-  return null;
 }
 
-function parseStyleDeclarations(style: string): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const declaration of style.split(";")) {
-    const [property, ...rest] = declaration.split(":");
-    const value = rest.join(":").trim();
-    if (property && value) out.set(property.trim().toLowerCase(), value);
-  }
-  return out;
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
 }
 
-function parseClassStyles(doc: Document): Map<string, Map<string, string>> {
-  const styles = new Map<string, Map<string, string>>();
-  for (const style of Array.from(doc.querySelectorAll("style"))) {
-    const text = style.textContent ?? "";
-    const rules = text.matchAll(/\.([A-Za-z0-9_-]+)\s*\{([^}]+)\}/g);
-    for (const rule of rules) {
-      styles.set(rule[1]!, parseStyleDeclarations(rule[2]!));
-    }
-  }
-  return styles;
-}
-
-function classDeclaration(element: Element, styles: ReadonlyMap<string, ReadonlyMap<string, string>>, attr: "fill" | "stroke"): string | null {
-  for (const className of Array.from(element.classList)) {
-    const value = styles.get(className)?.get(attr);
-    if (value) return value;
-  }
-  return null;
-}
-
-function colorFor(element: Element, styles: ReadonlyMap<string, ReadonlyMap<string, string>>, attr: "fill" | "stroke"): string | null {
-  const direct = element.getAttribute(attr);
-  if (direct) return canonicalColor(direct);
-  const inline = element.getAttribute("style");
-  if (inline) {
-    const fromStyle = parseStyleDeclarations(inline).get(attr);
-    if (fromStyle) return canonicalColor(fromStyle);
-  }
-  return canonicalColor(classDeclaration(element, styles, attr));
-}
-
-function collectColors(doc: Document, styles: ReadonlyMap<string, ReadonlyMap<string, string>>): Set<string> {
-  const colors = new Set<string>();
-  for (const element of Array.from(doc.querySelectorAll("*"))) {
-    for (const attr of COLOR_ATTRS) {
-      const color = colorFor(element, styles, attr);
-      if (color) colors.add(color);
-    }
-    const inline = element.getAttribute("style");
-    if (inline) {
-      for (const match of inline.matchAll(COLOR_PATTERN)) {
-        const color = canonicalColor(match[0]);
-        if (color) colors.add(color);
-      }
-    }
-  }
-  for (const style of Array.from(doc.querySelectorAll("style"))) {
-    for (const match of (style.textContent ?? "").matchAll(COLOR_PATTERN)) {
-      const color = canonicalColor(match[0]);
-      if (color) colors.add(color);
-    }
-  }
-  return colors;
-}
-
-async function loadSvg(src: string): Promise<SvgData | null> {
-  const cached = svgCache.get(src);
+async function loadFlagPixels(src: string): Promise<FlagPixels | null> {
+  const cached = pixelCache.get(src);
   if (cached) return cached;
-  const promise = fetch(src)
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const text = await response.text();
-      const doc = new DOMParser().parseFromString(text, "image/svg+xml");
-      if (doc.querySelector("parsererror")) return null;
-      const styles = parseClassStyles(doc);
-      return { doc, styles, colors: collectColors(doc, styles) };
-    })
-    .catch(() => null);
-  svgCache.set(src, promise);
+
+  const promise = loadImage(src).then((image) => {
+    if (!image) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    ctx.drawImage(image, 0, 0, WIDTH, HEIGHT);
+    return { data: ctx.getImageData(0, 0, WIDTH, HEIGHT).data };
+  });
+
+  pixelCache.set(src, promise);
   return promise;
 }
 
-function hideUnrevealedColors(data: SvgData, revealedColors: ReadonlySet<string>): string {
-  const clone = data.doc.documentElement.cloneNode(true) as SVGElement;
-  const cloneDoc = document.implementation.createDocument("http://www.w3.org/2000/svg", "svg", null);
-  const imported = cloneDoc.importNode(clone, true);
-  cloneDoc.replaceChild(imported, cloneDoc.documentElement);
-  imported.setAttribute("class", `${imported.getAttribute("class") ?? ""} flag-color-svg`.trim());
-
-  for (const element of Array.from(imported.querySelectorAll("*"))) {
-    for (const attr of COLOR_ATTRS) {
-      const color = colorFor(element, data.styles, attr);
-      if (!color || revealedColors.has(color)) continue;
-      (element as SVGElement).style.setProperty(attr, attr === "fill" ? HIDDEN_FILL : HIDDEN_STROKE, "important");
-    }
-  }
-
-  return new XMLSerializer().serializeToString(imported);
-}
-
-function svgDataUrl(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
 export function createFlagColorRevealView(): FlagColorRevealView {
-  const image = el("img", { className: "flag-color-reveal-image", attrs: { alt: "Hidden target flag" } });
-  const meta = el("p", { className: "flag-color-reveal-meta", text: "Guess flags to reveal shared colours." });
-  const element = el("div", { className: "flag-color-reveal", children: [image, meta] });
-  const revealedColors = new Set<string>();
+  const canvas = el("canvas", { className: "flag-color-reveal-canvas", attrs: { width: String(WIDTH), height: String(HEIGHT), "aria-label": "Hidden target flag" } }) as HTMLCanvasElement;
+  const meta = el("p", { className: "flag-color-reveal-meta", text: "Guess flags to reveal matching colours in matching positions." });
+  const element = el("div", { className: "flag-color-reveal", children: [canvas, meta] });
+  const ctx = canvas.getContext("2d");
+  const revealed = new Uint8Array(WIDTH * HEIGHT);
   let targetSrc = "";
+  let targetPixels: FlagPixels | null = null;
   let renderToken = 0;
 
-  async function render(): Promise<void> {
-    const token = ++renderToken;
-    if (!targetSrc) return;
-    const target = await loadSvg(targetSrc);
-    if (token !== renderToken) return;
-    if (!target) {
-      image.removeAttribute("src");
-      meta.textContent = "Unable to load the target flag.";
-      return;
+  function render(): void {
+    if (!ctx) return;
+    drawHiddenFlag(ctx);
+    if (!targetPixels) return;
+
+    const output = ctx.getImageData(0, 0, WIDTH, HEIGHT);
+    let revealedCount = 0;
+    for (let pixel = 0; pixel < revealed.length; pixel += 1) {
+      if (revealed[pixel] !== 1) continue;
+      const offset = pixel * 4;
+      output.data[offset] = channel(targetPixels.data, offset);
+      output.data[offset + 1] = channel(targetPixels.data, offset + 1);
+      output.data[offset + 2] = channel(targetPixels.data, offset + 2);
+      output.data[offset + 3] = channel(targetPixels.data, offset + 3);
+      revealedCount += 1;
     }
-    image.src = svgDataUrl(hideUnrevealedColors(target, revealedColors));
-    meta.textContent = revealedColors.size === 0 ? "Guess flags to reveal shared colours." : `${revealedColors.size} target colour${revealedColors.size === 1 ? "" : "s"} revealed`;
+    ctx.putImageData(output, 0, 0);
+    const percent = Math.round((revealedCount / revealed.length) * 100);
+    meta.textContent = revealedCount === 0 ? "Guess flags to reveal matching colours in matching positions." : `${percent}% of the target flag revealed`;
   }
+
+  if (ctx) drawHiddenFlag(ctx);
 
   return {
     element,
     reset(nextTargetSrc: string): void {
       targetSrc = nextTargetSrc;
-      revealedColors.clear();
-      void render();
+      targetPixels = null;
+      revealed.fill(0);
+      render();
+      const token = ++renderToken;
+      void loadFlagPixels(nextTargetSrc).then((pixels) => {
+        if (token !== renderToken || targetSrc !== nextTargetSrc) return;
+        targetPixels = pixels;
+        render();
+      });
     },
     addGuess(flagSrc: string): void {
-      void loadSvg(flagSrc).then((guess) => {
-        if (!guess) return;
-        for (const color of guess.colors) revealedColors.add(color);
-        void render();
+      const token = renderToken;
+      void loadFlagPixels(flagSrc).then((guessPixels) => {
+        if (token !== renderToken || !targetPixels || !guessPixels) return;
+        for (let pixel = 0; pixel < revealed.length; pixel += 1) {
+          const offset = pixel * 4;
+          if (channel(targetPixels.data, offset + 3) < MIN_ALPHA || channel(guessPixels.data, offset + 3) < MIN_ALPHA) continue;
+          if (colorDistance(targetPixels.data, guessPixels.data, offset) <= MATCH_DISTANCE) revealed[pixel] = 1;
+        }
+        render();
       });
     },
   };

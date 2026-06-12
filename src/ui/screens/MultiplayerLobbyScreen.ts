@@ -68,19 +68,11 @@ type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capit
 
 type MultiplayerModeOption = Omit<GameModeOption, "id"> & { readonly id: MultiplayerPlayMode };
 
-const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "shapes", "codes", "capitals", "click-country", "spot-country"];
+const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country"];
 
-const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = [
-  ...gameModeOptions
-    .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
-    .map((option) => ({ ...option, id: option.id as MultiplayerPlayMode })),
-  {
-    id: "flag-colors",
-    label: "Flag colours",
-    description: "Guess countries to reveal matching colours in a hidden target flag.",
-    group: "Prompt games",
-  },
-];
+const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = gameModeOptions
+  .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
+  .map((option) => ({ ...option, id: option.id as MultiplayerPlayMode }));
 
 function getMultiplayerModeOption(mode: MultiplayerPlayMode): MultiplayerModeOption {
   return MULTIPLAYER_MODE_OPTIONS.find((option) => option.id === mode) ?? MULTIPLAYER_MODE_OPTIONS[0]!;
