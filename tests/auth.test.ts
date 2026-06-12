@@ -250,6 +250,41 @@ describe("auth routes", () => {
     expect(body.result.timeMs).toBe(134_000);
   });
 
+  it("returns daily retention summary with streak and friends who finished today", async () => {
+    const { service } = createService();
+    const user = await route(service, jsonRequest("/auth/register", "POST", { email: "daily-summary@b.com", password: "supersecret", displayName: "daily_summary" }));
+    const friend = await route(service, jsonRequest("/auth/register", "POST", { email: "daily-pal@b.com", password: "supersecret", displayName: "daily_pal" }));
+    const userToken = tokenFrom(user!);
+    const friendToken = tokenFrom(friend!);
+
+    await route(service, jsonRequest("/api/friends/requests", "POST", { username: "daily_pal" }, userToken));
+    const userMe = await route(service, jsonRequest("/auth/me", "GET", undefined, userToken));
+    await route(service, jsonRequest(`/api/friends/requests/${(await userMe!.json()).user.id}/accept`, "POST", undefined, friendToken));
+
+    const base = {
+      date: "2026-06-12",
+      seed: "daily:2026-06-12",
+      score: 8,
+      timeMs: 134_000,
+      hintsUsed: 1,
+      marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
+      shareText: "",
+      completedAt: 1_797_000_000_000,
+    };
+
+    await route(service, jsonRequest("/api/daily", "POST", { ...base, date: "2026-06-11", seed: "daily:2026-06-11" }, userToken));
+    await route(service, jsonRequest("/api/daily", "POST", base, userToken));
+    await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 7, timeMs: 150_000 }, friendToken));
+
+    const summary = await route(service, jsonRequest("/api/daily/summary?date=2026-06-12", "GET", undefined, userToken));
+    expect(summary?.status).toBe(200);
+    const body = await summary!.json();
+    expect(body.summary.streak).toBe(2);
+    expect(body.summary.history.map((entry: { date: string }) => entry.date)).toEqual(["2026-06-12", "2026-06-11"]);
+    expect(body.summary.friendsToday[0].user.username).toBe("daily_pal");
+    expect(body.summary.friendsToday[0].result.score).toBe(7);
+  });
+
   it("falls through for unrelated routes", async () => {
     const { service } = createService();
     expect(await route(service, jsonRequest("/index.html", "GET"))).toBeNull();

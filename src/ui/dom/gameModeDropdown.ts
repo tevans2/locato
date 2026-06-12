@@ -18,6 +18,7 @@ export interface GameModeDropdown {
 export function createGameModeDropdown(options: GameModeDropdownOptions): GameModeDropdown {
   let selectedMode = options.selectedMode;
   const selectedText = el("span", { className: "category-dropdown-selected" });
+  const selectedDescription = el("span", { className: "category-dropdown-selected-description" });
   const radioName = options.name ?? "game-mode";
 
   const modeControls = gameModeOptions.map((mode) => {
@@ -40,7 +41,9 @@ export function createGameModeDropdown(options: GameModeDropdownOptions): GameMo
 
   function setSelectedMode(mode: GameModeId): void {
     selectedMode = mode;
-    selectedText.textContent = getGameModeOption(selectedMode).label;
+    const selected = getGameModeOption(selectedMode);
+    selectedText.textContent = selected.label;
+    selectedDescription.textContent = selected.description;
     for (const control of modeControls) control.radio.checked = control.mode.id === selectedMode;
   }
 
@@ -71,7 +74,10 @@ export function createGameModeDropdown(options: GameModeDropdownOptions): GameMo
     children: [
       el("summary", {
         className: "category-dropdown-summary",
-        children: [el("span", { className: "category-row-label", text: "Game mode" }), selectedText],
+        children: [
+          el("span", { className: "category-row-label", text: "Game mode" }),
+          el("span", { className: "game-mode-selected-copy", children: [selectedText, selectedDescription] }),
+        ],
       }),
       el("div", { className: "category-dropdown-menu", attrs: { role: "radiogroup", "aria-label": "Game modes" }, children: menuChildren }),
     ],

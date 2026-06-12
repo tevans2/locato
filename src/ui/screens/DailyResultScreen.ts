@@ -1,4 +1,5 @@
 import { DAILY_COUNTRY_COUNT, formatDailyTime } from "../../core/dailyChallenge";
+import { fetchDailySummary, type DailyChallengeResult, type DailySummary } from "../../core/auth";
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
@@ -10,11 +11,74 @@ export interface DailyResultScreenOptions {
 }
 
 export function createDailyResultScreen(options: DailyResultScreenOptions): Screen {
+  let destroyed = false;
   const { result } = options;
   const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
   const backButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
+  const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
+
+  function summaryStat(label: string, value: string): HTMLElement {
+    return el("article", { children: [el("span", { text: label }), el("strong", { text: value })] });
+  }
+
+  function dailyLine(entry: DailyChallengeResult): HTMLElement {
+    return el("li", {
+      className: "daily-history-row",
+      children: [
+        el("span", { text: entry.date }),
+        el("strong", { text: `${entry.score}/${DAILY_COUNTRY_COUNT}` }),
+        el("span", { text: formatDailyTime(entry.timeMs) }),
+      ],
+    });
+  }
+
+  function renderSummary(summary: DailySummary | null): void {
+    if (!summary) {
+      retentionPanel.replaceChildren(el("p", { className: "muted", text: "Sign in to sync daily history and compare with friends." }));
+      return;
+    }
+
+    const best = summary.best;
+    const friendRows = summary.friendsToday.map((entry) =>
+      el("li", {
+        className: "daily-history-row daily-friend-row",
+        children: [
+          el("span", { className: "daily-friend-name", text: `${entry.user.avatarEmoji ?? ""} ${entry.user.username}`.trim() }),
+          el("strong", { text: `${entry.result.score}/${DAILY_COUNTRY_COUNT}` }),
+          el("span", { text: formatDailyTime(entry.result.timeMs) }),
+        ],
+      }),
+    );
+
+    retentionPanel.replaceChildren(
+      el("div", {
+        className: "daily-result-stats daily-retention-stats",
+        children: [
+          summaryStat("Current streak", String(summary.streak)),
+          summaryStat("Best recent", best ? `${best.score}/${DAILY_COUNTRY_COUNT}` : "-"),
+        ],
+      }),
+      el("div", {
+        className: "daily-retention-grid",
+        children: [
+          el("section", {
+            children: [
+              el("h2", { text: "Recent dailies" }),
+              el("ul", { className: "daily-history-list", children: summary.history.length > 0 ? summary.history.map(dailyLine) : [el("li", { className: "daily-history-row", text: "No recent results." })] }),
+            ],
+          }),
+          el("section", {
+            children: [
+              el("h2", { text: "Friends today" }),
+              el("ul", { className: "daily-history-list", children: friendRows.length > 0 ? friendRows : [el("li", { className: "daily-history-row", text: "No friend results yet." })] }),
+            ],
+          }),
+        ],
+      }),
+    );
+  }
 
   copyButton.addEventListener("click", () => {
     void navigator.clipboard?.writeText(result.shareText);
@@ -53,14 +117,21 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
           }),
           share,
           el("div", { className: "daily-legend", children: [el("span", { text: "🟩 correct without hint" }), el("span", { text: "🟨 correct with hint" }), el("span", { text: "🟥 missed or skipped" })] }),
+          retentionPanel,
           el("div", { className: "actions", children: [copyButton, backButton] }),
         ],
       }),
     ],
   });
 
+  void fetchDailySummary(result.date).then((summary) => {
+    if (!destroyed) renderSummary(summary);
+  });
+
   return {
     element,
-    destroy: () => undefined,
+    destroy: () => {
+      destroyed = true;
+    },
   };
 }

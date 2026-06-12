@@ -42,6 +42,15 @@ describe("multiplayer public protocol", () => {
     expect(message.ok ? message.message : null).toEqual({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags", "codes"] });
   });
 
+  it("accepts bounded private room settings", () => {
+    const message = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], roundLimit: 15, roundDurationMs: 45_000 });
+
+    expect(message.ok).toBe(true);
+    expect(message.ok ? message.message : null).toEqual({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], roundLimit: 15, roundDurationMs: 45_000 });
+    expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], roundLimit: 2 }).ok).toBe(false);
+    expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], roundDurationMs: 5000 }).ok).toBe(false);
+  });
+
   it("reveals the answer only in round-ended messages", () => {
     const message: ServerMessage = {
       type: "ROUND_ENDED",

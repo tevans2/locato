@@ -135,6 +135,7 @@ export class Room {
       roomCode: this.code,
       hostPlayerId: this.hostPlayerId,
       categoryIds: this.categoryIds,
+      settings: { roundLimit: this.roundLimit, roundDurationMs: this.roundDurationMs },
       status: this.status,
       players: [...this.players.values()].map(toPublicPlayer),
       round: this.publicRound,
@@ -240,7 +241,7 @@ export class Room {
     if (!category.accepts(country, answer, false)) {
       const updatedPlayer = { ...player, wrongAnswers: player.wrongAnswers + 1, streak: 0 };
       this.players.set(playerId, updatedPlayer);
-      if (!this.roundAnswers.has(playerId)) this.roundAnswers.set(playerId, { playerId, name: player.name, correct: false, points: 0, answeredAt: now });
+      if (!this.roundAnswers.has(playerId)) this.roundAnswers.set(playerId, { playerId, name: player.name, correct: false, points: 0, answeredAt: now, guess: answer });
       // Rejection is private to the guesser: broadcasting it would flash "Not quite" on every
       // screen. No state other than this player's private streak/wrong tally changes, so there
       // is nothing to broadcast either.
@@ -250,7 +251,7 @@ export class Room {
     const points = this.calculatePoints(player, now);
     const updatedPlayer = { ...player, score: player.score + points, streak: player.streak + 1, correctAnswers: player.correctAnswers + 1 };
     this.players.set(playerId, updatedPlayer);
-    this.roundAnswers.set(playerId, { playerId, name: player.name, correct: true, points, answeredAt: now });
+    this.roundAnswers.set(playerId, { playerId, name: player.name, correct: true, points, answeredAt: now, guess: answer });
     // First correct answer takes the round and the points; the round closes immediately.
     return ok([{ type: "ANSWER_ACCEPTED", playerId, points }, ...this.closeRound(now)]);
   }
@@ -326,7 +327,7 @@ export class Room {
   }
 
   private roundResults(): readonly RoundResult[] {
-    return [...this.players.values()].map((player) => this.roundAnswers.get(player.id) ?? { playerId: player.id, name: player.name, correct: false, points: 0, answeredAt: null });
+    return [...this.players.values()].map((player) => this.roundAnswers.get(player.id) ?? { playerId: player.id, name: player.name, correct: false, points: 0, answeredAt: null, guess: null });
   }
 
   private roundEndedMessage(): ServerMessage {

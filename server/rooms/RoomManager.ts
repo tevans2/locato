@@ -153,7 +153,10 @@ export class RoomManager {
   private handleClientMessage(connection: MultiplayerConnection, message: ClientMessage, now: number): void {
     switch (message.type) {
       case "CREATE_ROOM":
-        this.createRoom(connection, message.playerName, message.categoryIds, now);
+        this.createRoom(connection, message.playerName, message.categoryIds, now, {
+          ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}),
+          ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}),
+        });
         return;
       case "JOIN_ROOM":
         this.joinRoom(connection, message.roomCode, message.playerName, now);
@@ -193,7 +196,7 @@ export class RoomManager {
     }
   }
 
-  private createRoom(connection: MultiplayerConnection, playerName: string, categoryIds: readonly string[], now: number): void {
+  private createRoom(connection: MultiplayerConnection, playerName: string, categoryIds: readonly string[], now: number, settings: { readonly roundLimit?: number; readonly roundDurationMs?: number }): void {
     if (this.rooms.size >= this.maxRooms) {
       sendError(connection, "too-many-rooms", "The server is at room capacity.");
       return;
@@ -216,6 +219,8 @@ export class RoomManager {
       seed: createId("seed"),
       now,
       maxPlayers: this.maxPlayersPerRoom,
+      ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
+      ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
       resultDisplayMs: this.resultDisplayMs,
     });
     this.rooms.set(roomCode, room);

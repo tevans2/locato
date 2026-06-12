@@ -65,6 +65,10 @@
   grid-column: 1 / -1;
 }
 
+.multiplayer-form-grid > input:last-child {
+  grid-column: 1 / -1;
+}
+
 .multiplayer-form-grid .category-dropdown {
   justify-self: stretch;
   width: 100%;
@@ -88,6 +92,13 @@
 .room-code-row > span {
   color: var(--muted);
   font-weight: 720;
+}
+
+.room-settings {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 680;
 }
 
 .room-code {

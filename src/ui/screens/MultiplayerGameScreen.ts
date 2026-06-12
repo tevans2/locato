@@ -56,12 +56,14 @@ function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null):
 }
 
 function createResultRows(results: readonly RoundResult[]): readonly HTMLElement[] {
-  return results.map((result) =>
-    el("li", {
+  return results.map((result) => {
+    const guess = result.guess ? ` guessed ${result.guess}` : " did not answer";
+    const outcome = result.correct ? `+${result.points}` : "missed";
+    return el("li", {
       className: result.correct ? "result-row good" : "result-row",
-      text: `${result.name}: ${result.correct ? `+${result.points}` : "no correct answer"}`,
-    }),
-  );
+      text: `${result.name}${guess} · ${outcome}`,
+    });
+  });
 }
 
 function createFinalRows(results: readonly FinalResult[]): readonly HTMLElement[] {

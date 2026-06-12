@@ -368,6 +368,22 @@ export class SqliteUserStore implements UserStore {
     return { ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] };
   }
 
+  listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[] {
+    const rows = this.db
+      .query<{ date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt FROM daily_challenge_results WHERE user_id = ? ORDER BY date DESC LIMIT ?",
+      )
+      .all(userId, limit);
+    return rows.map((row) => ({ ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] }));
+  }
+
+  listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
+    return userIds.flatMap((userId) => {
+      const result = this.getDailyResult(userId, date);
+      return result ? [{ userId, result }] : [];
+    });
+  }
+
   saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
     const existing = this.getDailyResult(userId, result.date);
     if (existing) return existing;

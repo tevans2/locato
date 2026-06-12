@@ -153,6 +153,19 @@ export function createMemoryUserStore(): UserStore {
     getDailyResult(userId: string, date: string): DailyChallengeResult | null {
       return dailyResults.get(dailyKey(userId, date)) ?? null;
     },
+    listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[] {
+      return [...dailyResults.entries()]
+        .filter(([key]) => key.startsWith(`${userId}:`))
+        .map(([, result]) => ({ ...result, marks: [...result.marks] }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, limit);
+    },
+    listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
+      return userIds.flatMap((userId) => {
+        const result = dailyResults.get(dailyKey(userId, date));
+        return result ? [{ userId, result: { ...result, marks: [...result.marks] } }] : [];
+      });
+    },
     saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
       const key = dailyKey(userId, result.date);
       const existing = dailyResults.get(key);

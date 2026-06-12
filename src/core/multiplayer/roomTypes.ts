@@ -24,10 +24,16 @@ export interface PublicRoundState {
   readonly endsAt: number | null;
 }
 
+export interface PublicRoomSettings {
+  readonly roundLimit: number;
+  readonly roundDurationMs: number;
+}
+
 export interface PublicRoomState {
   readonly roomCode: RoomCode;
   readonly hostPlayerId: PlayerId;
   readonly categoryIds: readonly string[];
+  readonly settings: PublicRoomSettings;
   readonly status: "lobby" | "playing" | "round-result" | "complete";
   readonly players: readonly PublicPlayerState[];
   readonly round: PublicRoundState | null;
@@ -44,6 +50,7 @@ export interface RoundResult {
   readonly correct: boolean;
   readonly points: number;
   readonly answeredAt: number | null;
+  readonly guess: string | null;
 }
 
 export interface FinalResult {

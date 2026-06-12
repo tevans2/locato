@@ -199,6 +199,14 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json({ stats: service.recordGame(user.id, result) });
   }
 
+  if (pathname === "/api/daily/summary" && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const date = url.searchParams.get("date");
+    if (!isDailyDate(date)) return json({ error: "Invalid daily challenge date." }, 400);
+    return json({ summary: service.getDailySummary(user.id, date) });
+  }
+
   const dailyMatch = pathname.match(/^\/api\/daily\/(\d{4}-\d{2}-\d{2})$/);
   if (dailyMatch && method === "GET") {
     const user = service.authenticate(readSessionToken(request));
