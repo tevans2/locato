@@ -2,6 +2,7 @@
 *.log
 node_modules/
 dist/
+.data/
 
 # Local development and generated scratch files
 i-want-to-create-an-html/work/

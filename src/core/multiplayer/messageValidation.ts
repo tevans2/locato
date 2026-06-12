@@ -56,7 +56,7 @@ function isCategoryIdList(value: unknown): value is readonly string[] {
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight") && typeof value.value === "string";
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
@@ -144,7 +144,7 @@ function isRoundResult(value: unknown): value is RoundResult {
 }
 
 function isFinalResult(value: unknown): value is FinalResult {
-  return isRecord(value) && typeof value.playerId === "string" && typeof value.name === "string" && isFiniteNumber(value.rank) && isFiniteNumber(value.score) && isFiniteNumber(value.correctAnswers);
+  return isRecord(value) && typeof value.playerId === "string" && typeof value.name === "string" && isFiniteNumber(value.rank) && isFiniteNumber(value.score) && isFiniteNumber(value.correctAnswers) && isFiniteNumber(value.wrongAnswers);
 }
 
 export function parseServerMessage(value: unknown): MessageParseResult<ServerMessage> {

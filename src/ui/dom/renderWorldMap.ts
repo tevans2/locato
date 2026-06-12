@@ -1,18 +1,33 @@
 import type { CountryId, CountryIndex } from "../../core/countries";
-import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import {
+  MAP_VIEWBOX_HEIGHT,
+  MAP_VIEWBOX_WIDTH,
+  projectWorldMapPosition,
+  type ProjectedPoint,
+  type WorldCountryFeature,
+  type WorldMapPolygon,
+  type WorldMapPosition,
+} from "../../core/map";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const VIEWBOX_WIDTH = 1000;
-const VIEWBOX_HEIGHT = 500;
-const INITIAL_VIEWBOX_Y = -18;
-const VIEWBOX_VERTICAL_MARGIN = 28;
+const VIEWBOX_WIDTH = MAP_VIEWBOX_WIDTH;
+const VIEWBOX_HEIGHT = MAP_VIEWBOX_HEIGHT;
+const INITIAL_VIEWBOX_Y = 0;
+const VIEWBOX_VERTICAL_MARGIN = 20;
 const DEFAULT_VIEWBOX: ViewBoxState = { x: 0, y: INITIAL_VIEWBOX_Y, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT };
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 24;
 const ZOOM_IN_FACTOR = 0.78;
 const ZOOM_OUT_FACTOR = 1.22;
 const MISSING_DOT_BASE_RADIUS = 2;
-
-type ProjectedPoint = readonly [number, number];
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
+const WHEEL_DELTA_LINE_PIXELS = 40;
+const WHEEL_DELTA_PAGE_PIXELS = 800;
+const MAX_WHEEL_DELTA_PIXELS = 140;
+const MIN_WHEEL_DELTA_PIXELS = 0.35;
+const FOCUS_VIEWBOX_MIN_WIDTH = 48;
+const FOCUS_VIEWBOX_MAX_WIDTH = 220;
+const FOCUS_VIEWBOX_PADDING = 7;
+const VIEWBOX_ANIMATION_MS = 420;
 
 interface ViewBoxState {
   x: number;
@@ -40,18 +55,16 @@ export interface WorldMapView {
   readonly remainingCount: HTMLElement;
   readonly pathByCountryId: ReadonlyMap<CountryId, SVGPathElement>;
   readonly missingDotByCountryId: ReadonlyMap<CountryId, SVGCircleElement>;
+  readonly focusCountry: (countryId: CountryId, options?: { readonly animate?: boolean }) => void;
+  readonly resetView: (options?: { readonly animate?: boolean }) => void;
 }
 
 function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVGElementTagNameMap[K] {
   return document.createElementNS(SVG_NS, tagName);
 }
 
-function project([longitude, latitude]: WorldMapPosition): ProjectedPoint {
-  return [((longitude + 180) / 360) * VIEWBOX_WIDTH, ((90 - latitude) / 180) * VIEWBOX_HEIGHT];
-}
-
 function formatPoint(point: WorldMapPosition): string {
-  const [x, y] = project(point);
+  const [x, y] = projectWorldMapPosition(point);
   return `${x.toFixed(3)} ${y.toFixed(3)}`;
 }
 
@@ -113,7 +126,7 @@ function centerOfBounds(points: readonly ProjectedPoint[]): ProjectedPoint {
 function polygonArea(polygon: WorldMapPolygon): number {
   const outerRing = polygon[0];
   if (!outerRing) return 0;
-  return Math.abs(ringArea(outerRing.map(project)));
+  return Math.abs(ringArea(outerRing.map(projectWorldMapPosition)));
 }
 
 function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
@@ -132,8 +145,31 @@ function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
   const outerRing = largestPolygon?.[0];
   if (!outerRing || outerRing.length === 0) return null;
 
-  const points = outerRing.map(project);
+  const points = outerRing.map(projectWorldMapPosition);
   return ringCentroid(points) ?? centerOfBounds(points);
+}
+
+function featureProjectedPoints(feature: WorldCountryFeature): ProjectedPoint[] {
+  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+  return polygons.flatMap((polygon) => polygon.flatMap((ring) => ring.map(projectWorldMapPosition)));
+}
+
+function boundsForPoints(points: readonly ProjectedPoint[]): ViewBoxState | null {
+  if (points.length === 0) return null;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  return { x: minX, y: minY, width: Math.max(0.001, maxX - minX), height: Math.max(0.001, maxY - minY) };
 }
 
 function createButton(text: string, label: string): HTMLButtonElement {
@@ -192,6 +228,39 @@ function zoomAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, c
   });
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function focusViewBoxForBounds(bounds: ViewBoxState): ViewBoxState {
+  const aspect = VIEWBOX_HEIGHT / VIEWBOX_WIDTH;
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+  const widthFromBounds = Math.max(bounds.width, bounds.height / aspect) * FOCUS_VIEWBOX_PADDING;
+  const width = clampNumber(widthFromBounds, FOCUS_VIEWBOX_MIN_WIDTH, FOCUS_VIEWBOX_MAX_WIDTH);
+  const height = width * aspect;
+
+  return clampViewBox({
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
+  });
+}
+
+function wheelDeltaYToPixels(event: WheelEvent): number {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * WHEEL_DELTA_LINE_PIXELS;
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * WHEEL_DELTA_PAGE_PIXELS;
+  return event.deltaY;
+}
+
+function zoomFactorFromWheelDelta(deltaPixels: number): number | null {
+  if (Math.abs(deltaPixels) < MIN_WHEEL_DELTA_PIXELS) return null;
+
+  const boundedDelta = clampNumber(deltaPixels, -MAX_WHEEL_DELTA_PIXELS, MAX_WHEEL_DELTA_PIXELS);
+  return Math.exp(boundedDelta * WHEEL_ZOOM_SENSITIVITY);
+}
+
 function countryIdFromEventTarget(target: EventTarget | null): CountryId | null {
   const element = target instanceof Element ? target : null;
   const countryPath = element?.closest<SVGPathElement>(".world-map-country[data-country-id]");
@@ -203,7 +272,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   const svg = createSvgElement("svg");
   applyViewBox(svg, DEFAULT_VIEWBOX);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Unlabeled world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("aria-label", "Unlabeled flat world map. Drag to pan and scroll to zoom.");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.setAttribute("class", "world-map-svg");
 
   const mapLayer = createSvgElement("g");
@@ -212,9 +282,15 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   const pathByCountryId = new Map<CountryId, SVGPathElement>();
   const missingDotByCountryId = new Map<CountryId, SVGCircleElement>();
+  const boundsByCountryId = new Map<CountryId, ViewBoxState>();
   let viewBox: ViewBoxState = { ...DEFAULT_VIEWBOX };
   let panState: PanState | null = null;
   let suppressNextCountryClick = false;
+  let pendingWheelDelta = 0;
+  let pendingWheelClientX = 0;
+  let pendingWheelClientY = 0;
+  let wheelAnimationFrame: number | null = null;
+  let viewBoxAnimationFrame: number | null = null;
 
   for (const feature of features) {
     const country = countryIndex.byCode.get(feature.code.toUpperCase());
@@ -225,8 +301,10 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
     if (country) {
       const center = countryCenter(feature);
+      const bounds = boundsForPoints(featureProjectedPoints(feature));
       path.dataset.countryId = String(country.id);
       pathByCountryId.set(country.id, path);
+      if (bounds) boundsByCountryId.set(country.id, bounds);
 
       if (center) {
         const dot = createSvgElement("circle");
@@ -261,23 +339,95 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   controls.append(zoomInButton, zoomOutButton, resetViewButton);
 
   function setViewBox(nextViewBox: ViewBoxState): void {
+    if (viewBoxAnimationFrame !== null) {
+      window.cancelAnimationFrame(viewBoxAnimationFrame);
+      viewBoxAnimationFrame = null;
+    }
     viewBox = clampViewBox(nextViewBox);
     applyViewBox(svg, viewBox);
     setMissingDotRadius(missingDotByCountryId.values(), viewBox);
   }
 
+  function animateViewBox(nextViewBox: ViewBoxState): void {
+    if (viewBoxAnimationFrame !== null) window.cancelAnimationFrame(viewBoxAnimationFrame);
+
+    const from = { ...viewBox };
+    const to = clampViewBox(nextViewBox);
+    const startedAt = performance.now();
+
+    function tick(now: number): void {
+      const progress = clampNumber((now - startedAt) / VIEWBOX_ANIMATION_MS, 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      viewBox = {
+        x: from.x + (to.x - from.x) * eased,
+        y: from.y + (to.y - from.y) * eased,
+        width: from.width + (to.width - from.width) * eased,
+        height: from.height + (to.height - from.height) * eased,
+      };
+      applyViewBox(svg, viewBox);
+      setMissingDotRadius(missingDotByCountryId.values(), viewBox);
+
+      if (progress < 1) {
+        viewBoxAnimationFrame = window.requestAnimationFrame(tick);
+      } else {
+        viewBoxAnimationFrame = null;
+        viewBox = to;
+        applyViewBox(svg, viewBox);
+        setMissingDotRadius(missingDotByCountryId.values(), viewBox);
+      }
+    }
+
+    viewBoxAnimationFrame = window.requestAnimationFrame(tick);
+  }
+
+  function moveToViewBox(nextViewBox: ViewBoxState, animate = true): void {
+    if (animate) {
+      animateViewBox(nextViewBox);
+      return;
+    }
+
+    setViewBox(nextViewBox);
+  }
+
   function resetViewBox(): void {
-    setViewBox(DEFAULT_VIEWBOX);
+    moveToViewBox(DEFAULT_VIEWBOX);
+  }
+
+  function focusCountry(countryId: CountryId, options: { readonly animate?: boolean } = {}): void {
+    const bounds = boundsByCountryId.get(countryId);
+    if (!bounds) return;
+    moveToViewBox(focusViewBoxForBounds(bounds), options.animate ?? true);
+  }
+
+  function resetView(options: { readonly animate?: boolean } = {}): void {
+    moveToViewBox(DEFAULT_VIEWBOX, options.animate ?? true);
+  }
+
+  function applyPendingWheelZoom(): void {
+    wheelAnimationFrame = null;
+    const deltaPixels = pendingWheelDelta;
+    pendingWheelDelta = 0;
+
+    const factor = zoomFactorFromWheelDelta(deltaPixels);
+    if (factor === null) return;
+
+    setViewBox(zoomAround(svg, viewBox, factor, pendingWheelClientX, pendingWheelClientY));
   }
 
   svg.addEventListener("wheel", (event) => {
     event.preventDefault();
-    const factor = event.deltaY < 0 ? ZOOM_IN_FACTOR : ZOOM_OUT_FACTOR;
-    setViewBox(zoomAround(svg, viewBox, factor, event.clientX, event.clientY));
-  });
+    pendingWheelDelta += wheelDeltaYToPixels(event);
+    pendingWheelClientX = event.clientX;
+    pendingWheelClientY = event.clientY;
+
+    if (wheelAnimationFrame === null) {
+      wheelAnimationFrame = window.requestAnimationFrame(applyPendingWheelZoom);
+    }
+  }, { passive: false });
 
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    event.preventDefault();
     panState = {
       pointerId: event.pointerId,
       clientX: event.clientX,
@@ -292,6 +442,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointermove", (event) => {
     if (!panState || panState.pointerId !== event.pointerId) return;
+    event.preventDefault();
     const rect = svg.getBoundingClientRect();
     const rawDeltaX = event.clientX - panState.clientX;
     const rawDeltaY = event.clientY - panState.clientY;
@@ -325,6 +476,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     if (countryId === null) return;
     options.onCountryClick?.(countryId);
   });
+  svg.addEventListener("dragstart", (event) => event.preventDefault());
   svg.addEventListener("dblclick", resetViewBox);
   zoomInButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
   zoomOutButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
@@ -346,11 +498,17 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   meta.children[0]!.append("Found ", highlightedCount);
   meta.children[1]!.append("Left ", remainingCount);
 
-  return { element, highlightedCount, remainingCount, pathByCountryId, missingDotByCountryId };
+  return { element, highlightedCount, remainingCount, pathByCountryId, missingDotByCountryId, focusCountry, resetView };
 }
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {
   view.element.classList.toggle("show-missing-countries", visible);
+}
+
+export function setWorldMapTargetCountry(view: WorldMapView, countryId: CountryId | null): void {
+  for (const [id, path] of view.pathByCountryId) {
+    path.classList.toggle("is-target", id === countryId);
+  }
 }
 
 export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>, totalCountries: number): void {

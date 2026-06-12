@@ -4,9 +4,9 @@ import { getCategory } from "../src/core/categories";
 import { createGameEngine, getCurrentCountry, TOTAL_HINTS } from "../src/core/game";
 
 const fixtureCountries = [
-  { name: "Japan", code: "JP", aliases: ["Nippon"], continent: "Asia", flagSrc: "assets/flags/jp.svg" },
-  { name: "Brazil", code: "BR", aliases: ["Brasil"], continent: "South America", flagSrc: "assets/flags/br.svg" },
-  { name: "Canada", code: "CA", aliases: [], continent: "North America", flagSrc: "assets/flags/ca.svg" },
+  { name: "Japan", code: "JP", aliases: ["Nippon"], continent: "Asia", flagSrc: "assets/flags/jp.svg", capital: "Tokyo", capitalAliases: [] },
+  { name: "Brazil", code: "BR", aliases: ["Brasil"], continent: "South America", flagSrc: "assets/flags/br.svg", capital: "Brasília", capitalAliases: ["Brasilia"] },
+  { name: "Canada", code: "CA", aliases: [], continent: "North America", flagSrc: "assets/flags/ca.svg", capital: "Ottawa", capitalAliases: [] },
 ] as const satisfies readonly RawCountry[];
 
 function createFixtureGame(seed = "test-seed") {
@@ -77,7 +77,7 @@ describe("game engine", () => {
 
   it("accepts punctuation-heavy abbreviations and close misspellings on submit", () => {
     const countryIndex = indexCountries([
-      { name: "United States", code: "US", aliases: ["USA"], continent: "North America", flagSrc: "assets/flags/us.svg" },
+      { name: "United States", code: "US", aliases: ["USA"], continent: "North America", flagSrc: "assets/flags/us.svg", capital: "Washington D.C.", capitalAliases: ["Washington", "Washington DC"] },
     ] as const satisfies readonly RawCountry[]);
     const engine = createGameEngine({ countryIndex, categoryIds: ["flags"], seed: "abbr", now: 1000 });
 
@@ -117,6 +117,23 @@ describe("game engine", () => {
     const second = createFixtureGame("same-seed").engine.getState().currentCountryId;
 
     expect(first).toBe(second);
+  });
+
+  it("can play only a supplied country pool", () => {
+    const countryIndex = indexCountries(fixtureCountries);
+    const poolCountryIds = [countryIndex.byCode.get("JP")!.id, countryIndex.byCode.get("CA")!.id];
+    const engine = createGameEngine({ countryIndex, categoryIds: ["flags"], seed: "fixed-pool", poolCountryIds, now: 1000 });
+
+    expect(engine.getState().poolCountryIds).toEqual(poolCountryIds);
+
+    while (engine.getState().status === "playing") {
+      const current = getCurrentCountry(countryIndex, engine.getState());
+      if (!current) break;
+      engine.dispatch({ type: "SUBMIT_GUESS", value: current.name, now: 1200 });
+    }
+
+    expect(engine.getState().correctAnswers).toBe(2);
+    expect(engine.getState().status).toBe("complete");
   });
 
   it("emits completion after all countries are guessed", () => {

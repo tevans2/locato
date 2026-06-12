@@ -30,7 +30,7 @@
 .mode-select {
   width: auto;
   min-width: 172px;
-  background: rgba(255,255,255,0.035);
+  background-color: rgba(255,255,255,0.035);
 }
 
 .mode-description {
@@ -53,12 +53,25 @@
   gap: 12px;
   min-height: 42px;
   padding: 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.16);
   border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.08), transparent 55%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   user-select: none;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.category-dropdown-summary:hover,
+.category-dropdown[open] .category-dropdown-summary {
+  border-color: rgba(184, 227, 109, 0.42);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.12), transparent 58%),
+    rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .category-dropdown-summary::-webkit-details-marker {
@@ -67,11 +80,15 @@
 
 .category-dropdown-summary::after {
   content: "▾";
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 0.78rem;
+  line-height: 1;
+  transition: transform 140ms ease, color 140ms ease;
 }
 
 .category-dropdown[open] .category-dropdown-summary::after {
+  color: var(--accent);
   transform: rotate(180deg);
 }
 
@@ -85,20 +102,35 @@
 }
 
 .category-dropdown-menu {
-  position: absolute;
-  right: 0;
-  z-index: 20;
-  width: min(300px, calc(100vw - 32px));
-  margin-top: 8px;
+  position: fixed;
+  top: var(--dropdown-top, 0);
+  left: var(--dropdown-left, 0);
+  z-index: 1000;
+  width: var(--dropdown-width, min(300px, calc(100vw - 24px)));
+  max-height: var(--dropdown-max-height, min(360px, calc(100dvh - 24px)));
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-md);
   display: grid;
-  gap: 6px;
-  background: rgba(20, 25, 20, 0.98);
-  box-shadow: var(--shadow);
+  gap: 7px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
+    rgba(16, 20, 16, 0.98);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  animation: dropdown-pop 120ms ease-out;
 }
 
+.dropdown-opens-above .category-dropdown-menu {
+  transform-origin: bottom right;
+}
+
+@keyframes dropdown-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .category-row-label {
   color: var(--muted);
@@ -110,14 +142,30 @@
 .category-option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
   border-radius: var(--radius-sm);
   cursor: pointer;
   user-select: none;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.category-option:hover {
+  border-color: rgba(184, 227, 109, 0.38);
+  background: rgba(184, 227, 109, 0.075);
+}
+
+.category-option:active {
+  transform: translateY(1px);
+}
+
+.category-option:has(input:checked) {
+  border-color: rgba(184, 227, 109, 0.52);
+  background: rgba(184, 227, 109, 0.12);
 }
 
 .category-option input {
@@ -129,7 +177,7 @@
 .prompt-text {
   font-size: clamp(3rem, 12vw, 7rem);
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   color: var(--accent);
   text-align: center;
   line-height: 1;
@@ -270,6 +318,82 @@
   color: var(--accent);
 }
 
+.daily-badge {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid rgba(232, 226, 211, 0.16);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  font-weight: 760;
+}
+
+.daily-result-screen {
+  justify-content: center;
+}
+
+.daily-result-panel {
+  width: min(620px, 100%);
+  margin: auto;
+  display: grid;
+  gap: 18px;
+}
+
+.daily-result-panel h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(4rem, 16vw, 7rem);
+  line-height: 0.95;
+}
+
+.daily-result-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.daily-result-stats article {
+  border: 1px solid rgba(232, 226, 211, 0.11);
+  border-radius: var(--radius-sm);
+  background: rgba(20, 25, 20, 0.42);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.daily-result-stats span,
+.daily-legend {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 620;
+}
+
+.daily-result-stats strong {
+  color: var(--text);
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-share-text {
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font: 700 0.95rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.daily-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
 .answer-panel {
   flex: 0 0 auto;
   width: min(860px, 100%);
@@ -368,6 +492,8 @@
     radial-gradient(circle at 50% 44%, rgba(184, 227, 109, 0.08), transparent 56%),
     #090d0a;
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg {
@@ -378,6 +504,7 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .world-map-svg.is-panning {
@@ -426,6 +553,25 @@
   stroke: rgba(245, 244, 206, 0.9);
   stroke-width: 0.9;
   filter: drop-shadow(0 0 5px rgba(184, 227, 109, 0.35));
+}
+
+.world-map-country.is-target {
+  fill: rgba(237, 74, 67, 0.9);
+  stroke: rgba(255, 235, 219, 0.96);
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 8px rgba(237, 74, 67, 0.62));
+  animation: country-flash 1.4s ease-in-out infinite;
+}
+
+@keyframes country-flash {
+  0%, 100% {
+    fill: rgba(237, 74, 67, 0.9);
+    filter: drop-shadow(0 0 8px rgba(237, 74, 67, 0.62));
+  }
+  50% {
+    fill: rgba(255, 204, 190, 0.96);
+    filter: drop-shadow(0 0 14px rgba(255, 126, 99, 0.82));
+  }
 }
 
 .world-map-country-unplayable {
@@ -511,12 +657,12 @@
 }
 
 .country-guess-timer-select {
-  min-height: 28px;
-  min-width: 96px;
-  padding: 0 7px;
+  min-height: 30px;
+  min-width: 112px;
+  padding: 0 34px 0 10px;
   font-size: 0.76rem;
   font-weight: 720;
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.045);
 }
 
 .country-guess-stats.timer-is-active .country-guess-mode-card {
@@ -535,10 +681,6 @@
 .country-guess-category-dropdown {
   justify-self: end;
   width: min(300px, 100%);
-}
-
-.country-guess-category-dropdown .category-dropdown-menu {
-  width: min(300px, calc(100vw - 32px));
 }
 
 .country-guess-category-dropdown .category-dropdown-selected {
@@ -598,4 +740,333 @@
   margin: 0;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+/* Continent puzzle mode */
+.puzzle-map-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 10px;
+}
+
+.puzzle-board-shell,
+.puzzle-piece-tray {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(rgba(232, 226, 211, 0.03) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(232, 226, 211, 0.022) 1px, transparent 1px) 0 0 / 48px 48px,
+    radial-gradient(circle at 50% 44%, rgba(184, 227, 109, 0.08), transparent 58%),
+    #090d0a;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+}
+
+.puzzle-board-shell {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.puzzle-board-svg {
+  width: 100%;
+  height: 100%;
+  min-height: clamp(320px, calc(100dvh - 310px), 620px);
+  display: block;
+  touch-action: none;
+  user-select: none;
+}
+
+.puzzle-continent-layer,
+.puzzle-target-layer {
+  pointer-events: none;
+}
+
+.puzzle-continent-silhouette-country {
+  fill: rgba(232, 226, 211, 0.044);
+  stroke: none;
+}
+
+.puzzle-target-country {
+  fill: transparent;
+  stroke: rgba(232, 226, 211, 0.34);
+  stroke-width: 0.9;
+  stroke-dasharray: 5 5;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.puzzle-map-panel.show-country-borders .puzzle-target-country {
+  opacity: 1;
+}
+
+.puzzle-country-piece {
+  fill: rgba(184, 227, 109, 0.72);
+  stroke: rgba(245, 244, 206, 0.94);
+  stroke-width: 1.15;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
+  cursor: grab;
+  transition: filter 120ms ease, opacity 120ms ease, fill 120ms ease;
+}
+
+.puzzle-country-piece.is-dragging {
+  cursor: grabbing;
+  fill: rgba(245, 244, 206, 0.84);
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 10px rgba(184, 227, 109, 0.32));
+}
+
+.puzzle-country-piece.is-loose {
+  fill: rgba(184, 227, 109, 0.54);
+}
+
+.puzzle-country-piece.is-placed {
+  fill: rgba(184, 227, 109, 0.88);
+  stroke: rgba(245, 244, 206, 0.98);
+  cursor: grab;
+  filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.34));
+}
+
+.puzzle-country-piece.is-accuracy-close {
+  fill: rgba(184, 227, 109, 0.92);
+  stroke: rgba(245, 244, 206, 1);
+  filter: drop-shadow(0 0 10px rgba(184, 227, 109, 0.44));
+}
+
+.puzzle-country-piece.is-accuracy-far {
+  fill: rgba(242, 144, 96, 0.78);
+  stroke: rgba(255, 220, 190, 0.96);
+  filter: drop-shadow(0 0 8px rgba(242, 144, 96, 0.34));
+}
+
+.puzzle-board-controls {
+  top: auto;
+  bottom: 12px;
+  right: 12px;
+}
+
+.puzzle-board-svg.is-panning {
+  cursor: grabbing;
+}
+
+.puzzle-border-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 226, 211, 0.13);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 8, 6, 0.76);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 780;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  user-select: none;
+}
+
+.puzzle-border-toggle:hover,
+.puzzle-border-toggle:focus-within {
+  border-color: rgba(184, 227, 109, 0.48);
+  background: rgba(18, 25, 14, 0.86);
+}
+
+.puzzle-border-toggle-input {
+  accent-color: var(--accent);
+}
+
+.puzzle-piece-tray {
+  min-height: 0;
+  max-height: clamp(320px, calc(100dvh - 310px), 620px);
+  overflow: auto;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.puzzle-piece-card {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid rgba(232, 226, 211, 0.13);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+  cursor: grab;
+}
+
+.puzzle-piece-card:hover,
+.puzzle-piece-card:focus-visible,
+.puzzle-piece-card.is-in-play {
+  border-color: rgba(184, 227, 109, 0.48);
+  background: rgba(184, 227, 109, 0.1);
+}
+
+.puzzle-piece-card-svg {
+  width: 48px;
+  height: 38px;
+  display: block;
+  overflow: visible;
+}
+
+.puzzle-piece-card-path {
+  fill: rgba(184, 227, 109, 0.74);
+  stroke: rgba(245, 244, 206, 0.86);
+  stroke-width: 1.6;
+}
+
+.puzzle-piece-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 760;
+}
+
+.puzzle-tray-empty {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.puzzle-continent-select {
+  min-height: 42px;
+  padding: 0 38px 0 12px;
+  border: 1px solid rgba(232, 226, 211, 0.14);
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font: inherit;
+  font-weight: 780;
+}
+
+.game-header-left,
+.game-header-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.game-header-left {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+.game-header-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.game-mode-dropdown {
+  width: min(340px, 100%);
+}
+
+.game-mode-dropdown .category-dropdown-menu {
+  width: var(--dropdown-width, min(380px, calc(100vw - 24px)));
+}
+
+.game-mode-group-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  padding: 4px 4px 0;
+  text-transform: uppercase;
+}
+
+.game-mode-option {
+  align-items: flex-start;
+  min-height: 52px;
+}
+
+.game-mode-option input {
+  margin-top: 3px;
+}
+
+.game-mode-option-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.game-mode-option-label {
+  color: var(--text);
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.game-mode-option-description {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.leaderboard-screen .leaderboard-layout {
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 24px 20px 40px;
+  width: 100%;
+}
+
+.leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.leaderboard-filter {
+  display: grid;
+  gap: 6px;
+  min-width: min(220px, 100%);
+}
+
+.leaderboard-mode-select,
+.leaderboard-variant-select {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.leaderboard-status,
+.leaderboard-user-rank {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.global-leaderboard .leaderboard-row {
+  grid-template-columns: 56px 36px minmax(0, 1fr) auto;
+}
+
+.leaderboard-avatar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.leaderboard-avatar.is-emoji {
+  font-size: 1.1rem;
+}
+
+.solo-timer-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
 }

@@ -58,6 +58,17 @@ function buildAssignments(index: CountryIndex, categoryIds: readonly string[], s
   return new Map(buildPromptSlots(index, categoryIds, seed).map((slot) => [slot.countryId, slot.categoryId]));
 }
 
+function filterAssignments(assignments: ReadonlyMap<CountryId, string>, poolCountryIds?: readonly CountryId[]): ReadonlyMap<CountryId, string> {
+  if (!poolCountryIds) return assignments;
+
+  const filtered = new Map<CountryId, string>();
+  for (const countryId of poolCountryIds) {
+    const categoryId = assignments.get(countryId);
+    if (categoryId) filtered.set(countryId, categoryId);
+  }
+  return filtered;
+}
+
 function createInitialState(
   assignments: ReadonlyMap<CountryId, string>,
   categoryIds: readonly string[],
@@ -114,7 +125,7 @@ function advanceToNextCountry(
 export function createGameEngine(input: CreateGameEngineInput): GameEngine {
   const { countryIndex } = input;
   let categoryIds = input.initialState?.categoryIds ?? input.categoryIds;
-  let assignments = buildAssignments(countryIndex, categoryIds, input.initialState?.seed ?? input.seed);
+  let assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, input.initialState?.seed ?? input.seed), input.poolCountryIds);
   let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now());
 
   function categoryFor(countryId: CountryId) {
@@ -141,7 +152,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
       if (command.type === "START_GAME" || command.type === "RESET_GAME") {
         if (command.type === "START_GAME") categoryIds = command.categoryIds;
         const seed = command.type === "START_GAME" ? command.seed : state.seed;
-        assignments = buildAssignments(countryIndex, categoryIds, seed);
+        assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, seed), input.poolCountryIds);
         state = createInitialState(assignments, categoryIds, seed, command.now);
         if (state.currentCountryId !== null) events.push({ type: "GAME_STARTED", currentCountryId: state.currentCountryId });
         if (command.type === "RESET_GAME") events.push({ type: "GAME_RESET" });

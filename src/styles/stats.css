@@ -1,0 +1,183 @@
+.stats-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow-y: auto;
+}
+
+.stats-content {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin-inline: auto;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.stats-loading {
+  color: var(--muted);
+  text-align: center;
+  padding: 60px 0;
+}
+
+/* Hero row */
+.stats-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .stats-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.stats-hero-card {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.stats-hero-card.is-highlight {
+  border-color: rgba(184, 227, 109, 0.4);
+  background: rgba(184, 227, 109, 0.055);
+}
+
+.stats-hero-value {
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  font-weight: 820;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.stats-hero-card.is-highlight .stats-hero-value { color: var(--accent); }
+
+.stats-hero-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Mode split */
+.stats-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .stats-mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .stats-mode-grid { grid-template-columns: 1fr; }
+}
+
+.stats-card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stats-card h2 {
+  font-size: 0.9rem;
+  font-weight: 760;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 4px;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.stats-row-label { color: var(--muted); }
+.stats-row-value { font-weight: 760; font-variant-numeric: tabular-nums; }
+
+/* Category bars */
+.cat-bar-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) 3rem 3rem;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.cat-bar-label { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-bar-pct { font-weight: 760; text-align: right; font-variant-numeric: tabular-nums; }
+.cat-bar-count { color: var(--muted); font-size: 0.78rem; text-align: right; }
+
+.cat-bar-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cat-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--earth));
+  transform-origin: left;
+  border-radius: 999px;
+}
+
+/* Recent games */
+.stats-recent { gap: 4px; }
+
+.recent-games-header,
+.recent-game-row {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) 5rem 3rem 7rem;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.82rem;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.recent-games-header {
+  color: var(--muted);
+  font-weight: 720;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.recent-game-row { border: 1px solid transparent; }
+.recent-game-row:hover { background: rgba(255, 255, 255, 0.03); }
+.recent-game-row.is-win { border-color: rgba(184, 227, 109, 0.3); background: rgba(184, 227, 109, 0.045); }
+
+.game-row-mode { font-weight: 760; color: var(--muted); }
+.game-row-cats { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-row-result { font-weight: 760; }
+.game-row-acc { color: var(--muted); }
+.game-row-date { color: var(--muted); font-size: 0.75rem; }
+
+/* Auth panel view stats button */
+.auth-view-stats { width: 100%; font-size: 0.85rem; }
+
+@media (max-width: 600px) {
+  .stats-mode-grid { grid-template-columns: minmax(0, 1fr); }
+  .cat-bar-row { grid-template-columns: 6rem minmax(0, 1fr) 2.5rem; }
+  .cat-bar-count { display: none; }
+  .recent-games-header { display: none; }
+  .recent-game-row { grid-template-columns: 2.6rem minmax(0, 1fr) 4.5rem; }
+  .game-row-acc,
+  .game-row-date { display: none; }
+}

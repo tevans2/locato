@@ -7,6 +7,13 @@ primary_region = "jnb"
   MAX_PLAYERS_PER_ROOM = "8"
   MAX_ROOMS = "500"
   ANSWER_RATE_LIMIT_PER_SECOND = "5"
+  DATABASE_PATH = "/data/locato.db"
+
+# Persistent SQLite lives on a volume so accounts/stats survive deploys and scale-to-zero stops.
+# Create it first: fly volumes create data -a locato-staging --size 1 --region jnb
+[mounts]
+  source = "data"
+  destination = "/data"
 
 [http_service]
   internal_port = 3000

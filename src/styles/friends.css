@@ -1,0 +1,180 @@
+.friends-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.friends-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.friends-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.friend-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+
+.friend-section h2 {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.friend-add-form {
+  display: flex;
+  gap: 8px;
+}
+
+.friend-add-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 0.95rem;
+}
+
+.friend-feedback {
+  margin: 0;
+  font-size: 0.85rem;
+  min-height: 1.1em;
+  color: var(--muted);
+}
+
+.friend-feedback.is-good { color: var(--good); }
+.friend-feedback.is-bad { color: var(--bad); }
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.friend-empty {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 0.9rem;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.friend-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 1rem;
+  flex: none;
+}
+
+.friend-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.friend-status {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--subtle);
+  flex: none;
+}
+
+.friend-status.is-online {
+  background: var(--good);
+  box-shadow: 0 0 0 3px rgba(152, 223, 116, 0.18);
+}
+
+.friend-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.friend-action-btn {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+}
+
+.invite-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.invite-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.invite-empty {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.invite-btn {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+}
+
+.game-invite-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  max-width: calc(100vw - 32px);
+}
+
+.invite-toast-text {
+  font-weight: 600;
+}
+
+.game-invite-toast button {
+  padding: 5px 12px;
+  font-size: 0.85rem;
+}

@@ -13,7 +13,7 @@ export interface PublicPlayerState {
 }
 
 export interface PublicPromptContent {
-  readonly kind: "image" | "text";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight";
   readonly value: string;
 }
 
@@ -52,4 +52,5 @@ export interface FinalResult {
   readonly rank: number;
   readonly score: number;
   readonly correctAnswers: number;
+  readonly wrongAnswers: number;
 }

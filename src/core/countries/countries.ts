@@ -4,6 +4,8 @@ export const rawCountries = [
   {
     "name": "Afghanistan",
     "code": "AF",
+    "capital": "Kabul",
+    "capitalAliases": [],
     "aliases": [
       "Islamic Republic of Afghanistan"
     ],
@@ -13,6 +15,8 @@ export const rawCountries = [
   {
     "name": "Albania",
     "code": "AL",
+    "capital": "Tirana",
+    "capitalAliases": ["Tiranë"],
     "aliases": [
       "Republic of Albania"
     ],
@@ -22,6 +26,8 @@ export const rawCountries = [
   {
     "name": "Algeria",
     "code": "DZ",
+    "capital": "Algiers",
+    "capitalAliases": ["Alger"],
     "aliases": [
       "People's Democratic Republic of Algeria"
     ],
@@ -31,6 +37,8 @@ export const rawCountries = [
   {
     "name": "Andorra",
     "code": "AD",
+    "capital": "Andorra la Vella",
+    "capitalAliases": [],
     "aliases": [
       "Principality of Andorra"
     ],
@@ -40,6 +48,8 @@ export const rawCountries = [
   {
     "name": "Angola",
     "code": "AO",
+    "capital": "Luanda",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Angola"
     ],
@@ -49,6 +59,8 @@ export const rawCountries = [
   {
     "name": "Antigua and Barbuda",
     "code": "AG",
+    "capital": "Saint John's",
+    "capitalAliases": ["St John's"],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/ag.svg"
@@ -56,6 +68,8 @@ export const rawCountries = [
   {
     "name": "Argentina",
     "code": "AR",
+    "capital": "Buenos Aires",
+    "capitalAliases": [],
     "aliases": [
       "Argentine Republic"
     ],
@@ -65,6 +79,8 @@ export const rawCountries = [
   {
     "name": "Armenia",
     "code": "AM",
+    "capital": "Yerevan",
+    "capitalAliases": ["Erevan"],
     "aliases": [
       "Republic of Armenia"
     ],
@@ -74,6 +90,8 @@ export const rawCountries = [
   {
     "name": "Australia",
     "code": "AU",
+    "capital": "Canberra",
+    "capitalAliases": [],
     "aliases": [
       "Commonwealth of Australia"
     ],
@@ -83,6 +101,8 @@ export const rawCountries = [
   {
     "name": "Austria",
     "code": "AT",
+    "capital": "Vienna",
+    "capitalAliases": ["Wien"],
     "aliases": [
       "Republic of Austria"
     ],
@@ -92,6 +112,8 @@ export const rawCountries = [
   {
     "name": "Azerbaijan",
     "code": "AZ",
+    "capital": "Baku",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Azerbaijan"
     ],
@@ -101,6 +123,8 @@ export const rawCountries = [
   {
     "name": "Bahamas",
     "code": "BS",
+    "capital": "Nassau",
+    "capitalAliases": [],
     "aliases": [
       "The Bahamas",
       "Commonwealth of The Bahamas",
@@ -112,6 +136,8 @@ export const rawCountries = [
   {
     "name": "Bahrain",
     "code": "BH",
+    "capital": "Manama",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Bahrain"
     ],
@@ -121,6 +147,8 @@ export const rawCountries = [
   {
     "name": "Bangladesh",
     "code": "BD",
+    "capital": "Dhaka",
+    "capitalAliases": ["Dacca"],
     "aliases": [
       "People's Republic of Bangladesh"
     ],
@@ -130,6 +158,8 @@ export const rawCountries = [
   {
     "name": "Barbados",
     "code": "BB",
+    "capital": "Bridgetown",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/bb.svg"
@@ -137,6 +167,8 @@ export const rawCountries = [
   {
     "name": "Belarus",
     "code": "BY",
+    "capital": "Minsk",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Belarus"
     ],
@@ -146,6 +178,8 @@ export const rawCountries = [
   {
     "name": "Belgium",
     "code": "BE",
+    "capital": "Brussels",
+    "capitalAliases": ["Bruxelles","Brussel"],
     "aliases": [
       "Kingdom of Belgium"
     ],
@@ -155,6 +189,8 @@ export const rawCountries = [
   {
     "name": "Belize",
     "code": "BZ",
+    "capital": "Belmopan",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/bz.svg"
@@ -162,6 +198,8 @@ export const rawCountries = [
   {
     "name": "Benin",
     "code": "BJ",
+    "capital": "Porto-Novo",
+    "capitalAliases": ["Cotonou"],
     "aliases": [
       "Republic of Benin"
     ],
@@ -171,6 +209,8 @@ export const rawCountries = [
   {
     "name": "Bhutan",
     "code": "BT",
+    "capital": "Thimphu",
+    "capitalAliases": ["Thimbu"],
     "aliases": [
       "Kingdom of Bhutan"
     ],
@@ -180,6 +220,8 @@ export const rawCountries = [
   {
     "name": "Bolivia",
     "code": "BO",
+    "capital": "Sucre",
+    "capitalAliases": ["La Paz"],
     "aliases": [
       "Plurinational State of Bolivia",
       "Bolivia (Plurinational State of)"
@@ -190,6 +232,8 @@ export const rawCountries = [
   {
     "name": "Bosnia and Herzegovina",
     "code": "BA",
+    "capital": "Sarajevo",
+    "capitalAliases": [],
     "aliases": [
       "Bosnia"
     ],
@@ -199,6 +243,8 @@ export const rawCountries = [
   {
     "name": "Botswana",
     "code": "BW",
+    "capital": "Gaborone",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Botswana"
     ],
@@ -208,6 +254,8 @@ export const rawCountries = [
   {
     "name": "Brazil",
     "code": "BR",
+    "capital": "Brasília",
+    "capitalAliases": ["Brasilia"],
     "aliases": [
       "Federative Republic of Brazil"
     ],
@@ -217,6 +265,8 @@ export const rawCountries = [
   {
     "name": "Brunei",
     "code": "BN",
+    "capital": "Bandar Seri Begawan",
+    "capitalAliases": ["BSB"],
     "aliases": [
       "Brunei Darussalam",
       "Nation of Brunei"
@@ -227,6 +277,8 @@ export const rawCountries = [
   {
     "name": "Bulgaria",
     "code": "BG",
+    "capital": "Sofia",
+    "capitalAliases": ["Sofiya"],
     "aliases": [
       "Republic of Bulgaria"
     ],
@@ -236,6 +288,8 @@ export const rawCountries = [
   {
     "name": "Burkina Faso",
     "code": "BF",
+    "capital": "Ouagadougou",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Africa",
     "flagSrc": "assets/flags/bf.svg"
@@ -243,6 +297,8 @@ export const rawCountries = [
   {
     "name": "Burundi",
     "code": "BI",
+    "capital": "Gitega",
+    "capitalAliases": ["Bujumbura"],
     "aliases": [
       "Republic of Burundi"
     ],
@@ -252,6 +308,8 @@ export const rawCountries = [
   {
     "name": "Cabo Verde",
     "code": "CV",
+    "capital": "Praia",
+    "capitalAliases": [],
     "aliases": [
       "Cape Verde",
       "Republic of Cabo Verde"
@@ -262,6 +320,8 @@ export const rawCountries = [
   {
     "name": "Cambodia",
     "code": "KH",
+    "capital": "Phnom Penh",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Cambodia"
     ],
@@ -271,6 +331,8 @@ export const rawCountries = [
   {
     "name": "Cameroon",
     "code": "CM",
+    "capital": "Yaoundé",
+    "capitalAliases": ["Yaounde"],
     "aliases": [
       "Republic of Cameroon"
     ],
@@ -280,6 +342,8 @@ export const rawCountries = [
   {
     "name": "Canada",
     "code": "CA",
+    "capital": "Ottawa",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/ca.svg"
@@ -287,6 +351,8 @@ export const rawCountries = [
   {
     "name": "Central African Republic",
     "code": "CF",
+    "capital": "Bangui",
+    "capitalAliases": [],
     "aliases": [
       "CAR"
     ],
@@ -296,6 +362,8 @@ export const rawCountries = [
   {
     "name": "Chad",
     "code": "TD",
+    "capital": "N'Djamena",
+    "capitalAliases": ["Ndjamena"],
     "aliases": [
       "Republic of Chad"
     ],
@@ -305,6 +373,8 @@ export const rawCountries = [
   {
     "name": "Chile",
     "code": "CL",
+    "capital": "Santiago",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Chile"
     ],
@@ -314,6 +384,8 @@ export const rawCountries = [
   {
     "name": "China",
     "code": "CN",
+    "capital": "Beijing",
+    "capitalAliases": ["Peking"],
     "aliases": [
       "People's Republic of China",
       "PRC"
@@ -324,6 +396,8 @@ export const rawCountries = [
   {
     "name": "Colombia",
     "code": "CO",
+    "capital": "Bogotá",
+    "capitalAliases": ["Bogota"],
     "aliases": [
       "Republic of Colombia"
     ],
@@ -333,6 +407,8 @@ export const rawCountries = [
   {
     "name": "Comoros",
     "code": "KM",
+    "capital": "Moroni",
+    "capitalAliases": [],
     "aliases": [
       "Union of the Comoros"
     ],
@@ -342,6 +418,8 @@ export const rawCountries = [
   {
     "name": "Congo",
     "code": "CG",
+    "capital": "Brazzaville",
+    "capitalAliases": [],
     "aliases": [
       "Republic of the Congo",
       "Congo-Brazzaville",
@@ -353,6 +431,8 @@ export const rawCountries = [
   {
     "name": "Costa Rica",
     "code": "CR",
+    "capital": "San José",
+    "capitalAliases": ["San Jose"],
     "aliases": [
       "Republic of Costa Rica"
     ],
@@ -362,6 +442,8 @@ export const rawCountries = [
   {
     "name": "Cote d'Ivoire",
     "code": "CI",
+    "capital": "Yamoussoukro",
+    "capitalAliases": ["Abidjan"],
     "aliases": [
       "Ivory Coast",
       "Côte d'Ivoire",
@@ -373,6 +455,8 @@ export const rawCountries = [
   {
     "name": "Croatia",
     "code": "HR",
+    "capital": "Zagreb",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Croatia"
     ],
@@ -382,6 +466,8 @@ export const rawCountries = [
   {
     "name": "Cuba",
     "code": "CU",
+    "capital": "Havana",
+    "capitalAliases": ["La Habana"],
     "aliases": [
       "Republic of Cuba"
     ],
@@ -391,6 +477,8 @@ export const rawCountries = [
   {
     "name": "Cyprus",
     "code": "CY",
+    "capital": "Nicosia",
+    "capitalAliases": ["Lefkosia"],
     "aliases": [
       "Republic of Cyprus"
     ],
@@ -400,6 +488,8 @@ export const rawCountries = [
   {
     "name": "Czechia",
     "code": "CZ",
+    "capital": "Prague",
+    "capitalAliases": ["Praha"],
     "aliases": [
       "Czech Republic"
     ],
@@ -409,6 +499,8 @@ export const rawCountries = [
   {
     "name": "Democratic Republic of the Congo",
     "code": "CD",
+    "capital": "Kinshasa",
+    "capitalAliases": ["Léopoldville"],
     "aliases": [
       "DR Congo",
       "DRC",
@@ -422,6 +514,8 @@ export const rawCountries = [
   {
     "name": "Denmark",
     "code": "DK",
+    "capital": "Copenhagen",
+    "capitalAliases": ["København"],
     "aliases": [
       "Kingdom of Denmark"
     ],
@@ -431,6 +525,8 @@ export const rawCountries = [
   {
     "name": "Djibouti",
     "code": "DJ",
+    "capital": "Djibouti",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Djibouti"
     ],
@@ -440,6 +536,8 @@ export const rawCountries = [
   {
     "name": "Dominica",
     "code": "DM",
+    "capital": "Roseau",
+    "capitalAliases": [],
     "aliases": [
       "Commonwealth of Dominica"
     ],
@@ -449,6 +547,8 @@ export const rawCountries = [
   {
     "name": "Dominican Republic",
     "code": "DO",
+    "capital": "Santo Domingo",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/do.svg"
@@ -456,6 +556,8 @@ export const rawCountries = [
   {
     "name": "Ecuador",
     "code": "EC",
+    "capital": "Quito",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Ecuador"
     ],
@@ -465,6 +567,8 @@ export const rawCountries = [
   {
     "name": "Egypt",
     "code": "EG",
+    "capital": "Cairo",
+    "capitalAliases": ["Al-Qahirah"],
     "aliases": [
       "Arab Republic of Egypt"
     ],
@@ -474,6 +578,8 @@ export const rawCountries = [
   {
     "name": "El Salvador",
     "code": "SV",
+    "capital": "San Salvador",
+    "capitalAliases": [],
     "aliases": [
       "Republic of El Salvador"
     ],
@@ -483,6 +589,8 @@ export const rawCountries = [
   {
     "name": "Equatorial Guinea",
     "code": "GQ",
+    "capital": "Malabo",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Equatorial Guinea"
     ],
@@ -492,6 +600,8 @@ export const rawCountries = [
   {
     "name": "Eritrea",
     "code": "ER",
+    "capital": "Asmara",
+    "capitalAliases": ["Asmera"],
     "aliases": [
       "State of Eritrea"
     ],
@@ -501,6 +611,8 @@ export const rawCountries = [
   {
     "name": "Estonia",
     "code": "EE",
+    "capital": "Tallinn",
+    "capitalAliases": ["Tallin"],
     "aliases": [
       "Republic of Estonia"
     ],
@@ -510,6 +622,8 @@ export const rawCountries = [
   {
     "name": "Eswatini",
     "code": "SZ",
+    "capital": "Mbabane",
+    "capitalAliases": [],
     "aliases": [
       "Swaziland",
       "Kingdom of Eswatini"
@@ -520,6 +634,8 @@ export const rawCountries = [
   {
     "name": "Ethiopia",
     "code": "ET",
+    "capital": "Addis Ababa",
+    "capitalAliases": ["Addis Abeba"],
     "aliases": [
       "Federal Democratic Republic of Ethiopia"
     ],
@@ -529,6 +645,8 @@ export const rawCountries = [
   {
     "name": "Fiji",
     "code": "FJ",
+    "capital": "Suva",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Fiji"
     ],
@@ -538,6 +656,8 @@ export const rawCountries = [
   {
     "name": "Finland",
     "code": "FI",
+    "capital": "Helsinki",
+    "capitalAliases": ["Helsingfors"],
     "aliases": [
       "Republic of Finland"
     ],
@@ -547,6 +667,8 @@ export const rawCountries = [
   {
     "name": "France",
     "code": "FR",
+    "capital": "Paris",
+    "capitalAliases": [],
     "aliases": [
       "French Republic"
     ],
@@ -556,6 +678,8 @@ export const rawCountries = [
   {
     "name": "Gabon",
     "code": "GA",
+    "capital": "Libreville",
+    "capitalAliases": [],
     "aliases": [
       "Gabonese Republic"
     ],
@@ -565,6 +689,8 @@ export const rawCountries = [
   {
     "name": "Gambia",
     "code": "GM",
+    "capital": "Banjul",
+    "capitalAliases": [],
     "aliases": [
       "The Gambia",
       "Republic of The Gambia",
@@ -576,6 +702,8 @@ export const rawCountries = [
   {
     "name": "Georgia",
     "code": "GE",
+    "capital": "Tbilisi",
+    "capitalAliases": ["Tiflis"],
     "aliases": [],
     "continent": "Asia",
     "flagSrc": "assets/flags/ge.svg"
@@ -583,6 +711,8 @@ export const rawCountries = [
   {
     "name": "Germany",
     "code": "DE",
+    "capital": "Berlin",
+    "capitalAliases": [],
     "aliases": [
       "Federal Republic of Germany"
     ],
@@ -592,6 +722,8 @@ export const rawCountries = [
   {
     "name": "Ghana",
     "code": "GH",
+    "capital": "Accra",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Ghana"
     ],
@@ -601,6 +733,8 @@ export const rawCountries = [
   {
     "name": "Greece",
     "code": "GR",
+    "capital": "Athens",
+    "capitalAliases": ["Athína","Athenai"],
     "aliases": [
       "Hellenic Republic"
     ],
@@ -610,6 +744,8 @@ export const rawCountries = [
   {
     "name": "Grenada",
     "code": "GD",
+    "capital": "St George's",
+    "capitalAliases": ["Saint George's"],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/gd.svg"
@@ -617,6 +753,8 @@ export const rawCountries = [
   {
     "name": "Guatemala",
     "code": "GT",
+    "capital": "Guatemala City",
+    "capitalAliases": ["Ciudad de Guatemala"],
     "aliases": [
       "Republic of Guatemala"
     ],
@@ -626,6 +764,8 @@ export const rawCountries = [
   {
     "name": "Guinea",
     "code": "GN",
+    "capital": "Conakry",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Guinea"
     ],
@@ -635,6 +775,8 @@ export const rawCountries = [
   {
     "name": "Guinea-Bissau",
     "code": "GW",
+    "capital": "Bissau",
+    "capitalAliases": [],
     "aliases": [
       "Guinea Bissau",
       "Republic of Guinea-Bissau"
@@ -645,6 +787,8 @@ export const rawCountries = [
   {
     "name": "Guyana",
     "code": "GY",
+    "capital": "Georgetown",
+    "capitalAliases": [],
     "aliases": [
       "Co-operative Republic of Guyana",
       "Cooperative Republic of Guyana"
@@ -655,6 +799,8 @@ export const rawCountries = [
   {
     "name": "Haiti",
     "code": "HT",
+    "capital": "Port-au-Prince",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Haiti"
     ],
@@ -664,6 +810,8 @@ export const rawCountries = [
   {
     "name": "Honduras",
     "code": "HN",
+    "capital": "Tegucigalpa",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Honduras"
     ],
@@ -673,6 +821,8 @@ export const rawCountries = [
   {
     "name": "Hungary",
     "code": "HU",
+    "capital": "Budapest",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Europe",
     "flagSrc": "assets/flags/hu.svg"
@@ -680,6 +830,8 @@ export const rawCountries = [
   {
     "name": "Iceland",
     "code": "IS",
+    "capital": "Reykjavík",
+    "capitalAliases": ["Reykjavik"],
     "aliases": [
       "Republic of Iceland"
     ],
@@ -689,6 +841,8 @@ export const rawCountries = [
   {
     "name": "India",
     "code": "IN",
+    "capital": "New Delhi",
+    "capitalAliases": ["Delhi"],
     "aliases": [
       "Republic of India"
     ],
@@ -698,6 +852,8 @@ export const rawCountries = [
   {
     "name": "Indonesia",
     "code": "ID",
+    "capital": "Jakarta",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Indonesia"
     ],
@@ -707,6 +863,8 @@ export const rawCountries = [
   {
     "name": "Iran",
     "code": "IR",
+    "capital": "Tehran",
+    "capitalAliases": ["Teheran"],
     "aliases": [
       "Islamic Republic of Iran",
       "Iran (Islamic Republic of)"
@@ -717,6 +875,8 @@ export const rawCountries = [
   {
     "name": "Iraq",
     "code": "IQ",
+    "capital": "Baghdad",
+    "capitalAliases": ["Bagdad"],
     "aliases": [
       "Republic of Iraq"
     ],
@@ -726,6 +886,8 @@ export const rawCountries = [
   {
     "name": "Ireland",
     "code": "IE",
+    "capital": "Dublin",
+    "capitalAliases": ["Baile Átha Cliath"],
     "aliases": [],
     "continent": "Europe",
     "flagSrc": "assets/flags/ie.svg"
@@ -733,6 +895,8 @@ export const rawCountries = [
   {
     "name": "Israel",
     "code": "IL",
+    "capital": "Jerusalem",
+    "capitalAliases": [],
     "aliases": [
       "State of Israel"
     ],
@@ -742,6 +906,8 @@ export const rawCountries = [
   {
     "name": "Italy",
     "code": "IT",
+    "capital": "Rome",
+    "capitalAliases": ["Roma"],
     "aliases": [
       "Italian Republic"
     ],
@@ -751,6 +917,8 @@ export const rawCountries = [
   {
     "name": "Jamaica",
     "code": "JM",
+    "capital": "Kingston",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/jm.svg"
@@ -758,6 +926,8 @@ export const rawCountries = [
   {
     "name": "Japan",
     "code": "JP",
+    "capital": "Tokyo",
+    "capitalAliases": ["Tokio"],
     "aliases": [],
     "continent": "Asia",
     "flagSrc": "assets/flags/jp.svg"
@@ -765,6 +935,8 @@ export const rawCountries = [
   {
     "name": "Jordan",
     "code": "JO",
+    "capital": "Amman",
+    "capitalAliases": [],
     "aliases": [
       "Hashemite Kingdom of Jordan"
     ],
@@ -774,6 +946,8 @@ export const rawCountries = [
   {
     "name": "Kazakhstan",
     "code": "KZ",
+    "capital": "Astana",
+    "capitalAliases": ["Nur-Sultan","Nursultan"],
     "aliases": [
       "Republic of Kazakhstan"
     ],
@@ -783,6 +957,8 @@ export const rawCountries = [
   {
     "name": "Kenya",
     "code": "KE",
+    "capital": "Nairobi",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Kenya"
     ],
@@ -792,6 +968,8 @@ export const rawCountries = [
   {
     "name": "Kiribati",
     "code": "KI",
+    "capital": "South Tarawa",
+    "capitalAliases": ["Tarawa"],
     "aliases": [
       "Republic of Kiribati"
     ],
@@ -801,6 +979,8 @@ export const rawCountries = [
   {
     "name": "Kuwait",
     "code": "KW",
+    "capital": "Kuwait City",
+    "capitalAliases": [],
     "aliases": [
       "State of Kuwait"
     ],
@@ -810,6 +990,8 @@ export const rawCountries = [
   {
     "name": "Kyrgyzstan",
     "code": "KG",
+    "capital": "Bishkek",
+    "capitalAliases": ["Frunze"],
     "aliases": [
       "Kyrgyz Republic"
     ],
@@ -819,6 +1001,8 @@ export const rawCountries = [
   {
     "name": "Laos",
     "code": "LA",
+    "capital": "Vientiane",
+    "capitalAliases": [],
     "aliases": [
       "Lao People's Democratic Republic",
       "Lao PDR"
@@ -829,6 +1013,8 @@ export const rawCountries = [
   {
     "name": "Latvia",
     "code": "LV",
+    "capital": "Riga",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Latvia"
     ],
@@ -838,6 +1024,8 @@ export const rawCountries = [
   {
     "name": "Lebanon",
     "code": "LB",
+    "capital": "Beirut",
+    "capitalAliases": ["Beyrouth"],
     "aliases": [
       "Lebanese Republic"
     ],
@@ -847,6 +1035,8 @@ export const rawCountries = [
   {
     "name": "Lesotho",
     "code": "LS",
+    "capital": "Maseru",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Lesotho"
     ],
@@ -856,6 +1046,8 @@ export const rawCountries = [
   {
     "name": "Liberia",
     "code": "LR",
+    "capital": "Monrovia",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Liberia"
     ],
@@ -865,6 +1057,8 @@ export const rawCountries = [
   {
     "name": "Libya",
     "code": "LY",
+    "capital": "Tripoli",
+    "capitalAliases": ["Tarabulus"],
     "aliases": [
       "State of Libya"
     ],
@@ -874,6 +1068,8 @@ export const rawCountries = [
   {
     "name": "Liechtenstein",
     "code": "LI",
+    "capital": "Vaduz",
+    "capitalAliases": [],
     "aliases": [
       "Principality of Liechtenstein"
     ],
@@ -883,6 +1079,8 @@ export const rawCountries = [
   {
     "name": "Lithuania",
     "code": "LT",
+    "capital": "Vilnius",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Lithuania"
     ],
@@ -892,6 +1090,8 @@ export const rawCountries = [
   {
     "name": "Luxembourg",
     "code": "LU",
+    "capital": "Luxembourg",
+    "capitalAliases": ["Luxembourg City"],
     "aliases": [
       "Grand Duchy of Luxembourg"
     ],
@@ -901,6 +1101,8 @@ export const rawCountries = [
   {
     "name": "Madagascar",
     "code": "MG",
+    "capital": "Antananarivo",
+    "capitalAliases": ["Tananarive"],
     "aliases": [
       "Republic of Madagascar"
     ],
@@ -910,6 +1112,8 @@ export const rawCountries = [
   {
     "name": "Malawi",
     "code": "MW",
+    "capital": "Lilongwe",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Malawi"
     ],
@@ -919,6 +1123,8 @@ export const rawCountries = [
   {
     "name": "Malaysia",
     "code": "MY",
+    "capital": "Kuala Lumpur",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Asia",
     "flagSrc": "assets/flags/my.svg"
@@ -926,6 +1132,8 @@ export const rawCountries = [
   {
     "name": "Maldives",
     "code": "MV",
+    "capital": "Malé",
+    "capitalAliases": ["Male"],
     "aliases": [
       "Republic of Maldives"
     ],
@@ -935,6 +1143,8 @@ export const rawCountries = [
   {
     "name": "Mali",
     "code": "ML",
+    "capital": "Bamako",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Mali"
     ],
@@ -944,6 +1154,8 @@ export const rawCountries = [
   {
     "name": "Malta",
     "code": "MT",
+    "capital": "Valletta",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Malta"
     ],
@@ -953,6 +1165,8 @@ export const rawCountries = [
   {
     "name": "Marshall Islands",
     "code": "MH",
+    "capital": "Majuro",
+    "capitalAliases": [],
     "aliases": [
       "Republic of the Marshall Islands"
     ],
@@ -962,6 +1176,8 @@ export const rawCountries = [
   {
     "name": "Mauritania",
     "code": "MR",
+    "capital": "Nouakchott",
+    "capitalAliases": [],
     "aliases": [
       "Islamic Republic of Mauritania"
     ],
@@ -971,6 +1187,8 @@ export const rawCountries = [
   {
     "name": "Mauritius",
     "code": "MU",
+    "capital": "Port Louis",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Mauritius"
     ],
@@ -980,6 +1198,8 @@ export const rawCountries = [
   {
     "name": "Mexico",
     "code": "MX",
+    "capital": "Mexico City",
+    "capitalAliases": ["Ciudad de México"],
     "aliases": [
       "United Mexican States"
     ],
@@ -989,6 +1209,8 @@ export const rawCountries = [
   {
     "name": "Micronesia",
     "code": "FM",
+    "capital": "Palikir",
+    "capitalAliases": [],
     "aliases": [
       "Federated States of Micronesia"
     ],
@@ -998,6 +1220,8 @@ export const rawCountries = [
   {
     "name": "Moldova",
     "code": "MD",
+    "capital": "Chișinău",
+    "capitalAliases": ["Chisinau","Kishinev"],
     "aliases": [
       "Republic of Moldova"
     ],
@@ -1007,6 +1231,8 @@ export const rawCountries = [
   {
     "name": "Monaco",
     "code": "MC",
+    "capital": "Monaco",
+    "capitalAliases": ["Monaco-Ville"],
     "aliases": [
       "Principality of Monaco"
     ],
@@ -1016,6 +1242,8 @@ export const rawCountries = [
   {
     "name": "Mongolia",
     "code": "MN",
+    "capital": "Ulaanbaatar",
+    "capitalAliases": ["Ulan Bator"],
     "aliases": [],
     "continent": "Asia",
     "flagSrc": "assets/flags/mn.svg"
@@ -1023,6 +1251,8 @@ export const rawCountries = [
   {
     "name": "Montenegro",
     "code": "ME",
+    "capital": "Podgorica",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Europe",
     "flagSrc": "assets/flags/me.svg"
@@ -1030,6 +1260,8 @@ export const rawCountries = [
   {
     "name": "Morocco",
     "code": "MA",
+    "capital": "Rabat",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Morocco"
     ],
@@ -1039,6 +1271,8 @@ export const rawCountries = [
   {
     "name": "Mozambique",
     "code": "MZ",
+    "capital": "Maputo",
+    "capitalAliases": ["Lourenço Marques"],
     "aliases": [
       "Republic of Mozambique"
     ],
@@ -1048,6 +1282,8 @@ export const rawCountries = [
   {
     "name": "Myanmar",
     "code": "MM",
+    "capital": "Naypyidaw",
+    "capitalAliases": ["Nay Pyi Taw"],
     "aliases": [
       "Burma",
       "Republic of the Union of Myanmar"
@@ -1058,6 +1294,8 @@ export const rawCountries = [
   {
     "name": "Namibia",
     "code": "NA",
+    "capital": "Windhoek",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Namibia"
     ],
@@ -1067,6 +1305,8 @@ export const rawCountries = [
   {
     "name": "Nauru",
     "code": "NR",
+    "capital": "Yaren",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Nauru"
     ],
@@ -1076,6 +1316,8 @@ export const rawCountries = [
   {
     "name": "Nepal",
     "code": "NP",
+    "capital": "Kathmandu",
+    "capitalAliases": ["Katmandu"],
     "aliases": [
       "Federal Democratic Republic of Nepal"
     ],
@@ -1085,6 +1327,8 @@ export const rawCountries = [
   {
     "name": "Netherlands",
     "code": "NL",
+    "capital": "Amsterdam",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of the Netherlands",
       "Holland"
@@ -1095,6 +1339,8 @@ export const rawCountries = [
   {
     "name": "New Zealand",
     "code": "NZ",
+    "capital": "Wellington",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Oceania",
     "flagSrc": "assets/flags/nz.svg"
@@ -1102,6 +1348,8 @@ export const rawCountries = [
   {
     "name": "Nicaragua",
     "code": "NI",
+    "capital": "Managua",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Nicaragua"
     ],
@@ -1111,6 +1359,8 @@ export const rawCountries = [
   {
     "name": "Niger",
     "code": "NE",
+    "capital": "Niamey",
+    "capitalAliases": [],
     "aliases": [
       "Republic of the Niger"
     ],
@@ -1120,6 +1370,8 @@ export const rawCountries = [
   {
     "name": "Nigeria",
     "code": "NG",
+    "capital": "Abuja",
+    "capitalAliases": [],
     "aliases": [
       "Federal Republic of Nigeria"
     ],
@@ -1129,6 +1381,8 @@ export const rawCountries = [
   {
     "name": "North Korea",
     "code": "KP",
+    "capital": "Pyongyang",
+    "capitalAliases": [],
     "aliases": [
       "Democratic People's Republic of Korea",
       "DPRK",
@@ -1140,6 +1394,8 @@ export const rawCountries = [
   {
     "name": "North Macedonia",
     "code": "MK",
+    "capital": "Skopje",
+    "capitalAliases": [],
     "aliases": [
       "Republic of North Macedonia",
       "Macedonia"
@@ -1150,6 +1406,8 @@ export const rawCountries = [
   {
     "name": "Norway",
     "code": "NO",
+    "capital": "Oslo",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Norway"
     ],
@@ -1159,6 +1417,8 @@ export const rawCountries = [
   {
     "name": "Oman",
     "code": "OM",
+    "capital": "Muscat",
+    "capitalAliases": ["Masqat"],
     "aliases": [
       "Sultanate of Oman"
     ],
@@ -1168,6 +1428,8 @@ export const rawCountries = [
   {
     "name": "Pakistan",
     "code": "PK",
+    "capital": "Islamabad",
+    "capitalAliases": [],
     "aliases": [
       "Islamic Republic of Pakistan"
     ],
@@ -1177,6 +1439,8 @@ export const rawCountries = [
   {
     "name": "Palau",
     "code": "PW",
+    "capital": "Ngerulmud",
+    "capitalAliases": ["Melekeok"],
     "aliases": [
       "Republic of Palau"
     ],
@@ -1186,6 +1450,8 @@ export const rawCountries = [
   {
     "name": "Panama",
     "code": "PA",
+    "capital": "Panama City",
+    "capitalAliases": ["Ciudad de Panamá"],
     "aliases": [
       "Republic of Panama"
     ],
@@ -1195,6 +1461,8 @@ export const rawCountries = [
   {
     "name": "Papua New Guinea",
     "code": "PG",
+    "capital": "Port Moresby",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Oceania",
     "flagSrc": "assets/flags/pg.svg"
@@ -1202,6 +1470,8 @@ export const rawCountries = [
   {
     "name": "Paraguay",
     "code": "PY",
+    "capital": "Asunción",
+    "capitalAliases": ["Asuncion"],
     "aliases": [
       "Republic of Paraguay"
     ],
@@ -1211,6 +1481,8 @@ export const rawCountries = [
   {
     "name": "Peru",
     "code": "PE",
+    "capital": "Lima",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Peru"
     ],
@@ -1220,6 +1492,8 @@ export const rawCountries = [
   {
     "name": "Philippines",
     "code": "PH",
+    "capital": "Manila",
+    "capitalAliases": [],
     "aliases": [
       "Republic of the Philippines"
     ],
@@ -1229,6 +1503,8 @@ export const rawCountries = [
   {
     "name": "Poland",
     "code": "PL",
+    "capital": "Warsaw",
+    "capitalAliases": ["Warszawa"],
     "aliases": [
       "Republic of Poland"
     ],
@@ -1238,6 +1514,8 @@ export const rawCountries = [
   {
     "name": "Portugal",
     "code": "PT",
+    "capital": "Lisbon",
+    "capitalAliases": ["Lisboa"],
     "aliases": [
       "Portuguese Republic"
     ],
@@ -1247,6 +1525,8 @@ export const rawCountries = [
   {
     "name": "Qatar",
     "code": "QA",
+    "capital": "Doha",
+    "capitalAliases": [],
     "aliases": [
       "State of Qatar"
     ],
@@ -1256,6 +1536,8 @@ export const rawCountries = [
   {
     "name": "Romania",
     "code": "RO",
+    "capital": "Bucharest",
+    "capitalAliases": ["București"],
     "aliases": [],
     "continent": "Europe",
     "flagSrc": "assets/flags/ro.svg"
@@ -1263,6 +1545,8 @@ export const rawCountries = [
   {
     "name": "Russia",
     "code": "RU",
+    "capital": "Moscow",
+    "capitalAliases": ["Moskva"],
     "aliases": [
       "Russian Federation"
     ],
@@ -1272,6 +1556,8 @@ export const rawCountries = [
   {
     "name": "Rwanda",
     "code": "RW",
+    "capital": "Kigali",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Rwanda"
     ],
@@ -1281,6 +1567,8 @@ export const rawCountries = [
   {
     "name": "Saint Kitts and Nevis",
     "code": "KN",
+    "capital": "Basseterre",
+    "capitalAliases": [],
     "aliases": [
       "St Kitts and Nevis",
       "St. Kitts and Nevis"
@@ -1291,6 +1579,8 @@ export const rawCountries = [
   {
     "name": "Saint Lucia",
     "code": "LC",
+    "capital": "Castries",
+    "capitalAliases": [],
     "aliases": [
       "St Lucia",
       "St. Lucia"
@@ -1301,6 +1591,8 @@ export const rawCountries = [
   {
     "name": "Saint Vincent and the Grenadines",
     "code": "VC",
+    "capital": "Kingstown",
+    "capitalAliases": [],
     "aliases": [
       "St Vincent and the Grenadines",
       "St. Vincent and the Grenadines"
@@ -1311,6 +1603,8 @@ export const rawCountries = [
   {
     "name": "Samoa",
     "code": "WS",
+    "capital": "Apia",
+    "capitalAliases": [],
     "aliases": [
       "Independent State of Samoa"
     ],
@@ -1320,6 +1614,8 @@ export const rawCountries = [
   {
     "name": "San Marino",
     "code": "SM",
+    "capital": "San Marino",
+    "capitalAliases": [],
     "aliases": [
       "Republic of San Marino"
     ],
@@ -1329,6 +1625,8 @@ export const rawCountries = [
   {
     "name": "Sao Tome and Principe",
     "code": "ST",
+    "capital": "São Tomé",
+    "capitalAliases": ["Sao Tome"],
     "aliases": [
       "São Tomé and Príncipe",
       "Sao Tome",
@@ -1340,6 +1638,8 @@ export const rawCountries = [
   {
     "name": "Saudi Arabia",
     "code": "SA",
+    "capital": "Riyadh",
+    "capitalAliases": ["Ar-Riyāḍ"],
     "aliases": [
       "Kingdom of Saudi Arabia"
     ],
@@ -1349,6 +1649,8 @@ export const rawCountries = [
   {
     "name": "Senegal",
     "code": "SN",
+    "capital": "Dakar",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Senegal"
     ],
@@ -1358,6 +1660,8 @@ export const rawCountries = [
   {
     "name": "Serbia",
     "code": "RS",
+    "capital": "Belgrade",
+    "capitalAliases": ["Beograd"],
     "aliases": [
       "Republic of Serbia"
     ],
@@ -1367,6 +1671,8 @@ export const rawCountries = [
   {
     "name": "Seychelles",
     "code": "SC",
+    "capital": "Victoria",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Seychelles"
     ],
@@ -1376,6 +1682,8 @@ export const rawCountries = [
   {
     "name": "Sierra Leone",
     "code": "SL",
+    "capital": "Freetown",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Sierra Leone"
     ],
@@ -1385,6 +1693,8 @@ export const rawCountries = [
   {
     "name": "Singapore",
     "code": "SG",
+    "capital": "Singapore",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Singapore"
     ],
@@ -1394,6 +1704,8 @@ export const rawCountries = [
   {
     "name": "Slovakia",
     "code": "SK",
+    "capital": "Bratislava",
+    "capitalAliases": [],
     "aliases": [
       "Slovak Republic"
     ],
@@ -1403,6 +1715,8 @@ export const rawCountries = [
   {
     "name": "Slovenia",
     "code": "SI",
+    "capital": "Ljubljana",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Slovenia"
     ],
@@ -1412,6 +1726,8 @@ export const rawCountries = [
   {
     "name": "Solomon Islands",
     "code": "SB",
+    "capital": "Honiara",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Oceania",
     "flagSrc": "assets/flags/sb.svg"
@@ -1419,6 +1735,8 @@ export const rawCountries = [
   {
     "name": "Somalia",
     "code": "SO",
+    "capital": "Mogadishu",
+    "capitalAliases": ["Muqdisho"],
     "aliases": [
       "Federal Republic of Somalia"
     ],
@@ -1428,6 +1746,8 @@ export const rawCountries = [
   {
     "name": "South Africa",
     "code": "ZA",
+    "capital": "Pretoria",
+    "capitalAliases": ["Tshwane","Cape Town","Bloemfontein"],
     "aliases": [
       "Republic of South Africa"
     ],
@@ -1437,6 +1757,8 @@ export const rawCountries = [
   {
     "name": "South Korea",
     "code": "KR",
+    "capital": "Seoul",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Korea",
       "Korea",
@@ -1448,6 +1770,8 @@ export const rawCountries = [
   {
     "name": "South Sudan",
     "code": "SS",
+    "capital": "Juba",
+    "capitalAliases": [],
     "aliases": [
       "Republic of South Sudan"
     ],
@@ -1457,6 +1781,8 @@ export const rawCountries = [
   {
     "name": "Spain",
     "code": "ES",
+    "capital": "Madrid",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Spain"
     ],
@@ -1466,6 +1792,8 @@ export const rawCountries = [
   {
     "name": "Sri Lanka",
     "code": "LK",
+    "capital": "Sri Jayawardenepura Kotte",
+    "capitalAliases": ["Colombo","Kotte"],
     "aliases": [
       "Democratic Socialist Republic of Sri Lanka"
     ],
@@ -1475,6 +1803,8 @@ export const rawCountries = [
   {
     "name": "Sudan",
     "code": "SD",
+    "capital": "Khartoum",
+    "capitalAliases": [],
     "aliases": [
       "Republic of the Sudan"
     ],
@@ -1484,6 +1814,8 @@ export const rawCountries = [
   {
     "name": "Suriname",
     "code": "SR",
+    "capital": "Paramaribo",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Suriname"
     ],
@@ -1493,6 +1825,8 @@ export const rawCountries = [
   {
     "name": "Sweden",
     "code": "SE",
+    "capital": "Stockholm",
+    "capitalAliases": [],
     "aliases": [
       "Kingdom of Sweden"
     ],
@@ -1502,6 +1836,8 @@ export const rawCountries = [
   {
     "name": "Switzerland",
     "code": "CH",
+    "capital": "Bern",
+    "capitalAliases": ["Berne"],
     "aliases": [
       "Swiss Confederation"
     ],
@@ -1511,6 +1847,8 @@ export const rawCountries = [
   {
     "name": "Syria",
     "code": "SY",
+    "capital": "Damascus",
+    "capitalAliases": ["Dimashq"],
     "aliases": [
       "Syrian Arab Republic"
     ],
@@ -1520,6 +1858,8 @@ export const rawCountries = [
   {
     "name": "Tajikistan",
     "code": "TJ",
+    "capital": "Dushanbe",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Tajikistan"
     ],
@@ -1529,6 +1869,8 @@ export const rawCountries = [
   {
     "name": "Tanzania",
     "code": "TZ",
+    "capital": "Dodoma",
+    "capitalAliases": [],
     "aliases": [
       "United Republic of Tanzania"
     ],
@@ -1538,6 +1880,8 @@ export const rawCountries = [
   {
     "name": "Thailand",
     "code": "TH",
+    "capital": "Bangkok",
+    "capitalAliases": ["Krung Thep"],
     "aliases": [
       "Kingdom of Thailand"
     ],
@@ -1547,6 +1891,8 @@ export const rawCountries = [
   {
     "name": "Timor-Leste",
     "code": "TL",
+    "capital": "Dili",
+    "capitalAliases": [],
     "aliases": [
       "East Timor",
       "Democratic Republic of Timor-Leste"
@@ -1557,6 +1903,8 @@ export const rawCountries = [
   {
     "name": "Togo",
     "code": "TG",
+    "capital": "Lomé",
+    "capitalAliases": ["Lome"],
     "aliases": [
       "Togolese Republic"
     ],
@@ -1566,6 +1914,8 @@ export const rawCountries = [
   {
     "name": "Tonga",
     "code": "TO",
+    "capital": "Nuku'alofa",
+    "capitalAliases": ["Nukualofa"],
     "aliases": [
       "Kingdom of Tonga"
     ],
@@ -1575,6 +1925,8 @@ export const rawCountries = [
   {
     "name": "Trinidad and Tobago",
     "code": "TT",
+    "capital": "Port of Spain",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "North America",
     "flagSrc": "assets/flags/tt.svg"
@@ -1582,6 +1934,8 @@ export const rawCountries = [
   {
     "name": "Tunisia",
     "code": "TN",
+    "capital": "Tunis",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Tunisia"
     ],
@@ -1591,6 +1945,8 @@ export const rawCountries = [
   {
     "name": "Turkiye",
     "code": "TR",
+    "capital": "Ankara",
+    "capitalAliases": [],
     "aliases": [
       "Turkey",
       "Türkiye",
@@ -1602,6 +1958,8 @@ export const rawCountries = [
   {
     "name": "Turkmenistan",
     "code": "TM",
+    "capital": "Ashgabat",
+    "capitalAliases": ["Ashkhabad"],
     "aliases": [],
     "continent": "Asia",
     "flagSrc": "assets/flags/tm.svg"
@@ -1609,6 +1967,8 @@ export const rawCountries = [
   {
     "name": "Tuvalu",
     "code": "TV",
+    "capital": "Funafuti",
+    "capitalAliases": [],
     "aliases": [],
     "continent": "Oceania",
     "flagSrc": "assets/flags/tv.svg"
@@ -1616,6 +1976,8 @@ export const rawCountries = [
   {
     "name": "Uganda",
     "code": "UG",
+    "capital": "Kampala",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Uganda"
     ],
@@ -1625,6 +1987,8 @@ export const rawCountries = [
   {
     "name": "Ukraine",
     "code": "UA",
+    "capital": "Kyiv",
+    "capitalAliases": ["Kiev"],
     "aliases": [],
     "continent": "Europe",
     "flagSrc": "assets/flags/ua.svg"
@@ -1632,6 +1996,8 @@ export const rawCountries = [
   {
     "name": "United Arab Emirates",
     "code": "AE",
+    "capital": "Abu Dhabi",
+    "capitalAliases": [],
     "aliases": [
       "UAE"
     ],
@@ -1641,6 +2007,8 @@ export const rawCountries = [
   {
     "name": "United Kingdom",
     "code": "GB",
+    "capital": "London",
+    "capitalAliases": [],
     "aliases": [
       "UK",
       "Great Britain",
@@ -1653,6 +2021,8 @@ export const rawCountries = [
   {
     "name": "United States",
     "code": "US",
+    "capital": "Washington D.C.",
+    "capitalAliases": ["Washington","Washington DC"],
     "aliases": [
       "USA",
       "US",
@@ -1666,6 +2036,8 @@ export const rawCountries = [
   {
     "name": "Uruguay",
     "code": "UY",
+    "capital": "Montevideo",
+    "capitalAliases": [],
     "aliases": [
       "Oriental Republic of Uruguay"
     ],
@@ -1675,6 +2047,8 @@ export const rawCountries = [
   {
     "name": "Uzbekistan",
     "code": "UZ",
+    "capital": "Tashkent",
+    "capitalAliases": ["Toshkent"],
     "aliases": [
       "Republic of Uzbekistan"
     ],
@@ -1684,6 +2058,8 @@ export const rawCountries = [
   {
     "name": "Vanuatu",
     "code": "VU",
+    "capital": "Port Vila",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Vanuatu"
     ],
@@ -1693,6 +2069,8 @@ export const rawCountries = [
   {
     "name": "Venezuela",
     "code": "VE",
+    "capital": "Caracas",
+    "capitalAliases": [],
     "aliases": [
       "Bolivarian Republic of Venezuela",
       "Venezuela (Bolivarian Republic of)"
@@ -1703,6 +2081,8 @@ export const rawCountries = [
   {
     "name": "Vietnam",
     "code": "VN",
+    "capital": "Hanoi",
+    "capitalAliases": ["Ha Noi"],
     "aliases": [
       "Viet Nam",
       "Socialist Republic of Viet Nam"
@@ -1713,6 +2093,8 @@ export const rawCountries = [
   {
     "name": "Yemen",
     "code": "YE",
+    "capital": "Sana'a",
+    "capitalAliases": ["Sanaa"],
     "aliases": [
       "Republic of Yemen"
     ],
@@ -1722,6 +2104,8 @@ export const rawCountries = [
   {
     "name": "Zambia",
     "code": "ZM",
+    "capital": "Lusaka",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Zambia"
     ],
@@ -1731,6 +2115,8 @@ export const rawCountries = [
   {
     "name": "Zimbabwe",
     "code": "ZW",
+    "capital": "Harare",
+    "capitalAliases": [],
     "aliases": [
       "Republic of Zimbabwe"
     ],
@@ -1740,6 +2126,8 @@ export const rawCountries = [
   {
     "name": "Holy See",
     "code": "VA",
+    "capital": "Vatican City",
+    "capitalAliases": ["Holy See"],
     "aliases": [
       "Vatican",
       "Vatican City",
@@ -1751,6 +2139,8 @@ export const rawCountries = [
   {
     "name": "Palestine",
     "code": "PS",
+    "capital": "Ramallah",
+    "capitalAliases": [],
     "aliases": [
       "State of Palestine",
       "Palestinian State"
@@ -1761,6 +2151,8 @@ export const rawCountries = [
   {
     "name": "Taiwan",
     "code": "TW",
+    "capital": "Taipei",
+    "capitalAliases": [],
     "aliases": [
       "Republic of China",
       "Chinese Taipei"

@@ -1,17 +1,22 @@
 import type { CountryIndex } from "../countries";
 import { createSeededRandom } from "../game/random";
-import { codesCategory, flagsCategory, shapesCategory } from "./builtins";
+import { capitalsCategory, codesCategory, flagsCategory, pickCountryCategory, shapesCategory, spotCountryCategory } from "./builtins";
 import type { PromptCategory, PromptSlot } from "./types";
 
 export const promptCategories = {
   flags: flagsCategory,
   shapes: shapesCategory,
   codes: codesCategory,
+  capitals: capitalsCategory,
+  "pick-country": pickCountryCategory,
+  "spot-country": spotCountryCategory,
 } as const;
 
 export type CategoryId = keyof typeof promptCategories;
 
-export const allCategories: readonly PromptCategory[] = Object.values(promptCategories);
+export const soloPromptCategories: readonly PromptCategory[] = [flagsCategory, shapesCategory, codesCategory, capitalsCategory];
+export const multiplayerPromptCategories: readonly PromptCategory[] = Object.values(promptCategories);
+export const allCategories: readonly PromptCategory[] = soloPromptCategories;
 
 export const DEFAULT_CATEGORY_IDS: readonly string[] = ["flags"];
 

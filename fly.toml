@@ -1,5 +1,5 @@
 app = "locato"
-primary_region = "ams"
+primary_region = "jnb"
 
 [env]
   NODE_ENV = "production"
@@ -7,6 +7,14 @@ primary_region = "ams"
   MAX_PLAYERS_PER_ROOM = "8"
   MAX_ROOMS = "500"
   ANSWER_RATE_LIMIT_PER_SECOND = "5"
+  DATABASE_PATH = "/data/locato.db"
+  # BASE_URL is set as a Fly secret (not here) since it contains the domain name.
+
+# Persistent SQLite for user accounts. Create before first deploy:
+# fly volumes create data -a locato --size 1 --region jnb
+[mounts]
+  source = "data"
+  destination = "/data"
 
 [http_service]
   internal_port = 3000

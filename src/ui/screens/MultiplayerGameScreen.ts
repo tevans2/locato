@@ -1,6 +1,10 @@
 import type { FinalResult, PlayerId, PublicRoomState, PublicRoundState, RoundResult } from "../../core/multiplayer";
+import type { CountryIndex } from "../../core/countries";
+import type { WorldCountryFeature } from "../../core/map";
+import { getPlayerEmoji } from "../../core/auth/avatars";
 import { el } from "../dom/createElement";
 import { promptImageClass } from "../dom/renderPrompt";
+import { createWorldMapView, setWorldMapTargetCountry } from "../dom/renderWorldMap";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -20,6 +24,12 @@ export interface MultiplayerGameView {
   readonly destroy: () => void;
 }
 
+export interface MultiplayerGameViewOptions {
+  readonly countryIndex: CountryIndex;
+  readonly worldCountryFeatures: readonly WorldCountryFeature[];
+  readonly onSubmit: (answer: string) => void;
+}
+
 function formatScore(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
 }
@@ -29,17 +39,19 @@ function sortPlayers(room: PublicRoomState) {
 }
 
 function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null): readonly HTMLElement[] {
-  return sortPlayers(room).map((player, index) =>
-    el("li", {
+  return sortPlayers(room).map((player, index) => {
+    const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
+    return el("li", {
       className: player.id === localPlayerId ? "score-row is-local" : "score-row",
       children: [
         el("span", { className: "score-rank", text: `#${index + 1}` }),
+        el("span", { className: "player-emoji score-emoji", text: emoji, attrs: { "aria-hidden": "true" } }),
         el("span", { className: "score-name", text: `${player.name}${player.connected ? "" : " · offline"}` }),
         el("span", { className: "score-value", text: formatScore(player.score) }),
         el("span", { className: "score-meta", text: `${player.correctAnswers} correct · ${player.streak} streak` }),
       ],
-    }),
-  );
+    });
+  });
 }
 
 function createResultRows(results: readonly RoundResult[]): readonly HTMLElement[] {
@@ -60,7 +72,7 @@ function createFinalRows(results: readonly FinalResult[]): readonly HTMLElement[
   );
 }
 
-export function createMultiplayerGameView(onSubmit: (answer: string) => void): MultiplayerGameView {
+export function createMultiplayerGameView(options: MultiplayerGameViewOptions): MultiplayerGameView {
   const flagSlot = el("div", { className: "multiplayer-flag-slot" });
   const roundKicker = el("p", { className: "round-kicker", text: "Waiting for the next round" });
   const timerFill = el("div", { className: "multiplayer-timer-fill" });
@@ -77,6 +89,28 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     className: "guess-form multiplayer-answer-form",
     children: [el("label", { text: "Your answer" }), el("div", { className: "input-row", children: [answerInput, submitButton] })],
   });
+  const mapTargetName = el("strong", { className: "multiplayer-map-target-name", text: "—" });
+  const mapTarget = el("div", {
+    className: "multiplayer-map-target",
+    children: [el("span", { text: "Pick this country" }), mapTargetName],
+  });
+  let allowMapClickSubmit = false;
+  const mapView = createWorldMapView(options.worldCountryFeatures, options.countryIndex, {
+    onCountryClick: (countryId) => {
+      if (!allowMapClickSubmit) return;
+      const country = options.countryIndex.byId[countryId];
+      if (!country || answerInput.disabled) return;
+      options.onSubmit(country.code);
+    },
+  });
+  mapView.element.classList.add("multiplayer-map-panel");
+  const mapPrompt = el("div", { className: "multiplayer-map-prompt", children: [mapTarget] });
+  const mapHighlightLabel = el("p", { className: "multiplayer-map-highlight-label", text: "Name the highlighted country" });
+  const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt", children: [mapHighlightLabel] });
+
+  function attachMapTo(container: HTMLElement): void {
+    if (mapView.element.parentElement !== container) container.append(mapView.element);
+  }
 
   let renderedRoundKey: string | null = null;
   let focusedRoundKey: string | null = null;
@@ -120,7 +154,7 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     event.preventDefault();
     const answer = answerInput.value.trim();
     if (!answer) return;
-    onSubmit(answer);
+    options.onSubmit(answer);
     answerInput.value = "";
   });
 
@@ -154,9 +188,12 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
     update: (state) => {
       const visibleRound = state.round ?? state.room.round;
       const roundKey = visibleRound ? `${state.room.roomCode}:${visibleRound.roundNumber}:${visibleRound.startedAt}:${visibleRound.prompt.kind}:${visibleRound.prompt.value}` : null;
+      const isMapClickRound = visibleRound?.prompt.kind === "map-click";
+      const isMapHighlightRound = visibleRound?.prompt.kind === "map-highlight";
       const isNewRound = roundKey !== null && roundKey !== renderedRoundKey;
       if (isNewRound) answerInput.value = "";
       renderedRoundKey = roundKey;
+      allowMapClickSubmit = isMapClickRound && state.canSubmit;
 
       const intermission = state.room.status === "round-result";
       roundKicker.textContent = state.room.status === "complete"
@@ -166,26 +203,41 @@ export function createMultiplayerGameView(onSubmit: (answer: string) => void): M
           : visibleRound
             ? `Round ${visibleRound.roundNumber}`
             : "Waiting for the next round";
-      roundTitle.textContent = state.room.status === "complete" ? "Game complete" : "Your answer";
+      roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : "Your answer";
       feedback.textContent = state.feedback;
       answerInput.disabled = !state.canSubmit;
       submitButton.disabled = !state.canSubmit;
+      answerForm.hidden = isMapClickRound;
+      mapView.element.classList.toggle("is-disabled", !state.canSubmit);
       // Focus the first time a round becomes submittable, not on round identity alone: the
       // ROUND_STARTED/GAME_STARTED frame arrives while status is still round-result/lobby
       // (canSubmit false), and the playing snapshot follows separately. Keying focus off
       // canSubmit handles that split, and once-per-round avoids stealing the caret mid-type.
-      if (state.canSubmit && roundKey !== null && roundKey !== focusedRoundKey) {
+      if (state.canSubmit && !isMapClickRound && roundKey !== null && roundKey !== focusedRoundKey) {
         answerInput.focus();
         focusedRoundKey = roundKey;
       }
 
       if (visibleRound) {
-        flagSlot.replaceChildren(
-          visibleRound.prompt.kind === "image"
-            ? el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } })
-            : el("div", { className: "prompt-text", text: visibleRound.prompt.value }),
-        );
+        if (visibleRound.prompt.kind === "image") {
+          setWorldMapTargetCountry(mapView, null);
+          flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
+        } else if (visibleRound.prompt.kind === "map-click") {
+          setWorldMapTargetCountry(mapView, null);
+          mapTargetName.textContent = visibleRound.prompt.value;
+          attachMapTo(mapPrompt);
+          flagSlot.replaceChildren(mapPrompt);
+        } else if (visibleRound.prompt.kind === "map-highlight") {
+          const country = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase());
+          setWorldMapTargetCountry(mapView, country?.id ?? null);
+          attachMapTo(mapHighlightPrompt);
+          flagSlot.replaceChildren(mapHighlightPrompt);
+        } else {
+          setWorldMapTargetCountry(mapView, null);
+          flagSlot.replaceChildren(el("div", { className: "prompt-text", text: visibleRound.prompt.value }));
+        }
       } else {
+        setWorldMapTargetCountry(mapView, null);
         flagSlot.replaceChildren(el("div", { className: "complete-card", text: "The server will reveal the next prompt when the room starts." }));
       }
 

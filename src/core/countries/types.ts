@@ -18,6 +18,8 @@ export interface RawCountry {
   readonly aliases: readonly string[];
   readonly continent: Continent;
   readonly flagSrc: string;
+  readonly capital: string;
+  readonly capitalAliases: readonly string[];
 }
 
 export interface Country {
@@ -29,7 +31,10 @@ export interface Country {
   readonly flagSrc: string;
   readonly normalizedName: string;
   readonly acceptedAnswers: readonly string[];
+  readonly capital: string;
+  readonly capitalAliases: readonly string[];
 }
+
 
 export interface CountryIndex {
   readonly countries: readonly Country[];

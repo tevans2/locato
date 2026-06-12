@@ -36,12 +36,19 @@
     gap: 10px;
   }
 
+  .game-header-left,
+  .game-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
   .mode-controls {
     width: 100%;
     justify-items: stretch;
   }
 
-  .category-dropdown {
+  .category-dropdown,
+  .game-mode-dropdown {
     width: 100%;
   }
 
@@ -167,6 +174,10 @@
     min-height: clamp(200px, 36dvh, 300px);
   }
 
+  .multiplayer-map-prompt {
+    min-height: clamp(330px, 58dvh, 480px);
+  }
+
   .multiplayer-modal {
     width: 100%;
     max-height: 88dvh;
@@ -204,5 +215,26 @@
 @media (max-width: 700px) {
   .country-guess-category-dropdown {
     justify-self: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .puzzle-map-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .puzzle-piece-tray {
+    max-height: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .puzzle-board-svg {
+    min-height: clamp(300px, 50dvh, 440px);
+  }
+
+  .puzzle-piece-tray {
+    grid-template-columns: 1fr;
   }
 }

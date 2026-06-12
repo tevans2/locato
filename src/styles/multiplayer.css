@@ -61,7 +61,7 @@
 }
 
 .multiplayer-form-grid > input:first-child,
-.multiplayer-form-grid .category-dropdown {
+.multiplayer-form-grid > .category-dropdown {
   grid-column: 1 / -1;
 }
 
@@ -128,7 +128,7 @@
 }
 
 .player-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .player-row.is-local,
@@ -144,6 +144,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 760;
+}
+
+.player-emoji,
+.score-emoji {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .player-status,
@@ -213,6 +220,66 @@
   color: var(--accent);
   font-size: clamp(1.15rem, 2.4vw, 1.8rem);
   line-height: 1.18;
+  text-align: center;
+}
+
+.multiplayer-map-prompt {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.multiplayer-map-target {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  text-align: center;
+}
+
+.multiplayer-map-target span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.multiplayer-map-target-name {
+  min-width: 0;
+  color: var(--accent);
+  font-size: clamp(1.35rem, 3vw, 2.4rem);
+  line-height: 1;
+}
+
+.multiplayer-map-panel {
+  min-height: 0;
+  height: 100%;
+}
+
+.multiplayer-map-panel .world-map-svg {
+  min-height: 0;
+  height: 100%;
+}
+
+.multiplayer-map-panel .world-map-meta {
+  display: none;
+}
+
+.multiplayer-map-panel.is-disabled .world-map-svg {
+  pointer-events: none;
+}
+
+.multiplayer-map-highlight-prompt {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.multiplayer-map-highlight-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
   text-align: center;
 }
 
@@ -286,11 +353,11 @@
 }
 
 .score-row {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
 }
 
 .score-meta {
-  grid-column: 2 / -1;
+  grid-column: 3 / -1;
 }
 
 .score-value {
@@ -331,6 +398,14 @@
     min-height: 260px;
   }
 
+  .multiplayer-map-prompt {
+    min-height: 360px;
+  }
+
+  .multiplayer-flag-slot .flag-image {
+    max-height: 240px;
+  }
+
   .multiplayer-round-panel,
   .multiplayer-score-panel {
     overflow: visible;
@@ -354,11 +429,15 @@
 
   .player-row,
   .score-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .score-meta {
-    grid-column: auto;
+    grid-column: 2 / -1;
+  }
+
+  .score-meta {
+    grid-column: 2 / -1;
   }
 }
 
