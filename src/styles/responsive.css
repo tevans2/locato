@@ -1,3 +1,30 @@
+
+@media (max-width: 980px) {
+  .app-shell { width: min(100% - 24px, 940px); }
+
+  .play-layout,
+  .country-guess-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .answer-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .world-map-svg {
+    min-height: clamp(300px, calc(100dvh - 310px), 620px);
+  }
+
+  .puzzle-board-svg {
+    min-height: clamp(320px, calc(100dvh - 310px), 620px);
+  }
+
+  .puzzle-piece-tray {
+    max-height: clamp(320px, calc(100dvh - 310px), 620px);
+  }
+}
 @media (max-width: 1080px) {
   .app-shell { width: min(100% - 24px, 940px); }
   .stats-panel { grid-template-columns: repeat(5, auto); }
@@ -71,6 +98,7 @@
   .country-guess-layout {
     min-height: 0;
     display: grid;
+    grid-template-columns: 1fr;
     grid-template-rows: auto auto;
   }
 
