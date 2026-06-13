@@ -119,6 +119,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   const flagColorReveal = createFlagColorRevealView();
   let activeFlagColorRoundKey: string | null = null;
   let activeFlagColorPromptSrc: string | null = null;
+  let focusedMapHighlightRoundKey: string | null = null;
+  let resetMapHighlightRoundKey: string | null = null;
 
   function attachMapTo(container: HTMLElement): void {
     if (mapView.element.parentElement !== container) container.append(mapView.element);
@@ -240,6 +242,10 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           activeFlagColorRoundKey = null;
           activeFlagColorPromptSrc = null;
         }
+        if (!isMapHighlightRound) {
+          focusedMapHighlightRoundKey = null;
+          resetMapHighlightRoundKey = null;
+        }
         if (visibleRound.prompt.kind === "image") {
           setWorldMapTargetCountry(mapView, null);
           flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
@@ -250,7 +256,22 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           flagSlot.replaceChildren(mapPrompt);
         } else if (visibleRound.prompt.kind === "map-highlight") {
           const country = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase());
-          setWorldMapTargetCountry(mapView, country?.id ?? null);
+          const countryId = country?.id ?? null;
+          if (intermission) {
+            setWorldMapTargetCountry(mapView, null);
+            if (roundKey !== null && resetMapHighlightRoundKey !== roundKey) {
+              resetMapHighlightRoundKey = roundKey;
+              focusedMapHighlightRoundKey = null;
+              mapView.resetView();
+            }
+          } else {
+            setWorldMapTargetCountry(mapView, countryId);
+            if (countryId !== null && roundKey !== null && focusedMapHighlightRoundKey !== roundKey) {
+              focusedMapHighlightRoundKey = roundKey;
+              resetMapHighlightRoundKey = null;
+              mapView.focusCountry(countryId);
+            }
+          }
           attachMapTo(mapHighlightPrompt);
           flagSlot.replaceChildren(mapHighlightPrompt);
         } else if (visibleRound.prompt.kind === "flag-colors") {
