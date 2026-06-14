@@ -17,6 +17,10 @@
     min-height: clamp(300px, calc(100dvh - 310px), 620px);
   }
 
+  .world-globe-panel {
+    min-height: clamp(300px, calc(100dvh - 310px), 620px);
+  }
+
   .puzzle-board-svg {
     min-height: clamp(320px, calc(100dvh - 310px), 620px);
   }
@@ -107,6 +111,10 @@
   }
 
   .world-map-svg {
+    min-height: clamp(260px, 48dvh, 430px);
+  }
+
+  .world-globe-panel {
     min-height: clamp(260px, 48dvh, 430px);
   }
 

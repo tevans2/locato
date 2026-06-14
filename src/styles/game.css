@@ -732,16 +732,17 @@
 }
 
 .world-map-country.is-review-missed {
-  fill: rgba(187, 130, 86, 0.62);
-  stroke: rgba(255, 226, 189, 0.86);
+  fill: rgba(237, 74, 67, 0.72);
+  stroke: rgba(255, 220, 209, 0.9);
   stroke-width: 0.9;
+  cursor: pointer;
 }
 
 .world-map-country.is-review-active {
-  fill: rgba(184, 227, 109, 0.82);
-  stroke: rgba(245, 244, 206, 0.95);
+  fill: rgba(255, 102, 87, 0.9);
+  stroke: rgba(255, 238, 232, 0.98);
   stroke-width: 1.18;
-  filter: drop-shadow(0 0 10px rgba(184, 227, 109, 0.55));
+  filter: drop-shadow(0 0 10px rgba(237, 74, 67, 0.62));
 }
 
 @keyframes country-flash {
@@ -787,12 +788,33 @@
 
 .world-map-missing-dot.is-review-missed {
   opacity: 0.96;
-  fill: var(--earth);
+  fill: var(--bad);
 }
 
 .world-map-missing-dot.is-review-active {
   opacity: 1;
-  fill: var(--accent);
+  fill: #ffded5;
+}
+
+.world-map-country-label {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 3;
+  max-width: min(320px, calc(100% - 24px));
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 220, 209, 0.34);
+  border-radius: var(--radius-sm);
+  background: rgba(9, 13, 10, 0.78);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 820;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 
 .world-map-meta {
@@ -962,6 +984,35 @@
 
 .world-map-panel.is-click-country-mode .world-map-country.is-guessed:hover {
   fill: rgba(184, 227, 109, 0.74);
+}
+
+.world-globe-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(232, 226, 211, 0.03) 1px, transparent 1px) 0 0 / 70px 70px,
+    linear-gradient(90deg, rgba(232, 226, 211, 0.022) 1px, transparent 1px) 0 0 / 70px 70px,
+    radial-gradient(circle at 50% 44%, rgba(184, 227, 109, 0.1), transparent 54%),
+    #090d0a;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.world-globe-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.world-globe-panel.is-click-country-mode .world-globe-canvas {
+  cursor: crosshair;
 }
 
 .country-click-prompt {

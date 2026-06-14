@@ -57,6 +57,7 @@ export interface WorldMapView {
   readonly missingDotByCountryId: ReadonlyMap<CountryId, SVGCircleElement>;
   readonly focusCountry: (countryId: CountryId, options?: { readonly animate?: boolean }) => void;
   readonly resetView: (options?: { readonly animate?: boolean }) => void;
+  readonly showCountryLabel: (countryId: CountryId | null) => void;
 }
 
 function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVGElementTagNameMap[K] {
@@ -330,6 +331,9 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   highlightedCount.textContent = "0";
   const remainingCount = document.createElement("strong");
   remainingCount.textContent = String(countryIndex.countries.length);
+  const countryLabel = document.createElement("div");
+  countryLabel.className = "world-map-country-label";
+  countryLabel.hidden = true;
 
   const zoomInButton = createButton("+", "Zoom in");
   const zoomOutButton = createButton("−", "Zoom out");
@@ -401,6 +405,12 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   function resetView(options: { readonly animate?: boolean } = {}): void {
     moveToViewBox(DEFAULT_VIEWBOX, options.animate ?? true);
+  }
+
+  function showCountryLabel(countryId: CountryId | null): void {
+    const country = countryId === null ? null : countryIndex.byId[countryId] ?? null;
+    countryLabel.hidden = country === null;
+    countryLabel.textContent = country ? country.name : "";
   }
 
   function applyPendingWheelZoom(): void {
@@ -487,6 +497,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   element.append(
     svg,
     controls,
+    countryLabel,
     document.createElement("div"),
   );
   const meta = element.lastElementChild as HTMLElement;
@@ -498,7 +509,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   meta.children[0]!.append("Found ", highlightedCount);
   meta.children[1]!.append("Left ", remainingCount);
 
-  return { element, highlightedCount, remainingCount, pathByCountryId, missingDotByCountryId, focusCountry, resetView };
+  return { element, highlightedCount, remainingCount, pathByCountryId, missingDotByCountryId, focusCountry, resetView, showCountryLabel };
 }
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {
