@@ -5,6 +5,10 @@ export const MAX_CLIENT_MESSAGE_BYTES = 2048;
 export const MAX_PLAYER_NAME_LENGTH = 32;
 export const MAX_ROOM_CODE_LENGTH = 12;
 export const MAX_ANSWER_LENGTH = 80;
+export const MIN_ROOM_ROUND_LIMIT = 3;
+export const MAX_ROOM_ROUND_LIMIT = 20;
+export const MIN_ROOM_ROUND_DURATION_MS = 10_000;
+export const MAX_ROOM_ROUND_DURATION_MS = 90_000;
 
 export type MessageParseResult<T> =
   | { readonly ok: true; readonly message: T }
@@ -28,6 +32,13 @@ function isBoolean(value: unknown): value is boolean {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function clampInteger(value: unknown, min: number, max: number): number | null {
+  if (value === undefined) return null;
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  if (value < min || value > max) return null;
+  return value;
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: readonly string[]): boolean {
@@ -56,7 +67,7 @@ function isCategoryIdList(value: unknown): value is readonly string[] {
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors") && typeof value.value === "string";
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
@@ -66,7 +77,20 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
     case "CREATE_ROOM": {
       if (!isNonEmptyString(value.playerName, MAX_PLAYER_NAME_LENGTH)) return reject("invalid-player-name", "Player name is required.");
       if (!isCategoryIdList(value.categoryIds)) return reject("invalid-category", "At least one category is required.");
-      return { ok: true, message: { type: "CREATE_ROOM", playerName: normalizePlayerName(value.playerName), categoryIds: value.categoryIds.map((id) => id.trim()) } };
+      const roundLimit = clampInteger(value.roundLimit, MIN_ROOM_ROUND_LIMIT, MAX_ROOM_ROUND_LIMIT);
+      const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
+      if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
+      if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
+      return {
+        ok: true,
+        message: {
+          type: "CREATE_ROOM",
+          playerName: normalizePlayerName(value.playerName),
+          categoryIds: value.categoryIds.map((id) => id.trim()),
+          ...(roundLimit !== null ? { roundLimit } : {}),
+          ...(roundDurationMs !== null ? { roundDurationMs } : {}),
+        },
+      };
     }
     case "JOIN_ROOM": {
       if (!isNonEmptyString(value.roomCode, MAX_ROOM_CODE_LENGTH)) return reject("invalid-room-code", "Room code is required.");
@@ -130,6 +154,9 @@ function isRoom(value: unknown): value is PublicRoomState {
     typeof value.roomCode === "string" &&
     typeof value.hostPlayerId === "string" &&
     isCategoryIdList(value.categoryIds) &&
+    isRecord(value.settings) &&
+    isFiniteNumber(value.settings.roundLimit) &&
+    isFiniteNumber(value.settings.roundDurationMs) &&
     (value.status === "lobby" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&
@@ -140,7 +167,15 @@ function isRoom(value: unknown): value is PublicRoomState {
 }
 
 function isRoundResult(value: unknown): value is RoundResult {
-  return isRecord(value) && typeof value.playerId === "string" && typeof value.name === "string" && typeof value.correct === "boolean" && isFiniteNumber(value.points) && (value.answeredAt === null || isFiniteNumber(value.answeredAt));
+  return (
+    isRecord(value) &&
+    typeof value.playerId === "string" &&
+    typeof value.name === "string" &&
+    typeof value.correct === "boolean" &&
+    isFiniteNumber(value.points) &&
+    (value.answeredAt === null || isFiniteNumber(value.answeredAt)) &&
+    (value.guess === null || typeof value.guess === "string")
+  );
 }
 
 function isFinalResult(value: unknown): value is FinalResult {

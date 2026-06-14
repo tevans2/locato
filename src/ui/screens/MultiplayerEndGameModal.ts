@@ -40,7 +40,7 @@ function leaderboardRows(state: EndGameModalState): readonly HTMLElement[] {
 export function createEndGameModal(callbacks: EndGameModalCallbacks): EndGameModal {
   const headline = el("h2", { className: "modal-headline", text: "Game over" });
   const leaderboard = el("ol", { className: "leaderboard" });
-  const playAgainButton = el("button", { className: "primary-action", text: "Play again", attrs: { type: "button" } });
+  const playAgainButton = el("button", { className: "primary-action", text: "Rematch", attrs: { type: "button" } });
   const leaveButton = el("button", { className: "ghost-action", text: "Leave room", attrs: { type: "button" } });
   const hint = el("p", { className: "modal-hint", text: "" });
 

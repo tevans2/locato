@@ -64,11 +64,11 @@ interface RoundReveal {
   readonly results: readonly RoundResult[];
 }
 
-type MultiplayerPlayMode = "flags" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country";
+type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country";
 
 type MultiplayerModeOption = Omit<GameModeOption, "id"> & { readonly id: MultiplayerPlayMode };
 
-const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "shapes", "codes", "capitals", "click-country", "spot-country"];
+const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country"];
 
 const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = gameModeOptions
   .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
@@ -85,6 +85,7 @@ function createMultiplayerModeDropdown(options: {
 }): { readonly element: HTMLElement; readonly selectedMode: () => MultiplayerPlayMode } {
   let selectedMode = options.selectedMode;
   const selectedText = el("span", { className: "category-dropdown-selected" });
+  const selectedDescription = el("span", { className: "category-dropdown-selected-description" });
 
   const modeControls = MULTIPLAYER_MODE_OPTIONS.map((modeOption) => {
     const radio = el("input", { attrs: { type: "radio", name: "multiplayer-mode", value: modeOption.id } });
@@ -105,7 +106,9 @@ function createMultiplayerModeDropdown(options: {
 
   function setMode(mode: MultiplayerPlayMode): void {
     selectedMode = mode;
-    selectedText.textContent = getMultiplayerModeOption(mode).label;
+    const selected = getMultiplayerModeOption(mode);
+    selectedText.textContent = selected.label;
+    selectedDescription.textContent = selected.description;
     for (const control of modeControls) control.radio.checked = control.modeOption.id === selectedMode;
   }
 
@@ -136,7 +139,10 @@ function createMultiplayerModeDropdown(options: {
     children: [
       el("summary", {
         className: "category-dropdown-summary",
-        children: [el("span", { className: "category-row-label", text: "Game mode" }), selectedText],
+        children: [
+          el("span", { className: "category-row-label", text: "Game mode" }),
+          el("span", { className: "game-mode-selected-copy", children: [selectedText, selectedDescription] }),
+        ],
       }),
       el("div", { className: "category-dropdown-menu", attrs: { role: "radiogroup", "aria-label": "Multiplayer game modes" }, children: menuChildren }),
     ],
@@ -154,7 +160,7 @@ function categoryIdsForMode(mode: MultiplayerPlayMode): readonly string[] {
 function setupCopyForMode(mode: MultiplayerPlayMode): { readonly title: string; readonly description: string } {
   const modeOption = getMultiplayerModeOption(mode);
   return {
-    title: mode === "click-country" || mode === "spot-country" ? "Host or join a map race" : "Host or join a prompt race",
+    title: mode === "click-country" || mode === "spot-country" ? "Host or join a map race" : mode === "flag-colors" ? "Host or join a flag-colour race" : "Host or join a prompt race",
     description: `${modeOption.description} Create a room or join a code to race friends in real time.`,
   };
 }
@@ -215,6 +221,19 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: "Player" } });
   const joinCodeInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: "12", placeholder: "Room code" } });
+  const roundLimitSelect = el("select", {
+    attrs: { "aria-label": "Rounds" },
+    children: [5, 10, 15, 20].map((count) => el("option", { text: `${count} rounds`, attrs: { value: String(count), ...(count === 10 ? { selected: "" } : {}) } })),
+  });
+  const roundDurationSelect = el("select", {
+    attrs: { "aria-label": "Timer" },
+    children: [
+      { label: "15 sec", value: 15_000 },
+      { label: "30 sec", value: 30_000 },
+      { label: "45 sec", value: 45_000 },
+      { label: "60 sec", value: 60_000 },
+    ].map((option) => el("option", { text: option.label, attrs: { value: String(option.value), ...(option.value === 30_000 ? { selected: "" } : {}) } })),
+  });
   let playMode: MultiplayerPlayMode = "flags";
   const initialSetupCopy = setupCopyForMode(playMode);
   const setupTitle = el("h1", { text: initialSetupCopy.title });
@@ -235,6 +254,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   });
   const statusText = el("p", { className: "multiplayer-status", text: feedback });
   const roomCode = el("strong", { className: "room-code", text: "----" });
+  const roomSettings = el("p", { className: "room-settings", text: "" });
   const playerList = el("ul", { className: "player-list" });
   const inviteList = el("div", { className: "invite-list" });
   const inviteSection = el("div", { className: "invite-section", attrs: { hidden: "true" }, children: [el("p", { className: "eyebrow", text: "INVITE FRIENDS" }), inviteList] });
@@ -252,7 +272,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("p", { className: "eyebrow", text: "MULTIPLAYER" }),
       setupTitle,
       setupDescription,
-      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, joinCodeInput] }),
+      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, roundLimitSelect, roundDurationSelect, joinCodeInput] }),
       el("div", { className: "actions", children: [createButton, joinButton] }),
     ],
   });
@@ -262,6 +282,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     children: [
       el("p", { className: "eyebrow", text: "ROOM" }),
       el("div", { className: "room-code-row", children: [el("span", { text: "Code" }), roomCode, copyButton] }),
+      roomSettings,
       playerList,
       inviteSection,
       el("div", { className: "actions", children: [readyButton, startButton, leaveButton] }),
@@ -380,6 +401,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     if (!room) return;
 
     roomCode.textContent = room.roomCode;
+    roomSettings.textContent = `${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
     playerList.replaceChildren(...createPlayerRows(room, localPlayerId));
     // Show "invite friends" only to signed-in users while waiting in the lobby. Friends are fetched
     // once per room, then re-filtered every render so anyone in the lobby is excluded live.
@@ -513,7 +535,13 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       allowSessionPersistence = true;
       const playerName = nameInput.value.trim() || "Player";
       connectWith(options.createOnlineTransport(), () =>
-        transport?.send({ type: "CREATE_ROOM", playerName, categoryIds: categoryIdsForMode(modeDropdown.selectedMode()) }),
+        transport?.send({
+          type: "CREATE_ROOM",
+          playerName,
+          categoryIds: categoryIdsForMode(modeDropdown.selectedMode()),
+          roundLimit: Number(roundLimitSelect.value),
+          roundDurationMs: Number(roundDurationSelect.value),
+        }),
       );
     },
     { signal: controller.signal },

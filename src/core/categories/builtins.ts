@@ -11,6 +11,16 @@ export const flagsCategory: PromptCategory = {
   reveal: (country) => country.name,
 };
 
+export const flagColorsCategory: PromptCategory = {
+  id: "flag-colors",
+  label: "Flag colours",
+  description: "Guess countries to reveal matching colours in the hidden target flag.",
+  eligible: () => true,
+  prompt: (country) => ({ kind: "flag-colors", value: country.flagSrc }),
+  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, true),
+  reveal: (country) => country.name,
+};
+
 export const shapesCategory: PromptCategory = {
   id: "shapes",
   label: "Country outlines",

@@ -38,6 +38,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
       roomCode: DEMO_ROOM_CODE,
       hostPlayerId: HOST_PLAYER_ID,
       categoryIds: [...categoryIds],
+      settings: { roundLimit: DEMO_ROUNDS.length, roundDurationMs: DEMO_ROUND_MS },
       status: "lobby",
       players: [createPlayer(HOST_PLAYER_ID, hostName, false), createPlayer(RIVAL_PLAYER_ID, "Rival", true)],
       round: null,
@@ -116,6 +117,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         roundIndex = -1;
         assignedPlayerId = HOST_PLAYER_ID;
         room = lobbyRoom(message.categoryIds, message.playerName);
+        room = { ...room, settings: { roundLimit: message.roundLimit ?? DEMO_ROUNDS.length, roundDurationMs: message.roundDurationMs ?? DEMO_ROUND_MS } };
         assign(HOST_PLAYER_ID);
         emitSnapshot();
         return;
@@ -129,6 +131,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           roomCode: message.roomCode || DEMO_ROOM_CODE,
           hostPlayerId: HOST_PLAYER_ID,
           categoryIds: ["flags", "shapes", "codes", "pick-country"],
+          settings: { roundLimit: DEMO_ROUNDS.length, roundDurationMs: DEMO_ROUND_MS },
           status: "lobby",
           players: [createPlayer(HOST_PLAYER_ID, "Host", true), createPlayer("guest", message.playerName, false)],
           round: null,
@@ -202,7 +205,14 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         emit({
           type: "ROUND_ENDED",
           answer: data.reveal,
-          results: room.players.map((player) => ({ playerId: player.id, name: player.name, correct: player.id === assignedPlayerId, points: player.id === assignedPlayerId ? points : 0, answeredAt: player.id === assignedPlayerId ? closedAt : null })),
+          results: room.players.map((player) => ({
+            playerId: player.id,
+            name: player.name,
+            correct: player.id === assignedPlayerId,
+            points: player.id === assignedPlayerId ? points : 0,
+            answeredAt: player.id === assignedPlayerId ? closedAt : null,
+            guess: player.id === assignedPlayerId ? message.answer.trim() : null,
+          })),
         });
         emitSnapshot();
 

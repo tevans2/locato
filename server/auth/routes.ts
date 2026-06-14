@@ -3,9 +3,10 @@ import { readSessionToken, serializeClearCookie, serializeSessionCookie, type Co
 import { buildAuthUrl, consumeOAuthState, exchangeOAuthCode, saveOAuthState } from "./oauth";
 import { createOAuthState } from "./tokens";
 import { NOOP_SOCIAL, type SocialBridge } from "../../src/core/social/socialProtocol";
-import type { AuthUser, GameResult } from "./types";
+import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 
 const MAX_STAT_VALUE = 1_000_000;
+const DAILY_COUNTRY_COUNT = 10;
 
 function publicRef(user: AuthUser) {
   return { id: user.id, username: user.displayName, avatarEmoji: user.avatarEmoji };
@@ -71,6 +72,31 @@ function isDurationMs(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 86_400_000;
 }
 
+function isDailyDate(v: unknown): v is string {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+function isTimestampMs(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 && v <= 4_102_444_800_000;
+}
+
+function parseDailyMarks(v: unknown): DailyRoundMark[] | null {
+  if (!Array.isArray(v) || v.length !== DAILY_COUNTRY_COUNT) return null;
+  return v.every((mark) => mark === "correct" || mark === "hint" || mark === "miss") ? (v as DailyRoundMark[]) : null;
+}
+
+function formatDailyTime(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function createDailyShareText(date: string, score: number, timeMs: number, marks: readonly DailyRoundMark[]): string {
+  const grid = marks.map((mark) => (mark === "correct" ? "🟩" : mark === "hint" ? "🟨" : "🟥")).join("");
+  return `Locato Daily ${date}\nScore: ${score}/${DAILY_COUNTRY_COUNT}\nTime: ${formatDailyTime(timeMs)}\n${grid}`;
+}
+
 function parseGameResult(body: Record<string, unknown>): GameResult | null {
   const { mode, categoryIds, correctAnswers, wrongAnswers, score, bestStreak, rank, totalPlayers, durationMs, completed, countriesFound, countriesTotal, playMode } = body;
   if (mode !== "solo" && mode !== "multiplayer" && mode !== "world-map") return null;
@@ -87,6 +113,25 @@ function parseGameResult(body: Record<string, unknown>): GameResult | null {
     if (typeof playMode === "string") result.playMode = playMode;
   }
   return result as unknown as GameResult;
+}
+
+function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult | null {
+  const { date, seed, score, timeMs, hintsUsed, marks, completedAt } = body;
+  if (!isDailyDate(date) || seed !== `daily:${date}`) return null;
+  if (!Number.isInteger(score) || typeof score !== "number" || score < 0 || score > DAILY_COUNTRY_COUNT) return null;
+  if (!isDurationMs(timeMs) || !isNonNegInt(hintsUsed)) return null;
+  const parsedMarks = parseDailyMarks(marks);
+  if (!parsedMarks) return null;
+  return {
+    date,
+    seed,
+    score,
+    timeMs,
+    hintsUsed,
+    marks: parsedMarks,
+    shareText: createDailyShareText(date, score, timeMs, parsedMarks),
+    completedAt: isTimestampMs(completedAt) ? completedAt : Date.now(),
+  };
 }
 
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
@@ -152,6 +197,34 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!result) return json({ error: "Invalid game result." }, 400);
     log("info", "game.recorded", { ip: ip(request), userId: user.id, mode: result.mode, correct: result.correctAnswers });
     return json({ stats: service.recordGame(user.id, result) });
+  }
+
+  if (pathname === "/api/daily/summary" && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const date = url.searchParams.get("date");
+    if (!isDailyDate(date)) return json({ error: "Invalid daily challenge date." }, 400);
+    return json({ summary: service.getDailySummary(user.id, date) });
+  }
+
+  const dailyMatch = pathname.match(/^\/api\/daily\/(\d{4}-\d{2}-\d{2})$/);
+  if (dailyMatch && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const date = dailyMatch[1]!;
+    return json({ result: service.getDailyResult(user.id, date) });
+  }
+
+  if (pathname === "/api/daily" && (method === "POST" || method === "PUT")) {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = parseDailyResult(body);
+    if (!result) return json({ error: "Invalid daily challenge result." }, 400);
+    const saved = service.saveDailyResult(user.id, result);
+    log("info", "daily.recorded", { ip: ip(request), userId: user.id, date: saved.date, score: saved.score });
+    return json({ result: saved });
   }
 
   if (pathname === "/api/stats" && method === "GET") {

@@ -65,6 +65,10 @@
   grid-column: 1 / -1;
 }
 
+.multiplayer-form-grid > input:last-child {
+  grid-column: 1 / -1;
+}
+
 .multiplayer-form-grid .category-dropdown {
   justify-self: stretch;
   width: 100%;
@@ -88,6 +92,13 @@
 .room-code-row > span {
   color: var(--muted);
   font-weight: 720;
+}
+
+.room-settings {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 680;
 }
 
 .room-code {
@@ -167,16 +178,14 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(300px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.4fr);
+  grid-template-rows: minmax(0, 1fr) minmax(150px, 0.34fr);
   gap: clamp(12px, 1.8vw, 18px);
   overflow: hidden;
 }
 
-.multiplayer-bottom-grid {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
-  gap: clamp(12px, 1.8vw, 18px);
+.multiplayer-play-grid {
+  display: contents;
 }
 
 .multiplayer-flag-card,
@@ -186,8 +195,10 @@
 }
 
 .multiplayer-flag-card {
+  grid-column: 1;
+  grid-row: 1 / -1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   padding: clamp(14px, 2vw, 20px);
 }
 
@@ -273,7 +284,7 @@
 }
 
 .multiplayer-map-highlight-prompt {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .multiplayer-map-highlight-label {
@@ -312,6 +323,16 @@
   overflow: hidden auto;
   padding: clamp(14px, 2vw, 20px);
   scrollbar-width: thin;
+}
+
+.multiplayer-round-panel {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.multiplayer-score-panel {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .multiplayer-round-panel h2,
@@ -375,6 +396,34 @@
   color: var(--text);
 }
 
+.flag-color-reveal {
+  width: min(100%, 720px);
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  gap: 10px;
+}
+
+.flag-color-reveal-canvas {
+  width: auto;
+  height: auto;
+  max-width: min(92%, calc(100% - 24px));
+  max-height: min(92%, calc(100% - 42px));
+  border-radius: var(--radius-md);
+  background: #121712;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+}
+
+.flag-color-reveal-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 680;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .multiplayer-screen {
     overflow: auto;
@@ -386,12 +435,22 @@
 
   .multiplayer-game-layout {
     height: auto;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
     overflow: visible;
   }
 
-  .multiplayer-bottom-grid {
+  .multiplayer-play-grid {
+    display: grid;
     grid-template-columns: 1fr;
+    gap: clamp(12px, 1.8vw, 18px);
+  }
+
+  .multiplayer-flag-card,
+  .multiplayer-round-panel,
+  .multiplayer-score-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .multiplayer-flag-slot {

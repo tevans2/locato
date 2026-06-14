@@ -511,6 +511,18 @@ export function setWorldMapTargetCountry(view: WorldMapView, countryId: CountryI
   }
 }
 
+export function setWorldMapReviewCountries(view: WorldMapView, countryIds: ReadonlySet<CountryId>, activeCountryId: CountryId | null): void {
+  for (const [id, path] of view.pathByCountryId) {
+    path.classList.toggle("is-review-missed", countryIds.has(id));
+    path.classList.toggle("is-review-active", activeCountryId === id);
+  }
+
+  for (const [id, dot] of view.missingDotByCountryId) {
+    dot.classList.toggle("is-review-missed", countryIds.has(id));
+    dot.classList.toggle("is-review-active", activeCountryId === id);
+  }
+}
+
 export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>, totalCountries: number): void {
   for (const [countryId, path] of view.pathByCountryId.entries()) {
     const guessed = guessedCountryIds.has(countryId);

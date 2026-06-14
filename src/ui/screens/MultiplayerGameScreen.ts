@@ -1,10 +1,11 @@
 import type { FinalResult, PlayerId, PublicRoomState, PublicRoundState, RoundResult } from "../../core/multiplayer";
-import type { CountryIndex } from "../../core/countries";
+import { isCorrectAnswer, type Country, type CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import { getPlayerEmoji } from "../../core/auth/avatars";
 import { el } from "../dom/createElement";
 import { promptImageClass } from "../dom/renderPrompt";
 import { createWorldMapView, setWorldMapTargetCountry } from "../dom/renderWorldMap";
+import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -55,12 +56,14 @@ function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null):
 }
 
 function createResultRows(results: readonly RoundResult[]): readonly HTMLElement[] {
-  return results.map((result) =>
-    el("li", {
+  return results.map((result) => {
+    const guess = result.guess ? ` guessed ${result.guess}` : " did not answer";
+    const outcome = result.correct ? `+${result.points}` : "missed";
+    return el("li", {
       className: result.correct ? "result-row good" : "result-row",
-      text: `${result.name}: ${result.correct ? `+${result.points}` : "no correct answer"}`,
-    }),
-  );
+      text: `${result.name}${guess} · ${outcome}`,
+    });
+  });
 }
 
 function createFinalRows(results: readonly FinalResult[]): readonly HTMLElement[] {
@@ -70,6 +73,13 @@ function createFinalRows(results: readonly FinalResult[]): readonly HTMLElement[
       text: `#${result.rank} ${result.name} · ${formatScore(result.score)} · ${result.correctAnswers} correct`,
     }),
   );
+}
+
+function countryForGuess(index: CountryIndex, answer: string): Country | null {
+  for (const country of index.countries) {
+    if (isCorrectAnswer(index, country.id, answer)) return country;
+  }
+  return null;
 }
 
 export function createMultiplayerGameView(options: MultiplayerGameViewOptions): MultiplayerGameView {
@@ -105,8 +115,12 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   });
   mapView.element.classList.add("multiplayer-map-panel");
   const mapPrompt = el("div", { className: "multiplayer-map-prompt", children: [mapTarget] });
-  const mapHighlightLabel = el("p", { className: "multiplayer-map-highlight-label", text: "Name the highlighted country" });
-  const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt", children: [mapHighlightLabel] });
+  const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt" });
+  const flagColorReveal = createFlagColorRevealView();
+  let activeFlagColorRoundKey: string | null = null;
+  let activeFlagColorPromptSrc: string | null = null;
+  let focusedMapHighlightRoundKey: string | null = null;
+  let resetMapHighlightRoundKey: string | null = null;
 
   function attachMapTo(container: HTMLElement): void {
     if (mapView.element.parentElement !== container) container.append(mapView.element);
@@ -154,6 +168,10 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     event.preventDefault();
     const answer = answerInput.value.trim();
     if (!answer) return;
+    if (activeFlagColorPromptSrc) {
+      const guessedCountry = countryForGuess(options.countryIndex, answer);
+      if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
+    }
     options.onSubmit(answer);
     answerInput.value = "";
   });
@@ -161,22 +179,22 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   const element = el("div", {
     className: "multiplayer-game-layout",
     children: [
-      el("section", {
-        className: "flag-card multiplayer-flag-card",
-        children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot, timerBar],
-      }),
       el("div", {
-        className: "multiplayer-bottom-grid",
+        className: "multiplayer-play-grid",
         children: [
+          el("section", {
+            className: "flag-card multiplayer-flag-card",
+            children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot, timerBar],
+          }),
           el("section", {
             className: "answer-panel multiplayer-round-panel multiplayer-answer-panel",
             children: [roundTitle, answerForm, feedback, resultList],
           }),
-          el("aside", {
-            className: "answer-panel multiplayer-score-panel",
-            children: [el("h2", { text: "Scoreboard" }), scoreList],
-          }),
         ],
+      }),
+      el("aside", {
+        className: "answer-panel multiplayer-score-panel",
+        children: [el("h2", { text: "Scoreboard" }), scoreList],
       }),
     ],
   });
@@ -190,6 +208,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       const roundKey = visibleRound ? `${state.room.roomCode}:${visibleRound.roundNumber}:${visibleRound.startedAt}:${visibleRound.prompt.kind}:${visibleRound.prompt.value}` : null;
       const isMapClickRound = visibleRound?.prompt.kind === "map-click";
       const isMapHighlightRound = visibleRound?.prompt.kind === "map-highlight";
+      const isFlagColorRound = visibleRound?.prompt.kind === "flag-colors";
       const isNewRound = roundKey !== null && roundKey !== renderedRoundKey;
       if (isNewRound) answerInput.value = "";
       renderedRoundKey = roundKey;
@@ -203,7 +222,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           : visibleRound
             ? `Round ${visibleRound.roundNumber}`
             : "Waiting for the next round";
-      roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : "Your answer";
+      roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : isFlagColorRound ? "Find the target flag" : "Your answer";
       feedback.textContent = state.feedback;
       answerInput.disabled = !state.canSubmit;
       submitButton.disabled = !state.canSubmit;
@@ -219,6 +238,14 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       }
 
       if (visibleRound) {
+        if (!isFlagColorRound) {
+          activeFlagColorRoundKey = null;
+          activeFlagColorPromptSrc = null;
+        }
+        if (!isMapHighlightRound) {
+          focusedMapHighlightRoundKey = null;
+          resetMapHighlightRoundKey = null;
+        }
         if (visibleRound.prompt.kind === "image") {
           setWorldMapTargetCountry(mapView, null);
           flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
@@ -229,15 +256,40 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           flagSlot.replaceChildren(mapPrompt);
         } else if (visibleRound.prompt.kind === "map-highlight") {
           const country = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase());
-          setWorldMapTargetCountry(mapView, country?.id ?? null);
+          const countryId = country?.id ?? null;
+          if (intermission) {
+            setWorldMapTargetCountry(mapView, null);
+            if (roundKey !== null && resetMapHighlightRoundKey !== roundKey) {
+              resetMapHighlightRoundKey = roundKey;
+              focusedMapHighlightRoundKey = null;
+              mapView.resetView();
+            }
+          } else {
+            setWorldMapTargetCountry(mapView, countryId);
+            if (countryId !== null && roundKey !== null && focusedMapHighlightRoundKey !== roundKey) {
+              focusedMapHighlightRoundKey = roundKey;
+              resetMapHighlightRoundKey = null;
+              mapView.focusCountry(countryId);
+            }
+          }
           attachMapTo(mapHighlightPrompt);
           flagSlot.replaceChildren(mapHighlightPrompt);
+        } else if (visibleRound.prompt.kind === "flag-colors") {
+          setWorldMapTargetCountry(mapView, null);
+          if (activeFlagColorRoundKey !== roundKey || activeFlagColorPromptSrc !== visibleRound.prompt.value) {
+            activeFlagColorRoundKey = roundKey;
+            activeFlagColorPromptSrc = visibleRound.prompt.value;
+            flagColorReveal.reset(visibleRound.prompt.value);
+          }
+          flagSlot.replaceChildren(flagColorReveal.element);
         } else {
           setWorldMapTargetCountry(mapView, null);
           flagSlot.replaceChildren(el("div", { className: "prompt-text", text: visibleRound.prompt.value }));
         }
       } else {
         setWorldMapTargetCountry(mapView, null);
+        activeFlagColorRoundKey = null;
+        activeFlagColorPromptSrc = null;
         flagSlot.replaceChildren(el("div", { className: "complete-card", text: "The server will reveal the next prompt when the room starts." }));
       }
 

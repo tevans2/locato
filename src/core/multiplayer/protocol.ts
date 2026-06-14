@@ -1,7 +1,7 @@
 import type { FinalResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
-  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[] }
+  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
   | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string }
   | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
   | { readonly type: "LEAVE_ROOM" }

@@ -80,6 +80,31 @@ export interface GameRecord {
   readonly playMode: string | null;
 }
 
+export type DailyRoundMark = "correct" | "hint" | "miss";
+
+export interface DailyChallengeResult {
+  readonly date: string;
+  readonly seed: string;
+  readonly score: number;
+  readonly timeMs: number;
+  readonly hintsUsed: number;
+  readonly marks: readonly DailyRoundMark[];
+  readonly shareText: string;
+  readonly completedAt: number;
+}
+
+export interface DailyFriendResult {
+  readonly user: PublicUser;
+  readonly result: DailyChallengeResult;
+}
+
+export interface DailySummary {
+  readonly history: readonly DailyChallengeResult[];
+  readonly streak: number;
+  readonly best: DailyChallengeResult | null;
+  readonly friendsToday: readonly DailyFriendResult[];
+}
+
 // Flat aggregate returned by /auth/me (fast, no joins).
 export interface UserStats {
   readonly totalGames: number;
@@ -193,6 +218,10 @@ export interface UserStore {
   getStats(userId: string): UserStats;
   getFullStats(userId: string): FullStats;
   recordGame(userId: string, result: GameResult, now: number): UserStats;
+  getDailyResult(userId: string, date: string): DailyChallengeResult | null;
+  listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[];
+  listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[];
+  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult;
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;

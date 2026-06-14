@@ -8,6 +8,8 @@ import type {
   CategoryStats,
   CreateSessionInput,
   CreateUserInput,
+  DailyChallengeResult,
+  DailyRoundMark,
   FriendRequestLists,
   FullStats,
   GameRecord,
@@ -125,6 +127,21 @@ function migrate(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS mode_best_times_rank
       ON mode_best_times (game_mode, variant, best_time_ms ASC, achieved_at ASC);
+
+    CREATE TABLE IF NOT EXISTS daily_challenge_results (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      seed TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      time_ms INTEGER NOT NULL,
+      hints_used INTEGER NOT NULL,
+      marks TEXT NOT NULL,
+      share_text TEXT NOT NULL,
+      completed_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, date)
+    );
+    CREATE INDEX IF NOT EXISTS daily_challenge_results_user_completed
+      ON daily_challenge_results(user_id, completed_at DESC);
 
     CREATE TABLE IF NOT EXISTS friendships (
       user_low TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -339,6 +356,46 @@ export class SqliteUserStore implements UserStore {
     );
 
     return this.getStats(userId);
+  }
+
+  getDailyResult(userId: string, date: string): DailyChallengeResult | null {
+    const row = this.db
+      .query<{ date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt FROM daily_challenge_results WHERE user_id = ? AND date = ?",
+      )
+      .get(userId, date);
+    if (!row) return null;
+    return { ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] };
+  }
+
+  listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[] {
+    const rows = this.db
+      .query<{ date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt FROM daily_challenge_results WHERE user_id = ? ORDER BY date DESC LIMIT ?",
+      )
+      .all(userId, limit);
+    return rows.map((row) => ({ ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] }));
+  }
+
+  listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
+    return userIds.flatMap((userId) => {
+      const result = this.getDailyResult(userId, date);
+      return result ? [{ userId, result }] : [];
+    });
+  }
+
+  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
+    const existing = this.getDailyResult(userId, result.date);
+    if (existing) return existing;
+
+    this.db
+      .query(
+        `INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt);
+
+    return this.getDailyResult(userId, result.date)!;
   }
 
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {

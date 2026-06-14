@@ -1,5 +1,5 @@
 import type { AuthUser } from "../../core/auth";
-import { type Country, type CountryIndex } from "../../core/countries";
+import { isCorrectAnswer, type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { DAILY_COUNTRY_COUNT, type DailyRoundMark } from "../../core/dailyChallenge";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
@@ -7,6 +7,7 @@ import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type G
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
+import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
@@ -15,6 +16,7 @@ import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "
 import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/renderFeedback";
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
+import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -26,6 +28,7 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
+  readonly onExitDailyChallenge?: () => void;
   readonly onViewStats?: () => void;
   readonly onLeaderboard: () => void;
   readonly getAuthUser: () => AuthUser | null;
@@ -48,6 +51,13 @@ function visibleCountries(index: CountryIndex, state: GameState): readonly Count
   return index.countries.filter((country) => ids.has(country.id));
 }
 
+function countryForGuess(index: CountryIndex, answer: string): Country | null {
+  for (const country of index.countries) {
+    if (isCorrectAnswer(index, country.id, answer)) return country;
+  }
+  return null;
+}
+
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
@@ -60,6 +70,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   let dailyCompleted = false;
   const stats = createStatsView();
   const prompt = createPromptView();
+  const flagColorReveal = createFlagColorRevealView();
   const feedback = createFeedbackView();
   const atlas = createAtlasView(countries);
   const views: SoloViews = { stats, prompt, feedback, atlas };
@@ -72,6 +83,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const dailyButton = el("button", { className: "ghost-action daily-action", text: "Daily Challenge", attrs: { type: "button", ...(isDailyChallenge ? { disabled: "" } : {}) } });
+  const exitDailyButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
   const timerModeSelect = el("select", {
     className: "country-guess-timer-select",
@@ -84,6 +96,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const timerElapsed = el("strong", { className: "stat-value", text: "—" });
   const timerLast = el("strong", { className: "stat-value", text: "—" });
   const timerBest = el("strong", { className: "stat-value", text: "—" });
+  const achievementPanel = el("section", { className: "achievement-panel compact", attrs: { hidden: "true" } });
   const timerPanel = el("div", {
     className: "stats-panel country-guess-stats solo-timer-stats",
     children: [
@@ -98,6 +111,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   });
 
   let playTimer: PlayTimer;
+  let activeFlagColorTarget: string | null = null;
+
+  function showAchievements(unlocked: readonly Achievement[]): void {
+    if (unlocked.length === 0) return;
+    achievementPanel.hidden = false;
+    achievementPanel.replaceChildren(
+      el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: "Unlocked" }), el("strong", { text: `${unlocked.length} achievement${unlocked.length === 1 ? "" : "s"}` })] }),
+      el("div", {
+        className: "achievement-list",
+        children: unlocked.map((achievement) =>
+          el("article", {
+            className: "achievement-chip",
+            children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })],
+          }),
+        ),
+      }),
+    );
+  }
 
   function renderTimer(): void {
     timerModeSelect.value = playTimer.mode;
@@ -149,6 +180,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "GAME_COMPLETED") {
+        if (!isDailyChallenge) showAchievements(recordSoloAchievements(options.storage, { completed: true, wrongAnswers: engine.getState().wrongAnswers, bestStreak: engine.getState().bestStreak, gameMode: options.selectedGameMode }));
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           void finishTimerRun(finalTimeMs).then((result) => {
@@ -198,7 +230,18 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     updateStatsView(stats, countryIndex, state);
-    updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
+    if (content?.kind === "flag-colors") {
+      prompt.status.textContent = `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = category?.label ?? "Flag colours";
+      if (activeFlagColorTarget !== content.value) {
+        activeFlagColorTarget = content.value;
+        flagColorReveal.reset(content.value);
+      }
+      prompt.imageSlot.replaceChildren(flagColorReveal.element);
+    } else {
+      activeFlagColorTarget = null;
+      updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
+    }
     updateAtlasView(atlas, countries, state.guessedCountryIds);
     const playing = state.status === "playing";
     input.disabled = !playing;
@@ -267,6 +310,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "submit",
     (event) => {
       event.preventDefault();
+      if (engine.getState().currentCategoryId === "flag-colors") {
+        const guessedCountry = countryForGuess(countryIndex, input.value);
+        if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
+      }
       dispatchAndRender(engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now() }));
       if (engine.getState().lastResult?.type === "wrong") input.select();
     },
@@ -309,6 +356,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
+  exitDailyButton.addEventListener("click", () => options.onExitDailyChallenge?.(), { signal: controller.signal });
   leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
 
   document.addEventListener(
@@ -362,7 +410,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
               timerPanel,
               stats.element,
               feedback.element,
-              el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
+              achievementPanel,
+              el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
             ],
           }),
         ],

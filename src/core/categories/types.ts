@@ -1,7 +1,7 @@
 import type { Country, CountryId } from "../countries";
 
 export interface PromptContent {
-  readonly kind: "image" | "text" | "map-click" | "map-highlight";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors";
   readonly value: string;
 }
 

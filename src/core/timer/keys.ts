@@ -25,6 +25,10 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
     last: "locato:solo:flags:timer-last-ms:v1",
     best: "locato:solo:flags:timer-best-ms:v1",
   },
+  "flag-colors": {
+    last: "locato:solo:flag-colors:timer-last-ms:v1",
+    best: "locato:solo:flag-colors:timer-best-ms:v1",
+  },
   shapes: {
     last: "locato:solo:shapes:timer-last-ms:v1",
     best: "locato:solo:shapes:timer-best-ms:v1",

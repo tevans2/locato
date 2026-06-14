@@ -1,6 +1,6 @@
 import { soloPromptCategories } from "./categories";
 
-export type PromptGameModeId = "flags" | "shapes" | "codes" | "capitals";
+export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
 export type GameModeId = PromptGameModeId | WorldMapGameModeId;
 
@@ -11,7 +11,7 @@ export interface GameModeOption {
   readonly group: "Prompt games" | "World map games";
 }
 
-const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "shapes", "codes", "capitals"];
+const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
 
 export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {

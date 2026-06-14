@@ -10,6 +10,8 @@ import {
 import type {
   AdminUserList,
   AuthUser,
+  DailyChallengeResult,
+  DailySummary,
   FriendRequestLists,
   FullStats,
   GameResult,
@@ -35,6 +37,7 @@ const MAX_EMAIL_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_ADMIN_PAGE = 50;
 const MAX_ADMIN_PAGE = 200;
+const DEFAULT_DAILY_HISTORY_LIMIT = 14;
 
 export interface AuthServiceOptions {
   readonly sessionTtlMs: number;
@@ -57,6 +60,13 @@ function normalizeUsername(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const name = value.trim();
   return name.length >= USERNAME_MIN_LENGTH && name.length <= USERNAME_MAX_LENGTH && USERNAME_PATTERN.test(name) ? name : null;
+}
+
+function previousDailyDate(date: string, daysBack: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const utc = Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1);
+  const previous = new Date(utc - daysBack * 86_400_000);
+  return previous.toISOString().slice(0, 10);
 }
 
 const SUBMIT_RATE_LIMIT = 10;
@@ -184,6 +194,42 @@ export class AuthService {
 
   recordGame(userId: string, result: GameResult): UserStats {
     return this.store.recordGame(userId, result, this.clock());
+  }
+
+  getDailyResult(userId: string, date: string): DailyChallengeResult | null {
+    return this.store.getDailyResult(userId, date);
+  }
+
+  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
+    return this.store.saveDailyResult(userId, result);
+  }
+
+  getDailySummary(userId: string, date: string, limit = DEFAULT_DAILY_HISTORY_LIMIT): DailySummary {
+    const history = this.store.listDailyResults(userId, limit);
+    const resultDates = new Set(history.map((result) => result.date));
+    let streak = 0;
+    for (let offset = 0; ; offset += 1) {
+      if (!resultDates.has(previousDailyDate(date, offset))) break;
+      streak += 1;
+    }
+
+    const best = history.reduce<DailyChallengeResult | null>((currentBest, result) => {
+      if (!currentBest) return result;
+      if (result.score !== currentBest.score) return result.score > currentBest.score ? result : currentBest;
+      if (result.timeMs !== currentBest.timeMs) return result.timeMs < currentBest.timeMs ? result : currentBest;
+      return result.hintsUsed < currentBest.hintsUsed ? result : currentBest;
+    }, null);
+
+    const friendsToday = this.store
+      .listDailyResultsForUsers(this.store.friendIds(userId), date)
+      .map((entry) => {
+        const friend = this.store.findUserById(entry.userId);
+        return friend ? { user: this.toPublicUser(friend), result: entry.result } : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.user.username.localeCompare(b.user.username));
+
+    return { history, streak, best, friendsToday };
   }
 
   submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): SubmitBestTimeResult | { error: string } {
@@ -321,5 +367,9 @@ export class AuthService {
 
   private toAuthUser(user: StoredUser): AuthUser {
     return { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl, avatarEmoji: user.avatarEmoji, createdAt: user.createdAt };
+  }
+
+  private toPublicUser(user: StoredUser): PublicUser {
+    return { id: user.id, username: user.displayName, avatarEmoji: user.avatarEmoji };
   }
 }
