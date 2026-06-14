@@ -17,6 +17,10 @@
     min-height: clamp(300px, calc(100dvh - 310px), 620px);
   }
 
+  .world-globe-panel {
+    min-height: clamp(300px, calc(100dvh - 310px), 620px);
+  }
+
   .puzzle-board-svg {
     min-height: clamp(320px, calc(100dvh - 310px), 620px);
   }
@@ -110,6 +114,10 @@
     min-height: clamp(260px, 48dvh, 430px);
   }
 
+  .world-globe-panel {
+    min-height: clamp(260px, 48dvh, 430px);
+  }
+
   .world-map-meta {
     position: static;
     padding: 8px;
@@ -154,6 +162,10 @@
 
   .flag-slot {
     min-height: clamp(220px, 42dvh, 340px);
+  }
+
+  .daily-map-prompt .world-map-panel {
+    min-height: clamp(220px, 34dvh, 300px);
   }
 
   .stats-panel {

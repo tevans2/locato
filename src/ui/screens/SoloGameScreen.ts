@@ -1,9 +1,10 @@
 import type { AuthUser } from "../../core/auth";
 import { isCorrectAnswer, type Country, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
-import { DAILY_COUNTRY_COUNT, type DailyRoundMark } from "../../core/dailyChallenge";
+import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
 import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
+import type { WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
@@ -17,6 +18,7 @@ import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/rend
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
+import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -33,6 +35,7 @@ export interface SoloGameScreenOptions {
   readonly onLeaderboard: () => void;
   readonly getAuthUser: () => AuthUser | null;
   readonly authControls?: AuthControls;
+  readonly worldCountryFeatures?: readonly WorldCountryFeature[];
   readonly dailyChallenge?: {
     readonly date: string;
     readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[] }) => void;
@@ -66,7 +69,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const countries = visibleCountries(countryIndex, initialState);
   const dailyMarks: DailyRoundMark[] = [];
   let dailyHintsUsed = 0;
-  let dailyRoundHadHint = false;
+  let dailyRoundHintsUsed = 0;
+  let dailyScore = 0;
   let dailyCompleted = false;
   const stats = createStatsView();
   const prompt = createPromptView();
@@ -112,6 +116,20 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
+  const dailyMap =
+    options.worldCountryFeatures && options.worldCountryFeatures.length > 0
+      ? createWorldMapView(options.worldCountryFeatures, countryIndex, {
+          onCountryClick: (countryId) => {
+            const state = engine.getState();
+            const current = getCurrentCountry(countryIndex, state);
+            const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
+            if (state.status !== "playing" || !current || category?.prompt(current).kind !== "map-click") return;
+            const clickedCountry = countryIndex.byId[countryId];
+            if (!clickedCountry) return;
+            dispatchAndRender(engine.dispatch({ type: "SUBMIT_GUESS", value: clickedCountry.code, now: Date.now() }));
+          },
+        })
+      : null;
 
   function showAchievements(unlocked: readonly Achievement[]): void {
     if (unlocked.length === 0) return;
@@ -230,7 +248,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     updateStatsView(stats, countryIndex, state);
-    if (content?.kind === "flag-colors") {
+    if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
+      activeFlagColorTarget = null;
+      prompt.status.textContent = `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = category?.label ?? "Map";
+      prompt.imageSlot.replaceChildren(
+        el("div", {
+          className: "daily-map-prompt",
+          children: [
+            el("div", { className: "prompt-text daily-map-prompt-text", text: content.kind === "map-click" ? `Click ${content.value}` : "Spot the highlighted country" }),
+            dailyMap.element,
+          ],
+        }),
+      );
+      updateWorldMapView(dailyMap, state.guessedCountryIds, countries.length);
+      const targetId = current?.id ?? null;
+      setWorldMapTargetCountry(dailyMap, content.kind === "map-highlight" ? targetId : null);
+      if (content.kind === "map-highlight" && targetId !== null) dailyMap.focusCountry(targetId);
+    } else if (content?.kind === "flag-colors") {
       prompt.status.textContent = `Round ${state.roundNumber}`;
       prompt.kicker.textContent = category?.label ?? "Flag colours";
       if (activeFlagColorTarget !== content.value) {
@@ -240,6 +275,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       prompt.imageSlot.replaceChildren(flagColorReveal.element);
     } else {
       activeFlagColorTarget = null;
+      if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
       updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
     }
     updateAtlasView(atlas, countries, state.guessedCountryIds);
@@ -266,19 +302,21 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     for (const event of events) {
       if (event.type === "HINT_REVEALED") {
         dailyHintsUsed += 1;
-        dailyRoundHadHint = true;
+        dailyRoundHintsUsed += 1;
         continue;
       }
 
       if (event.type === "GUESS_CORRECT") {
-        dailyMarks.push(dailyRoundHadHint ? "hint" : "correct");
-        dailyRoundHadHint = false;
+        dailyScore += scoreDailyRound(dailyRoundHintsUsed);
+        dailyMarks.push(dailyRoundHintsUsed > 0 ? "hint" : "correct");
+        dailyRoundHintsUsed = 0;
         continue;
       }
 
       if (event.type === "ANSWER_REVEALED" || event.type === "ROUND_SKIPPED") {
+        dailyScore += scoreDailyRound(dailyRoundHintsUsed, true);
         dailyMarks.push("miss");
-        dailyRoundHadHint = false;
+        dailyRoundHintsUsed = 0;
       }
     }
   }
@@ -292,7 +330,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     while (marks.length < DAILY_COUNTRY_COUNT) marks.push("miss");
 
     options.dailyChallenge.onComplete({
-      score: state.correctAnswers,
+      score: dailyScore,
       timeMs: Math.max(0, (state.endedAt ?? Date.now()) - (state.startedAt ?? Date.now())),
       hintsUsed: dailyHintsUsed,
       marks: marks.slice(0, DAILY_COUNTRY_COUNT),

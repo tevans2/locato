@@ -11,6 +11,7 @@ import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createAtlasView, setAtlasOpen, updateAtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
+import { createGlobeMapView } from "../dom/renderGlobeMap";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
 
@@ -37,6 +38,7 @@ export interface CountryGuessingScreenOptions {
 }
 
 type CountryGuessPlayMode = WorldMapGameModeId;
+type MapSurface = "flat" | "globe";
 
 function createLogo(): HTMLElement {
   return el("div", {
@@ -61,6 +63,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let activeReviewCountryId: CountryId | null = null;
   let reviewTitle = "Missed countries";
   let runGivenUp = false;
+  let mapSurface: MapSurface = "flat";
   // A run = from a fresh start until it ends (completion, restart, mode/continent change, or leaving).
   // Recorded at most once; reset to false whenever a new run begins.
   let currentRunRecorded = false;
@@ -130,17 +133,6 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   let playTimer: PlayTimer;
 
-  const reviewList = el("div", { className: "map-review-list" });
-  const reviewEmpty = el("p", { className: "muted", text: "End a partial map run to review the countries you missed." });
-  const reviewPanel = el("section", {
-    className: "map-review-panel",
-    children: [
-      el("div", { className: "map-review-header", children: [el("span", { className: "eyebrow", text: "Review" }), el("strong", { className: "map-review-title", text: reviewTitle })] }),
-      reviewEmpty,
-      reviewList,
-    ],
-  });
-  const reviewTitleElement = reviewPanel.querySelector<HTMLElement>(".map-review-title")!;
   const achievementPanel = el("section", { className: "achievement-panel compact", attrs: { hidden: "true" } });
 
   function showAchievements(unlocked: readonly Achievement[]): void {
@@ -160,31 +152,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     );
   }
 
-  function renderReviewPanel(): void {
+  function renderMapReviewState(): void {
     const activeSet = new Set(reviewCountryIds);
     setWorldMapReviewCountries(map, activeSet, activeReviewCountryId);
-    reviewTitleElement.textContent = reviewTitle;
-    reviewEmpty.hidden = reviewCountryIds.length > 0;
-    reviewList.hidden = reviewCountryIds.length === 0;
-    reviewList.replaceChildren(
-      ...reviewCountryIds.map((countryId) => {
-        const country = countryIndex.byId[countryId];
-        const button = el("button", {
-          className: `map-review-country${activeReviewCountryId === countryId ? " is-active" : ""}`,
-          attrs: { type: "button" },
-          children: [
-            el("span", { text: country?.name ?? "Unknown" }),
-            el("small", { text: country ? `${country.continent} · ${country.capital || country.code}` : "" }),
-          ],
-        });
-        button.addEventListener("click", () => {
-          activeReviewCountryId = countryId;
-          map.focusCountry(countryId);
-          renderReviewPanel();
-        });
-        return button;
-      }),
-    );
+    globe.update({
+      guessedCountryIds,
+      missedCountryIds: activeSet,
+      targetCountryId: playMode === "spot-country" && !roundEnded() ? targetCountryId : null,
+      clickableCountryIds: runGivenUp ? activeSet : playMode === "click-country" ? null : new Set<CountryId>(),
+    });
   }
 
   function renderTimer(): void {
@@ -224,7 +200,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const namingModeActive = playMode === "name-all";
     const spotCountryModeActive = playMode === "spot-country";
     const puzzleModeActive = playMode === "puzzle";
-    map.element.hidden = puzzleModeActive;
+    const globeActive = !puzzleModeActive && mapSurface === "globe";
+    map.element.hidden = puzzleModeActive || globeActive;
+    globe.element.hidden = puzzleModeActive || !globeActive;
     puzzle.element.hidden = !puzzleModeActive;
     panelHeading.textContent = puzzleModeActive
       ? "Puzzle the continent"
@@ -241,6 +219,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     foundCount.textContent = String(puzzleModeActive ? puzzlePlacedCount : guessedCountryIds.size);
     remainingCount.textContent = String(puzzleModeActive ? Math.max(0, puzzleTotalCount - puzzlePlacedCount) : Math.max(0, countryIndex.countries.length - guessedCountryIds.size));
     showMissingButton.hidden = puzzleModeActive;
+    mapSurfaceButton.hidden = puzzleModeActive;
+    mapSurfaceButton.textContent = mapSurface === "flat" ? "3D globe" : "Flat map";
+    mapSurfaceButton.setAttribute("aria-pressed", String(mapSurface === "globe"));
     giveUpButton.hidden = !namingModeActive;
     giveUpButton.disabled = !namingModeActive || finished;
     checkPuzzleButton.hidden = !puzzleModeActive;
@@ -249,21 +230,27 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     showMissingButton.textContent = showMissingCountries ? "Hide missing" : "Show missing";
     showMissingButton.setAttribute("aria-pressed", String(showMissingCountries));
     setWorldMapMissingMarkersVisible(map, showMissingCountries && !puzzleModeActive);
-    map.element.classList.toggle("is-click-country-mode", playMode === "click-country" && !finished);
+    map.element.classList.toggle("is-click-country-mode", (playMode === "click-country" && !finished) || runGivenUp);
+    globe.element.classList.toggle("is-click-country-mode", (playMode === "click-country" && !finished) || runGivenUp);
     renderTargetPrompt();
     renderTimer();
-    renderReviewPanel();
+    renderMapReviewState();
     focusSpotTargetIfNeeded();
   }
 
   function resetGame(feedbackMessage: string, captureReview = true): void {
-    if (captureReview) captureReviewForCurrentRun();
+    if (captureReview && !runGivenUp) captureReviewForCurrentRun();
     recordCurrentRun(false); // record the run being abandoned before clearing it
     clearSpotFocusTimeout();
     lastFocusedSpotTargetId = null;
     setAtlasOpen(atlas, false);
     guessedCountryIds.clear();
     runGivenUp = false;
+    showMissingCountries = false;
+    reviewCountryIds = [];
+    activeReviewCountryId = null;
+    map.showCountryLabel(null);
+    globe.showCountryLabel(null);
     currentRunRecorded = false; // a fresh run starts
     input.value = "";
     lastCountryName.textContent = "None";
@@ -412,6 +399,17 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   function handleCountryClick(countryId: CountryId): void {
+    if (runGivenUp) {
+      const clickedCountry = countryIndex.byId[countryId];
+      if (!clickedCountry || guessedCountryIds.has(countryId)) return;
+      activeReviewCountryId = countryId;
+      lastCountryName.textContent = clickedCountry.name;
+      map.showCountryLabel(countryId);
+      globe.showCountryLabel(countryId);
+      render();
+      return;
+    }
+
     if (playMode !== "click-country" || roundEnded()) return;
 
     const clickedCountry = countryIndex.byId[countryId];
@@ -440,9 +438,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     runGivenUp = true;
     showMissingCountries = true;
     input.value = "";
+    activeReviewCountryId = null;
     render();
-    if (activeReviewCountryId !== null) map.focusCountry(activeReviewCountryId);
-    showFeedback(feedback, `Round ended. Review the ${reviewCountryIds.length} missed countries below.`, "neutral");
+    showFeedback(feedback, `Round ended. Click any red country to see its name.`, "neutral");
   }
 
 
@@ -519,6 +517,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   const map = createWorldMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
+  const globe = createGlobeMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
@@ -589,6 +588,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     ],
   });
   const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
+  const mapSurfaceButton = el("button", { className: "ghost-action", text: "3D globe", attrs: { type: "button", "aria-pressed": "false" } });
   const giveUpButton = el("button", { className: "ghost-action", text: "Give up", attrs: { type: "button" } });
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
@@ -652,6 +652,16 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     "click",
     () => {
       showMissingCountries = !showMissingCountries;
+      render();
+    },
+    { signal: controller.signal },
+  );
+  mapSurfaceButton.addEventListener(
+    "click",
+    () => {
+      mapSurface = mapSurface === "flat" ? "globe" : "flat";
+      map.showCountryLabel(null);
+      globe.showCountryLabel(null);
       render();
     },
     { signal: controller.signal },
@@ -722,6 +732,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         className: "country-guess-layout",
         children: [
           map.element,
+          globe.element,
           puzzle.element,
           el("aside", {
             className: "answer-panel country-guess-panel",
@@ -732,10 +743,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
               puzzlePrompt,
               form,
               statsPanel,
-              feedback.element,
               achievementPanel,
-              reviewPanel,
-              el("div", { className: "actions", children: [showMissingButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
+              el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
             ],
           }),
         ],
@@ -763,6 +772,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       recordCurrentRun(false); // leaving the screen ends the run; record progress so it isn't lost
       playTimer.destroy();
       clearSpotFocusTimeout();
+      globe.destroy();
       puzzle.destroy();
       controller.abort();
     },

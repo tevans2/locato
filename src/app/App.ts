@@ -1,6 +1,6 @@
 import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
-import { createDailyChallenge } from "../core/dailyChallenge";
+import { createDailyChallenge, createDailyShareText } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
@@ -131,7 +131,7 @@ export function createApp(options: AppOptions): App {
   }
 
   function dailyAccountResultToLocal(result: DailyChallengeResult): DailyResultSave {
-    return { version: 1, ...result };
+    return { version: 2, ...result, shareText: createDailyShareText(result.date, result.score, result.timeMs, result.marks) };
   }
 
   function dailyLocalResultToAccount(result: DailyResultSave): DailyChallengeResult {
@@ -223,6 +223,17 @@ export function createApp(options: AppOptions): App {
       return;
     }
 
+    mount(createLoadingScreen("Loading Daily Challenge..."));
+    let worldCountryFeatures: readonly WorldCountryFeature[];
+    try {
+      worldCountryFeatures = await loadWorldCountryFeatures();
+    } catch (error) {
+      if (run !== navigationRun) return;
+      activeScreen!.element.textContent = error instanceof Error ? error.message : "Unable to load daily map data.";
+      return;
+    }
+    if (run !== navigationRun) return;
+
     const engine = createGameEngine({
       countryIndex: options.countryIndex,
       categoryIds: challenge.categoryIds,
@@ -237,6 +248,7 @@ export function createApp(options: AppOptions): App {
         engine,
         selectedGameMode: "flags",
         storage: options.storage,
+        worldCountryFeatures,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onReset: () => undefined,
         onStateChange: () => undefined,

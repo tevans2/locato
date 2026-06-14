@@ -98,6 +98,12 @@ export interface DailyFriendResult {
   readonly result: DailyChallengeResult;
 }
 
+export interface DailyLeaderboardEntry {
+  readonly rank: number;
+  readonly user: PublicUser;
+  readonly result: DailyChallengeResult;
+}
+
 export interface DailySummary {
   readonly history: readonly DailyChallengeResult[];
   readonly streak: number;
@@ -221,6 +227,7 @@ export interface UserStore {
   getDailyResult(userId: string, date: string): DailyChallengeResult | null;
   listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[];
   listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[];
+  listDailyResultsForDate(date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[];
   saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult;
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
