@@ -134,6 +134,7 @@ export function createApp(options: AppOptions): App {
     mount(
       createDailyResultScreen({
         result,
+        storage: options.storage,
         onBackToSolo: () => {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);

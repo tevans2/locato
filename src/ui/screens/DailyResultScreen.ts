@@ -1,11 +1,13 @@
 import { DAILY_COUNTRY_COUNT, formatDailyTime } from "../../core/dailyChallenge";
 import { fetchDailySummary, type DailyChallengeResult, type DailySummary } from "../../core/auth";
+import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 
 export interface DailyResultScreenOptions {
   readonly result: DailyResultSave;
+  readonly storage: Storage;
   readonly onBackToSolo: () => void;
   readonly onMultiplayer: () => void;
 }
@@ -13,6 +15,7 @@ export interface DailyResultScreenOptions {
 export function createDailyResultScreen(options: DailyResultScreenOptions): Screen {
   let destroyed = false;
   const { result } = options;
+  const achievementResult = recordDailyAchievement(options.storage, result.date);
   const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
   const backButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
@@ -21,6 +24,26 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
 
   function summaryStat(label: string, value: string): HTMLElement {
     return el("article", { children: [el("span", { text: label }), el("strong", { text: value })] });
+  }
+
+  function achievementList(unlocked: readonly Achievement[]): HTMLElement {
+    return el("section", {
+      className: "achievement-panel",
+      children: [
+        el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: unlocked.length > 0 ? "Unlocked" : "Daily streak" }), el("strong", { text: `${achievementResult.streak} day${achievementResult.streak === 1 ? "" : "s"}` })] }),
+        unlocked.length > 0
+          ? el("div", {
+              className: "achievement-list",
+              children: unlocked.map((achievement) =>
+                el("article", {
+                  className: "achievement-chip",
+                  children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })],
+                }),
+              ),
+            })
+          : el("p", { className: "muted", text: "Come back tomorrow to keep the chain going." }),
+      ],
+    });
   }
 
   function dailyLine(entry: DailyChallengeResult): HTMLElement {
@@ -113,8 +136,10 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
             children: [
               el("article", { children: [el("span", { text: "Time" }), el("strong", { text: formatDailyTime(result.timeMs) })] }),
               el("article", { children: [el("span", { text: "Hints used" }), el("strong", { text: String(result.hintsUsed) })] }),
+              el("article", { children: [el("span", { text: "Daily streak" }), el("strong", { text: String(achievementResult.streak) })] }),
             ],
           }),
+          achievementList(achievementResult.unlocked),
           share,
           el("div", { className: "daily-legend", children: [el("span", { text: "🟩 correct without hint" }), el("span", { text: "🟨 correct with hint" }), el("span", { text: "🟥 missed or skipped" })] }),
           retentionPanel,

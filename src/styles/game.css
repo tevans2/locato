@@ -369,7 +369,7 @@
 
 .daily-result-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -454,6 +454,56 @@
 
 .daily-history-row strong {
   color: var(--text);
+}
+
+.achievement-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(184, 227, 109, 0.22);
+  border-radius: var(--radius-md);
+  background: rgba(184, 227, 109, 0.055);
+}
+
+.achievement-panel.compact {
+  padding: 10px;
+}
+
+.achievement-panel-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.achievement-panel-title strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.achievement-list {
+  display: grid;
+  gap: 7px;
+}
+
+.achievement-chip {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 8, 6, 0.26);
+}
+
+.achievement-chip strong {
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+
+.achievement-chip span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .answer-panel {
@@ -678,6 +728,19 @@
   animation: country-flash 1.4s ease-in-out infinite;
 }
 
+.world-map-country.is-review-missed {
+  fill: rgba(187, 130, 86, 0.62);
+  stroke: rgba(255, 226, 189, 0.86);
+  stroke-width: 0.9;
+}
+
+.world-map-country.is-review-active {
+  fill: rgba(184, 227, 109, 0.82);
+  stroke: rgba(245, 244, 206, 0.95);
+  stroke-width: 1.18;
+  filter: drop-shadow(0 0 10px rgba(184, 227, 109, 0.55));
+}
+
 @keyframes country-flash {
   0%, 100% {
     fill: rgba(237, 74, 67, 0.9);
@@ -717,6 +780,16 @@
 
 .world-map-missing-dot.is-guessed {
   opacity: 0;
+}
+
+.world-map-missing-dot.is-review-missed {
+  opacity: 0.96;
+  fill: var(--earth);
+}
+
+.world-map-missing-dot.is-review-active {
+  opacity: 1;
+  fill: var(--accent);
 }
 
 .world-map-meta {
@@ -787,6 +860,71 @@
 
 .country-guess-panel .actions {
   justify-content: flex-start;
+}
+
+.map-review-panel {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(187, 130, 86, 0.26);
+  border-radius: var(--radius-md);
+  background: rgba(187, 130, 86, 0.055);
+}
+
+.map-review-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.map-review-header strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.map-review-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.map-review-country {
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 9px;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.map-review-country.is-active {
+  border-color: rgba(184, 227, 109, 0.52);
+  background: rgba(184, 227, 109, 0.1);
+}
+
+.map-review-country span,
+.map-review-country small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-review-country span {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 760;
+}
+
+.map-review-country small {
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .country-guess-screen [hidden] {

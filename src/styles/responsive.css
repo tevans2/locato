@@ -125,6 +125,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .daily-result-stats,
+  .map-review-list {
+    grid-template-columns: 1fr;
+  }
+
   .country-guess-mode-card {
     grid-column: 1 / -1;
     justify-content: space-between;

@@ -7,6 +7,7 @@ import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type G
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
+import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
@@ -93,6 +94,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const timerElapsed = el("strong", { className: "stat-value", text: "—" });
   const timerLast = el("strong", { className: "stat-value", text: "—" });
   const timerBest = el("strong", { className: "stat-value", text: "—" });
+  const achievementPanel = el("section", { className: "achievement-panel compact", attrs: { hidden: "true" } });
   const timerPanel = el("div", {
     className: "stats-panel country-guess-stats solo-timer-stats",
     children: [
@@ -108,6 +110,23 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
+
+  function showAchievements(unlocked: readonly Achievement[]): void {
+    if (unlocked.length === 0) return;
+    achievementPanel.hidden = false;
+    achievementPanel.replaceChildren(
+      el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: "Unlocked" }), el("strong", { text: `${unlocked.length} achievement${unlocked.length === 1 ? "" : "s"}` })] }),
+      el("div", {
+        className: "achievement-list",
+        children: unlocked.map((achievement) =>
+          el("article", {
+            className: "achievement-chip",
+            children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })],
+          }),
+        ),
+      }),
+    );
+  }
 
   function renderTimer(): void {
     timerModeSelect.value = playTimer.mode;
@@ -159,6 +178,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "GAME_COMPLETED") {
+        if (!isDailyChallenge) showAchievements(recordSoloAchievements(options.storage, { completed: true, wrongAnswers: engine.getState().wrongAnswers, bestStreak: engine.getState().bestStreak, gameMode: options.selectedGameMode }));
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           void finishTimerRun(finalTimeMs).then((result) => {
@@ -387,6 +407,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
               timerPanel,
               stats.element,
               feedback.element,
+              achievementPanel,
               el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
             ],
           }),
