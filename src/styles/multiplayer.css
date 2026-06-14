@@ -358,6 +358,12 @@
   padding-inline: 14px;
 }
 
+.multiplayer-skip-btn {
+  align-self: flex-start;
+  margin-top: -2px;
+  margin-bottom: 2px;
+}
+
 .multiplayer-feedback {
   min-height: 42px;
   margin: 0 0 10px;

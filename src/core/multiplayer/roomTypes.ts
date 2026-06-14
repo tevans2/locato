@@ -37,6 +37,10 @@ export interface PublicRoomState {
   readonly status: "lobby" | "playing" | "round-result" | "complete";
   readonly players: readonly PublicPlayerState[];
   readonly round: PublicRoundState | null;
+  // Skip votes for the active round. When every connected player has voted, the server reveals
+  // the answer and advances using the normal round-result flow.
+  readonly skipVotes: readonly PlayerId[];
+  readonly skipRequired: number;
   // Start/end of the current time-boxed phase, in server epoch ms. During "playing"
   // this tracks the live round deadline; during "round-result" it tracks the gap until
   // the next round. Null when the phase has no deadline (lobby/complete/untimed round).

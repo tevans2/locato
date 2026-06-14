@@ -13,6 +13,9 @@ import { el } from "../dom/createElement";
 
 export interface FriendsScreenOptions {
   readonly onBack: () => void;
+  readonly initialUsername?: string;
+  readonly currentUsername?: string | null;
+  readonly appOrigin?: string;
   // Invite an online friend to a multiplayer game (wired once presence/invites land).
   readonly onInviteToGame?: (friend: PublicUser) => void;
   // Optional live-update hook: called with a listener, returns an unsubscribe fn.
@@ -33,10 +36,13 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
     className: "friend-add-input",
     attrs: { type: "text", placeholder: "Add by username", autocomplete: "off", maxlength: "20", list: "friend-suggestions", "aria-label": "Friend username" },
   });
+  if (options.initialUsername) addInput.value = options.initialUsername;
   const suggestions = el("datalist", { attrs: { id: "friend-suggestions" } });
   const addButton = el("button", { className: "primary-action", text: "Add", attrs: { type: "submit" } });
+  const copyFriendLinkButton = el("button", { className: "ghost-action", text: "Copy my friend link", attrs: { type: "button" } });
+  copyFriendLinkButton.hidden = !options.currentUsername;
   const addFeedback = el("p", { className: "friend-feedback", attrs: { role: "status" } });
-  const addForm = el("form", { className: "friend-add-form", children: [addInput, addButton, suggestions] });
+  const addForm = el("form", { className: "friend-add-form", children: [addInput, addButton, copyFriendLinkButton, suggestions] });
 
   const incomingList = el("div", { className: "friend-list" });
   const outgoingList = el("div", { className: "friend-list" });
@@ -51,6 +57,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const element = el("section", {
     className: "game-screen friends-screen",
     children: [
+      ...(options.initialUsername ? [el("p", { className: "friend-link-hint", text: `Friend link opened for ${options.initialUsername}. Send a request when you're signed in.` })] : []),
       el("header", { className: "friends-header", children: [el("h1", { text: "Friends" }), backButton] }),
       el("section", { className: "friend-section", children: [el("h2", { text: "Add a friend" }), addForm, addFeedback] }),
       incomingSection,
@@ -137,6 +144,24 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
       addFeedback.className = `friend-feedback${result.ok ? " is-good" : " is-bad"}`;
       if (result.ok) addInput.value = "";
     });
+  });
+
+  copyFriendLinkButton.addEventListener("click", () => {
+    const username = options.currentUsername;
+    if (!username) return;
+    const origin = options.appOrigin ?? window.location.origin;
+    const url = `${origin}/?friend=${encodeURIComponent(username)}`;
+    const text = `Add ${username} as a friend on locato: ${url}`;
+    void navigator.clipboard?.writeText(text).then(
+      () => {
+        addFeedback.textContent = "Friend link copied.";
+        addFeedback.className = "friend-feedback is-good";
+      },
+      () => {
+        addFeedback.textContent = url;
+        addFeedback.className = "friend-feedback";
+      },
+    );
   });
 
   // Suggestions as you type (debounced), so users can find the exact handle.

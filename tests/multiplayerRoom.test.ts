@@ -65,6 +65,45 @@ describe("multiplayer room", () => {
     expect(reveal.answer).toBe(correctAnswer);
   });
 
+  it("reveals the answer when all connected players vote to skip", () => {
+    const room = new Room({
+      code: "SKIP1",
+      hostPlayerId: "host",
+      hostName: "Host",
+      countryIndex,
+      categoryIds: ["flags"],
+      seed: "skip-seed",
+      now: 1000,
+      roundLimit: 1,
+    });
+    expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
+    expect(room.setReady("guest", true, 1020).ok).toBe(true);
+    const start = room.startGame("host", 1030);
+    expect(start.ok).toBe(true);
+
+    const first = room.voteSkip("host", 1040);
+    expect(first.ok).toBe(true);
+    expect(first.ok ? first.messages.some((message) => message.type === "ROUND_ENDED") : false).toBe(false);
+    const firstSnapshot = first.ok ? first.messages.find((message) => message.type === "ROOM_SNAPSHOT") : null;
+    expect(firstSnapshot?.type).toBe("ROOM_SNAPSHOT");
+    if (firstSnapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(firstSnapshot.room.skipVotes).toEqual(["host"]);
+    expect(firstSnapshot.room.skipRequired).toBe(2);
+
+    const second = room.voteSkip("guest", 1050);
+    expect(second.ok).toBe(true);
+    const reveal = second.ok ? second.messages.find((message) => message.type === "ROUND_ENDED") : null;
+    expect(reveal?.type).toBe("ROUND_ENDED");
+    if (reveal?.type !== "ROUND_ENDED") throw new Error("Expected round reveal.");
+    expect(reveal.results.every((result) => result.answeredAt === null && result.guess === null && !result.correct)).toBe(true);
+    const resultSnapshot = second.ok ? second.messages.find((message) => message.type === "ROOM_SNAPSHOT") : null;
+    expect(resultSnapshot?.type).toBe("ROOM_SNAPSHOT");
+    if (resultSnapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(resultSnapshot.room.status).toBe("round-result");
+    expect(resultSnapshot.room.skipVotes).toEqual([]);
+    expect(resultSnapshot.room.skipRequired).toBe(0);
+  });
+
   it("keeps answers private until a round is ended by the authoritative room", () => {
     const room = new Room({
       code: "ABCDE",

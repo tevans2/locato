@@ -7,3 +7,5 @@ dist/
 # Local development and generated scratch files
 i-want-to-create-an-html/work/
 i-want-to-create-an-html/outputs/
+
+.env
