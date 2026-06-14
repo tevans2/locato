@@ -9,6 +9,7 @@ export type ClientMessage =
   | { readonly type: "START_GAME" }
   | { readonly type: "PLAY_AGAIN" }
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
+  | { readonly type: "VOTE_SKIP" }
   | { readonly type: "REQUEST_HINT" };
 
 export type ServerMessage =

@@ -295,6 +295,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     onSubmit: (answer) => {
       transport?.send({ type: "SUBMIT_ANSWER", answer, clientSentAt: Date.now() });
     },
+    onSkip: () => {
+      transport?.send({ type: "VOTE_SKIP" });
+    },
   });
 
   function disconnectCurrentTransport(): void {

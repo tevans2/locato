@@ -29,6 +29,7 @@ export interface MultiplayerGameViewOptions {
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly onSubmit: (answer: string) => void;
+  readonly onSkip: () => void;
 }
 
 function formatScore(value: number): string {
@@ -95,6 +96,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     attrs: { type: "text", autocomplete: "off", autocapitalize: "words", spellcheck: "false", placeholder: "Type the country name" },
   });
   const submitButton = el("button", { className: "primary-action", text: "Submit", attrs: { type: "submit" } });
+  const skipButton = el("button", { className: "ghost-action multiplayer-skip-btn", text: "Skip", attrs: { type: "button" } });
   const answerForm = el("form", {
     className: "guess-form multiplayer-answer-form",
     children: [el("label", { text: "Your answer" }), el("div", { className: "input-row", children: [answerInput, submitButton] })],
@@ -188,7 +190,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           }),
           el("section", {
             className: "answer-panel multiplayer-round-panel multiplayer-answer-panel",
-            children: [roundTitle, answerForm, feedback, resultList],
+            children: [roundTitle, answerForm, skipButton, feedback, resultList],
           }),
         ],
       }),
@@ -198,6 +200,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       }),
     ],
   });
+
+  skipButton.addEventListener("click", () => options.onSkip());
 
   return {
     element,
@@ -224,6 +228,12 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
             : "Waiting for the next round";
       roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : isFlagColorRound ? "Find the target flag" : "Your answer";
       feedback.textContent = state.feedback;
+      const localSkipVoted = state.localPlayerId !== null && state.room.skipVotes.includes(state.localPlayerId);
+      const skipRequired = Math.max(0, state.room.skipRequired);
+      const skipCount = Math.min(state.room.skipVotes.length, skipRequired);
+      skipButton.hidden = !state.canSubmit || skipRequired === 0;
+      skipButton.disabled = !state.canSubmit || localSkipVoted;
+      skipButton.textContent = localSkipVoted ? `Skip voted ${skipCount}/${skipRequired}` : `Skip ${skipCount}/${skipRequired}`;
       answerInput.disabled = !state.canSubmit;
       submitButton.disabled = !state.canSubmit;
       answerForm.hidden = isMapClickRound;

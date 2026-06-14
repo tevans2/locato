@@ -116,6 +116,8 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isNonEmptyString(value.answer, MAX_ANSWER_LENGTH)) return reject("invalid-answer", "Answer is required.");
       if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
       return { ok: true, message: { type: "SUBMIT_ANSWER", answer: value.answer.trim(), clientSentAt: value.clientSentAt } };
+    case "VOTE_SKIP":
+      return { ok: true, message: { type: "VOTE_SKIP" } };
     case "REQUEST_HINT":
       return { ok: true, message: { type: "REQUEST_HINT" } };
     default:
@@ -161,6 +163,9 @@ function isRoom(value: unknown): value is PublicRoomState {
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&
     (value.round === null || isRound(value.round)) &&
+    Array.isArray(value.skipVotes) &&
+    value.skipVotes.every((id) => typeof id === "string") &&
+    isFiniteNumber(value.skipRequired) &&
     (value.phaseStartedAt === null || isFiniteNumber(value.phaseStartedAt)) &&
     (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt))
   );

@@ -78,6 +78,7 @@ export class Room {
   private remainingSlots: PromptSlot[];
   private currentRound: PrivateRoundState | null = null;
   private roundAnswers = new Map<PlayerId, RoundResult>();
+  private skipVotes = new Set<PlayerId>();
   private completedRounds = 0;
   private resultStartedAt: number | null = null;
   private resultEndsAt: number | null = null;
@@ -139,6 +140,8 @@ export class Room {
       status: this.status,
       players: [...this.players.values()].map(toPublicPlayer),
       round: this.publicRound,
+      skipVotes: this.activeSkipVotes(),
+      skipRequired: this.skipRequired(),
       phaseStartedAt: this.phaseStartedAt,
       phaseEndsAt: this.pendingTransitionAt,
     };
@@ -182,6 +185,7 @@ export class Room {
     if (!player) return fail("not-in-room", "Player is not in this room.");
     this.players.set(playerId, { ...player, connected: false, ready: false, streak: 0 });
     this.transferHostIfNeeded();
+    if (this.status === "playing" && this.allConnectedPlayersSkipped()) return ok(this.closeRound(now));
     return ok([this.snapshotMessage()]);
   }
 
@@ -262,6 +266,17 @@ export class Room {
     return ok(this.closeRound(now));
   }
 
+  voteSkip(playerId: PlayerId, now: number): RoomResult {
+    this.touch(now);
+    if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round can be skipped.");
+    const player = this.players.get(playerId);
+    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
+    this.skipVotes.add(playerId);
+    if (this.allConnectedPlayersSkipped()) return ok(this.closeRound(now));
+    return ok([this.snapshotMessage()]);
+  }
+
+
   advanceAfterResult(now: number): RoomResult {
     this.touch(now);
     if (this.status !== "round-result") return fail("round-result-not-open", "Room is not showing a round result.");
@@ -296,6 +311,7 @@ export class Room {
     }
 
     this.roundAnswers = new Map();
+    this.skipVotes = new Set();
     this.resultStartedAt = null;
     this.resultEndsAt = null;
     this.status = "playing";
@@ -314,6 +330,25 @@ export class Room {
     return 100 + Math.min(player.streak, 10) * 10 + timeBonus;
   }
 
+  private connectedPlayerIds(): readonly PlayerId[] {
+    return [...this.players.values()].filter((player) => player.connected).map((player) => player.id);
+  }
+
+  private activeSkipVotes(): readonly PlayerId[] {
+    const connected = new Set(this.connectedPlayerIds());
+    return [...this.skipVotes].filter((playerId) => connected.has(playerId));
+  }
+
+  private skipRequired(): number {
+    return this.status === "playing" ? this.connectedPlayerIds().length : 0;
+  }
+
+  private allConnectedPlayersSkipped(): boolean {
+    const connected = this.connectedPlayerIds();
+    return connected.length > 0 && connected.every((playerId) => this.skipVotes.has(playerId));
+  }
+
+
   // Closes the live round into the result-reveal phase. Reads the reveal/results while the
   // round state is still intact, then arms the result-display deadline the RoomManager uses
   // to schedule the next round.
@@ -323,6 +358,7 @@ export class Room {
     this.completedRounds += 1;
     this.resultStartedAt = now;
     this.resultEndsAt = this.resultDisplayMs > 0 ? now + this.resultDisplayMs : now;
+    this.skipVotes = new Set();
     return [reveal, this.snapshotMessage()];
   }
 

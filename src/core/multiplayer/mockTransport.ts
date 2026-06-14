@@ -42,6 +42,8 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
       status: "lobby",
       players: [createPlayer(HOST_PLAYER_ID, hostName, false), createPlayer(RIVAL_PLAYER_ID, "Rival", true)],
       round: null,
+      skipVotes: [],
+      skipRequired: 0,
       phaseStartedAt: null,
       phaseEndsAt: null,
     };
@@ -82,7 +84,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
     const data = DEMO_ROUNDS[index];
     if (!data) return;
     const round: PublicRoundState = { roundNumber: index + 1, prompt: data.prompt, startedAt, endsAt: startedAt + DEMO_ROUND_MS };
-    room = { ...room, status: "playing", round, phaseStartedAt: startedAt, phaseEndsAt: round.endsAt };
+    room = { ...room, status: "playing", round, skipVotes: [], skipRequired: room.players.filter((player) => player.connected).length, phaseStartedAt: startedAt, phaseEndsAt: round.endsAt };
     emit({ type: index === 0 ? "GAME_STARTED" : "ROUND_STARTED", round });
     emitSnapshot();
   }
@@ -94,7 +96,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
   }
 
   function completeGame(): void {
-    room = { ...room, status: "complete", round: null, phaseStartedAt: null, phaseEndsAt: null };
+    room = { ...room, status: "complete", round: null, skipVotes: [], skipRequired: 0, phaseStartedAt: null, phaseEndsAt: null };
     emit({ type: "GAME_COMPLETED", results: finalStandings() });
     emitSnapshot();
   }
@@ -136,6 +138,8 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           players: [createPlayer(HOST_PLAYER_ID, "Host", true), createPlayer("guest", message.playerName, false)],
           round: null,
           phaseStartedAt: null,
+          skipVotes: [],
+          skipRequired: 0,
           phaseEndsAt: null,
         };
         assign("guest");
@@ -179,6 +183,8 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           ...room,
           status: "lobby",
           round: null,
+          skipVotes: [],
+          skipRequired: 0,
           phaseStartedAt: null,
           phaseEndsAt: null,
           players: room.players.map((player) => ({ ...player, ready: player.id !== assignedPlayerId, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0 })),
@@ -200,7 +206,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         const points = 120 - roundIndex * 10;
         const closedAt = Date.now();
         updateAssignedPlayer((player) => ({ ...player, score: player.score + points, streak: player.streak + 1, correctAnswers: player.correctAnswers + 1 }));
-        room = { ...room, status: "round-result", phaseStartedAt: closedAt, phaseEndsAt: closedAt + DEMO_RESULT_MS };
+        room = { ...room, status: "round-result", skipVotes: [], skipRequired: 0, phaseStartedAt: closedAt, phaseEndsAt: closedAt + DEMO_RESULT_MS };
         emit({ type: "ANSWER_ACCEPTED", playerId: assignedPlayerId, points });
         emit({
           type: "ROUND_ENDED",

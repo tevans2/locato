@@ -51,6 +51,12 @@ describe("multiplayer public protocol", () => {
     expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], roundDurationMs: 5000 }).ok).toBe(false);
   });
 
+  it("accepts skip votes as a client message", () => {
+    const message = parseClientMessage({ type: "VOTE_SKIP" });
+    expect(message.ok).toBe(true);
+    expect(message.ok ? message.message : null).toEqual({ type: "VOTE_SKIP" });
+  });
+
   it("reveals the answer only in round-ended messages", () => {
     const message: ServerMessage = {
       type: "ROUND_ENDED",
