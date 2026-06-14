@@ -6,7 +6,7 @@ export type AppRoute =
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
   | { readonly type: "multiplayer"; readonly joinCode?: string }
   | { readonly type: "stats" }
-  | { readonly type: "friends" }
+  | { readonly type: "friends"; readonly username?: string }
   | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string };
 
 export interface Screen {

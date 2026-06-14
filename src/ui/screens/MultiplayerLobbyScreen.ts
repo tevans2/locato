@@ -577,9 +577,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         render();
         return;
       }
-      void clipboard.writeText(code).then(
+      const origin = window.location.origin;
+      const username = options.authControls?.getUser()?.displayName ?? null;
+      const roomUrl = `${origin}/?room=${encodeURIComponent(code)}`;
+      const shareText = username
+        ? `${username} invited you to play locato.\nJoin here: ${roomUrl}\nRoom code: ${code}`
+        : `Join my locato multiplayer room.\nJoin here: ${roomUrl}\nRoom code: ${code}`;
+      void clipboard.writeText(shareText).then(
         () => {
-          feedback = "Room code copied.";
+          feedback = "Room invite link copied.";
           render();
         },
         () => {

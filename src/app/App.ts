@@ -46,6 +46,15 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
   return createWebSocketMultiplayerTransport(resolveDefaultWebSocketUrl(window.location));
 }
 
+function routeFromLocation(location: Pick<Location, "search">): AppRoute | null {
+  const params = new URLSearchParams(location.search);
+  const room = params.get("room")?.trim();
+  if (room) return { type: "multiplayer", joinCode: room };
+  const friend = params.get("friend")?.trim();
+  if (friend) return { type: "friends", username: friend };
+  return null;
+}
+
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
@@ -399,8 +408,12 @@ export function createApp(options: AppOptions): App {
     }
 
     if (route.type === "friends") {
+      const currentUser = authControls.getUser();
       mount(createFriendsScreen({
         onBack: () => navigate({ type: "solo-game", continueSaved: true }),
+        ...(route.username ? { initialUsername: route.username } : {}),
+        currentUsername: currentUser?.displayName ?? null,
+        appOrigin: window.location.origin,
         subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
           if (message.type !== "GAME_INVITE") listener();
         }),
@@ -434,7 +447,7 @@ export function createApp(options: AppOptions): App {
   });
 
   return {
-    start: () => navigate({ type: "solo-game", continueSaved: true }),
+    start: () => navigate(routeFromLocation(window.location) ?? { type: "solo-game", continueSaved: true }),
     navigate,
   };
 }
