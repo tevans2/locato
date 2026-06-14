@@ -208,7 +208,7 @@ describe("auth routes", () => {
     const result = {
       date: "2026-06-12",
       seed: "daily:2026-06-12",
-      score: 8,
+      score: 80,
       timeMs: 134_000,
       hintsUsed: 1,
       marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
@@ -219,12 +219,13 @@ describe("auth routes", () => {
     const save = await route(service, jsonRequest("/api/daily", "POST", result, token));
     expect(save?.status).toBe(200);
     const savedBody = await save!.json();
-    expect(savedBody.result).toMatchObject({ date: "2026-06-12", score: 8, hintsUsed: 1 });
+    expect(savedBody.result).toMatchObject({ date: "2026-06-12", score: 80, hintsUsed: 1 });
     expect(savedBody.result.shareText).toContain("Locato Daily 2026-06-12");
+    expect(savedBody.result.shareText).toContain("Score: 80/100");
 
     const fetch = await route(service, jsonRequest("/api/daily/2026-06-12", "GET", undefined, token));
     expect(fetch?.status).toBe(200);
-    expect((await fetch!.json()).result.score).toBe(8);
+    expect((await fetch!.json()).result.score).toBe(80);
   });
 
   it("does not overwrite an existing daily result for the same account and date", async () => {
@@ -234,7 +235,7 @@ describe("auth routes", () => {
     const base = {
       date: "2026-06-12",
       seed: "daily:2026-06-12",
-      score: 8,
+      score: 80,
       timeMs: 134_000,
       hintsUsed: 1,
       marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
@@ -243,10 +244,10 @@ describe("auth routes", () => {
     };
 
     await route(service, jsonRequest("/api/daily", "POST", base, token));
-    const replay = await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 10, timeMs: 90_000, hintsUsed: 0, marks: Array(10).fill("correct") }, token));
+    const replay = await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 100, timeMs: 90_000, hintsUsed: 0, marks: Array(10).fill("correct") }, token));
     expect(replay?.status).toBe(200);
     const body = await replay!.json();
-    expect(body.result.score).toBe(8);
+    expect(body.result.score).toBe(80);
     expect(body.result.timeMs).toBe(134_000);
   });
 
@@ -264,7 +265,7 @@ describe("auth routes", () => {
     const base = {
       date: "2026-06-12",
       seed: "daily:2026-06-12",
-      score: 8,
+      score: 80,
       timeMs: 134_000,
       hintsUsed: 1,
       marks: ["correct", "correct", "miss", "correct", "hint", "correct", "correct", "miss", "correct", "correct"],
@@ -274,7 +275,7 @@ describe("auth routes", () => {
 
     await route(service, jsonRequest("/api/daily", "POST", { ...base, date: "2026-06-11", seed: "daily:2026-06-11" }, userToken));
     await route(service, jsonRequest("/api/daily", "POST", base, userToken));
-    await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 7, timeMs: 150_000 }, friendToken));
+    await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 70, timeMs: 150_000 }, friendToken));
 
     const summary = await route(service, jsonRequest("/api/daily/summary?date=2026-06-12", "GET", undefined, userToken));
     expect(summary?.status).toBe(200);
@@ -282,7 +283,13 @@ describe("auth routes", () => {
     expect(body.summary.streak).toBe(2);
     expect(body.summary.history.map((entry: { date: string }) => entry.date)).toEqual(["2026-06-12", "2026-06-11"]);
     expect(body.summary.friendsToday[0].user.username).toBe("daily_pal");
-    expect(body.summary.friendsToday[0].result.score).toBe(7);
+    expect(body.summary.friendsToday[0].result.score).toBe(70);
+
+    const leaderboard = await route(service, jsonRequest("/api/daily/leaderboard?date=2026-06-12", "GET"));
+    expect(leaderboard?.status).toBe(200);
+    const leaderboardBody = await leaderboard!.json();
+    expect(leaderboardBody.entries.map((entry: { user: { username: string } }) => entry.user.username)).toEqual(["daily_summary", "daily_pal"]);
+    expect(leaderboardBody.entries.map((entry: { rank: number }) => entry.rank)).toEqual([1, 2]);
   });
 
   it("falls through for unrelated routes", async () => {

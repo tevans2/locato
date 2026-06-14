@@ -1,5 +1,5 @@
-import { DAILY_COUNTRY_COUNT, formatDailyTime } from "../../core/dailyChallenge";
-import { fetchDailySummary, type DailyChallengeResult, type DailySummary } from "../../core/auth";
+import { DAILY_MAX_SCORE, formatDailyTime } from "../../core/dailyChallenge";
+import { fetchDailyLeaderboard, fetchDailySummary, type DailyChallengeResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
@@ -21,6 +21,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const topBackButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
+  const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
   const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
 
   function summaryStat(label: string, value: string): HTMLElement {
@@ -52,10 +53,37 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       className: "daily-history-row",
       children: [
         el("span", { text: entry.date }),
-        el("strong", { text: `${entry.score}/${DAILY_COUNTRY_COUNT}` }),
+        el("strong", { text: `${entry.score}/${DAILY_MAX_SCORE}` }),
         el("span", { text: formatDailyTime(entry.timeMs) }),
       ],
     });
+  }
+
+  function renderLeaderboard(entries: readonly DailyLeaderboardEntry[] | null): void {
+    if (!entries) {
+      leaderboardPanel.replaceChildren(el("h2", { text: "Today's leaderboard" }), el("p", { className: "muted", text: "Leaderboard is unavailable right now." }));
+      return;
+    }
+
+    leaderboardPanel.replaceChildren(
+      el("h2", { text: "Today's leaderboard" }),
+      el("ul", {
+        className: "daily-history-list daily-leaderboard-list",
+        children:
+          entries.length > 0
+            ? entries.map((entry) =>
+                el("li", {
+                  className: "daily-history-row daily-friend-row",
+                  children: [
+                    el("span", { className: "daily-friend-name", text: `#${entry.rank} ${entry.user.avatarEmoji ?? ""} ${entry.user.username}`.trim() }),
+                    el("strong", { text: `${entry.result.score}/${DAILY_MAX_SCORE}` }),
+                    el("span", { text: `${formatDailyTime(entry.result.timeMs)} · ${entry.result.hintsUsed} hints` }),
+                  ],
+                }),
+              )
+            : [el("li", { className: "daily-history-row", text: "No completed results yet." })],
+      }),
+    );
   }
 
   function renderSummary(summary: DailySummary | null): void {
@@ -70,7 +98,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
         className: "daily-history-row daily-friend-row",
         children: [
           el("span", { className: "daily-friend-name", text: `${entry.user.avatarEmoji ?? ""} ${entry.user.username}`.trim() }),
-          el("strong", { text: `${entry.result.score}/${DAILY_COUNTRY_COUNT}` }),
+          el("strong", { text: `${entry.result.score}/${DAILY_MAX_SCORE}` }),
           el("span", { text: formatDailyTime(entry.result.timeMs) }),
         ],
       }),
@@ -81,7 +109,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
         className: "daily-result-stats daily-retention-stats",
         children: [
           summaryStat("Current streak", String(summary.streak)),
-          summaryStat("Best recent", best ? `${best.score}/${DAILY_COUNTRY_COUNT}` : "-"),
+          summaryStat("Best recent", best ? `${best.score}/${DAILY_MAX_SCORE}` : "-"),
         ],
       }),
       el("div", {
@@ -132,7 +160,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
         className: "daily-result-panel",
         children: [
           el("p", { className: "eyebrow", text: `Daily Challenge ${result.date}` }),
-          el("h1", { text: `${result.score}/${DAILY_COUNTRY_COUNT}` }),
+          el("h1", { text: `${result.score}/${DAILY_MAX_SCORE}` }),
           el("div", {
             className: "daily-result-stats",
             children: [
@@ -144,6 +172,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
           achievementList(achievementResult.unlocked),
           share,
           el("div", { className: "daily-legend", children: [el("span", { text: "🟩 correct without hint" }), el("span", { text: "🟨 correct with hint" }), el("span", { text: "🟥 missed or skipped" })] }),
+          leaderboardPanel,
           retentionPanel,
           el("div", { className: "actions", children: [copyButton, backButton] }),
         ],
@@ -153,6 +182,9 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
 
   void fetchDailySummary(result.date).then((summary) => {
     if (!destroyed) renderSummary(summary);
+  });
+  void fetchDailyLeaderboard(result.date).then((entries) => {
+    if (!destroyed) renderLeaderboard(entries);
   });
 
   return {

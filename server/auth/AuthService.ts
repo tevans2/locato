@@ -11,6 +11,7 @@ import type {
   AdminUserList,
   AuthUser,
   DailyChallengeResult,
+  DailyLeaderboardEntry,
   DailySummary,
   FriendRequestLists,
   FullStats,
@@ -230,6 +231,19 @@ export class AuthService {
       .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.user.username.localeCompare(b.user.username));
 
     return { history, streak, best, friendsToday };
+  }
+
+  getDailyLeaderboard(date: string, limit = 100): readonly DailyLeaderboardEntry[] {
+    return this.store
+      .listDailyResultsForDate(date)
+      .map((entry) => {
+        const user = this.store.findUserById(entry.userId);
+        return user ? { user: this.toPublicUser(user), result: entry.result } : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.result.hintsUsed - b.result.hintsUsed || a.user.username.localeCompare(b.user.username))
+      .slice(0, Math.max(1, Math.min(200, limit)))
+      .map((entry, index) => ({ rank: index + 1, ...entry }));
   }
 
   submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): SubmitBestTimeResult | { error: string } {

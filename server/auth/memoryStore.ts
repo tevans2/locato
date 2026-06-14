@@ -166,6 +166,11 @@ export function createMemoryUserStore(): UserStore {
         return result ? [{ userId, result: { ...result, marks: [...result.marks] } }] : [];
       });
     },
+    listDailyResultsForDate(date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
+      return [...dailyResults.entries()]
+        .filter(([key]) => key.endsWith(`:${date}`))
+        .map(([key, result]) => ({ userId: key.slice(0, -date.length - 1), result: { ...result, marks: [...result.marks] } }));
+    },
     saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
       const key = dailyKey(userId, result.date);
       const existing = dailyResults.get(key);

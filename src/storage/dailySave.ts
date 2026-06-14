@@ -1,10 +1,10 @@
-import { createDailyShareText, DAILY_COUNTRY_COUNT, type DailyRoundMark } from "../core/dailyChallenge";
+import { createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, type DailyRoundMark } from "../core/dailyChallenge";
 
 const DAILY_SAVE_PREFIX = "locato:daily:";
-const DAILY_SAVE_SUFFIX = ":v1";
+const DAILY_SAVE_SUFFIX = ":v2";
 
 export interface DailyResultSave {
-  readonly version: 1;
+  readonly version: 2;
   readonly date: string;
   readonly seed: string;
   readonly score: number;
@@ -22,7 +22,7 @@ export function dailySaveKey(date: string): string {
 export function createDailyResultSave(input: Omit<DailyResultSave, "version" | "shareText" | "completedAt">, completedAt = Date.now()): DailyResultSave {
   return {
     ...input,
-    version: 1,
+    version: 2,
     shareText: createDailyShareText(input.date, input.score, input.timeMs, input.marks),
     completedAt,
   };
@@ -39,10 +39,12 @@ export function readDailyResult(storage: Storage, date: string): DailyResultSave
   try {
     const parsed = JSON.parse(raw) as Partial<DailyResultSave>;
     if (
-      parsed.version !== 1 ||
+      parsed.version !== 2 ||
       parsed.date !== date ||
       typeof parsed.seed !== "string" ||
       typeof parsed.score !== "number" ||
+      parsed.score < 0 ||
+      parsed.score > DAILY_MAX_SCORE ||
       typeof parsed.timeMs !== "number" ||
       typeof parsed.hintsUsed !== "number" ||
       !Array.isArray(parsed.marks) ||

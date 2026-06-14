@@ -98,6 +98,12 @@ export interface DailyFriendResult {
   readonly result: DailyChallengeResult;
 }
 
+export interface DailyLeaderboardEntry {
+  readonly rank: number;
+  readonly user: PublicUser;
+  readonly result: DailyChallengeResult;
+}
+
 export interface DailySummary {
   readonly history: readonly DailyChallengeResult[];
   readonly streak: number;
@@ -262,6 +268,18 @@ export async function fetchDailySummary(date: string): Promise<DailySummary | nu
     if (!response.ok) return null;
     const data = (await response.json()) as { summary?: DailySummary };
     return data.summary ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchDailyLeaderboard(date: string): Promise<readonly DailyLeaderboardEntry[] | null> {
+  try {
+    const params = new URLSearchParams({ date });
+    const response = await fetch(`/api/daily/leaderboard?${params.toString()}`);
+    if (!response.ok) return null;
+    const data = (await response.json()) as { entries?: readonly DailyLeaderboardEntry[] };
+    return data.entries ?? null;
   } catch {
     return null;
   }

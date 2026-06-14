@@ -7,6 +7,7 @@ import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from 
 
 const MAX_STAT_VALUE = 1_000_000;
 const DAILY_COUNTRY_COUNT = 10;
+const DAILY_MAX_SCORE = 100;
 
 function publicRef(user: AuthUser) {
   return { id: user.id, username: user.displayName, avatarEmoji: user.avatarEmoji };
@@ -94,7 +95,7 @@ function formatDailyTime(ms: number): string {
 
 function createDailyShareText(date: string, score: number, timeMs: number, marks: readonly DailyRoundMark[]): string {
   const grid = marks.map((mark) => (mark === "correct" ? "🟩" : mark === "hint" ? "🟨" : "🟥")).join("");
-  return `Locato Daily ${date}\nScore: ${score}/${DAILY_COUNTRY_COUNT}\nTime: ${formatDailyTime(timeMs)}\n${grid}`;
+  return `Locato Daily ${date}\nScore: ${score}/${DAILY_MAX_SCORE}\nTime: ${formatDailyTime(timeMs)}\n${grid}`;
 }
 
 function parseGameResult(body: Record<string, unknown>): GameResult | null {
@@ -118,7 +119,7 @@ function parseGameResult(body: Record<string, unknown>): GameResult | null {
 function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult | null {
   const { date, seed, score, timeMs, hintsUsed, marks, completedAt } = body;
   if (!isDailyDate(date) || seed !== `daily:${date}`) return null;
-  if (!Number.isInteger(score) || typeof score !== "number" || score < 0 || score > DAILY_COUNTRY_COUNT) return null;
+  if (!Number.isInteger(score) || typeof score !== "number" || score < 0 || score > DAILY_MAX_SCORE) return null;
   if (!isDurationMs(timeMs) || !isNonNegInt(hintsUsed)) return null;
   const parsedMarks = parseDailyMarks(marks);
   if (!parsedMarks) return null;
@@ -205,6 +206,12 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const date = url.searchParams.get("date");
     if (!isDailyDate(date)) return json({ error: "Invalid daily challenge date." }, 400);
     return json({ summary: service.getDailySummary(user.id, date) });
+  }
+
+  if (pathname === "/api/daily/leaderboard" && method === "GET") {
+    const date = url.searchParams.get("date");
+    if (!isDailyDate(date)) return json({ error: "Invalid daily challenge date." }, 400);
+    return json({ entries: service.getDailyLeaderboard(date, intParam(url, "limit") ?? 100) });
   }
 
   const dailyMatch = pathname.match(/^\/api\/daily\/(\d{4}-\d{2}-\d{2})$/);
