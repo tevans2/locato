@@ -28,6 +28,7 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
+  readonly onExitDailyChallenge?: () => void;
   readonly onViewStats?: () => void;
   readonly onLeaderboard: () => void;
   readonly getAuthUser: () => AuthUser | null;
@@ -82,6 +83,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const dailyButton = el("button", { className: "ghost-action daily-action", text: "Daily Challenge", attrs: { type: "button", ...(isDailyChallenge ? { disabled: "" } : {}) } });
+  const exitDailyButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
   const timerModeSelect = el("select", {
     className: "country-guess-timer-select",
@@ -354,6 +356,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   );
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
+  exitDailyButton.addEventListener("click", () => options.onExitDailyChallenge?.(), { signal: controller.signal });
   leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
 
   document.addEventListener(
@@ -408,7 +411,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
               stats.element,
               feedback.element,
               achievementPanel,
-              el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
+              el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
             ],
           }),
         ],

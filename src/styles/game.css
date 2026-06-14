@@ -350,12 +350,15 @@
 }
 
 .daily-result-screen {
-  justify-content: center;
+  justify-content: flex-start;
+  overflow: auto;
+  padding-bottom: 18px;
+  scrollbar-width: thin;
 }
 
 .daily-result-panel {
   width: min(620px, 100%);
-  margin: auto;
+  margin: 0 auto;
   display: grid;
   gap: 18px;
 }
@@ -546,7 +549,7 @@
 .answer-panel > .actions,
 .country-guess-panel > .actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   align-items: stretch;
 }
 
