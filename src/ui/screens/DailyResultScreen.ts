@@ -18,6 +18,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const achievementResult = recordDailyAchievement(options.storage, result.date);
   const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
   const backButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
+  const topBackButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
   const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
@@ -111,6 +112,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     }, 1400);
   });
   backButton.addEventListener("click", options.onBackToSolo);
+  topBackButton.addEventListener("click", options.onBackToSolo);
   multiplayerButton.addEventListener("click", options.onMultiplayer);
 
   const element = el("section", {
@@ -123,7 +125,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
             className: "brand-lockup compact",
             children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
           }),
-          el("div", { className: "game-header-actions", children: [multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [topBackButton, multiplayerButton] }),
         ],
       }),
       el("div", {

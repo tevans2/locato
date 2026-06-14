@@ -233,6 +233,7 @@ export function createApp(options: AppOptions): App {
         onStateChange: () => undefined,
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        onExitDailyChallenge: () => navigate({ type: "solo-game", continueSaved: true }),
         onLeaderboard: () => navigate({ type: "leaderboard", mode: "flags" }),
         getAuthUser: () => authControls.getUser(),
         authControls,

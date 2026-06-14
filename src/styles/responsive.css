@@ -69,6 +69,10 @@
     flex-direction: column;
   }
 
+  .game-header-actions {
+    padding-right: 0;
+  }
+
   .mode-controls {
     width: 100%;
     justify-items: stretch;
@@ -126,6 +130,7 @@
   }
 
   .daily-result-stats,
+  .daily-retention-grid,
   .map-review-list {
     grid-template-columns: 1fr;
   }
