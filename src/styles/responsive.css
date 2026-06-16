@@ -294,7 +294,7 @@
     right: 10px;
     bottom: calc(8px + env(safe-area-inset-bottom));
     left: 10px;
-    z-index: 1001;
+    z-index: 1000;
     display: grid;
     align-content: start;
     gap: 12px;
@@ -577,6 +577,47 @@
     padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
   }
 
+  .country-guess-screen.is-mobile-typing {
+    padding-bottom: 0;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-layout {
+    display: block;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-panel {
+    display: contents;
+  }
+
+  .country-guess-screen.is-mobile-typing .panel-title,
+  .country-guess-screen.is-mobile-typing .country-click-prompt,
+  .country-guess-screen.is-mobile-typing .mobile-extras-toggle,
+  .country-guess-screen.is-mobile-typing .mobile-extras-panel,
+  .country-guess-screen.is-mobile-typing .feedback {
+    display: none;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-form {
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(var(--keyboard-offset, 0px) + max(8px, env(safe-area-inset-bottom)));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 130;
+    margin: 0;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.38);
+  }
+
+  .country-guess-screen.is-mobile-typing .world-map-panel,
+  .country-guess-screen.is-mobile-typing .world-globe-panel {
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 120;
+    height: clamp(240px, calc(100svh - max(var(--keyboard-offset, 0px), 38vh) - 86px), 430px);
+    min-height: 240px;
+  }
+
   .answer-panel {
     gap: 7px;
   }
@@ -737,8 +778,8 @@
   }
 
   .country-guess-screen.is-mobile-typing .world-map-svg,
-  .country-guess-screen.is-mobile-typing .world-globe-panel {
-    min-height: clamp(220px, 46svh, 390px);
+  .country-guess-screen.is-mobile-typing .world-globe-canvas {
+    min-height: 100%;
   }
 
   .stats-panel,
@@ -760,6 +801,7 @@
     right: 12px;
     bottom: calc(8px + env(safe-area-inset-bottom));
     left: 12px !important;
+    z-index: 1002;
     width: auto !important;
     max-height: none;
     border-radius: 18px;

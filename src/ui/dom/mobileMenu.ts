@@ -11,6 +11,12 @@ export interface MobileMenu {
   readonly close: () => void;
 }
 
+function closeOpenDropdowns(): void {
+  for (const dropdown of document.querySelectorAll<HTMLDetailsElement>(".category-dropdown[open]")) {
+    dropdown.open = false;
+  }
+}
+
 export function createMobileMenu(title: string, sections: readonly MobileMenuSection[], signal: AbortSignal): MobileMenu {
   const button = el("button", {
     className: "ghost-action nav-action mobile-nav-trigger",
@@ -32,6 +38,7 @@ export function createMobileMenu(title: string, sections: readonly MobileMenuSec
   };
 
   const open = (): void => {
+    closeOpenDropdowns();
     sheet.hidden = false;
     button.setAttribute("aria-expanded", "true");
   };
