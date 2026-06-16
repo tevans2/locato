@@ -2,17 +2,19 @@ import { soloPromptCategories } from "./categories";
 
 export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
-export type GameModeId = PromptGameModeId | WorldMapGameModeId;
+export type StreetViewGameModeId = "streetview-country";
+export type GameModeId = PromptGameModeId | WorldMapGameModeId | StreetViewGameModeId;
 
 export interface GameModeOption {
   readonly id: GameModeId;
   readonly label: string;
   readonly description: string;
-  readonly group: "Prompt games" | "World map games";
+  readonly group: "Prompt games" | "World map games" | "Street View games";
 }
 
 const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
+const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
 
 export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
   const category = soloPromptCategories.find((item) => item.id === id);
@@ -51,7 +53,16 @@ export const worldMapGameModeOptions: readonly GameModeOption[] = [
   },
 ];
 
-export const gameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
+export const streetViewGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "streetview-country",
+    label: "Street View Country",
+    description: "Interactive Street View challenge: guess the hidden country from up to 3 moveable frames.",
+    group: "Street View games",
+  },
+];
+
+export const gameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions, ...streetViewGameModeOptions];
 
 export function isPromptGameModeId(id: string): id is PromptGameModeId {
   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
@@ -59,6 +70,10 @@ export function isPromptGameModeId(id: string): id is PromptGameModeId {
 
 export function isWorldMapGameModeId(id: string): id is WorldMapGameModeId {
   return WORLD_MAP_GAME_MODE_IDS.includes(id as WorldMapGameModeId);
+}
+
+export function isStreetViewGameModeId(id: string): id is StreetViewGameModeId {
+  return STREET_VIEW_GAME_MODE_IDS.includes(id as StreetViewGameModeId);
 }
 
 export function getGameModeOption(id: GameModeId): GameModeOption {

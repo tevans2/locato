@@ -4,6 +4,7 @@ export type AppRoute =
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean }
   | { readonly type: "daily-challenge" }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
+  | { readonly type: "streetview-country" }
   | { readonly type: "multiplayer"; readonly joinCode?: string }
   | { readonly type: "stats" }
   | { readonly type: "friends"; readonly username?: string }

@@ -2,13 +2,14 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
-import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
 import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
+import { createStreetViewCountryScreen } from "../ui/screens/StreetViewCountryScreen";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
@@ -296,6 +297,11 @@ export function createApp(options: AppOptions): App {
 
     if (isWorldMapGameModeId(gameMode)) {
       navigate({ type: "country-guessing", mode: gameMode });
+      return;
+    }
+
+    if (isStreetViewGameModeId(gameMode)) {
+      navigate({ type: "streetview-country" });
     }
   }
 
@@ -342,6 +348,16 @@ export function createApp(options: AppOptions): App {
 
       loading.element.textContent = error instanceof Error ? error.message : "Unable to load world map data.";
     }
+  }
+
+  function startStreetViewCountry(): void {
+    mount(
+      createStreetViewCountryScreen({
+        countryIndex: options.countryIndex,
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
+      }),
+    );
   }
 
   async function startMultiplayer(joinCode?: string): Promise<void> {
@@ -407,6 +423,10 @@ export function createApp(options: AppOptions): App {
 
     if (route.type === "country-guessing") {
       void startCountryGuessing(route.mode ?? "name-all");
+      return;
+    }
+    if (route.type === "streetview-country") {
+      startStreetViewCountry();
       return;
     }
     if (route.type === "multiplayer") {

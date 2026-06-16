@@ -1484,3 +1484,104 @@
 .category-picker-menu {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+.streetview-country-screen {
+  min-height: 100dvh;
+}
+
+.streetview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: clamp(12px, 2vw, 20px);
+  align-items: stretch;
+  min-height: min(720px, calc(100dvh - 110px));
+}
+
+.streetview-stage {
+  position: relative;
+  overflow: hidden;
+  --streetview-ui-crop-x: 360px;
+  --streetview-ui-crop-y: 145px;
+  min-height: 420px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: var(--shadow-panel);
+}
+
+.streetview-frame {
+  display: block;
+  position: absolute;
+  top: calc(var(--streetview-ui-crop-y) * -1);
+  right: calc(var(--streetview-ui-crop-x) * -1);
+  bottom: calc(var(--streetview-ui-crop-y) * -1);
+  left: calc(var(--streetview-ui-crop-x) * -1);
+  width: calc(100% + (var(--streetview-ui-crop-x) * 2));
+  height: calc(100% + (var(--streetview-ui-crop-y) * 2));
+  min-height: 0;
+  border: 0;
+  pointer-events: auto;
+}
+
+.streetview-preload-frame {
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.streetview-missing-key {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: inherit;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.streetview-missing-key strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.streetview-panel {
+  min-height: 0;
+}
+
+.streetview-rules {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.streetview-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.streetview-stats .previous-guesses-card {
+  grid-column: 1 / -1;
+}
+
+.streetview-result {
+  display: block;
+  min-height: 1.4em;
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .streetview-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .streetview-stage {
+    min-height: 52dvh;
+    --streetview-ui-crop-x: 300px;
+    --streetview-ui-crop-y: 130px;
+  }
+}
