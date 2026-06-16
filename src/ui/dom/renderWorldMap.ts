@@ -8,6 +8,7 @@ import {
   type WorldMapPolygon,
   type WorldMapPosition,
 } from "../../core/map";
+import { isTouchKeyboardViewport } from "./mobileKeyboard";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const VIEWBOX_WIDTH = MAP_VIEWBOX_WIDTH;
@@ -437,6 +438,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    if (event.pointerType === "touch" && isTouchKeyboardViewport()) return;
     event.preventDefault();
     panState = {
       pointerId: event.pointerId,

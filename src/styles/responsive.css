@@ -36,22 +36,28 @@
 }
 
 @media (max-width: 700px) {
-  /* Mobile: drop the fixed-viewport desktop shell and let the document scroll, so the prompt,
-     input, actions, and scoreboard are never clipped behind the fold or the on-screen keyboard. */
+  /* Mobile scrolls inside the app shell instead of relying on body scrolling.
+     iOS/Chrome can keep body locked while the virtual keyboard is active. */
   html,
   body {
-    overflow: visible;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
-    overflow-y: auto;
+    overscroll-behavior-y: none;
   }
 
   .app-shell {
     width: 100%;
-    height: auto;
-    min-height: 100dvh;
+    height: 100dvh;
+    min-height: 100svh;
     display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     padding: 10px 12px max(16px, env(safe-area-inset-bottom));
   }
 
@@ -297,22 +303,27 @@
 /* Mobile hardening: keep controls reachable, avoid iOS safe-area overlap, and make dropdowns act like bottom sheets. */
 @media (max-width: 700px) {
   html {
-    overflow-x: hidden;
+    overflow: hidden;
   }
 
   body {
-    min-height: 100svh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: none;
+    min-height: 100%;
+    overflow: hidden;
   }
 
   .app-shell {
+    height: 100dvh;
     min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding-top: max(56px, calc(12px + env(safe-area-inset-top)));
     padding-right: max(10px, env(safe-area-inset-right));
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
     padding-left: max(10px, env(safe-area-inset-left));
+  }
+
+  .app-shell.is-mobile-typing-shell {
+    padding-top: max(4px, env(safe-area-inset-top));
   }
 
   .game-screen {
@@ -354,6 +365,20 @@
     overscroll-behavior: contain;
   }
 
+  html,
+  body,
+  .app-shell,
+  .game-screen,
+  .game-screen * {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .puzzle-piece-card,
+  .puzzle-piece-card * {
+    touch-action: none;
+  }
+
   .world-map-control-button {
     min-width: 44px;
     min-height: 44px;
@@ -364,6 +389,61 @@
     gap: 8px;
     overflow: visible;
   }
+
+  .feedback {
+    max-height: 5.2em;
+    overflow-y: auto;
+  }
+
+  .guess-form {
+    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 96px);
+  }
+
+  .game-screen.is-mobile-typing {
+    gap: 8px;
+    padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
+  }
+
+  .game-screen.is-mobile-typing .game-header {
+    display: none;
+  }
+
+  .game-screen.is-mobile-typing .guess-form {
+    padding: 8px;
+    border: 1px solid rgba(184, 227, 109, 0.32);
+    border-radius: var(--radius-sm);
+    background: rgba(8, 12, 8, 0.92);
+    backdrop-filter: blur(14px);
+  }
+
+  .game-screen.is-mobile-typing .guess-form label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .game-screen.is-mobile-typing .feedback {
+    min-height: 0;
+    max-height: 3.4em;
+    padding: 7px 9px;
+  }
+
+  .game-screen.is-mobile-typing .flag-slot {
+    min-height: clamp(150px, 34svh, 280px);
+  }
+
+  .game-screen.is-mobile-typing .daily-map-prompt .world-map-panel {
+    min-height: clamp(190px, 40svh, 320px);
+  }
+
+  .country-guess-screen.is-mobile-typing .world-map-svg,
+  .country-guess-screen.is-mobile-typing .world-globe-panel {
+    min-height: clamp(220px, 46svh, 390px);
+  }
+
 
   .stats-panel,
   .answer-panel .stats-panel {

@@ -19,6 +19,7 @@ import { createPromptView, updatePromptView, type PromptView } from "../dom/rend
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
+import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -61,9 +62,6 @@ function countryForGuess(index: CountryIndex, answer: string): Country | null {
   return null;
 }
 
-function shouldAutoFocusInput(): boolean {
-  return window.matchMedia("(hover: hover) and (pointer: fine)").matches && window.innerWidth > 700;
-}
 
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
@@ -83,7 +81,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const atlas = createAtlasView(countries);
   const views: SoloViews = { stats, prompt, feedback, atlas };
   const input = el("input", {
-    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", spellcheck: "false", placeholder: "e.g. Brazil, Japan, ZA..." },
+    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
   const submitButton = el("button", { className: "primary-action", text: "Lock in", attrs: { type: "submit" } });
   const hintButton = el("button", { className: "secondary-action", text: "Hint", attrs: { type: "button" } });
@@ -312,8 +310,12 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     if (isDailyChallenge) recordDailyEvents(events);
     applyEvents(events);
     render(persist);
-    if (events.some((event) => event.type === "GUESS_CORRECT")) input.value = "";
-    if (engine.getState().status === "playing" && shouldAutoFocusInput()) input.focus();
+    const correct = events.some((event) => event.type === "GUESS_CORRECT");
+    if (correct) {
+      input.value = "";
+      dismissKeyboardIfTouchInput(input);
+    }
+    if (engine.getState().status === "playing" && shouldAutoFocusTextInput()) input.focus();
     if (isDailyChallenge) completeDailyIfNeeded(events);
   }
 
@@ -372,7 +374,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
       }
       dispatchAndRender(engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now() }));
-      if (engine.getState().lastResult?.type === "wrong") input.select();
+      if (engine.getState().lastResult?.type === "wrong" && shouldAutoFocusTextInput()) input.select();
     },
     { signal: controller.signal },
   );
@@ -389,15 +391,20 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   hintButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       const command = engine.getState().hintLevel >= TOTAL_HINTS ? ({ type: "REVEAL_ANSWER", now: Date.now() } as const) : ({ type: "REQUEST_HINT", now: Date.now() } as const);
       dispatchAndRender(engine.dispatch(command));
     },
     { signal: controller.signal },
   );
-  skipButton.addEventListener("click", () => dispatchAndRender(engine.dispatch(isDailyChallenge ? { type: "REVEAL_ANSWER", now: Date.now() } : { type: "SKIP_ROUND", now: Date.now() })), { signal: controller.signal });
+  skipButton.addEventListener("click", () => {
+    dismissKeyboardIfTouchInput(input);
+    dispatchAndRender(engine.dispatch(isDailyChallenge ? { type: "REVEAL_ANSWER", now: Date.now() } : { type: "SKIP_ROUND", now: Date.now() }));
+  }, { signal: controller.signal });
   resetButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       resetRun(playTimer.mode === "count-up" ? "Timer reset. Start with your first correct answer." : "Fresh run started.");
     },
     { signal: controller.signal },
@@ -407,6 +414,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     () => {
       const nextMode: PlayTimerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
       playTimer.setMode(nextMode);
+      dismissKeyboardIfTouchInput(input);
       resetRun(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct answer." : "Practice mode ready.");
     },
     { signal: controller.signal },
@@ -476,6 +484,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     ],
   });
 
+  bindKeyboardAwareInput(element, input, controller.signal);
   render();
   showFeedback(feedback, initialState.lastResult?.message ?? "First prompt is ready. Type the country when you know it.", "neutral");
 

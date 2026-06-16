@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { isTouchKeyboardViewport } from "./mobileKeyboard";
 import type { CountryId, CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
 
@@ -219,6 +220,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
 
   renderer.domElement.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    if (event.pointerType === "touch" && isTouchKeyboardViewport()) return;
     dragging = true;
     moved = false;
     lastX = event.clientX;
@@ -247,6 +249,13 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     if (countryId === null || (clickableCountryIds && !clickableCountryIds.has(countryId))) return;
     options.onCountryClick?.(countryId);
   }
+
+  renderer.domElement.addEventListener("click", (event) => {
+    if (!isTouchKeyboardViewport()) return;
+    const countryId = countryIdFromPointer(event);
+    if (countryId === null || (clickableCountryIds && !clickableCountryIds.has(countryId))) return;
+    options.onCountryClick?.(countryId);
+  });
 
   renderer.domElement.addEventListener("pointerup", finishPointer);
   renderer.domElement.addEventListener("pointercancel", finishPointer);

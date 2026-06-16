@@ -14,6 +14,7 @@ import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createGlobeMapView } from "../dom/renderGlobeMap";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
+import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 
 export interface WorldMapRunResult {
   readonly playMode: WorldMapGameModeId;
@@ -40,9 +41,6 @@ export interface CountryGuessingScreenOptions {
 type CountryGuessPlayMode = WorldMapGameModeId;
 type MapSurface = "flat" | "globe";
 
-function shouldAutoFocusInput(): boolean {
-  return window.matchMedia("(hover: hover) and (pointer: fine)").matches && window.innerWidth > 700;
-}
 
 function createLogo(): HTMLElement {
   return el("div", {
@@ -270,7 +268,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     playTimer.reset();
     render();
     showFeedback(feedback, feedbackMessage, "neutral");
-    if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusInput()) input.focus();
+    if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusTextInput()) input.focus();
   }
 
   function recordGuess(country: Country): void {
@@ -283,6 +281,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       lastFocusedSpotTargetId = null;
       render();
       input.value = "";
+      dismissKeyboardIfTouchInput(input);
       map.resetView();
 
       if (complete()) {
@@ -375,13 +374,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     if (country && country.id !== targetCountry.id) {
       showFeedback(feedback, `That's ${country.name}, not the highlighted country.`, "bad");
-      if (showMiss) input.select();
+      if (showMiss && shouldAutoFocusTextInput()) input.select();
       return;
     }
 
     if (showMiss && input.value.trim()) {
       showFeedback(feedback, "Not quite. Name the highlighted country.", "neutral");
-      input.select();
+      if (shouldAutoFocusTextInput()) input.select();
     }
   }
 
@@ -398,7 +397,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     if (showMiss && input.value.trim()) {
       showFeedback(feedback, "No new country detected yet.", "neutral");
-      input.select();
+      if (shouldAutoFocusTextInput()) input.select();
     }
   }
 
@@ -441,6 +440,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (playTimer.mode === "count-up") playTimer.stop();
     runGivenUp = true;
     showMissingCountries = true;
+    dismissKeyboardIfTouchInput(input);
     input.value = "";
     activeReviewCountryId = null;
     render();
@@ -525,7 +525,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
-    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", spellcheck: "false", placeholder: "e.g. Brazil, Japan, ZA..." },
+    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
   const submitButton = el("button", { className: "primary-action", text: "Lock in", attrs: { type: "submit" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
@@ -655,6 +655,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   showMissingButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       showMissingCountries = !showMissingCountries;
       render();
     },
@@ -663,6 +664,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   mapSurfaceButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       mapSurface = mapSurface === "flat" ? "globe" : "flat";
       map.showCountryLabel(null);
       globe.showCountryLabel(null);
@@ -702,6 +704,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   resetButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       resetGame(
         playTimer.mode === "count-up"
           ? "Timer reset. Start with your first correct move."
@@ -768,7 +771,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
           : "Start typing country names. Matches highlight instantly on the map.",
     "neutral",
   );
-  if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusInput()) queueMicrotask(() => input.focus());
+  bindKeyboardAwareInput(element, input, controller.signal);
+  if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusTextInput()) queueMicrotask(() => input.focus());
 
   return {
     element,
