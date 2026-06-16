@@ -531,7 +531,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const input = el("input", {
     attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
-  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Lock in", attrs: { type: "submit", "aria-label": "Submit guess" } });
+  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const timerModeSelect = el("select", {
     className: "country-guess-timer-select",

@@ -85,9 +85,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const input = el("input", {
     attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
-  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Lock in", attrs: { type: "submit", "aria-label": "Submit guess" } });
-  const hintButton = el("button", { className: "secondary-action", text: "Hint", attrs: { type: "button" } });
-  const skipButton = el("button", { className: "secondary-action", text: "Skip", attrs: { type: "button" } });
+  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
+  const hintButton = el("button", { className: "secondary-action hint-action", text: "Hint", attrs: { type: "button", "aria-label": "Get a hint" } });
+  const skipButton = el("button", { className: "secondary-action", text: "Pass", attrs: { type: "button", "aria-label": "Reveal this answer" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
   const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge", ...(isDailyChallenge ? { disabled: "" } : {}) } });
@@ -385,6 +385,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     mobileHintButton.textContent = hintLabel;
     hintButton.classList.toggle("is-reveal-armed", revealAnswerReady);
     mobileHintButton.classList.toggle("is-reveal-armed", revealAnswerReady);
+    hintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
     mobileHintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
     skipButton.disabled = !playing;
     mobileSkipButton.disabled = !playing;

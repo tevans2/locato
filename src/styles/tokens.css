@@ -18,5 +18,9 @@
   --radius-md: 5px;
   --radius-lg: 7px;
   --shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+  --app-shell-max-width: 1480px;
+  --app-shell-gutter: clamp(24px, 5vw, 56px);
+  --header-control-height: 46px;
+  --floating-auth-clearance: 132px;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
 }

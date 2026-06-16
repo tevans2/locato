@@ -642,7 +642,7 @@
     min-width: 0;
     min-height: 46px;
     padding: 0;
-    border-radius: var(--radius-sm);
+    border-radius: 999px;
     font-size: 0;
     line-height: 1;
   }

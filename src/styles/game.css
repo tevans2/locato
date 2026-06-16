@@ -54,7 +54,7 @@
   min-height: 42px;
   padding: 0 14px;
   border: 1px solid rgba(232, 226, 211, 0.16);
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
   list-style: none;
   background:
@@ -584,6 +584,11 @@
   width: 100%;
 }
 
+.answer-panel > .actions button,
+.country-guess-panel > .actions button {
+  border-radius: 999px;
+}
+
 .answer-panel > .actions .atlas-open,
 .country-guess-panel > .actions .atlas-open {
   width: 100%;
@@ -627,6 +632,50 @@
   min-width: 104px;
   padding-inline: 22px;
   white-space: nowrap;
+}
+
+.guess-submit-action,
+.hint-action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+}
+
+.guess-submit-action::before {
+  content: "↵";
+  font-size: 1.2em;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.hint-action {
+  color: var(--accent);
+  border-color: rgba(184, 227, 109, 0.38);
+  background: rgba(184, 227, 109, 0.1);
+}
+
+.hint-action:hover:not(:disabled) {
+  border-color: rgba(184, 227, 109, 0.62);
+  background: rgba(184, 227, 109, 0.14);
+}
+
+.hint-action.is-reveal-armed {
+  color: var(--earth);
+  border-color: rgba(187, 130, 86, 0.48);
+  background: rgba(187, 130, 86, 0.12);
+}
+
+.hint-action::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  background: currentColor;
+  mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
+  -webkit-mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
 }
 
 .mobile-daily-actions,
@@ -1350,8 +1399,77 @@
 .game-header-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
-  /* The persistent auth button is fixed beside this row; keep a small safe area so menus never overlap it. */
-  padding-right: 74px;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 10px;
+  /* Leave room for the persistent auth button so top-row controls never sit underneath it. */
+  padding-right: var(--floating-auth-clearance);
+}
+
+@media (min-width: 701px) {
+  .game-header {
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .game-header-left,
+  .game-header-actions {
+    align-items: center;
+  }
+
+  .game-header-actions {
+    gap: 14px;
+  }
+
+  .game-header .nav-action,
+  .game-header .game-mode-dropdown .category-dropdown-summary,
+  .game-header .daily-badge,
+  .stats-header .screen-back-button,
+  .stats-header .screen-header-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--header-control-height);
+    border-radius: 999px;
+    border-color: rgba(232, 226, 211, 0.16);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+      rgba(17, 23, 16, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.18);
+    white-space: nowrap;
+  }
+
+  .game-header .nav-action,
+  .stats-header .screen-back-button,
+  .stats-header .screen-header-action {
+    padding-inline: 22px;
+  }
+
+  .game-header .nav-action {
+    flex: 0 0 auto;
+  }
+
+  .game-header .game-mode-dropdown .category-dropdown-summary,
+  .game-header .daily-badge {
+    padding-inline: 24px;
+  }
+
+  .game-header .nav-action:hover:not(:disabled),
+  .game-header .game-mode-dropdown .category-dropdown-summary:hover,
+  .game-header .game-mode-dropdown[open] .category-dropdown-summary,
+  .stats-header .screen-back-button:hover:not(:disabled),
+  .stats-header .screen-header-action:hover:not(:disabled) {
+    border-color: rgba(184, 227, 109, 0.42);
+    background:
+      linear-gradient(180deg, rgba(184, 227, 109, 0.12), rgba(255, 255, 255, 0.035)),
+      rgba(17, 23, 16, 0.96);
+    box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.22);
+  }
+
+  .game-header .game-mode-dropdown .category-dropdown-summary::after {
+    margin-left: 6px;
+  }
 }
 
 .game-mode-dropdown {
