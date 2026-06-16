@@ -451,8 +451,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   }
 
   function render(): void {
-    statusText.textContent = `${status}: ${feedback}`;
     const hasRoom = room !== null;
+    statusText.hidden = !hasRoom;
+    statusText.textContent = `${status}: ${feedback}`;
     setupPanel.hidden = hasRoom;
     lobbyPanel.hidden = !hasRoom || room?.status !== "lobby";
     gameView.element.hidden = !hasRoom || room?.status === "lobby";

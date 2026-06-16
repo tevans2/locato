@@ -591,7 +591,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     stats.element,
     feedback.element,
     achievementPanel,
-    el("div", { className: "actions", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
+    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
   );
 
   const element = el("section", {

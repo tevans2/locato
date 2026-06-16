@@ -566,32 +566,54 @@
 }
 
 .answer-panel > .actions,
-.country-guess-panel > .actions {
+.country-guess-panel > .actions,
+.answer-panel .mobile-extras-panel > .actions,
+.country-guess-panel .mobile-extras-panel > .actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   align-items: stretch;
 }
 
+/* The desktop extras container uses display: contents, so action rows inside it are not
+   direct children of the answer panel. Keep Atlas participating in the same grid as Hint,
+   Pass and Restart instead of keeping the global auto-left margin that pushed it onto a
+   second row. */
+.answer-panel .solo-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .answer-panel > .actions .atlas-shell,
-.country-guess-panel > .actions .atlas-shell {
+.country-guess-panel > .actions .atlas-shell,
+.answer-panel .mobile-extras-panel > .actions .atlas-shell,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-shell {
   margin-left: 0;
 }
 
 .answer-panel > .actions button,
 .answer-panel > .actions .atlas-shell,
 .country-guess-panel > .actions button,
-.country-guess-panel > .actions .atlas-shell {
+.country-guess-panel > .actions .atlas-shell,
+.answer-panel .mobile-extras-panel > .actions button,
+.answer-panel .mobile-extras-panel > .actions .atlas-shell,
+.country-guess-panel .mobile-extras-panel > .actions button,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-shell {
   width: 100%;
+  min-width: 0;
 }
 
 .answer-panel > .actions button,
-.country-guess-panel > .actions button {
+.country-guess-panel > .actions button,
+.answer-panel .mobile-extras-panel > .actions button,
+.country-guess-panel .mobile-extras-panel > .actions button {
   border-radius: 999px;
 }
 
 .answer-panel > .actions .atlas-open,
-.country-guess-panel > .actions .atlas-open {
+.country-guess-panel > .actions .atlas-open,
+.answer-panel .mobile-extras-panel > .actions .atlas-open,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-open {
   width: 100%;
+  min-width: 0;
 }
 
 .panel-title {
