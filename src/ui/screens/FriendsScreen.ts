@@ -63,7 +63,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const outgoingSection = el("section", { className: "friend-section", children: [el("h2", { text: "Sent" }), outgoingList] });
   const friendsSection = el("section", { className: "friend-section", children: [el("h2", { text: "Friends" }), friendsList] });
 
-  const backButton = el("button", { className: "ghost-action", text: "Back", attrs: { type: "button" }, on: { click: () => options.onBack() } });
+  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" }, on: { click: () => options.onBack() } });
 
   const element = el("section", {
     className: "game-screen friends-screen",

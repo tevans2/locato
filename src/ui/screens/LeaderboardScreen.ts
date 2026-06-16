@@ -65,8 +65,8 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
   const statusText = el("p", { className: "leaderboard-status", attrs: { role: "status" } });
   const userRankText = el("p", { className: "leaderboard-user-rank" });
   const list = el("ol", { className: "leaderboard global-leaderboard" });
-  const backButton = el("button", { className: "ghost-action", text: "Back to game", attrs: { type: "button" } });
-  const signInButton = el("button", { className: "secondary-action", text: "Sign in", attrs: { type: "button", hidden: "true" } });
+  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
+  const signInButton = el("button", { className: "secondary-action screen-header-action", text: "Sign in", attrs: { type: "button", hidden: "true" } });
   const postLocalBestButton = el("button", { className: "secondary-action", text: "Post saved best", attrs: { type: "button", hidden: "true" } });
 
   const variantFilter = el("label", {
@@ -172,10 +172,10 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     className: "game-screen leaderboard-screen",
     children: [
       el("header", {
-        className: "game-header",
+        className: "stats-header leaderboard-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo()] }),
-          el("div", { className: "game-header-actions", children: [backButton, signInButton] }),
+          el("div", { className: "stats-header-title", children: [createLogo(), el("h1", { text: "Leaderboards" })] }),
+          el("div", { className: "screen-header-actions", children: [backButton, signInButton] }),
         ],
       }),
       el("div", {

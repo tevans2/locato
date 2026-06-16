@@ -315,19 +315,24 @@
 
 @media (max-width: 700px) {
   .auth-trigger {
-    top: max(10px, env(safe-area-inset-top));
-    right: max(10px, env(safe-area-inset-right));
-    width: auto;
-    min-height: 40px;
+    display: none;
   }
 
   .auth-trigger.is-authenticated {
-    width: 40px;
-    height: 40px;
+    min-width: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+
+  .auth-avatar,
+  .auth-initial {
+    width: 22px;
+    height: 22px;
   }
 
   .auth-panel {
-    top: max(58px, calc(env(safe-area-inset-top) + 54px));
+    top: max(44px, calc(env(safe-area-inset-top) + 40px));
     right: 10px;
     left: 10px;
     width: auto;

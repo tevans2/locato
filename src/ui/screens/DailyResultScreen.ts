@@ -17,9 +17,9 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const { result } = options;
   const achievementResult = recordDailyAchievement(options.storage, result.date);
   const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
-  const backButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
-  const topBackButton = el("button", { className: "ghost-action", text: "Back to modes", attrs: { type: "button" } });
-  const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
+  const backButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
+  const topBackButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
+  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
   const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
   const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });

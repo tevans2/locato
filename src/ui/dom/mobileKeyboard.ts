@@ -20,9 +20,22 @@ function scrollContainerFor(root: HTMLElement): HTMLElement | null {
   return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : null;
 }
 
+function isVisibleElement(element: HTMLElement): boolean {
+  return !element.hidden && element.offsetParent !== null;
+}
+
+function keyboardAnchorFor(root: HTMLElement): HTMLElement | null {
+  const selectors = [".flag-card", ".world-map-panel", ".world-globe-panel", ".puzzle-board"] as const;
+  for (const selector of selectors) {
+    const element = root.querySelector<HTMLElement>(selector);
+    if (element && isVisibleElement(element)) return element;
+  }
+  return null;
+}
+
 function alignBoardToViewportTop(root: HTMLElement): void {
   const scrollContainer = scrollContainerFor(root);
-  const board = root.querySelector<HTMLElement>(".flag-card");
+  const board = keyboardAnchorFor(root);
   if (!scrollContainer || !board) return;
 
   const containerRect = scrollContainer.getBoundingClientRect();
@@ -45,6 +58,7 @@ export function dismissKeyboardIfTouchInput(input: HTMLInputElement): void {
 
 export function bindKeyboardAwareInput(root: HTMLElement, input: HTMLInputElement, signal: AbortSignal): void {
   const visualViewport = window.visualViewport;
+  const alignmentTimeouts = new Set<number>();
   let touchStartY: number | null = null;
 
   const updateKeyboardOffset = (): void => {
@@ -64,6 +78,26 @@ export function bindKeyboardAwareInput(root: HTMLElement, input: HTMLInputElemen
     root.classList.toggle("is-mobile-typing", isTyping);
     scrollContainerFor(root)?.classList.toggle("is-mobile-typing-shell", isTyping);
     updateKeyboardOffset();
+  };
+
+  const alignKeyboardAnchor = (): void => {
+    if (document.activeElement !== input || !isTouchKeyboardViewport()) return;
+    alignBoardToViewportTop(root);
+  };
+
+  const scheduleKeyboardAnchorAlignment = (): void => {
+    if (document.activeElement !== input || !isTouchKeyboardViewport()) return;
+    requestAnimationFrame(() => {
+      alignKeyboardAnchor();
+      requestAnimationFrame(alignKeyboardAnchor);
+    });
+    for (const delay of [80, 180, 360]) {
+      const timeoutId = window.setTimeout(() => {
+        alignmentTimeouts.delete(timeoutId);
+        alignKeyboardAnchor();
+      }, delay);
+      alignmentTimeouts.add(timeoutId);
+    }
   };
 
   root.addEventListener(
@@ -90,19 +124,31 @@ export function bindKeyboardAwareInput(root: HTMLElement, input: HTMLInputElemen
     "focus",
     () => {
       updateTypingState();
-      if (isTouchKeyboardViewport()) {
-        requestAnimationFrame(() => {
-          alignBoardToViewportTop(root);
-          requestAnimationFrame(() => alignBoardToViewportTop(root));
-        });
-      }
+      scheduleKeyboardAnchorAlignment();
     },
     { signal },
   );
   input.addEventListener("blur", updateTypingState, { signal });
-  window.addEventListener("resize", updateTypingState, { signal });
-  visualViewport?.addEventListener("resize", updateTypingState, { signal });
+  window.addEventListener(
+    "resize",
+    () => {
+      updateTypingState();
+      scheduleKeyboardAnchorAlignment();
+    },
+    { signal },
+  );
+  visualViewport?.addEventListener(
+    "resize",
+    () => {
+      updateTypingState();
+      scheduleKeyboardAnchorAlignment();
+    },
+    { signal },
+  );
+  visualViewport?.addEventListener("scroll", scheduleKeyboardAnchorAlignment, { signal });
   signal.addEventListener("abort", () => {
+    for (const timeoutId of alignmentTimeouts) window.clearTimeout(timeoutId);
+    alignmentTimeouts.clear();
     root.classList.remove("is-mobile-typing", "has-virtual-keyboard");
     scrollContainerFor(root)?.classList.remove("is-mobile-typing-shell");
     root.style.removeProperty("--keyboard-offset");

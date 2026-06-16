@@ -177,7 +177,7 @@ export function buildStats(stats: FullStats, container: HTMLElement): void {
 }
 
 export function createStatsScreen(options: StatsScreenOptions): Screen {
-  const backButton = el("button", { className: "ghost-action", text: "← Back", attrs: { type: "button" } });
+  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
   backButton.addEventListener("click", options.onBack);
 
   const logo = el("div", {
@@ -193,8 +193,8 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
     className: "game-screen stats-screen",
     children: [
       el("header", {
-        className: "game-header",
-        children: [logo, el("div", { className: "mode-controls", children: [el("div", { className: "mode-select-row", children: [backButton] })] })],
+        className: "stats-header",
+        children: [el("div", { className: "stats-header-title", children: [logo, el("h1", { text: "Stats" })] }), backButton],
       }),
       content,
     ],

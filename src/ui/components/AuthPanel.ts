@@ -29,6 +29,7 @@ export interface AuthControls {
   readonly refreshStats: (stats: UserStats) => void;
   readonly getUser: () => AuthState["user"];
   readonly openPanel: () => void;
+  readonly signOut: () => Promise<void>;
   readonly destroy: () => void;
 }
 
@@ -364,19 +365,17 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     { signal: controller.signal },
   );
 
-  signOutButton.addEventListener(
-    "click",
-    async () => {
-      signOutButton.disabled = true;
-      await signOut();
-      clearFormFields();
-      clearAccountDetails();
-      signOutButton.disabled = false;
-      applyState({ user: null, stats: null });
-      closePanel();
-    },
-    { signal: controller.signal },
-  );
+  async function signOutCurrentUser(): Promise<void> {
+    signOutButton.disabled = true;
+    await signOut();
+    clearFormFields();
+    clearAccountDetails();
+    signOutButton.disabled = false;
+    applyState({ user: null, stats: null });
+    closePanel();
+  }
+
+  signOutButton.addEventListener("click", () => void signOutCurrentUser(), { signal: controller.signal });
 
   viewStatsButton.addEventListener(
     "click",
@@ -408,6 +407,7 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     },
     getUser: () => currentState.user,
     openPanel: () => openPanel(),
+    signOut: signOutCurrentUser,
     destroy: () => controller.abort(),
   };
 }
