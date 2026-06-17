@@ -1790,3 +1790,248 @@
     --streetview-ui-crop-y: 130px;
   }
 }
+
+.country-guess-screen.is-map-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  width: 100vw;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: #060806;
+}
+
+.country-guess-screen.is-map-fullscreen .game-header {
+  display: none;
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-layout {
+  position: fixed;
+  inset: 0;
+  z-index: 910;
+  display: block;
+  min-height: 0;
+}
+
+.country-guess-screen.is-map-fullscreen .world-map-panel,
+.country-guess-screen.is-map-fullscreen .world-globe-panel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.country-guess-screen.is-map-fullscreen .world-map-svg,
+.country-guess-screen.is-map-fullscreen .world-globe-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.country-guess-screen.is-map-fullscreen .world-map-controls {
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+}
+
+.country-guess-screen.is-map-fullscreen .world-map-country-label {
+  top: max(14px, env(safe-area-inset-top));
+  left: max(14px, env(safe-area-inset-left));
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-panel {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 930;
+  width: min(780px, calc(100vw - 32px));
+  max-height: min(46dvh, 420px);
+  padding: 12px;
+  border: 1px solid rgba(232, 226, 211, 0.2);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(20, 27, 18, 0.92), rgba(8, 12, 8, 0.88)),
+    rgba(8, 12, 8, 0.9);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(18px) saturate(1.18);
+  transform: translateX(-50%);
+  overflow: auto;
+}
+
+.country-guess-screen.is-map-fullscreen .country-click-prompt {
+  margin-bottom: 0;
+  padding: 10px 12px;
+}
+
+.country-guess-screen.is-map-fullscreen .country-click-prompt p {
+  margin-bottom: 0;
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-stats {
+  display: none;
+}
+
+.country-guess-screen.is-map-fullscreen .mobile-extras-toggle {
+  display: none;
+}
+
+.country-guess-screen.is-map-fullscreen .mobile-extras-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-panel .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-panel .actions button,
+.country-guess-screen.is-map-fullscreen .country-guess-panel .actions .atlas-shell {
+  flex: 1 1 118px;
+}
+
+.country-guess-screen.is-map-fullscreen .country-guess-panel .actions button,
+.country-guess-screen.is-map-fullscreen .country-guess-panel .actions .atlas-open {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 0.84rem;
+}
+
+.country-guess-screen.is-map-fullscreen .guess-form {
+  gap: 5px;
+}
+
+.country-guess-screen.is-map-fullscreen .guess-form label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.country-guess-screen.is-map-fullscreen .input-row input,
+.country-guess-screen.is-map-fullscreen .input-row button {
+  min-height: 50px;
+}
+
+.country-guess-screen.is-map-fullscreen .feedback {
+  min-height: 0;
+  padding: 8px 10px;
+}
+
+.streetview-country-screen.is-streetview-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  width: 100vw;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: #060806;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .game-header {
+  display: none;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-layout {
+  position: fixed;
+  inset: 0;
+  z-index: 910;
+  display: block;
+  min-height: 0;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-panel {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 930;
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(48dvh, 430px);
+  padding: 12px;
+  border: 1px solid rgba(232, 226, 211, 0.2);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(20, 27, 18, 0.92), rgba(8, 12, 8, 0.88)),
+    rgba(8, 12, 8, 0.9);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(18px) saturate(1.18);
+  transform: translateX(-50%);
+  overflow: auto;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .panel-title h2 {
+  font-size: 1.18rem;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-rules {
+  display: none;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-guess-form {
+  gap: 5px;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-guess-form label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .input-row input,
+.streetview-country-screen.is-streetview-fullscreen .input-row button {
+  min-height: 50px;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-stats .previous-guesses-card {
+  grid-column: auto;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .feedback {
+  min-height: 0;
+  padding: 8px 10px;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-result {
+  min-height: 0;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-panel .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.streetview-country-screen.is-streetview-fullscreen .streetview-panel .actions button {
+  flex: 1 1 118px;
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 0.84rem;
+}

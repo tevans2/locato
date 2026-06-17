@@ -7,6 +7,7 @@ import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createMobileMenu } from "../dom/mobileMenu";
+import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 
 export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -117,6 +118,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   let currentStreetViewUrl = "";
   let currentPreloadUrl = "";
   let cachePromise: Promise<void> | null = null;
+  let streetViewFullscreen = false;
 
   function targetCountry(): Country {
     const country = options.countryIndex.byCode.get(round.countryCode);
@@ -166,6 +168,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   });
   const submitButton = el("button", { className: "primary-action", text: "Guess", attrs: { type: "submit" } });
   const nextRoundButton = el("button", { className: "primary-action", text: "Next round", attrs: { type: "button" } });
+  const fullscreenButton = el("button", { className: "ghost-action streetview-fullscreen-action", text: "Fullscreen", attrs: { type: "button", "aria-pressed": "false" } });
   const restartButton = el("button", { className: "ghost-action", text: "Restart country", attrs: { type: "button" } });
   const revealButton = el("button", { className: "ghost-action", text: "Reveal", attrs: { type: "button" } });
   const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
@@ -233,7 +236,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
               statsPanel,
               feedback.element,
               roundResult,
-              el("div", { className: "actions", children: [nextRoundButton, restartButton, revealButton] }),
+              el("div", { className: "actions", children: [fullscreenButton, nextRoundButton, restartButton, revealButton] }),
             ],
           }),
         ],
@@ -248,6 +251,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
 
   function render(): void {
     const attemptsUsed = attemptIndex + 1;
+    element.classList.toggle("is-streetview-fullscreen", streetViewFullscreen);
+    fullscreenButton.textContent = streetViewFullscreen ? "Exit fullscreen" : "Fullscreen";
+    fullscreenButton.setAttribute("aria-pressed", String(streetViewFullscreen));
     frameNumber.textContent = `${attemptsUsed} / ${maxAttempts}`;
     guessesLeft.textContent = String(Math.max(0, maxAttempts - guessedCountryIds.size));
     previousGuesses.textContent = previousGuessText();
@@ -380,6 +386,24 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     },
     { signal: controller.signal },
   );
+  fullscreenButton.addEventListener(
+    "click",
+    () => {
+      streetViewFullscreen = !streetViewFullscreen;
+      render();
+      if (streetViewFullscreen && shouldAutoFocusTextInput()) input.focus();
+    },
+    { signal: controller.signal },
+  );
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (!streetViewFullscreen || event.key !== "Escape") return;
+      streetViewFullscreen = false;
+      render();
+    },
+    { signal: controller.signal },
+  );
   nextRoundButton.addEventListener("click", () => startNextRound(), { signal: controller.signal });
   restartButton.addEventListener("click", () => resetCurrentCountry("Fresh attempt. Guess the country from the first frame."), { signal: controller.signal });
   revealButton.addEventListener(
@@ -396,6 +420,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   mobileDailyNavButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   mobileMultiplayerNavButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  bindKeyboardAwareInput(element, input, controller.signal);
 
   render();
   if (!apiKey) showFeedback(feedback, "Add your Google Maps Embed API key to enable Street View frames.", "neutral");

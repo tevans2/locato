@@ -72,6 +72,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let reviewTitle = "Missed countries";
   let runGivenUp = false;
   let mapSurface: MapSurface = "flat";
+  let mapFullscreen = false;
   // A run = from a fresh start until it ends (completion, restart, mode/continent change, or leaving).
   // Recorded at most once; reset to false whenever a new run begins.
   let currentRunRecorded = false;
@@ -162,12 +163,18 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   function renderMapReviewState(): void {
     const activeSet = new Set(reviewCountryIds);
+    const visibleMissingCountryIds =
+      showMissingCountries && !roundEnded()
+        ? new Set(countryIndex.countries.filter((country) => !guessedCountryIds.has(country.id)).map((country) => country.id))
+        : new Set<CountryId>();
+
     setWorldMapReviewCountries(map, activeSet, activeReviewCountryId);
     globe.update({
       guessedCountryIds,
       missedCountryIds: activeSet,
       targetCountryId: playMode === "spot-country" && !roundEnded() ? targetCountryId : null,
       clickableCountryIds: runGivenUp ? activeSet : playMode === "click-country" ? null : new Set<CountryId>(),
+      showMissingCountryIds: visibleMissingCountryIds,
     });
   }
 
@@ -208,7 +215,10 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const namingModeActive = playMode === "name-all";
     const spotCountryModeActive = playMode === "spot-country";
     const puzzleModeActive = playMode === "puzzle";
+    if (puzzleModeActive && mapFullscreen) mapFullscreen = false;
     const globeActive = !puzzleModeActive && mapSurface === "globe";
+    const mapFullscreenActive = mapFullscreen && !puzzleModeActive;
+    element.classList.toggle("is-map-fullscreen", mapFullscreenActive);
     map.element.hidden = puzzleModeActive || globeActive;
     globe.element.hidden = puzzleModeActive || !globeActive;
     puzzle.element.hidden = !puzzleModeActive;
@@ -228,8 +238,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     remainingCount.textContent = String(puzzleModeActive ? Math.max(0, puzzleTotalCount - puzzlePlacedCount) : Math.max(0, countryIndex.countries.length - guessedCountryIds.size));
     showMissingButton.hidden = puzzleModeActive;
     mapSurfaceButton.hidden = puzzleModeActive;
+    fullscreenButton.hidden = puzzleModeActive;
     mapSurfaceButton.textContent = mapSurface === "flat" ? "3D globe" : "Flat map";
     mapSurfaceButton.setAttribute("aria-pressed", String(mapSurface === "globe"));
+    fullscreenButton.textContent = mapFullscreenActive ? "Exit fullscreen" : "Fullscreen";
+    fullscreenButton.setAttribute("aria-pressed", String(mapFullscreenActive));
     giveUpButton.hidden = !namingModeActive;
     giveUpButton.disabled = !namingModeActive || finished;
     checkPuzzleButton.hidden = !puzzleModeActive;
@@ -254,6 +267,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     setAtlasOpen(atlas, false);
     guessedCountryIds.clear();
     runGivenUp = false;
+    if (playMode === "puzzle") mapFullscreen = false;
     showMissingCountries = false;
     reviewCountryIds = [];
     activeReviewCountryId = null;
@@ -598,6 +612,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   });
   const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
   const mapSurfaceButton = el("button", { className: "ghost-action", text: "3D globe", attrs: { type: "button", "aria-pressed": "false" } });
+  const fullscreenButton = el("button", { className: "ghost-action map-fullscreen-action", text: "Fullscreen", attrs: { type: "button", "aria-pressed": "false" } });
   const giveUpButton = el("button", { className: "ghost-action", text: "Give up", attrs: { type: "button" } });
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const mobileExtrasToggle = el("button", { className: "mobile-extras-toggle", text: "Details", attrs: { type: "button", "aria-expanded": "false" } });
@@ -713,6 +728,26 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
+  fullscreenButton.addEventListener(
+    "click",
+    () => {
+      dismissKeyboardIfTouchInput(input);
+      if (playMode === "puzzle") return;
+      mapFullscreen = !mapFullscreen;
+      render();
+      if ((playMode === "name-all" || playMode === "spot-country") && mapFullscreen && shouldAutoFocusTextInput()) input.focus();
+    },
+    { signal: controller.signal },
+  );
+  window.addEventListener(
+    "keydown",
+    (event) => {
+      if (!mapFullscreen || event.key !== "Escape") return;
+      mapFullscreen = false;
+      render();
+    },
+    { signal: controller.signal },
+  );
   giveUpButton.addEventListener("click", giveUpNameAllRun, { signal: controller.signal });
   checkPuzzleButton.addEventListener("click", handlePuzzleCheck, { signal: controller.signal });
 
@@ -789,7 +824,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   mobileExtrasPanel.replaceChildren(
     statsPanel,
     achievementPanel,
-    el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
+    el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, fullscreenButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
   );
 
 
