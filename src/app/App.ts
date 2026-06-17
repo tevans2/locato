@@ -2,13 +2,14 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
-import { isPromptGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
 import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
+import { createStreetViewCountryScreen } from "../ui/screens/StreetViewCountryScreen";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
 import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
@@ -148,6 +149,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
       }),
     );
@@ -183,6 +185,7 @@ export function createApp(options: AppOptions): App {
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onViewStats: () => navigate({ type: "stats" }),
+        onViewFriends: () => navigate({ type: "friends" }),
         onLeaderboard: () => navigate({ type: "leaderboard", mode: promptGameModeFromCategoryIds(activeCategories) }),
         getAuthUser: () => authControls.getUser(),
         authControls,
@@ -296,6 +299,11 @@ export function createApp(options: AppOptions): App {
 
     if (isWorldMapGameModeId(gameMode)) {
       navigate({ type: "country-guessing", mode: gameMode });
+      return;
+    }
+
+    if (isStreetViewGameModeId(gameMode)) {
+      navigate({ type: "streetview-country" });
     }
   }
 
@@ -330,7 +338,11 @@ export function createApp(options: AppOptions): App {
           initialMode,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onRecordGame: (r) => void recordWorldMapGame(r),
+          onViewStats: () => navigate({ type: "stats" }),
+          onViewFriends: () => navigate({ type: "friends" }),
+          authControls,
           onLeaderboard: () => navigate({ type: "leaderboard", mode: initialMode }),
           getAuthUser: () => authControls.getUser(),
         }),
@@ -342,6 +354,17 @@ export function createApp(options: AppOptions): App {
 
       loading.element.textContent = error instanceof Error ? error.message : "Unable to load world map data.";
     }
+  }
+
+  function startStreetViewCountry(): void {
+    mount(
+      createStreetViewCountryScreen({
+        countryIndex: options.countryIndex,
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+      }),
+    );
   }
 
   async function startMultiplayer(joinCode?: string): Promise<void> {
@@ -369,6 +392,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
         ...(joinCode ? { initialJoinCode: joinCode } : {}),
       }),
@@ -382,6 +406,7 @@ export function createApp(options: AppOptions): App {
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
         onBack: () => navigate(returnRoute),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onSignIn: () => authControls.openPanel(),
       }),
     );
@@ -409,13 +434,17 @@ export function createApp(options: AppOptions): App {
       void startCountryGuessing(route.mode ?? "name-all");
       return;
     }
+    if (route.type === "streetview-country") {
+      startStreetViewCountry();
+      return;
+    }
     if (route.type === "multiplayer") {
       void startMultiplayer(route.joinCode);
       return;
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }) })));
+      void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
       return;
     }
 
@@ -423,6 +452,7 @@ export function createApp(options: AppOptions): App {
       const currentUser = authControls.getUser();
       mount(createFriendsScreen({
         onBack: () => navigate({ type: "solo-game", continueSaved: true }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         ...(route.username ? { initialUsername: route.username } : {}),
         currentUsername: currentUser?.displayName ?? null,
         appOrigin: window.location.origin,

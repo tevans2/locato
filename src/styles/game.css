@@ -3,7 +3,7 @@
   justify-content: space-between;
   gap: 18px;
   align-items: flex-start;
-  margin-bottom: clamp(10px, 1.6dvh, 16px);
+  margin-bottom: clamp(8px, 1.2dvh, 12px);
   flex: 0 0 auto;
 }
 
@@ -54,7 +54,7 @@
   min-height: 42px;
   padding: 0 14px;
   border: 1px solid rgba(232, 226, 211, 0.16);
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
   list-style: none;
   background:
@@ -66,7 +66,7 @@
 }
 
 .game-mode-dropdown .category-dropdown-summary {
-  min-height: 58px;
+  min-height: 44px;
 }
 
 .category-dropdown-summary:hover,
@@ -118,7 +118,7 @@
   border: 1px solid rgba(232, 226, 211, 0.14);
   border-radius: var(--radius-md);
   display: grid;
-  gap: 7px;
+  gap: 8px;
   background:
     radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
     rgba(16, 20, 16, 0.98);
@@ -566,27 +566,54 @@
 }
 
 .answer-panel > .actions,
-.country-guess-panel > .actions {
+.country-guess-panel > .actions,
+.answer-panel .mobile-extras-panel > .actions,
+.country-guess-panel .mobile-extras-panel > .actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   align-items: stretch;
 }
 
+/* The desktop extras container uses display: contents, so action rows inside it are not
+   direct children of the answer panel. Keep Atlas participating in the same grid as Hint,
+   Pass and Restart instead of keeping the global auto-left margin that pushed it onto a
+   second row. */
+.answer-panel .solo-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .answer-panel > .actions .atlas-shell,
-.country-guess-panel > .actions .atlas-shell {
+.country-guess-panel > .actions .atlas-shell,
+.answer-panel .mobile-extras-panel > .actions .atlas-shell,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-shell {
   margin-left: 0;
 }
 
 .answer-panel > .actions button,
 .answer-panel > .actions .atlas-shell,
 .country-guess-panel > .actions button,
-.country-guess-panel > .actions .atlas-shell {
+.country-guess-panel > .actions .atlas-shell,
+.answer-panel .mobile-extras-panel > .actions button,
+.answer-panel .mobile-extras-panel > .actions .atlas-shell,
+.country-guess-panel .mobile-extras-panel > .actions button,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-shell {
   width: 100%;
+  min-width: 0;
+}
+
+.answer-panel > .actions button,
+.country-guess-panel > .actions button,
+.answer-panel .mobile-extras-panel > .actions button,
+.country-guess-panel .mobile-extras-panel > .actions button {
+  border-radius: 999px;
 }
 
 .answer-panel > .actions .atlas-open,
-.country-guess-panel > .actions .atlas-open {
+.country-guess-panel > .actions .atlas-open,
+.answer-panel .mobile-extras-panel > .actions .atlas-open,
+.country-guess-panel .mobile-extras-panel > .actions .atlas-open {
   width: 100%;
+  min-width: 0;
 }
 
 .panel-title {
@@ -627,6 +654,107 @@
   min-width: 104px;
   padding-inline: 22px;
   white-space: nowrap;
+}
+
+.guess-submit-action,
+.hint-action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+}
+
+.guess-submit-action::before {
+  content: "↵";
+  font-size: 1.2em;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.hint-action {
+  color: var(--accent);
+  border-color: rgba(184, 227, 109, 0.38);
+  background: rgba(184, 227, 109, 0.1);
+}
+
+.hint-action:hover:not(:disabled) {
+  border-color: rgba(184, 227, 109, 0.62);
+  background: rgba(184, 227, 109, 0.14);
+}
+
+.hint-action.is-reveal-armed {
+  color: var(--earth);
+  border-color: rgba(187, 130, 86, 0.48);
+  background: rgba(187, 130, 86, 0.12);
+}
+
+.hint-action::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  background: currentColor;
+  mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
+  -webkit-mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
+}
+
+.mobile-daily-actions,
+.mobile-hint-action {
+  display: none;
+}
+
+.mobile-extras-toggle {
+  display: none;
+}
+
+.mobile-extras-panel {
+  display: contents;
+}
+
+.mobile-nav-trigger,
+.mobile-nav-sheet {
+  display: none;
+}
+
+.hint-popover {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  margin: 0;
+  border: 1px solid rgba(184, 227, 109, 0.32);
+  border-radius: var(--radius-sm);
+  padding: 10px 11px;
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.12), transparent 62%),
+    rgba(7, 11, 7, 0.94);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34);
+}
+
+.hint-popover-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.hint-popover-title {
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.hint-popover-message {
+  color: var(--text);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.hint-popover-close {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-color: rgba(232, 226, 211, 0.16);
 }
 
 .feedback {
@@ -1281,7 +1409,7 @@
 .game-header-actions {
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1293,16 +1421,98 @@
 .game-header-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
-  /* The persistent auth button is fixed in the same header row; keep this space free so it cannot overlap navigation buttons. */
-  padding-right: 98px;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 10px;
+  /* Leave room for the persistent auth button so top-row controls never sit underneath it. */
+  padding-right: var(--floating-auth-clearance);
+}
+
+@media (min-width: 701px) {
+  .game-header {
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .game-header-left,
+  .game-header-actions {
+    align-items: center;
+  }
+
+  .game-header-actions {
+    gap: 14px;
+  }
+
+  .game-header .nav-action,
+  .game-header .game-mode-dropdown .category-dropdown-summary,
+  .game-header .daily-badge,
+  .stats-header .screen-back-button,
+  .stats-header .screen-header-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--header-control-height);
+    border-radius: 999px;
+    border-color: rgba(232, 226, 211, 0.16);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+      rgba(17, 23, 16, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.18);
+    white-space: nowrap;
+  }
+
+  .game-header .nav-action,
+  .stats-header .screen-back-button,
+  .stats-header .screen-header-action {
+    padding-inline: 22px;
+  }
+
+  .game-header .nav-action {
+    flex: 0 0 auto;
+  }
+
+  /* Keep the compact mobile menu trigger out of the desktop header. Without this
+     more-specific rule, the generic desktop .nav-action styling makes the empty
+     mobile trigger render as a blank circular button between Multiplayer and the
+     account avatar. */
+  .game-header-actions > .mobile-nav-trigger {
+    display: none;
+  }
+
+  .game-header .game-mode-dropdown .category-dropdown-summary,
+  .game-header .daily-badge {
+    padding-inline: 24px;
+  }
+
+  .game-header .nav-action:hover:not(:disabled),
+  .game-header .game-mode-dropdown .category-dropdown-summary:hover,
+  .game-header .game-mode-dropdown[open] .category-dropdown-summary,
+  .stats-header .screen-back-button:hover:not(:disabled),
+  .stats-header .screen-header-action:hover:not(:disabled) {
+    border-color: rgba(184, 227, 109, 0.42);
+    background:
+      linear-gradient(180deg, rgba(184, 227, 109, 0.12), rgba(255, 255, 255, 0.035)),
+      rgba(17, 23, 16, 0.96);
+    box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.22);
+  }
+
+  .game-header .game-mode-dropdown .category-dropdown-summary::after {
+    margin-left: 6px;
+  }
 }
 
 .game-mode-dropdown {
-  width: min(390px, 100%);
+  width: min(340px, 100%);
 }
 
 .game-mode-dropdown .category-dropdown-menu {
-  width: var(--dropdown-width, min(430px, calc(100vw - 24px)));
+  width: var(--dropdown-width, min(640px, calc(100vw - 24px)));
+  align-items: start;
+}
+
+.game-mode-dropdown .category-dropdown-menu:has(.game-mode-group) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .game-mode-selected-copy {
@@ -1312,18 +1522,28 @@
   text-align: right;
 }
 
+.game-mode-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgba(232, 226, 211, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
 .game-mode-group-label {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 780;
   letter-spacing: 0.06em;
-  padding: 4px 4px 0;
+  padding: 2px 4px 1px;
   text-transform: uppercase;
 }
 
 .game-mode-option {
   align-items: flex-start;
-  min-height: 52px;
+  min-height: 48px;
 }
 
 .game-mode-option input {
@@ -1416,4 +1636,157 @@
 .solo-timer-stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 12px;
+}
+
+
+/* Compact secondary navigation. Keeps core gameplay controls visible while moving rarely-used links out of the header. */
+.action-menu {
+  width: auto;
+}
+
+.action-menu-summary {
+  min-height: 40px;
+  min-width: 92px;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 12px 0 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.action-menu-summary .category-dropdown-selected {
+  font-size: 0.88rem;
+  font-weight: 780;
+}
+
+.action-menu-panel {
+  gap: 6px;
+}
+
+.action-menu-option {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.action-menu-option-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.action-menu-option-copy strong {
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.action-menu-option-copy span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.category-picker-menu {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.streetview-country-screen {
+  min-height: 100dvh;
+}
+
+.streetview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: clamp(12px, 2vw, 20px);
+  align-items: stretch;
+  min-height: min(720px, calc(100dvh - 110px));
+}
+
+.streetview-stage {
+  position: relative;
+  overflow: hidden;
+  --streetview-ui-crop-x: 360px;
+  --streetview-ui-crop-y: 145px;
+  min-height: 420px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: var(--shadow-panel);
+}
+
+.streetview-frame {
+  display: block;
+  position: absolute;
+  top: calc(var(--streetview-ui-crop-y) * -1);
+  right: calc(var(--streetview-ui-crop-x) * -1);
+  bottom: calc(var(--streetview-ui-crop-y) * -1);
+  left: calc(var(--streetview-ui-crop-x) * -1);
+  width: calc(100% + (var(--streetview-ui-crop-x) * 2));
+  height: calc(100% + (var(--streetview-ui-crop-y) * 2));
+  min-height: 0;
+  border: 0;
+  pointer-events: auto;
+}
+
+.streetview-preload-frame {
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.streetview-missing-key {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: inherit;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.streetview-missing-key strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.streetview-panel {
+  min-height: 0;
+}
+
+.streetview-rules {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.streetview-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.streetview-stats .previous-guesses-card {
+  grid-column: 1 / -1;
+}
+
+.streetview-result {
+  display: block;
+  min-height: 1.4em;
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .streetview-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .streetview-stage {
+    min-height: 52dvh;
+    --streetview-ui-crop-x: 300px;
+    --streetview-ui-crop-y: 130px;
+  }
 }

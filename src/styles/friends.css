@@ -237,3 +237,93 @@
   padding: 0;
   gap: 14px;
 }
+
+
+@media (max-width: 700px) {
+  .friends-screen {
+    gap: 10px;
+    max-width: none;
+    margin: 0;
+    padding: 4px 0 28px;
+  }
+
+  .friends-header {
+    gap: 10px;
+  }
+
+  .friends-header h1 {
+    font-size: 1.05rem;
+  }
+
+  .friend-section,
+  .friend-profile-panel {
+    padding: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .friend-add-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 54px;
+    gap: 7px;
+  }
+
+  .friend-add-input {
+    min-height: 44px;
+    padding: 0 11px;
+    border-radius: var(--radius-sm);
+  }
+
+  .friend-add-form .primary-action {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .friend-add-form .ghost-action {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+  }
+
+  .friend-row {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .friend-status {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    justify-self: end;
+    margin-right: -1px;
+  }
+
+  .friend-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+    gap: 6px;
+  }
+
+  .friend-action-btn {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 8px;
+  }
+
+  .game-invite-toast {
+    right: 10px;
+    left: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    transform: none;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+  }
+}

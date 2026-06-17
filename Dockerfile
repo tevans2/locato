@@ -3,6 +3,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+
+ARG VITE_GOOGLE_MAPS_EMBED_API_KEY
+ENV VITE_GOOGLE_MAPS_EMBED_API_KEY=$VITE_GOOGLE_MAPS_EMBED_API_KEY
+
 RUN npm run build
 
 FROM oven/bun:1-slim AS runtime

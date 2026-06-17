@@ -67,7 +67,7 @@ export function createCategoryDropdown(options: CategoryDropdownOptions): Catego
         className: "category-dropdown-summary",
         children: [el("span", { className: "category-row-label", text: "Categories" }), selectedText],
       }),
-      el("div", { className: "category-dropdown-menu", attrs: { role: "group", "aria-label": "Categories" }, children: categoryOptions.map((option) => option.label) }),
+      el("div", { className: "category-dropdown-menu category-picker-menu", attrs: { role: "group", "aria-label": "Categories" }, children: categoryOptions.map((option) => option.label) }),
     ],
   });
   updateSummary();

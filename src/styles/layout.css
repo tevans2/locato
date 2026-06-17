@@ -1,5 +1,5 @@
 .app-shell {
-  width: min(1480px, calc(100% - clamp(24px, 5vw, 56px)));
+  width: min(var(--app-shell-max-width), calc(100% - var(--app-shell-gutter)));
   height: 100dvh;
   margin: 0 auto;
   padding: clamp(12px, 2dvh, 22px) 0;

@@ -5,6 +5,44 @@
   overflow-y: auto;
 }
 
+.stats-header {
+  width: min(900px, 100%);
+  margin-inline: auto;
+  padding: 16px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stats-header-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-header h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.screen-back-button {
+  flex: none;
+}
+
+.screen-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: none;
+}
+
+.screen-header-action {
+  flex: none;
+}
+
 .stats-content {
   flex: 1;
   width: 100%;
@@ -171,6 +209,73 @@
 
 /* Auth panel view stats button */
 .auth-view-stats { width: 100%; font-size: 0.85rem; }
+
+@media (max-width: 700px) {
+  .stats-screen {
+    min-height: 0;
+  }
+
+  .stats-header {
+    padding: 4px 0 0;
+  }
+
+  .stats-header .brand-logo {
+    width: 22px;
+    height: 22px;
+  }
+
+  .stats-header h1 {
+    font-size: 1.05rem;
+  }
+
+  .screen-back-button {
+    width: auto;
+    min-width: 62px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+  }
+
+  .stats-content {
+    padding: 10px 0 28px;
+    gap: 10px;
+  }
+
+  .stats-hero {
+    gap: 7px;
+  }
+
+  .stats-hero-card,
+  .stats-card {
+    padding: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .stats-hero-value {
+    font-size: 1.45rem;
+  }
+
+  .stats-hero-label {
+    font-size: 0.72rem;
+  }
+
+  .stats-mode-grid {
+    gap: 8px;
+  }
+
+  .stats-card h2 {
+    font-size: 0.76rem;
+  }
+
+  .stats-row {
+    font-size: 0.84rem;
+  }
+
+  .recent-game-row {
+    padding-inline: 0;
+  }
+}
 
 @media (max-width: 600px) {
   .stats-mode-grid { grid-template-columns: minmax(0, 1fr); }

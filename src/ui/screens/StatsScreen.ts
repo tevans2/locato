@@ -5,6 +5,7 @@ import { el } from "../dom/createElement";
 
 export interface StatsScreenOptions {
   readonly onBack: () => void;
+  readonly onDailyChallenge?: () => void;
 }
 
 function pct(correct: number, wrong: number): string {
@@ -177,8 +178,11 @@ export function buildStats(stats: FullStats, container: HTMLElement): void {
 }
 
 export function createStatsScreen(options: StatsScreenOptions): Screen {
-  const backButton = el("button", { className: "ghost-action", text: "← Back", attrs: { type: "button" } });
+  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
   backButton.addEventListener("click", options.onBack);
+
+  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) } });
+  dailyButton.addEventListener("click", () => options.onDailyChallenge?.());
 
   const logo = el("div", {
     className: "brand-lockup compact",
@@ -193,8 +197,11 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
     className: "game-screen stats-screen",
     children: [
       el("header", {
-        className: "game-header",
-        children: [logo, el("div", { className: "mode-controls", children: [el("div", { className: "mode-select-row", children: [backButton] })] })],
+        className: "stats-header",
+        children: [
+          el("div", { className: "stats-header-title", children: [logo, el("h1", { text: "Stats" })] }),
+          el("div", { className: "screen-header-actions", children: [dailyButton, backButton] }),
+        ],
       }),
       content,
     ],

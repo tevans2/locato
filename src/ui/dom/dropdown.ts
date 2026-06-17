@@ -3,6 +3,7 @@ const DROPDOWN_GAP_PX = 8;
 const DROPDOWN_MAX_WIDTH_PX = 380;
 const DROPDOWN_MAX_HEIGHT_PX = 360;
 const DROPDOWN_MIN_HEIGHT_PX = 120;
+const MOBILE_DROPDOWN_BREAKPOINT_PX = 700;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -15,6 +16,15 @@ function asElement(target: EventTarget | null): Element | null {
 function closeOtherDropdowns(current: HTMLDetailsElement): void {
   for (const dropdown of document.querySelectorAll<HTMLDetailsElement>(".category-dropdown[open]")) {
     if (dropdown !== current) dropdown.open = false;
+  }
+}
+
+function closeMobileMenus(): void {
+  for (const sheet of document.querySelectorAll<HTMLElement>(".mobile-nav-sheet:not([hidden])")) {
+    sheet.hidden = true;
+  }
+  for (const trigger of document.querySelectorAll<HTMLElement>(".mobile-nav-trigger[aria-expanded='true']")) {
+    trigger.setAttribute("aria-expanded", "false");
   }
 }
 
@@ -34,11 +44,24 @@ export function enhanceDropdown(
     animationFrame = 0;
     if (!dropdown.open || !summary || !menu) return;
 
-    const summaryRect = summary.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    if (viewportWidth <= MOBILE_DROPDOWN_BREAKPOINT_PX) {
+      menu.style.setProperty("--dropdown-left", `${DROPDOWN_MARGIN_PX}px`);
+      menu.style.setProperty("--dropdown-top", "auto");
+      menu.style.setProperty("--dropdown-width", `${Math.max(0, viewportWidth - DROPDOWN_MARGIN_PX * 2)}px`);
+      menu.style.setProperty("--dropdown-max-height", `${Math.max(DROPDOWN_MIN_HEIGHT_PX, Math.min(520, viewportHeight * 0.72))}px`);
+      dropdown.classList.remove("dropdown-opens-above");
+      return;
+    }
+
+    const summaryRect = summary.getBoundingClientRect();
     const usableWidth = Math.max(0, viewportWidth - DROPDOWN_MARGIN_PX * 2);
-    const width = Math.min(Math.max(summaryRect.width, 280), DROPDOWN_MAX_WIDTH_PX, usableWidth);
+    const isGameModeMenu = dropdown.classList.contains("game-mode-dropdown");
+    const isActionMenu = dropdown.classList.contains("action-menu");
+    const minWidth = isGameModeMenu ? 560 : isActionMenu ? 220 : 280;
+    const maxWidth = isGameModeMenu ? 640 : isActionMenu ? 280 : DROPDOWN_MAX_WIDTH_PX;
+    const width = Math.min(Math.max(summaryRect.width, minWidth), maxWidth, usableWidth);
     const left = clamp(summaryRect.right - width, DROPDOWN_MARGIN_PX, viewportWidth - width - DROPDOWN_MARGIN_PX);
     const spaceBelow = viewportHeight - summaryRect.bottom - DROPDOWN_GAP_PX - DROPDOWN_MARGIN_PX;
     const spaceAbove = summaryRect.top - DROPDOWN_GAP_PX - DROPDOWN_MARGIN_PX;
@@ -73,6 +96,7 @@ export function enhanceDropdown(
     () => {
       dropdown.classList.toggle("is-open", dropdown.open);
       if (!dropdown.open) return;
+      closeMobileMenus();
       closeOtherDropdowns(dropdown);
       queuePosition();
     },

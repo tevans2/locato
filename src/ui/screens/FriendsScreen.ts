@@ -15,6 +15,7 @@ import { el } from "../dom/createElement";
 
 export interface FriendsScreenOptions {
   readonly onBack: () => void;
+  readonly onDailyChallenge?: () => void;
   readonly initialUsername?: string;
   readonly currentUsername?: string | null;
   readonly appOrigin?: string;
@@ -63,13 +64,14 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const outgoingSection = el("section", { className: "friend-section", children: [el("h2", { text: "Sent" }), outgoingList] });
   const friendsSection = el("section", { className: "friend-section", children: [el("h2", { text: "Friends" }), friendsList] });
 
-  const backButton = el("button", { className: "ghost-action", text: "Back", attrs: { type: "button" }, on: { click: () => options.onBack() } });
+  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" }, on: { click: () => options.onBack() } });
+  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) }, on: { click: () => options.onDailyChallenge?.() } });
 
   const element = el("section", {
     className: "game-screen friends-screen",
     children: [
       ...(options.initialUsername ? [el("p", { className: "friend-link-hint", text: `Friend link opened for ${options.initialUsername}. Send a request when you're signed in.` })] : []),
-      el("header", { className: "friends-header", children: [el("h1", { text: "Friends" }), backButton] }),
+      el("header", { className: "friends-header", children: [el("h1", { text: "Friends" }), el("div", { className: "screen-header-actions", children: [dailyButton, backButton] })] }),
       el("section", { className: "friend-section", children: [el("h2", { text: "Add a friend" }), addForm, addFeedback] }),
       incomingSection,
       outgoingSection,

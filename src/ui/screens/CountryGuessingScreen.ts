@@ -7,6 +7,7 @@ import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../cor
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
 import { recordWorldAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
+import type { AuthControls } from "../components/AuthPanel";
 import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createAtlasView, setAtlasOpen, updateAtlasView } from "../dom/renderAtlas";
@@ -14,6 +15,8 @@ import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createGlobeMapView } from "../dom/renderGlobeMap";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
+import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
+import { createMobileMenu } from "../dom/mobileMenu";
 
 export interface WorldMapRunResult {
   readonly playMode: WorldMapGameModeId;
@@ -31,14 +34,19 @@ export interface CountryGuessingScreenOptions {
   readonly initialMode: WorldMapGameModeId;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onMultiplayer: () => void;
+  readonly onDailyChallenge: () => void;
   // Called once per world-map run when it ends (completion, restart, mode change, or leaving).
   readonly onRecordGame?: (result: WorldMapRunResult) => void;
   readonly onLeaderboard: () => void;
   readonly getAuthUser: () => AuthUser | null;
+  readonly onViewStats?: () => void;
+  readonly onViewFriends?: () => void;
+  readonly authControls?: AuthControls;
 }
 
 type CountryGuessPlayMode = WorldMapGameModeId;
 type MapSurface = "flat" | "globe";
+
 
 function createLogo(): HTMLElement {
   return el("div", {
@@ -266,7 +274,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     playTimer.reset();
     render();
     showFeedback(feedback, feedbackMessage, "neutral");
-    if (playMode === "name-all" || playMode === "spot-country") input.focus();
+    if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusTextInput()) input.focus();
   }
 
   function recordGuess(country: Country): void {
@@ -371,13 +379,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     if (country && country.id !== targetCountry.id) {
       showFeedback(feedback, `That's ${country.name}, not the highlighted country.`, "bad");
-      if (showMiss) input.select();
+      if (showMiss && shouldAutoFocusTextInput()) input.select();
       return;
     }
 
     if (showMiss && input.value.trim()) {
       showFeedback(feedback, "Not quite. Name the highlighted country.", "neutral");
-      input.select();
+      if (shouldAutoFocusTextInput()) input.select();
     }
   }
 
@@ -394,7 +402,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     if (showMiss && input.value.trim()) {
       showFeedback(feedback, "No new country detected yet.", "neutral");
-      input.select();
+      if (shouldAutoFocusTextInput()) input.select();
     }
   }
 
@@ -437,6 +445,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (playTimer.mode === "count-up") playTimer.stop();
     runGivenUp = true;
     showMissingCountries = true;
+    dismissKeyboardIfTouchInput(input);
     input.value = "";
     activeReviewCountryId = null;
     render();
@@ -521,9 +530,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
-    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", spellcheck: "false", placeholder: "e.g. Brazil, Japan, ZA..." },
+    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
-  const submitButton = el("button", { className: "primary-action", text: "Lock in", attrs: { type: "submit" } });
+  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   const timerModeSelect = el("select", {
     className: "country-guess-timer-select",
@@ -591,8 +600,44 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const mapSurfaceButton = el("button", { className: "ghost-action", text: "3D globe", attrs: { type: "button", "aria-pressed": "false" } });
   const giveUpButton = el("button", { className: "ghost-action", text: "Give up", attrs: { type: "button" } });
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
-  const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
-  const leaderboardButton = el("button", { className: "ghost-action", text: "Leaderboards", attrs: { type: "button" } });
+  const mobileExtrasToggle = el("button", { className: "mobile-extras-toggle", text: "Details", attrs: { type: "button", "aria-expanded": "false" } });
+  const mobileExtrasPanel = el("div", { className: "mobile-extras-panel" });
+  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
+  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
+  const mobileDailyNavButton = el("button", { className: "mobile-nav-item", text: "Daily Challenge", attrs: { type: "button" } });
+  const mobileLeaderboardNavButton = el("button", { className: "mobile-nav-item", text: "Leaderboards", attrs: { type: "button" } });
+  const mobileMultiplayerNavButton = el("button", { className: "mobile-nav-item", text: "Multiplayer", attrs: { type: "button" } });
+  const mobileUserAvatar = el("span", { className: "mobile-nav-user-avatar", text: "?" });
+  const mobileUserName = el("span", { className: "mobile-nav-user-name", text: "Guest" });
+  const mobileUserSummary = el("div", { className: "mobile-nav-user-summary", children: [mobileUserAvatar, mobileUserName] });
+  const mobileStatsNavButton = el("button", { className: "mobile-nav-item", text: "Stats", attrs: { type: "button" } });
+  const mobileFriendsNavButton = el("button", { className: "mobile-nav-item", text: "Friends", attrs: { type: "button" } });
+  const mobileSignInNavButton = el("button", { className: "mobile-nav-item", text: "Sign in", attrs: { type: "button" } });
+  const mobileSignOutNavButton = el("button", { className: "mobile-nav-item", text: "Sign out", attrs: { type: "button" } });
+  const mobileMenu = createMobileMenu(
+    "Menu",
+    [
+      { title: "Play", items: [mobileDailyNavButton] },
+      { title: "Compete", items: [mobileLeaderboardNavButton, mobileMultiplayerNavButton] },
+      { title: "You", items: [mobileUserSummary, mobileStatsNavButton, mobileFriendsNavButton, mobileSignInNavButton, mobileSignOutNavButton] },
+    ],
+    controller.signal,
+  );
+  function updateMobileUserMenu(): void {
+    const user = options.authControls?.getUser() ?? null;
+    const signedIn = user !== null;
+    mobileUserSummary.hidden = !signedIn;
+    mobileStatsNavButton.hidden = !signedIn || !options.onViewStats;
+    mobileFriendsNavButton.hidden = !signedIn || !options.onViewFriends;
+    mobileSignOutNavButton.hidden = !signedIn;
+    mobileSignInNavButton.hidden = signedIn || !options.authControls;
+    if (user) {
+      mobileUserAvatar.textContent = user.avatarEmoji ?? user.displayName.charAt(0).toUpperCase();
+      mobileUserName.textContent = user.displayName;
+    }
+  }
+  updateMobileUserMenu();
+  const leaderboardButton = el("button", { className: "ghost-action nav-action", text: "Leaderboards", attrs: { type: "button", "data-mobile-label": "Ranks", "aria-label": "Open leaderboards" } });
   const gameModeDropdown = createGameModeDropdown({
     selectedMode: playMode,
     signal: controller.signal,
@@ -651,6 +696,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   showMissingButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       showMissingCountries = !showMissingCountries;
       render();
     },
@@ -659,6 +705,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   mapSurfaceButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       mapSurface = mapSurface === "flat" ? "globe" : "flat";
       map.showCountryLabel(null);
       globe.showCountryLabel(null);
@@ -698,6 +745,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   resetButton.addEventListener(
     "click",
     () => {
+      dismissKeyboardIfTouchInput(input);
       resetGame(
         playTimer.mode === "count-up"
           ? "Timer reset. Start with your first correct move."
@@ -712,11 +760,38 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
+  dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
+  mobileDailyNavButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
+  mobileMultiplayerNavButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  mobileLeaderboardNavButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
+  mobileStatsNavButton.addEventListener("click", () => options.onViewStats?.(), { signal: controller.signal });
+  mobileFriendsNavButton.addEventListener("click", () => options.onViewFriends?.(), { signal: controller.signal });
+  mobileSignInNavButton.addEventListener("click", () => options.authControls?.openPanel(), { signal: controller.signal });
+  mobileSignOutNavButton.addEventListener("click", () => void options.authControls?.signOut(), { signal: controller.signal });
+  mobileMenu.button.addEventListener("pointerdown", updateMobileUserMenu, { signal: controller.signal });
+  mobileMenu.button.addEventListener("click", updateMobileUserMenu, { signal: controller.signal, capture: true });
   atlas.openButton.addEventListener("click", () => setAtlasOpen(atlas, true), { signal: controller.signal });
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
   atlas.overlay.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
+
+  mobileExtrasToggle.addEventListener(
+    "click",
+    () => {
+      const open = mobileExtrasPanel.classList.toggle("is-open");
+      mobileExtrasToggle.setAttribute("aria-expanded", String(open));
+      mobileExtrasToggle.textContent = open ? "Hide details" : "Details";
+    },
+    { signal: controller.signal },
+  );
+
+  mobileExtrasPanel.replaceChildren(
+    statsPanel,
+    achievementPanel,
+    el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
+  );
+
 
   const element = el("section", {
     className: "game-screen country-guess-screen",
@@ -725,7 +800,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [leaderboardButton, multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),
       el("div", {
@@ -742,9 +817,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
               spotPrompt,
               puzzlePrompt,
               form,
-              statsPanel,
-              achievementPanel,
-              el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
+              feedback.element,
+              mobileExtrasToggle,
+              mobileExtrasPanel,
             ],
           }),
         ],
@@ -753,6 +828,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   });
 
   render();
+
   showFeedback(
     feedback,
     playMode === "click-country"
@@ -764,7 +840,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
           : "Start typing country names. Matches highlight instantly on the map.",
     "neutral",
   );
-  if (playMode === "name-all" || playMode === "spot-country") queueMicrotask(() => input.focus());
+  bindKeyboardAwareInput(element, input, controller.signal);
+  if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusTextInput()) queueMicrotask(() => input.focus());
 
   return {
     element,

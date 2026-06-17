@@ -11,6 +11,14 @@ const COLOR_GUESSED = 0xb8e36d;
 const COLOR_MISSED = 0xed4a43;
 const COLOR_TARGET = 0xffd0c2;
 
+const GLOBE_MIN_CAMERA_Z = 3.4;
+const GLOBE_MAX_CAMERA_Z = 7.2;
+
+interface GlobeTouchPoint {
+  readonly clientX: number;
+  readonly clientY: number;
+}
+
 export interface GlobeMapViewOptions {
   readonly onCountryClick?: (countryId: CountryId) => void;
 }
@@ -138,6 +146,9 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   raycaster.params.Line = { threshold: 0.035 };
   const pointer = new THREE.Vector2();
   let frameId: number | null = null;
+  const touchPointers = new Map<number, GlobeTouchPoint>();
+  let pinchDistance: number | null = null;
+  let pinchCameraZ = camera.position.z;
   let dragging = false;
   let moved = false;
   let lastX = 0;
@@ -189,7 +200,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     renderer.render(scene, camera);
   }
 
-  function countryIdFromPointer(event: PointerEvent): CountryId | null {
+  function countryIdFromPointer(event: PointerEvent | MouseEvent): CountryId | null {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
@@ -217,16 +228,56 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     return nearestCountryId;
   }
 
+  function globeTouchPoints(): readonly GlobeTouchPoint[] {
+    return [...touchPointers.values()];
+  }
+
+  function globeTouchDistance(): number {
+    const points = globeTouchPoints();
+    if (points.length < 2) return 0;
+    const [first, second] = points;
+    return Math.hypot(second!.clientX - first!.clientX, second!.clientY - first!.clientY);
+  }
+
+  function updatePinchZoom(): void {
+    if (pinchDistance === null) return;
+    const currentDistance = Math.max(1, globeTouchDistance());
+    camera.position.z = THREE.MathUtils.clamp(pinchCameraZ * (pinchDistance / currentDistance), GLOBE_MIN_CAMERA_Z, GLOBE_MAX_CAMERA_Z);
+  }
   renderer.domElement.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
+    event.preventDefault();
+    renderer.domElement.setPointerCapture(event.pointerId);
+
+    if (event.pointerType === "touch") {
+      touchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+      if (touchPointers.size >= 2) {
+        dragging = false;
+        moved = true;
+        pinchDistance = Math.max(1, globeTouchDistance());
+        pinchCameraZ = camera.position.z;
+        return;
+      }
+    }
+
     dragging = true;
     moved = false;
     lastX = event.clientX;
     lastY = event.clientY;
-    renderer.domElement.setPointerCapture(event.pointerId);
   });
 
   renderer.domElement.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch") {
+      if (!touchPointers.has(event.pointerId)) return;
+      event.preventDefault();
+      touchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+      if (touchPointers.size >= 2) {
+        moved = true;
+        updatePinchZoom();
+        return;
+      }
+    }
+
     if (!dragging) return;
     const deltaX = event.clientX - lastX;
     const deltaY = event.clientY - lastY;
@@ -238,10 +289,27 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   });
 
   function finishPointer(event: PointerEvent): void {
+    if (event.pointerType === "touch") {
+      touchPointers.delete(event.pointerId);
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
+
+      if (pinchDistance !== null) {
+        pinchDistance = null;
+        const remaining = [...touchPointers.values()][0];
+        if (remaining) {
+          dragging = true;
+          moved = true;
+          lastX = remaining.clientX;
+          lastY = remaining.clientY;
+          return;
+        }
+      }
+    }
+
     if (!dragging) return;
     dragging = false;
     if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
-    if (moved) return;
+    if (moved || event.type === "pointercancel") return;
 
     const countryId = countryIdFromPointer(event);
     if (countryId === null || (clickableCountryIds && !clickableCountryIds.has(countryId))) return;
@@ -278,6 +346,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     showCountryLabel,
     resetView: () => {
       root.rotation.set(0, -0.35, 0);
+      camera.position.z = 5.4;
     },
     destroy: () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId);

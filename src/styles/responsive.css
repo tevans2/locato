@@ -36,22 +36,28 @@
 }
 
 @media (max-width: 700px) {
-  /* Mobile: drop the fixed-viewport desktop shell and let the document scroll, so the prompt,
-     input, actions, and scoreboard are never clipped behind the fold or the on-screen keyboard. */
+  /* Mobile scrolls inside the app shell instead of relying on body scrolling.
+     iOS/Chrome can keep body locked while the virtual keyboard is active. */
   html,
   body {
-    overflow: visible;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
-    overflow-y: auto;
+    overscroll-behavior-y: none;
   }
 
   .app-shell {
     width: 100%;
-    height: auto;
-    min-height: 100dvh;
+    height: 100dvh;
+    min-height: 100svh;
     display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     padding: 10px 12px max(16px, env(safe-area-inset-bottom));
   }
 
@@ -62,18 +68,27 @@
   }
 
   .game-header {
+    position: relative;
     align-items: stretch;
     flex-direction: column;
-    gap: 10px;
+    gap: 0;
+    margin-bottom: 3px;
   }
 
-  .game-header-left,
-  .game-header-actions {
+  .game-header-left {
     width: 100%;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    padding-right: 70px;
   }
 
   .game-header-actions {
+    position: absolute;
+    top: 1px;
+    right: 0;
+    width: 62px;
     padding-right: 0;
   }
 
@@ -85,6 +100,40 @@
   .category-dropdown,
   .game-mode-dropdown {
     width: 100%;
+  }
+
+  .brand-lockup {
+    min-width: 0;
+    gap: 0;
+  }
+
+  .brand-logo {
+    width: 20px;
+    height: 20px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .game-mode-dropdown .category-dropdown-summary,
+  .daily-badge {
+    min-height: 32px;
+    padding-inline: 10px;
+    border-radius: 999px;
+  }
+
+  .game-mode-dropdown .category-row-label {
+    display: none;
+  }
+
+  .game-mode-selected-copy {
+    text-align: left;
+  }
+
+  .action-menu {
+    width: auto;
+    align-self: flex-start;
   }
 
   .category-dropdown-menu {
@@ -200,6 +249,137 @@
     min-height: 44px;
   }
 
+  .screen-back-button {
+    width: auto;
+    min-width: 62px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+  }
+
+  .game-header-actions {
+    display: block;
+  }
+
+  .game-header-actions > .nav-action:not(.mobile-nav-trigger) {
+    display: none;
+  }
+
+  .game-header-actions > .mobile-nav-trigger {
+    display: block;
+    width: 62px;
+    min-width: 0;
+    min-height: 30px;
+    padding: 0 8px;
+    border-color: rgba(232, 226, 211, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+    font-size: 0;
+    line-height: 1;
+    box-shadow: none;
+  }
+
+  .game-header-actions > .mobile-nav-trigger::after {
+    content: attr(data-mobile-label);
+    font-size: 0.7rem;
+    font-weight: 820;
+    letter-spacing: 0.01em;
+  }
+
+  .mobile-nav-sheet:not([hidden]) {
+    position: fixed;
+    top: max(44px, calc(env(safe-area-inset-top) + 40px));
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 1000;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    overflow: auto;
+    padding: 14px;
+    border: 1px solid rgba(232, 226, 211, 0.14);
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
+      rgba(16, 20, 16, 0.98);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-nav-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-nav-sheet-header strong {
+    font-size: 1rem;
+  }
+
+  .mobile-nav-close {
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    border-radius: 999px;
+  }
+
+  .mobile-nav-section {
+    display: grid;
+    gap: 7px;
+  }
+
+  .mobile-nav-section h2 {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mobile-nav-item {
+    min-height: 46px;
+    text-align: left;
+    border-color: rgba(232, 226, 211, 0.12);
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .mobile-nav-user-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 8px 10px;
+    border: 1px solid rgba(184, 227, 109, 0.22);
+    border-radius: var(--radius-sm);
+    background: rgba(184, 227, 109, 0.065);
+  }
+
+  .mobile-nav-user-avatar {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--earth));
+    color: #10140f;
+    font-weight: 850;
+    flex: none;
+  }
+
+  .mobile-nav-user-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-weight: 800;
+  }
+
   /* Multiplayer in-game: stack the round + scoreboard panels and let the view grow/scroll. */
   .multiplayer-layout {
     overflow: visible;
@@ -286,5 +466,375 @@
 
   .puzzle-piece-tray {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile hardening: keep controls reachable, avoid iOS safe-area overlap, and make dropdowns act like bottom sheets. */
+@media (max-width: 700px) {
+  html {
+    overflow: hidden;
+  }
+
+  body {
+    min-height: 100%;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100dvh;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
+  }
+
+  .app-shell.is-mobile-typing-shell {
+    padding-top: max(4px, env(safe-area-inset-top));
+  }
+
+  .game-screen {
+    gap: 6px;
+  }
+
+  .mode-description {
+    max-width: none;
+    text-align: left;
+  }
+
+  .play-layout,
+  .country-guess-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 10px;
+  }
+
+  .flag-card,
+  .answer-panel,
+  .world-map-panel {
+    border-radius: 6px;
+  }
+
+  .flag-card {
+    padding: 10px;
+  }
+
+  .flag-slot {
+    min-height: min(38svh, 320px);
+  }
+
+  .world-map-svg,
+  .world-globe-panel {
+    min-height: min(48svh, 420px);
+  }
+
+  .world-map-panel {
+    overscroll-behavior: contain;
+  }
+  html,
+  body,
+  .app-shell,
+  .game-screen,
+  .game-screen * {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .country-guess-screen .world-map-svg,
+  .country-guess-screen .world-globe-canvas {
+    touch-action: none;
+  }
+
+  .puzzle-piece-card,
+  .puzzle-piece-card * {
+    touch-action: none;
+  }
+
+  .world-map-control-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .answer-panel {
+    padding: 10px;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .feedback {
+    max-height: 5.2em;
+    overflow-y: auto;
+  }
+
+  .guess-form {
+    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 96px);
+  }
+
+  .game-screen.is-mobile-typing {
+    gap: 8px;
+    padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
+  }
+
+  .country-guess-screen.is-mobile-typing {
+    padding-bottom: 0;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-layout {
+    display: block;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-panel {
+    display: contents;
+  }
+
+  .country-guess-screen.is-mobile-typing .panel-title,
+  .country-guess-screen.is-mobile-typing .country-click-prompt,
+  .country-guess-screen.is-mobile-typing .mobile-extras-toggle,
+  .country-guess-screen.is-mobile-typing .mobile-extras-panel,
+  .country-guess-screen.is-mobile-typing .feedback {
+    display: none;
+  }
+
+  .country-guess-screen.is-mobile-typing .country-guess-form {
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(var(--keyboard-offset, 0px) + max(8px, env(safe-area-inset-bottom)));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 130;
+    margin: 0;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.38);
+  }
+
+  .country-guess-screen.is-mobile-typing .world-map-panel,
+  .country-guess-screen.is-mobile-typing .world-globe-panel {
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 120;
+    height: clamp(240px, calc(100svh - max(var(--keyboard-offset, 0px), 38vh) - 86px), 430px);
+    min-height: 240px;
+  }
+
+  .answer-panel {
+    gap: 7px;
+  }
+
+  .input-row {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 6px;
+  }
+
+  .input-row:has(.mobile-hint-action) {
+    grid-template-columns: minmax(0, 1fr) 44px 46px;
+  }
+
+  .input-row input {
+    min-height: 46px;
+  }
+
+  .guess-submit-action,
+  .mobile-hint-action {
+    position: relative;
+    display: inline-block;
+    min-width: 0;
+    min-height: 46px;
+    padding: 0;
+    border-radius: 999px;
+    font-size: 0;
+    line-height: 1;
+  }
+
+  .guess-submit-action::before {
+    content: "↵";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font-size: 1.25rem;
+    font-weight: 900;
+    transform: translate(-50%, -50%);
+  }
+
+  .mobile-hint-action {
+    color: var(--accent);
+    border-color: rgba(184, 227, 109, 0.38);
+    background: rgba(184, 227, 109, 0.1);
+  }
+
+  .mobile-hint-action.is-reveal-armed {
+    color: var(--earth);
+    border-color: rgba(187, 130, 86, 0.48);
+    background: rgba(187, 130, 86, 0.12);
+  }
+
+  .mobile-hint-action::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 21px;
+    height: 21px;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+    mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
+    -webkit-mask: url("/assets/icons/light-bulb.svg") center / contain no-repeat;
+  }
+
+  .mobile-daily-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .mobile-daily-actions button {
+    min-height: 40px;
+    padding-inline: 10px;
+    border-color: rgba(232, 226, 211, 0.14);
+    background: rgba(255, 255, 255, 0.035);
+    font-size: 0.86rem;
+  }
+
+  .hint-popover:not([hidden]) {
+    position: fixed;
+    top: max(6px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    z-index: 120;
+    max-height: 38svh;
+    overflow: auto;
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-extras-toggle {
+    display: block;
+    width: 100%;
+    min-height: 34px;
+    padding: 0 10px;
+    border-color: rgba(232, 226, 211, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.028);
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .mobile-extras-panel {
+    display: none;
+  }
+
+  .mobile-extras-panel.is-open {
+    display: grid;
+    gap: 8px;
+  }
+
+  .daily-game-screen .mobile-extras-panel .nav-action {
+    display: none;
+  }
+
+  .answer-panel > .feedback,
+  .mobile-extras-panel .feedback {
+    min-height: 0;
+    border-color: transparent;
+    padding: 2px 0 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.82rem;
+  }
+
+  .game-screen.is-mobile-typing .game-header {
+    display: none;
+  }
+
+  .game-screen.is-mobile-typing .guess-form {
+    padding: 8px;
+    border: 1px solid rgba(184, 227, 109, 0.32);
+    border-radius: var(--radius-sm);
+    background: rgba(8, 12, 8, 0.92);
+    backdrop-filter: blur(14px);
+  }
+
+  .game-screen.is-mobile-typing .guess-form label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .game-screen.is-mobile-typing .feedback {
+    min-height: 0;
+    max-height: 3.4em;
+    padding: 7px 9px;
+  }
+
+  .game-screen.is-mobile-typing .flag-slot {
+    min-height: clamp(150px, 34svh, 280px);
+  }
+
+  .game-screen.is-mobile-typing .daily-map-prompt .world-map-panel {
+    min-height: clamp(190px, 40svh, 320px);
+  }
+
+  .country-guess-screen.is-mobile-typing .world-map-svg,
+  .country-guess-screen.is-mobile-typing .world-globe-canvas {
+    min-height: 100%;
+  }
+
+  .stats-panel,
+  .answer-panel .stats-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .progress-card {
+    grid-column: 1 / -1;
+  }
+
+  .input-row button {
+    min-width: 0;
+  }
+
+  .category-dropdown-menu,
+  .game-mode-dropdown .category-dropdown-menu {
+    top: max(48px, calc(env(safe-area-inset-top) + 44px)) !important;
+    right: 12px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 12px !important;
+    z-index: 1002;
+    width: auto !important;
+    max-height: none;
+    border-radius: 18px;
+  }
+
+  .game-mode-dropdown .category-dropdown-menu:has(.game-mode-group),
+  .category-picker-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .action-menu-panel {
+    left: auto;
+    width: min(280px, calc(100vw - 20px));
+  }
+}
+
+@media (max-width: 420px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-name {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 720px) {
+  .flag-slot {
+    min-height: 30svh;
+  }
+
+  .world-map-svg,
+  .world-globe-panel {
+    min-height: 42svh;
   }
 }

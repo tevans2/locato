@@ -45,6 +45,18 @@ interface PanState {
   hasMoved: boolean;
 }
 
+interface TouchPoint {
+  readonly clientX: number;
+  readonly clientY: number;
+}
+
+interface PinchState {
+  readonly viewBox: ViewBoxState;
+  readonly distance: number;
+  readonly centerX: number;
+  readonly centerY: number;
+}
+
 export interface WorldMapViewOptions {
   readonly onCountryClick?: (countryId: CountryId) => void;
 }
@@ -287,6 +299,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   let viewBox: ViewBoxState = { ...DEFAULT_VIEWBOX };
   let panState: PanState | null = null;
   let suppressNextCountryClick = false;
+  const touchPointers = new Map<number, TouchPoint>();
+  let pinchState: PinchState | null = null;
   let pendingWheelDelta = 0;
   let pendingWheelClientX = 0;
   let pendingWheelClientY = 0;
@@ -424,6 +438,49 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     setViewBox(zoomAround(svg, viewBox, factor, pendingWheelClientX, pendingWheelClientY));
   }
 
+  function touchPoints(): readonly TouchPoint[] {
+    return [...touchPointers.values()];
+  }
+
+  function touchDistance(points: readonly TouchPoint[]): number {
+    if (points.length < 2) return 0;
+    const [first, second] = points;
+    return Math.hypot(second!.clientX - first!.clientX, second!.clientY - first!.clientY);
+  }
+
+  function touchCenter(points: readonly TouchPoint[]): TouchPoint {
+    if (points.length < 2) return points[0] ?? { clientX: 0, clientY: 0 };
+    const [first, second] = points;
+    return { clientX: (first!.clientX + second!.clientX) / 2, clientY: (first!.clientY + second!.clientY) / 2 };
+  }
+
+  function startPinchGesture(): void {
+    const points = touchPoints();
+    if (points.length < 2) return;
+    const center = touchCenter(points);
+    pinchState = {
+      viewBox: { ...viewBox },
+      distance: Math.max(1, touchDistance(points)),
+      centerX: center.clientX,
+      centerY: center.clientY,
+    };
+    panState = null;
+  }
+
+  function applyPinchGesture(): void {
+    if (!pinchState) return;
+    const points = touchPoints();
+    if (points.length < 2) return;
+    const currentCenter = touchCenter(points);
+    const currentDistance = Math.max(1, touchDistance(points));
+    const factor = pinchState.distance / currentDistance;
+    const zoomed = zoomAround(svg, pinchState.viewBox, factor, pinchState.centerX, pinchState.centerY);
+    const rect = svg.getBoundingClientRect();
+    const deltaX = rect.width > 0 ? ((currentCenter.clientX - pinchState.centerX) / rect.width) * zoomed.width : 0;
+    const deltaY = rect.height > 0 ? ((currentCenter.clientY - pinchState.centerY) / rect.height) * zoomed.height : 0;
+    setViewBox({ ...zoomed, x: zoomed.x - deltaX, y: zoomed.y - deltaY });
+  }
+
   svg.addEventListener("wheel", (event) => {
     event.preventDefault();
     pendingWheelDelta += wheelDeltaYToPixels(event);
@@ -438,6 +495,18 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   svg.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    svg.setPointerCapture(event.pointerId);
+    svg.classList.add("is-panning");
+
+    if (event.pointerType === "touch") {
+      touchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+      if (touchPointers.size >= 2) {
+        suppressNextCountryClick = true;
+        startPinchGesture();
+        return;
+      }
+    }
+
     panState = {
       pointerId: event.pointerId,
       clientX: event.clientX,
@@ -446,11 +515,20 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
       countryId: countryIdFromEventTarget(event.target),
       hasMoved: false,
     };
-    svg.setPointerCapture(event.pointerId);
-    svg.classList.add("is-panning");
   });
 
   svg.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch") {
+      if (!touchPointers.has(event.pointerId)) return;
+      event.preventDefault();
+      touchPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+      if (touchPointers.size >= 2) {
+        suppressNextCountryClick = true;
+        applyPinchGesture();
+        return;
+      }
+    }
+
     if (!panState || panState.pointerId !== event.pointerId) return;
     event.preventDefault();
     const rect = svg.getBoundingClientRect();
@@ -463,6 +541,29 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   });
 
   function finishPan(event: PointerEvent): void {
+    if (event.pointerType === "touch") {
+      const clickedCountryId = !pinchState && panState?.pointerId === event.pointerId && !panState.hasMoved ? panState.countryId : null;
+      touchPointers.delete(event.pointerId);
+      if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+
+      if (pinchState) {
+        suppressNextCountryClick = true;
+        pinchState = null;
+        const remaining = [...touchPointers.entries()][0];
+        if (remaining) {
+          const [pointerId, point] = remaining;
+          panState = { pointerId, clientX: point.clientX, clientY: point.clientY, viewBox: { ...viewBox }, countryId: null, hasMoved: true };
+          return;
+        }
+      }
+
+      panState = null;
+      if (touchPointers.size === 0) svg.classList.remove("is-panning");
+      suppressNextCountryClick = true;
+      if (clickedCountryId !== null && event.type !== "pointercancel") options.onCountryClick?.(clickedCountryId);
+      return;
+    }
+
     if (!panState || panState.pointerId !== event.pointerId) return;
 
     const clickedCountryId = !panState.hasMoved ? panState.countryId : null;

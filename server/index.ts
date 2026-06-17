@@ -6,6 +6,7 @@ import { RoomManager, type MultiplayerConnection } from "./rooms/RoomManager";
 import { AuthService, bunPasswordHasher, handleAuthRequest, readSessionToken, type AuthUser } from "./auth";
 import { openDatabase, SqliteUserStore } from "./db/database";
 import { SocialHub, type SocialConnection } from "./social/SocialHub";
+import { StreetViewLocationPool } from "./streetview";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -29,6 +30,10 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   ".json": "application/json; charset=utf-8",
   ".woff2": "font/woff2",
 };
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8" } });
+}
 
 function readIntegerEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -96,6 +101,15 @@ const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT
 const adminToken = process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.length > 0 ? process.env.ADMIN_TOKEN : null;
 // Presence + friend/invite push hub, backed by the persistent /social socket.
 const socialHub = new SocialHub((userId) => authService.friendIds(userId));
+const streetViewPool = new StreetViewLocationPool({
+  storagePath: process.env.STREETVIEW_POOL_PATH ?? resolve(PROJECT_ROOT, ".data/streetview-country-pool.json"),
+  metadataApiKey: process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "",
+  maxEntries: readIntegerEnv("STREETVIEW_POOL_MAX_ENTRIES", 500),
+  dailyGenerateCount: readIntegerEnv("STREETVIEW_DAILY_GENERATE_COUNT", 50),
+  refreshHours: readIntegerEnv("STREETVIEW_REFRESH_HOURS", 24),
+  metadataRadiusMeters: readIntegerEnv("STREETVIEW_METADATA_RADIUS_METERS", 1000),
+});
+streetViewPool.warm();
 
 // Hourly cleanup of expired session rows; cheap and keeps the table from growing unbounded.
 setInterval(() => authService.pruneExpiredSessions(), 60 * 60 * 1000).unref?.();
@@ -111,6 +125,7 @@ const server = Bun.serve<WebSocketData>({
   port: readIntegerEnv("PORT", DEFAULT_PORT),
   async fetch(request, serverInstance) {
     const url = new URL(request.url);
+    const { method } = request;
 
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
 
@@ -128,6 +143,31 @@ const server = Bun.serve<WebSocketData>({
       if (!user) return new Response("Unauthorized", { status: 401 });
       const upgraded = serverInstance.upgrade(request, { data: { user, kind: "social" } });
       return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
+    }
+
+    if (url.pathname === "/api/streetview-country/round" && method === "GET") {
+      try {
+        return json(await streetViewPool.createRound());
+      } catch (error) {
+        console.warn(JSON.stringify({ time: new Date().toISOString(), level: "warn", action: "streetview.round.failed", error: error instanceof Error ? error.message : String(error) }));
+        return json({ error: "Street View round unavailable." }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/streetview-country/rounds" && method === "GET") {
+      try {
+        const fallbackCount = readIntegerEnv("STREETVIEW_CLIENT_CACHE_SIZE", 5);
+        const parsedCount = Number.parseInt(url.searchParams.get("count") ?? String(fallbackCount), 10);
+        const count = Number.isFinite(parsedCount) ? parsedCount : fallbackCount;
+        return json(await streetViewPool.createRounds(count));
+      } catch (error) {
+        console.warn(JSON.stringify({ time: new Date().toISOString(), level: "warn", action: "streetview.rounds.failed", error: error instanceof Error ? error.message : String(error) }));
+        return json({ error: "Street View rounds unavailable." }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/streetview-country/stats" && method === "GET") {
+      return json(await streetViewPool.stats());
     }
 
     const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, adminToken, socialHub);
