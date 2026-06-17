@@ -34,6 +34,7 @@ export interface CountryGuessingScreenOptions {
   readonly initialMode: WorldMapGameModeId;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onMultiplayer: () => void;
+  readonly onDailyChallenge: () => void;
   // Called once per world-map run when it ends (completion, restart, mode change, or leaving).
   readonly onRecordGame?: (result: WorldMapRunResult) => void;
   readonly onLeaderboard: () => void;
@@ -601,7 +602,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const mobileExtrasToggle = el("button", { className: "mobile-extras-toggle", text: "Details", attrs: { type: "button", "aria-expanded": "false" } });
   const mobileExtrasPanel = el("div", { className: "mobile-extras-panel" });
+  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
   const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
+  const mobileDailyNavButton = el("button", { className: "mobile-nav-item", text: "Daily Challenge", attrs: { type: "button" } });
   const mobileLeaderboardNavButton = el("button", { className: "mobile-nav-item", text: "Leaderboards", attrs: { type: "button" } });
   const mobileMultiplayerNavButton = el("button", { className: "mobile-nav-item", text: "Multiplayer", attrs: { type: "button" } });
   const mobileUserAvatar = el("span", { className: "mobile-nav-user-avatar", text: "?" });
@@ -614,6 +617,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const mobileMenu = createMobileMenu(
     "Menu",
     [
+      { title: "Play", items: [mobileDailyNavButton] },
       { title: "Compete", items: [mobileLeaderboardNavButton, mobileMultiplayerNavButton] },
       { title: "You", items: [mobileUserSummary, mobileStatsNavButton, mobileFriendsNavButton, mobileSignInNavButton, mobileSignOutNavButton] },
     ],
@@ -756,8 +760,10 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
+  dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
+  mobileDailyNavButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   mobileMultiplayerNavButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   mobileLeaderboardNavButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
   mobileStatsNavButton.addEventListener("click", () => options.onViewStats?.(), { signal: controller.signal });
@@ -794,7 +800,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),
       el("div", {

@@ -9,6 +9,7 @@ export interface DailyResultScreenOptions {
   readonly result: DailyResultSave;
   readonly storage: Storage;
   readonly onBackToSolo: () => void;
+  readonly onDailyChallenge: () => void;
   readonly onMultiplayer: () => void;
 }
 
@@ -19,6 +20,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
   const backButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
   const topBackButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
+  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
   const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
   const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
@@ -141,6 +143,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   });
   backButton.addEventListener("click", options.onBackToSolo);
   topBackButton.addEventListener("click", options.onBackToSolo);
+  dailyButton.addEventListener("click", options.onDailyChallenge);
   multiplayerButton.addEventListener("click", options.onMultiplayer);
 
   const element = el("section", {
@@ -153,7 +156,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
             className: "brand-lockup compact",
             children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
           }),
-          el("div", { className: "game-header-actions", children: [topBackButton, multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, topBackButton, multiplayerButton] }),
         ],
       }),
       el("div", {

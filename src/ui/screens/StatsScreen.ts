@@ -5,6 +5,7 @@ import { el } from "../dom/createElement";
 
 export interface StatsScreenOptions {
   readonly onBack: () => void;
+  readonly onDailyChallenge?: () => void;
 }
 
 function pct(correct: number, wrong: number): string {
@@ -180,6 +181,9 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
   const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
   backButton.addEventListener("click", options.onBack);
 
+  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) } });
+  dailyButton.addEventListener("click", () => options.onDailyChallenge?.());
+
   const logo = el("div", {
     className: "brand-lockup compact",
     children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
@@ -194,7 +198,10 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
     children: [
       el("header", {
         className: "stats-header",
-        children: [el("div", { className: "stats-header-title", children: [logo, el("h1", { text: "Stats" })] }), backButton],
+        children: [
+          el("div", { className: "stats-header-title", children: [logo, el("h1", { text: "Stats" })] }),
+          el("div", { className: "screen-header-actions", children: [dailyButton, backButton] }),
+        ],
       }),
       content,
     ],

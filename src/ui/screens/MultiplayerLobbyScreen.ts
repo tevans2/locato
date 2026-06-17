@@ -16,6 +16,7 @@ export interface MultiplayerLobbyScreenOptions {
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly createOnlineTransport: () => MultiplayerTransport;
   readonly onBackToSolo: () => void;
+  readonly onDailyChallenge: () => void;
   readonly authControls?: AuthControls;
   // When set, auto-join this room code on mount (used by friend game invites).
   readonly initialJoinCode?: string;
@@ -326,6 +327,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const createButton = el("button", { className: "primary-action", text: "Create online room", attrs: { type: "button" } });
   const joinButton = el("button", { className: "secondary-action", text: "Join online room", attrs: { type: "button" } });
   const copyButton = el("button", { className: "ghost-action copy-code", text: "Copy code", attrs: { type: "button" } });
+  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge" } });
   const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
 
   const setupPanel = el("section", {
@@ -676,6 +678,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   startButton.addEventListener("click", () => transport?.send({ type: "START_GAME" }), { signal: controller.signal });
   leaveButton.addEventListener("click", () => leaveRoomFlow(), { signal: controller.signal });
+  dailyButton.addEventListener(
+    "click",
+    () => {
+      disconnectCurrentTransport();
+      clearStoredSession();
+      options.onDailyChallenge();
+    },
+    { signal: controller.signal },
+  );
   backButton.addEventListener(
     "click",
     () => {
@@ -689,7 +700,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const element = el("section", {
     className: "game-screen multiplayer-screen",
     children: [
-      el("header", { className: "stats-header multiplayer-header", children: [createBrand(), backButton] }),
+      el("header", { className: "stats-header multiplayer-header", children: [createBrand(), el("div", { className: "screen-header-actions", children: [dailyButton, backButton] })] }),
       statusText,
       el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element] }),
       endGameModal.element,

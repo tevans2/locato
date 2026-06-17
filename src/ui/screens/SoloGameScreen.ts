@@ -14,7 +14,7 @@ import type { AuthControls } from "../components/AuthPanel";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
-import { createFeedbackView, showFeedback, type FeedbackView } from "../dom/renderFeedback";
+import { createFeedbackView, hideFeedback, showFeedback, type FeedbackView } from "../dom/renderFeedback";
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
@@ -80,6 +80,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const prompt = createPromptView();
   const flagColorReveal = createFlagColorRevealView();
   const feedback = createFeedbackView();
+  hideFeedback(feedback);
   const atlas = createAtlasView(countries);
   const views: SoloViews = { stats, prompt, feedback, atlas };
   const input = el("input", {
@@ -628,7 +629,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   bindKeyboardAwareInput(element, input, controller.signal);
   render();
-  showFeedback(feedback, initialState.lastResult?.message ?? "First prompt is ready. Type the country when you know it.", "neutral");
+  if (initialState.lastResult?.message) showFeedback(feedback, initialState.lastResult.message, "neutral");
 
   return {
     element,

@@ -6,11 +6,13 @@ import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
+import { createMobileMenu } from "../dom/mobileMenu";
 
 export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onMultiplayer: () => void;
+  readonly onDailyChallenge: () => void;
 }
 
 type RoundStatus = "playing" | "won" | "lost";
@@ -166,7 +168,18 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const nextRoundButton = el("button", { className: "primary-action", text: "Next round", attrs: { type: "button" } });
   const restartButton = el("button", { className: "ghost-action", text: "Restart country", attrs: { type: "button" } });
   const revealButton = el("button", { className: "ghost-action", text: "Reveal", attrs: { type: "button" } });
-  const multiplayerButton = el("button", { className: "ghost-action", text: "Multiplayer", attrs: { type: "button" } });
+  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
+  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
+  const mobileDailyNavButton = el("button", { className: "mobile-nav-item", text: "Daily Challenge", attrs: { type: "button" } });
+  const mobileMultiplayerNavButton = el("button", { className: "mobile-nav-item", text: "Multiplayer", attrs: { type: "button" } });
+  const mobileMenu = createMobileMenu(
+    "Menu",
+    [
+      { title: "Play", items: [mobileDailyNavButton] },
+      { title: "Compete", items: [mobileMultiplayerNavButton] },
+    ],
+    controller.signal,
+  );
   const feedback = createFeedbackView();
 
   const gameModeDropdown = createGameModeDropdown({
@@ -202,7 +215,10 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     children: [
       el("header", {
         className: "game-header",
-        children: [el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }), el("div", { className: "game-header-actions", children: [multiplayerButton] })],
+        children: [
+          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
+        ],
       }),
       el("div", {
         className: "streetview-layout",
@@ -376,7 +392,10 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     },
     { signal: controller.signal },
   );
+  dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
+  mobileDailyNavButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
+  mobileMultiplayerNavButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
 
   render();
   if (!apiKey) showFeedback(feedback, "Add your Google Maps Embed API key to enable Street View frames.", "neutral");

@@ -1472,6 +1472,14 @@
     flex: 0 0 auto;
   }
 
+  /* Keep the compact mobile menu trigger out of the desktop header. Without this
+     more-specific rule, the generic desktop .nav-action styling makes the empty
+     mobile trigger render as a blank circular button between Multiplayer and the
+     account avatar. */
+  .game-header-actions > .mobile-nav-trigger {
+    display: none;
+  }
+
   .game-header .game-mode-dropdown .category-dropdown-summary,
   .game-header .daily-badge {
     padding-inline: 24px;

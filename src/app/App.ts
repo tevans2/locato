@@ -149,6 +149,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
       }),
     );
@@ -337,6 +338,7 @@ export function createApp(options: AppOptions): App {
           initialMode,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onRecordGame: (r) => void recordWorldMapGame(r),
           onViewStats: () => navigate({ type: "stats" }),
           onViewFriends: () => navigate({ type: "friends" }),
@@ -360,6 +362,7 @@ export function createApp(options: AppOptions): App {
         countryIndex: options.countryIndex,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
     );
   }
@@ -389,6 +392,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
         ...(joinCode ? { initialJoinCode: joinCode } : {}),
       }),
@@ -402,6 +406,7 @@ export function createApp(options: AppOptions): App {
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
         onBack: () => navigate(returnRoute),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onSignIn: () => authControls.openPanel(),
       }),
     );
@@ -439,7 +444,7 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }) })));
+      void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
       return;
     }
 
@@ -447,6 +452,7 @@ export function createApp(options: AppOptions): App {
       const currentUser = authControls.getUser();
       mount(createFriendsScreen({
         onBack: () => navigate({ type: "solo-game", continueSaved: true }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         ...(route.username ? { initialUsername: route.username } : {}),
         currentUsername: currentUser?.displayName ?? null,
         appOrigin: window.location.origin,
