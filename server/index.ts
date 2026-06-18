@@ -7,6 +7,7 @@ import { AuthService, bunPasswordHasher, handleAuthRequest, readSessionToken, ty
 import { openDatabase, SqliteUserStore } from "./db/database";
 import { SocialHub, type SocialConnection } from "./social/SocialHub";
 import { StreetViewLocationPool } from "./streetview";
+import { createMapTapRoundResponse, validateMapTapGuessResponse } from "./maptap";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -143,6 +144,15 @@ const server = Bun.serve<WebSocketData>({
       if (!user) return new Response("Unauthorized", { status: 401 });
       const upgraded = serverInstance.upgrade(request, { data: { user, kind: "social" } });
       return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
+    }
+
+
+    if (url.pathname === "/api/maptap/round" && method === "GET") {
+      return createMapTapRoundResponse(url);
+    }
+
+    if (url.pathname === "/api/maptap/guess" && method === "POST") {
+      return validateMapTapGuessResponse(request);
     }
 
     if (url.pathname === "/api/streetview-country/round" && method === "GET") {

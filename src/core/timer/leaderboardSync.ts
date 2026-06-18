@@ -1,5 +1,5 @@
 import { submitBestTime } from "../auth";
-import type { GameModeId } from "../gameModes";
+import type { TimerGameModeId } from "../gameModes";
 import { formatElapsedTime } from "./playTimer";
 
 export interface TimerLeaderboardResult {
@@ -8,7 +8,7 @@ export interface TimerLeaderboardResult {
 }
 
 export async function submitTimerToLeaderboard(input: {
-  readonly gameMode: GameModeId;
+  readonly gameMode: TimerGameModeId;
   readonly variant: string;
   readonly timeMs: number;
   readonly isLoggedIn: boolean;

@@ -1,0 +1,1470 @@
+diff --git a/package-lock.json b/package-lock.json
+index f174e22..1ae681d 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "locato",
+       "version": "0.1.0",
+       "dependencies": {
++        "maplibre-gl": "^5.24.0",
+         "three": "^0.184.0"
+       },
+       "devDependencies": {
+@@ -475,6 +476,118 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@mapbox/jsonlint-lines-primitives": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/@mapbox/jsonlint-lines-primitives/-/jsonlint-lines-primitives-2.0.2.tgz",
++      "integrity": "sha512-rY0o9A5ECsTQRVhv7tL/OyDpGAoUB4tTvLiW1DSzQGq4bvTPhNw1VpSNjDJc5GFZ2XuyOtSWSVN05qOtcD71qQ==",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/@mapbox/point-geometry": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@mapbox/point-geometry/-/point-geometry-1.1.0.tgz",
++      "integrity": "sha512-YGcBz1cg4ATXDCM/71L9xveh4dynfGmcLDqufR+nQQy3fKwsAZsWd/x4621/6uJaeB9mwOHE6hPeDgXz9uViUQ==",
++      "license": "ISC"
++    },
++    "node_modules/@mapbox/tiny-sdf": {
++      "version": "2.2.0",
++      "resolved": "https://registry.npmjs.org/@mapbox/tiny-sdf/-/tiny-sdf-2.2.0.tgz",
++      "integrity": "sha512-LVL4wgI9YAum5V+LNVQO6QgFBPw7/MIIY4XJPNsPDMrjEwcE+JfKk1LuIl8GnF197ejVdC9QdPaxrx5gfgdGXg==",
++      "license": "BSD-2-Clause"
++    },
++    "node_modules/@mapbox/unitbezier": {
++      "version": "0.0.1",
++      "resolved": "https://registry.npmjs.org/@mapbox/unitbezier/-/unitbezier-0.0.1.tgz",
++      "integrity": "sha512-nMkuDXFv60aBr9soUG5q+GvZYL+2KZHVvsqFCzqnkGEf46U2fvmytHaEVc1/YZbiLn8X+eR3QzX1+dwDO1lxlw==",
++      "license": "BSD-2-Clause"
++    },
++    "node_modules/@mapbox/vector-tile": {
++      "version": "2.0.5",
++      "resolved": "https://registry.npmjs.org/@mapbox/vector-tile/-/vector-tile-2.0.5.tgz",
++      "integrity": "sha512-pXj8m7KTsqZt+1jsE0xIpGvqTSbblfkuEJL/NJmNePMtEwxO8V3XMDo9WMSfDeqHvCtBI9Lmt4mGcGR10zecmw==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@mapbox/point-geometry": "~1.1.0",
++        "@types/geojson": "^7946.0.16",
++        "pbf": "^4.0.2"
++      }
++    },
++    "node_modules/@mapbox/whoots-js": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/@mapbox/whoots-js/-/whoots-js-3.1.0.tgz",
++      "integrity": "sha512-Es6WcD0nO5l+2BOQS4uLfNPYQaNDfbot3X1XUoloz+x0mPDS3eeORZJl06HXjwBG1fOGwCRnzK88LMdxKRrd6Q==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=6.0.0"
++      }
++    },
++    "node_modules/@maplibre/geojson-vt": {
++      "version": "6.1.0",
++      "resolved": "https://registry.npmjs.org/@maplibre/geojson-vt/-/geojson-vt-6.1.0.tgz",
++      "integrity": "sha512-2eIY4gZxeKIVOZVNkAMb+5NgXhgsMQpOveTQAvnp53LYqHGJZDidk7Ew0Tged9PThidpbS+NFTh0g4zivhPDzQ==",
++      "license": "ISC",
++      "dependencies": {
++        "kdbush": "^4.0.2"
++      }
++    },
++    "node_modules/@maplibre/maplibre-gl-style-spec": {
++      "version": "24.10.0",
++      "resolved": "https://registry.npmjs.org/@maplibre/maplibre-gl-style-spec/-/maplibre-gl-style-spec-24.10.0.tgz",
++      "integrity": "sha512-lichxSiagMEBBrqHF0trtMQH9RKh+9jUlIJl0qW0QHvt2H/tbvUWdE+ZzI2Jd0/pT7j/iavLonlPu7EQ/ixTOw==",
++      "license": "ISC",
++      "dependencies": {
++        "@mapbox/jsonlint-lines-primitives": "~2.0.2",
++        "@mapbox/unitbezier": "^1.0.0",
++        "json-stringify-pretty-compact": "^4.0.0",
++        "minimist": "^1.2.8",
++        "quickselect": "^3.0.0",
++        "tinyqueue": "^3.0.0"
++      },
++      "bin": {
++        "gl-style-format": "dist/gl-style-format.mjs",
++        "gl-style-migrate": "dist/gl-style-migrate.mjs",
++        "gl-style-validate": "dist/gl-style-validate.mjs"
++      }
++    },
++    "node_modules/@maplibre/maplibre-gl-style-spec/node_modules/@mapbox/unitbezier": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/@mapbox/unitbezier/-/unitbezier-1.0.0.tgz",
++      "integrity": "sha512-fqd515fjBmANKGGsQ286E2Wvj/XvDFpGzwJxq4CI6jMQue6Oy04uCKp+JWKF00xRTmk6cEu1jPJ9p3xqH8YWqQ==",
++      "license": "BSD-2-Clause"
++    },
++    "node_modules/@maplibre/mlt": {
++      "version": "1.1.11",
++      "resolved": "https://registry.npmjs.org/@maplibre/mlt/-/mlt-1.1.11.tgz",
++      "integrity": "sha512-dKvjKdITw9d0y3ndGkSqLUEpWCizMtdq8NB06cHohH/JZ2sJoM7dClR9wzJLUWykjbw9RXDFmhjjNBnNW27mzw==",
++      "license": "(MIT OR Apache-2.0)",
++      "dependencies": {
++        "@mapbox/point-geometry": "^1.1.0"
++      }
++    },
++    "node_modules/@maplibre/vt-pbf": {
++      "version": "4.3.2",
++      "resolved": "https://registry.npmjs.org/@maplibre/vt-pbf/-/vt-pbf-4.3.2.tgz",
++      "integrity": "sha512-j6p0AdjvAR19Z3XaCysle7A4ZSo08tYOzxD0Y9NQylwPAkwJJeYub5b2eVucdeDh7erhv69DahoLOevDRERRUw==",
++      "license": "MIT",
++      "dependencies": {
++        "@mapbox/point-geometry": "^1.1.0",
++        "@types/geojson": "^7946.0.16",
++        "pbf": "^5.1.0"
++      }
++    },
++    "node_modules/@maplibre/vt-pbf/node_modules/pbf": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/pbf/-/pbf-5.1.0.tgz",
++      "integrity": "sha512-Wv0yo0+uZepnoNEKsquhar1F18LogB8oeEikIhUXG16udbiXG7JecHGySwoo6kuMgjmbQYzdrTZlO+/K9t8eZg==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "resolve-protobuf-schema": "^2.1.0"
++      },
++      "bin": {
++        "pbf": "bin/pbf"
++      }
++    },
+     "node_modules/@polka/url": {
+       "version": "1.0.0-next.29",
+       "resolved": "https://registry.npmjs.org/@polka/url/-/url-1.0.0-next.29.tgz",
+@@ -864,6 +977,12 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@types/geojson": {
++      "version": "7946.0.16",
++      "resolved": "https://registry.npmjs.org/@types/geojson/-/geojson-7946.0.16.tgz",
++      "integrity": "sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==",
++      "license": "MIT"
++    },
+     "node_modules/@types/node": {
+       "version": "25.9.2",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-25.9.2.tgz",
+@@ -1115,6 +1234,12 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/earcut": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/earcut/-/earcut-3.0.2.tgz",
++      "integrity": "sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==",
++      "license": "ISC"
++    },
+     "node_modules/es-module-lexer": {
+       "version": "1.7.0",
+       "resolved": "https://registry.npmjs.org/es-module-lexer/-/es-module-lexer-1.7.0.tgz",
+@@ -1231,6 +1356,12 @@
+         "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
+       }
+     },
++    "node_modules/gl-matrix": {
++      "version": "3.4.4",
++      "resolved": "https://registry.npmjs.org/gl-matrix/-/gl-matrix-3.4.4.tgz",
++      "integrity": "sha512-latSnyDNt/8zYUB6VIJ6PCh2jBjJX6gnDsoCZ7LyW7GkqrD51EWwa9qCoGixj8YqBtETQK/xY7OmpTF8xz1DdQ==",
++      "license": "MIT"
++    },
+     "node_modules/js-tokens": {
+       "version": "9.0.1",
+       "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-9.0.1.tgz",
+@@ -1238,6 +1369,18 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/json-stringify-pretty-compact": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/json-stringify-pretty-compact/-/json-stringify-pretty-compact-4.0.0.tgz",
++      "integrity": "sha512-3CNZ2DnrpByG9Nqj6Xo8vqbjT4F6N+tb4Gb28ESAZjYZ5yqvmc56J+/kuIwkaAMOyblTQhUW7PxMkUb8Q36N3Q==",
++      "license": "MIT"
++    },
++    "node_modules/kdbush": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/kdbush/-/kdbush-4.1.0.tgz",
++      "integrity": "sha512-e9vurzrXJQrFX6ckpHP3bvj5l+9CnYzkxDNnNQ1h2QTqdWsUAJgXiKdGNcOa1EY85dU8KbQ+z/FdQdB7P+9yfQ==",
++      "license": "ISC"
++    },
+     "node_modules/loupe": {
+       "version": "3.2.1",
+       "resolved": "https://registry.npmjs.org/loupe/-/loupe-3.2.1.tgz",
+@@ -1255,6 +1398,40 @@
+         "@jridgewell/sourcemap-codec": "^1.5.5"
+       }
+     },
++    "node_modules/maplibre-gl": {
++      "version": "5.24.0",
++      "resolved": "https://registry.npmjs.org/maplibre-gl/-/maplibre-gl-5.24.0.tgz",
++      "integrity": "sha512-ALyFxgtd5R+65UqZ/++lOqwWcC0SNho9c27fYSyLmG7AfnAul2o46F05aDJGPbFU57wos9dgcIySHs0Xe6ia3A==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@mapbox/jsonlint-lines-primitives": "^2.0.2",
++        "@mapbox/point-geometry": "^1.1.0",
++        "@mapbox/tiny-sdf": "^2.1.0",
++        "@mapbox/unitbezier": "^0.0.1",
++        "@mapbox/vector-tile": "^2.0.4",
++        "@mapbox/whoots-js": "^3.1.0",
++        "@maplibre/geojson-vt": "^6.1.0",
++        "@maplibre/maplibre-gl-style-spec": "^24.8.1",
++        "@maplibre/mlt": "^1.1.8",
++        "@maplibre/vt-pbf": "^4.3.0",
++        "@types/geojson": "^7946.0.16",
++        "earcut": "^3.0.2",
++        "gl-matrix": "^3.4.4",
++        "kdbush": "^4.0.2",
++        "murmurhash-js": "^1.0.0",
++        "pbf": "^4.0.1",
++        "potpack": "^2.1.0",
++        "quickselect": "^3.0.0",
++        "tinyqueue": "^3.0.0"
++      },
++      "engines": {
++        "node": ">=16.14.0",
++        "npm": ">=8.1.0"
++      },
++      "funding": {
++        "url": "https://github.com/maplibre/maplibre-gl-js?sponsor=1"
++      }
++    },
+     "node_modules/meshoptimizer": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/meshoptimizer/-/meshoptimizer-1.1.1.tgz",
+@@ -1262,6 +1439,14 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/minimist": {
++      "version": "1.2.8",
++      "resolved": "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz",
++      "integrity": "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==",
++      "funding": {
++        "url": "https://github.com/sponsors/ljharb"
++      }
++    },
+     "node_modules/mrmime": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/mrmime/-/mrmime-2.0.1.tgz",
+@@ -1279,6 +1464,12 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/murmurhash-js": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/murmurhash-js/-/murmurhash-js-1.0.0.tgz",
++      "integrity": "sha512-TvmkNhkv8yct0SVBSy+o8wYzXjE4Zz3PCesbfs8HiCXXdcTuocApFv11UWlNFWKYsP2okqrhb7JNlSm9InBhIw==",
++      "license": "MIT"
++    },
+     "node_modules/nanoid": {
+       "version": "3.3.12",
+       "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.12.tgz",
+@@ -1315,6 +1506,18 @@
+         "node": ">= 14.16"
+       }
+     },
++    "node_modules/pbf": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/pbf/-/pbf-4.0.2.tgz",
++      "integrity": "sha512-J0ajxARhZfpUEebxYs1vhMGMuLSXtBe1e+fFPDrf2uA2hgo+UshKfNUWOz92HJNz6/NFEXseQPddnHkTreWRqg==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "resolve-protobuf-schema": "^2.1.0"
++      },
++      "bin": {
++        "pbf": "bin/pbf"
++      }
++    },
+     "node_modules/picocolors": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
+@@ -1364,6 +1567,33 @@
+         "node": "^10 || ^12 || >=14"
+       }
+     },
++    "node_modules/potpack": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/potpack/-/potpack-2.1.0.tgz",
++      "integrity": "sha512-pcaShQc1Shq0y+E7GqJqvZj8DTthWV1KeHGdi0Z6IAin2Oi3JnLCOfwnCo84qc+HAp52wT9nK9H7FAJp5a44GQ==",
++      "license": "ISC"
++    },
++    "node_modules/protocol-buffers-schema": {
++      "version": "3.6.1",
++      "resolved": "https://registry.npmjs.org/protocol-buffers-schema/-/protocol-buffers-schema-3.6.1.tgz",
++      "integrity": "sha512-VG2K63Igkiv9p76tk1lilczEK1cT+kCjKtkdhw1dQZV3k3IXJbd3o6Ho8b9zJZaHSnT2hKe4I+ObmX9w6m5SmQ==",
++      "license": "MIT"
++    },
++    "node_modules/quickselect": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/quickselect/-/quickselect-3.0.0.tgz",
++      "integrity": "sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g==",
++      "license": "ISC"
++    },
++    "node_modules/resolve-protobuf-schema": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/resolve-protobuf-schema/-/resolve-protobuf-schema-2.1.0.tgz",
++      "integrity": "sha512-kI5ffTiZWmJaS/huM8wZfEMer1eRd7oJQhDuxeCLe3t7N7mX3z94CN0xPxBQxFYQTSNz9T0i+v6inKqSdK8xrQ==",
++      "license": "MIT",
++      "dependencies": {
++        "protocol-buffers-schema": "^3.3.1"
++      }
++    },
+     "node_modules/rollup": {
+       "version": "4.61.1",
+       "resolved": "https://registry.npmjs.org/rollup/-/rollup-4.61.1.tgz",
+@@ -1515,6 +1745,12 @@
+         "node": "^18.0.0 || >=20.0.0"
+       }
+     },
++    "node_modules/tinyqueue": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/tinyqueue/-/tinyqueue-3.0.0.tgz",
++      "integrity": "sha512-gRa9gwYU3ECmQYv3lslts5hxuIa90veaEcxDYuu3QGOIAEM2mOZkVHp48ANJuu1CURtRdHKUBY5Lm1tHV+sD4g==",
++      "license": "ISC"
++    },
+     "node_modules/tinyrainbow": {
+       "version": "2.0.0",
+       "resolved": "https://registry.npmjs.org/tinyrainbow/-/tinyrainbow-2.0.0.tgz",
+diff --git a/package.json b/package.json
+index b9108e1..730e679 100644
+--- a/package.json
++++ b/package.json
+@@ -20,6 +20,7 @@
+     "vitest": "^3.2.4"
+   },
+   "dependencies": {
++    "maplibre-gl": "^5.24.0",
+     "three": "^0.184.0"
+   }
+ }
+diff --git a/server/index.ts b/server/index.ts
+index 80208ea..5efb2fe 100644
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -7,6 +7,7 @@ import { AuthService, bunPasswordHasher, handleAuthRequest, readSessionToken, ty
+ import { openDatabase, SqliteUserStore } from "./db/database";
+ import { SocialHub, type SocialConnection } from "./social/SocialHub";
+ import { StreetViewLocationPool } from "./streetview";
++import { createMapTapRoundResponse, validateMapTapGuessResponse } from "./maptap";
+ 
+ interface WebSocketData {
+   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
+@@ -145,6 +146,15 @@ const server = Bun.serve<WebSocketData>({
+       return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
+     }
+ 
++
++    if (url.pathname === "/api/maptap/round" && method === "GET") {
++      return createMapTapRoundResponse(url);
++    }
++
++    if (url.pathname === "/api/maptap/guess" && method === "POST") {
++      return validateMapTapGuessResponse(request);
++    }
++
+     if (url.pathname === "/api/streetview-country/round" && method === "GET") {
+       try {
+         return json(await streetViewPool.createRound());
+diff --git a/server/maptap.ts b/server/maptap.ts
+new file mode 100644
+index 0000000..dcdb439
+--- /dev/null
++++ b/server/maptap.ts
+@@ -0,0 +1,63 @@
++import { clampDecayKm, isValidLatLng, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess } from "../src/core/maptap/distance";
++import { filterMapTapLocations, findMapTapLocation, isMapTapCategory, isMapTapDifficulty, toMapTapRoundTarget } from "../src/core/maptap/locations";
++import type { MapTapGuessResult, MapTapLocation } from "../src/core/maptap/types";
++
++function json(data: unknown, status = 200): Response {
++  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8" } });
++}
++
++async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
++  try {
++    const body: unknown = await request.json();
++    return body !== null && typeof body === "object" ? (body as Record<string, unknown>) : null;
++  } catch {
++    return null;
++  }
++}
++
++function pickRandom<T>(items: readonly T[]): T | null {
++  if (items.length === 0) return null;
++  return items[Math.floor(Math.random() * items.length)] ?? null;
++}
++
++export function createMapTapRoundResponse(url: URL): Response {
++  const categoryRaw = url.searchParams.get("category");
++  const difficultyRaw = url.searchParams.get("difficulty");
++  const category = categoryRaw && isMapTapCategory(categoryRaw) ? categoryRaw : null;
++  const difficulty = difficultyRaw && isMapTapDifficulty(difficultyRaw) ? difficultyRaw : null;
++  const locations = filterMapTapLocations({ category, difficulty });
++  const location = pickRandom(locations);
++  if (!location) return json({ error: "No MapTap targets match those filters." }, 404);
++  return json({ target: toMapTapRoundTarget(location) });
++}
++
++function buildGuessResult(location: MapTapLocation, guessLat: number, guessLng: number, decayKm: number): MapTapGuessResult | null {
++  const guess = { lat: guessLat, lng: normalizeLongitude(guessLng) };
++  if (!isValidLatLng(guess)) return null;
++  const scored = scoreMapTapGuess(guess, location, decayKm);
++  return {
++    target: location,
++    guess,
++    distanceKm: Math.round(scored.distanceKm * 10) / 10,
++    score: scored.score,
++    maxScore: MAP_TAP_MAX_SCORE,
++    decayKm: scored.decayKm,
++  };
++}
++
++export async function validateMapTapGuessResponse(request: Request): Promise<Response> {
++  const body = await readJsonBody(request);
++  if (!body) return json({ error: "Invalid request body." }, 400);
++
++  const targetId = typeof body.targetId === "string" ? body.targetId : "";
++  const location = findMapTapLocation(targetId);
++  if (!location) return json({ error: "Unknown MapTap target." }, 404);
++
++  const guessLat = typeof body.guessLat === "number" ? body.guessLat : NaN;
++  const guessLng = typeof body.guessLng === "number" ? body.guessLng : NaN;
++  const decayKm = clampDecayKm(typeof body.decayKm === "number" ? body.decayKm : undefined);
++  const result = buildGuessResult(location, guessLat, guessLng, decayKm);
++  if (!result) return json({ error: "Invalid guess coordinates." }, 400);
++
++  return json(result);
++}
+diff --git a/src/app/App.ts b/src/app/App.ts
+index 9ca7b6a..cd45979 100644
+--- a/src/app/App.ts
++++ b/src/app/App.ts
+@@ -2,7 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
+ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
+ import { createDailyChallenge, createDailyShareText } from "../core/dailyChallenge";
+ import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
+-import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
++import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+ import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
+ import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
+ import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
+@@ -307,6 +307,11 @@ export function createApp(options: AppOptions): App {
+ 
+     if (isStreetViewGameModeId(gameMode)) {
+       navigate({ type: "streetview-country" });
++      return;
++    }
++
++    if (isMapTapGameModeId(gameMode)) {
++      navigate({ type: "map-tap" });
+     }
+   }
+ 
+@@ -370,6 +375,23 @@ export function createApp(options: AppOptions): App {
+     );
+   }
+ 
++  async function startMapTap(): Promise<void> {
++    const run = navigationRun;
++    const loading = createLoadingScreen("Loading MapTap...");
++    mount(loading);
++
++    const { createMapTapScreen } = await import("../ui/screens/MapTapScreen");
++    if (run !== navigationRun) return;
++
++    mount(
++      createMapTapScreen({
++        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
++        onMultiplayer: () => navigate({ type: "multiplayer" }),
++        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
++      }),
++    );
++  }
++
+   async function startMultiplayer(joinCode?: string): Promise<void> {
+     const run = navigationRun;
+     const loading = createLoadingScreen("Loading multiplayer...");
+@@ -441,6 +463,10 @@ export function createApp(options: AppOptions): App {
+       startStreetViewCountry();
+       return;
+     }
++    if (route.type === "map-tap") {
++      void startMapTap();
++      return;
++    }
+     if (route.type === "multiplayer") {
+       void startMultiplayer(route.joinCode);
+       return;
+diff --git a/src/app/router.ts b/src/app/router.ts
+index 8e341db..374b519 100644
+--- a/src/app/router.ts
++++ b/src/app/router.ts
+@@ -5,6 +5,7 @@ export type AppRoute =
+   | { readonly type: "daily-challenge" }
+   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
+   | { readonly type: "streetview-country" }
++  | { readonly type: "map-tap" }
+   | { readonly type: "multiplayer"; readonly joinCode?: string }
+   | { readonly type: "stats" }
+   | { readonly type: "friends"; readonly username?: string }
+diff --git a/src/core/gameModes.ts b/src/core/gameModes.ts
+index ae94bf2..00ad541 100644
+--- a/src/core/gameModes.ts
++++ b/src/core/gameModes.ts
+@@ -3,7 +3,9 @@ import { soloPromptCategories } from "./categories";
+ export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
+ export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
+ export type StreetViewGameModeId = "streetview-country";
+-export type GameModeId = PromptGameModeId | WorldMapGameModeId | StreetViewGameModeId;
++export type MapTapGameModeId = "map-tap";
++export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
++export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId;
+ 
+ export interface GameModeOption {
+   readonly id: GameModeId;
+@@ -15,6 +17,7 @@ export interface GameModeOption {
+ const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
+ const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
+ const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
++const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
+ 
+ export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
+   const category = soloPromptCategories.find((item) => item.id === id);
+@@ -62,7 +65,17 @@ export const streetViewGameModeOptions: readonly GameModeOption[] = [
+   },
+ ];
+ 
+-export const gameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions, ...streetViewGameModeOptions];
++export const mapTapGameModeOptions: readonly GameModeOption[] = [
++  {
++    id: "map-tap",
++    label: "MapTap",
++    description: "Rotate a satellite globe and click the named city, landmark, mountain, or point of interest.",
++    group: "World map games",
++  },
++];
++
++export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
++export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
+ 
+ export function isPromptGameModeId(id: string): id is PromptGameModeId {
+   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
+@@ -76,6 +89,14 @@ export function isStreetViewGameModeId(id: string): id is StreetViewGameModeId {
+   return STREET_VIEW_GAME_MODE_IDS.includes(id as StreetViewGameModeId);
+ }
+ 
++export function isMapTapGameModeId(id: string): id is MapTapGameModeId {
++  return MAP_TAP_GAME_MODE_IDS.includes(id as MapTapGameModeId);
++}
++
++export function isTimerGameModeId(id: string): id is TimerGameModeId {
++  return isPromptGameModeId(id) || isWorldMapGameModeId(id);
++}
++
+ export function getGameModeOption(id: GameModeId): GameModeOption {
+   return gameModeOptions.find((option) => option.id === id) ?? gameModeOptions[0]!;
+ }
+diff --git a/src/core/maptap/client.ts b/src/core/maptap/client.ts
+new file mode 100644
+index 0000000..2c38bad
+--- /dev/null
++++ b/src/core/maptap/client.ts
+@@ -0,0 +1,26 @@
++import type { MapTapCategory, MapTapDifficulty, MapTapGuessInput, MapTapGuessResult, MapTapRoundTarget } from "./types";
++
++async function readJson<T>(response: Response): Promise<T | null> {
++  if (!response.ok) return null;
++  return (await response.json()) as T;
++}
++
++export async function fetchMapTapRound(filters: { readonly category?: MapTapCategory | ""; readonly difficulty?: MapTapDifficulty | "" } = {}): Promise<MapTapRoundTarget | null> {
++  const params = new URLSearchParams();
++  if (filters.category) params.set("category", filters.category);
++  if (filters.difficulty) params.set("difficulty", filters.difficulty);
++  const suffix = params.size > 0 ? `?${params.toString()}` : "";
++  const data = await readJson<{ readonly target: MapTapRoundTarget }>(await fetch(`/api/maptap/round${suffix}`));
++  return data?.target ?? null;
++}
++
++export async function validateMapTapGuess(input: MapTapGuessInput): Promise<MapTapGuessResult | null> {
++  const data = await readJson<MapTapGuessResult>(
++    await fetch("/api/maptap/guess", {
++      method: "POST",
++      headers: { "content-type": "application/json" },
++      body: JSON.stringify(input),
++    }),
++  );
++  return data;
++}
+diff --git a/src/core/maptap/distance.ts b/src/core/maptap/distance.ts
+new file mode 100644
+index 0000000..74772ac
+--- /dev/null
++++ b/src/core/maptap/distance.ts
+@@ -0,0 +1,61 @@
++export const EARTH_RADIUS_KM = 6371.0088;
++export const MAP_TAP_MAX_SCORE = 5000;
++export const MAP_TAP_DEFAULT_DECAY_KM = 1000;
++export const MAP_TAP_MIN_DECAY_KM = 100;
++export const MAP_TAP_MAX_DECAY_KM = 10000;
++
++export interface LngLatPoint {
++  readonly lat: number;
++  readonly lng: number;
++}
++
++function toRadians(degrees: number): number {
++  return (degrees * Math.PI) / 180;
++}
++
++export function normalizeLongitude(lng: number): number {
++  if (!Number.isFinite(lng)) return NaN;
++  return ((((lng + 180) % 360) + 360) % 360) - 180;
++}
++
++export function isValidLatLng(point: LngLatPoint): boolean {
++  return Number.isFinite(point.lat) && Number.isFinite(point.lng) && point.lat >= -90 && point.lat <= 90;
++}
++
++export function haversineDistanceKm(a: LngLatPoint, b: LngLatPoint): number {
++  if (!isValidLatLng(a) || !isValidLatLng(b)) return NaN;
++
++  const lat1 = toRadians(a.lat);
++  const lat2 = toRadians(b.lat);
++  const deltaLat = toRadians(b.lat - a.lat);
++  const deltaLng = toRadians(normalizeLongitude(b.lng - a.lng));
++
++  const sinLat = Math.sin(deltaLat / 2);
++  const sinLng = Math.sin(deltaLng / 2);
++  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
++  return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
++}
++
++export function clampDecayKm(decayKm: number | undefined): number {
++  if (!Number.isFinite(decayKm)) return MAP_TAP_DEFAULT_DECAY_KM;
++  return Math.min(Math.max(decayKm!, MAP_TAP_MIN_DECAY_KM), MAP_TAP_MAX_DECAY_KM);
++}
++
++export function scoreMapTapDistance(distanceKm: number, decayKm = MAP_TAP_DEFAULT_DECAY_KM, maxScore = MAP_TAP_MAX_SCORE): number {
++  if (!Number.isFinite(distanceKm) || distanceKm < 0) return 0;
++  const decay = clampDecayKm(decayKm);
++  const score = maxScore * Math.exp(-distanceKm / decay);
++  return Math.max(0, Math.min(maxScore, Math.round(score)));
++}
++
++export function scoreMapTapGuess(guess: LngLatPoint, target: LngLatPoint, decayKm = MAP_TAP_DEFAULT_DECAY_KM): { readonly distanceKm: number; readonly score: number; readonly decayKm: number } {
++  const normalizedGuess = { lat: guess.lat, lng: normalizeLongitude(guess.lng) };
++  const normalizedTarget = { lat: target.lat, lng: normalizeLongitude(target.lng) };
++  const distanceKm = haversineDistanceKm(normalizedGuess, normalizedTarget);
++  const decay = clampDecayKm(decayKm);
++  return {
++    distanceKm,
++    score: scoreMapTapDistance(distanceKm, decay),
++    decayKm: decay,
++  };
++}
+diff --git a/src/core/maptap/index.ts b/src/core/maptap/index.ts
+new file mode 100644
+index 0000000..61fa2e8
+--- /dev/null
++++ b/src/core/maptap/index.ts
+@@ -0,0 +1,4 @@
++export * from "./client";
++export * from "./distance";
++export * from "./locations";
++export * from "./types";
+diff --git a/src/core/maptap/locations.ts b/src/core/maptap/locations.ts
+new file mode 100644
+index 0000000..1f9c9e7
+--- /dev/null
++++ b/src/core/maptap/locations.ts
+@@ -0,0 +1,39 @@
++import type { MapTapCategory, MapTapDifficulty, MapTapLocation, MapTapRoundTarget } from "./types";
++
++export const MAP_TAP_LOCATIONS: readonly MapTapLocation[] = [
++  { id: "mount-kilimanjaro", name: "Mount Kilimanjaro", category: "mountain", lat: -3.0674, lng: 37.3556, difficulty: "easy" },
++  { id: "andes-central", name: "The Andes", category: "mountain", lat: -32.6532, lng: -70.0112, difficulty: "medium" },
++  { id: "tokyo", name: "Tokyo", category: "city", lat: 35.6762, lng: 139.6503, difficulty: "easy" },
++  { id: "cape-town", name: "Cape Town", category: "city", lat: -33.9249, lng: 18.4241, difficulty: "easy" },
++  { id: "petra", name: "Petra", category: "poi", lat: 30.3285, lng: 35.4444, difficulty: "medium" },
++  { id: "pyramids-of-giza", name: "Pyramids of Giza", category: "poi", lat: 29.9792, lng: 31.1342, difficulty: "easy" },
++  { id: "eiffel-tower", name: "Eiffel Tower", category: "landmark", lat: 48.8584, lng: 2.2945, difficulty: "easy" },
++  { id: "taj-mahal", name: "Taj Mahal", category: "landmark", lat: 27.1751, lng: 78.0421, difficulty: "easy" },
++  { id: "machu-picchu", name: "Machu Picchu", category: "landmark", lat: -13.1631, lng: -72.5450, difficulty: "medium" },
++  { id: "uluru", name: "Uluru", category: "landmark", lat: -25.3444, lng: 131.0369, difficulty: "hard" },
++] as const;
++
++export function toMapTapRoundTarget(location: MapTapLocation): MapTapRoundTarget {
++  const { id, name, category, difficulty } = location;
++  return { id, name, category, difficulty };
++}
++
++export function findMapTapLocation(id: string): MapTapLocation | null {
++  return MAP_TAP_LOCATIONS.find((location) => location.id === id) ?? null;
++}
++
++export function filterMapTapLocations(input: { readonly category?: string | null; readonly difficulty?: string | null }): readonly MapTapLocation[] {
++  return MAP_TAP_LOCATIONS.filter((location) => {
++    const categoryOk = input.category ? location.category === input.category : true;
++    const difficultyOk = input.difficulty ? location.difficulty === input.difficulty : true;
++    return categoryOk && difficultyOk;
++  });
++}
++
++export function isMapTapCategory(value: string): value is MapTapCategory {
++  return ["city", "mountain", "poi", "landmark"].includes(value);
++}
++
++export function isMapTapDifficulty(value: string): value is MapTapDifficulty {
++  return ["easy", "medium", "hard"].includes(value);
++}
+diff --git a/src/core/maptap/types.ts b/src/core/maptap/types.ts
+new file mode 100644
+index 0000000..9d38ae8
+--- /dev/null
++++ b/src/core/maptap/types.ts
+@@ -0,0 +1,38 @@
++export type MapTapCategory = "city" | "mountain" | "poi" | "landmark";
++export type MapTapDifficulty = "easy" | "medium" | "hard";
++
++export interface MapTapLocation {
++  readonly id: string;
++  readonly name: string;
++  readonly category: MapTapCategory;
++  readonly lat: number;
++  readonly lng: number;
++  readonly difficulty: MapTapDifficulty;
++}
++
++// Public round payload. Do not include lat/lng here when a backend is available.
++export interface MapTapRoundTarget {
++  readonly id: string;
++  readonly name: string;
++  readonly category: MapTapCategory;
++  readonly difficulty: MapTapDifficulty;
++}
++
++export interface MapTapGuessInput {
++  readonly targetId: string;
++  readonly guessLat: number;
++  readonly guessLng: number;
++  readonly decayKm?: number;
++}
++
++export interface MapTapGuessResult {
++  readonly target: MapTapLocation;
++  readonly guess: {
++    readonly lat: number;
++    readonly lng: number;
++  };
++  readonly distanceKm: number;
++  readonly score: number;
++  readonly maxScore: number;
++  readonly decayKm: number;
++}
+diff --git a/src/core/timer/keys.ts b/src/core/timer/keys.ts
+index ea71621..1b2f407 100644
+--- a/src/core/timer/keys.ts
++++ b/src/core/timer/keys.ts
+@@ -1,4 +1,4 @@
+-import type { GameModeId, PromptGameModeId, WorldMapGameModeId } from "../gameModes";
++import type { PromptGameModeId, TimerGameModeId, WorldMapGameModeId } from "../gameModes";
+ import type { TimerStorageKeys } from "./playTimer";
+ 
+ const MAP_TIMER_KEYS: Record<WorldMapGameModeId, TimerStorageKeys> = {
+@@ -43,7 +43,7 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
+   },
+ };
+ 
+-export function timerKeysForMode(mode: GameModeId): TimerStorageKeys {
++export function timerKeysForMode(mode: TimerGameModeId): TimerStorageKeys {
+   if (mode in MAP_TIMER_KEYS) {
+     return MAP_TIMER_KEYS[mode as WorldMapGameModeId];
+   }
+diff --git a/src/core/timer/leaderboardSync.ts b/src/core/timer/leaderboardSync.ts
+index 60e3898..c54dd16 100644
+--- a/src/core/timer/leaderboardSync.ts
++++ b/src/core/timer/leaderboardSync.ts
+@@ -1,5 +1,5 @@
+ import { submitBestTime } from "../auth";
+-import type { GameModeId } from "../gameModes";
++import type { TimerGameModeId } from "../gameModes";
+ import { formatElapsedTime } from "./playTimer";
+ 
+ export interface TimerLeaderboardResult {
+@@ -8,7 +8,7 @@ export interface TimerLeaderboardResult {
+ }
+ 
+ export async function submitTimerToLeaderboard(input: {
+-  readonly gameMode: GameModeId;
++  readonly gameMode: TimerGameModeId;
+   readonly variant: string;
+   readonly timeMs: number;
+   readonly isLoggedIn: boolean;
+diff --git a/src/styles/game.css b/src/styles/game.css
+index b44e9b1..dba0d25 100644
+--- a/src/styles/game.css
++++ b/src/styles/game.css
+@@ -2203,3 +2203,136 @@
+   padding-inline: 11px;
+   font-size: 0.78rem;
+ }
++
++/* MapTap satellite-globe mode. */
++.maptap-screen {
++  min-height: 100vh;
++}
++
++.maptap-layout {
++  display: grid;
++  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
++  gap: 1rem;
++  align-items: stretch;
++  width: min(1180px, calc(100vw - 2rem));
++  margin: 0 auto 2rem;
++}
++
++.maptap-sidebar,
++.maptap-map-panel {
++  border: 1px solid var(--border);
++  border-radius: 24px;
++  background: var(--surface);
++  box-shadow: var(--shadow);
++}
++
++.maptap-sidebar {
++  padding: 1rem;
++  display: flex;
++  flex-direction: column;
++  gap: 1rem;
++}
++
++.maptap-sidebar .panel-title strong {
++  display: block;
++  font-size: clamp(1.6rem, 4vw, 2.5rem);
++  line-height: 1;
++  margin-top: 0.25rem;
++}
++
++.maptap-prompt-meta,
++.maptap-status,
++.maptap-score-note {
++  color: var(--muted);
++}
++
++.maptap-filters {
++  display: grid;
++  gap: 0.75rem;
++}
++
++.maptap-filters label {
++  display: grid;
++  gap: 0.35rem;
++}
++
++.maptap-filter-select,
++.maptap-decay-input {
++  width: 100%;
++  border-radius: 14px;
++  border: 1px solid var(--border);
++  background: var(--surface-soft);
++  color: var(--text);
++  padding: 0.7rem 0.8rem;
++  font: inherit;
++}
++
++.maptap-actions {
++  display: flex;
++  gap: 0.5rem;
++  flex-wrap: wrap;
++}
++
++.maptap-map-panel {
++  overflow: hidden;
++  min-height: 640px;
++  position: relative;
++}
++
++.maptap-globe {
++  width: 100%;
++  height: 100%;
++  min-height: 640px;
++  background: #020617;
++}
++
++.maptap-result-panel {
++  display: grid;
++  gap: 0.75rem;
++  padding-top: 0.75rem;
++  border-top: 1px solid var(--border);
++}
++
++.maptap-result-score,
++.maptap-result-stat {
++  display: flex;
++  justify-content: space-between;
++  gap: 1rem;
++  align-items: baseline;
++}
++
++.maptap-result-score span,
++.maptap-result-stat span {
++  color: var(--muted);
++}
++
++.maptap-result-score strong {
++  font-size: 1.4rem;
++}
++
++.maptap-marker {
++  width: 18px;
++  height: 18px;
++  border-radius: 999px;
++  border: 3px solid #ffffff;
++  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.45), 0 12px 30px rgba(0, 0, 0, 0.35);
++}
++
++.maptap-marker-guess {
++  background: #38bdf8;
++}
++
++.maptap-marker-target {
++  background: #fb7185;
++}
++
++@media (max-width: 860px) {
++  .maptap-layout {
++    grid-template-columns: 1fr;
++  }
++
++  .maptap-map-panel,
++  .maptap-globe {
++    min-height: 520px;
++  }
++}
+diff --git a/src/ui/components/MapTapGlobe.ts b/src/ui/components/MapTapGlobe.ts
+new file mode 100644
+index 0000000..2c299a9
+--- /dev/null
++++ b/src/ui/components/MapTapGlobe.ts
+@@ -0,0 +1,175 @@
++import * as maplibregl from "maplibre-gl";
++import "maplibre-gl/dist/maplibre-gl.css";
++import type { MapTapGuessResult } from "../../core/maptap";
++
++const RESULT_LINE_SOURCE_ID = "maptap-result-line";
++const RESULT_LINE_LAYER_ID = "maptap-result-line-layer";
++const EMPTY_LINE_DATA: Parameters<maplibregl.GeoJSONSource["setData"]>[0] = {
++  type: "FeatureCollection",
++  features: [],
++};
++
++export interface MapTapClick {
++  readonly lat: number;
++  readonly lng: number;
++}
++
++export interface MapTapGlobeOptions {
++  readonly onGuess: (point: MapTapClick) => void;
++  readonly signal: AbortSignal;
++}
++
++export interface MapTapGlobe {
++  readonly element: HTMLElement;
++  readonly reset: () => void;
++  readonly reveal: (result: MapTapGuessResult) => void;
++  readonly setAcceptingGuesses: (accepting: boolean) => void;
++  readonly destroy: () => void;
++}
++
++function createMarkerElement(className: string, label: string): HTMLElement {
++  const marker = document.createElement("div");
++  marker.className = className;
++  marker.setAttribute("aria-label", label);
++  marker.setAttribute("role", "img");
++  return marker;
++}
++
++function resultLineData(result: MapTapGuessResult): Parameters<maplibregl.GeoJSONSource["setData"]>[0] {
++  return {
++    type: "FeatureCollection",
++    features: [
++      {
++        type: "Feature",
++        properties: {},
++        geometry: {
++          type: "LineString",
++          coordinates: [
++            [result.guess.lng, result.guess.lat],
++            [result.target.lng, result.target.lat],
++          ],
++        },
++      },
++    ],
++  };
++}
++
++export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
++  let acceptingGuesses = true;
++  let guessMarker: maplibregl.Marker | null = null;
++  let targetMarker: maplibregl.Marker | null = null;
++  let destroyed = false;
++
++  const element = document.createElement("div");
++  element.className = "maptap-globe";
++
++  const map = new maplibregl.Map({
++    container: element,
++    center: [12, 20],
++    zoom: 1.2,
++    minZoom: 0.4,
++    maxZoom: 16,
++    attributionControl: false,
++    style: {
++      version: 8,
++      // MapLibre GL JS v5 configures globe projection in the style object.
++      // This is the v5 equivalent of the older map option `projection: "globe"`.
++      projection: { type: "globe" },
++      sources: {
++        "esri-world-imagery": {
++          type: "raster",
++          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
++          tileSize: 256,
++          attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
++          maxzoom: 19,
++        },
++      },
++      layers: [
++        {
++          id: "esri-world-imagery-layer",
++          type: "raster",
++          source: "esri-world-imagery",
++        },
++      ],
++    },
++  });
++
++  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
++  map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
++
++  function ensureLineLayer(): void {
++    if (map.getSource(RESULT_LINE_SOURCE_ID) === undefined) {
++      map.addSource(RESULT_LINE_SOURCE_ID, {
++        type: "geojson",
++        data: EMPTY_LINE_DATA,
++      });
++    }
++    if (map.getLayer(RESULT_LINE_LAYER_ID) === undefined) {
++      map.addLayer({
++        id: RESULT_LINE_LAYER_ID,
++        type: "line",
++        source: RESULT_LINE_SOURCE_ID,
++        layout: { "line-cap": "round", "line-join": "round" },
++        paint: { "line-width": 3, "line-color": "#ffffff", "line-opacity": 0.9 },
++      });
++    }
++  }
++
++  function setLineData(data: Parameters<maplibregl.GeoJSONSource["setData"]>[0]): void {
++    ensureLineLayer();
++    const source = map.getSource(RESULT_LINE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
++    source?.setData(data);
++  }
++
++  function clearMarkers(): void {
++    guessMarker?.remove();
++    targetMarker?.remove();
++    guessMarker = null;
++    targetMarker = null;
++  }
++
++  map.on("load", () => {
++    ensureLineLayer();
++  });
++
++  map.on("click", (event) => {
++    if (!acceptingGuesses || destroyed) return;
++    options.onGuess({ lng: event.lngLat.lng, lat: event.lngLat.lat });
++  });
++
++  function removeMap(): void {
++    if (destroyed) return;
++    destroyed = true;
++    map.remove();
++  }
++
++  options.signal.addEventListener("abort", removeMap);
++
++  requestAnimationFrame(() => map.resize());
++
++  return {
++    element,
++    reset: () => {
++      acceptingGuesses = true;
++      clearMarkers();
++      if (map.loaded()) setLineData(EMPTY_LINE_DATA);
++    },
++    reveal: (result) => {
++      acceptingGuesses = false;
++      clearMarkers();
++      guessMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-guess", "Your guess"), anchor: "center" })
++        .setLngLat([result.guess.lng, result.guess.lat])
++        .addTo(map);
++      targetMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-target", "Actual location"), anchor: "center" })
++        .setLngLat([result.target.lng, result.target.lat])
++        .addTo(map);
++      setLineData(resultLineData(result));
++      const bounds = new maplibregl.LngLatBounds([result.guess.lng, result.guess.lat], [result.guess.lng, result.guess.lat]).extend([result.target.lng, result.target.lat]);
++      map.fitBounds(bounds, { padding: 90, duration: 800, maxZoom: 7 });
++    },
++    setAcceptingGuesses: (accepting) => {
++      acceptingGuesses = accepting;
++    },
++    destroy: removeMap,
++  };
++}
+diff --git a/src/ui/screens/LeaderboardScreen.ts b/src/ui/screens/LeaderboardScreen.ts
+index 8e132bc..5b22963 100644
+--- a/src/ui/screens/LeaderboardScreen.ts
++++ b/src/ui/screens/LeaderboardScreen.ts
+@@ -1,6 +1,6 @@
+ import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
+ import { CONTINENTS } from "../../core/countries";
+-import { gameModeOptions, type GameModeId } from "../../core/gameModes";
++import { isTimerGameModeId, timerGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
+ import { timerKeysForMode } from "../../core/timer/keys";
+ import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
+ import type { Screen } from "../../app/router";
+@@ -45,14 +45,14 @@ function renderRows(entries: readonly LeaderboardEntry[], currentUserId: string
+ 
+ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Screen {
+   const controller = new AbortController();
+-  let selectedMode: GameModeId = options.initialMode ?? "name-all";
++  let selectedMode: TimerGameModeId = options.initialMode && isTimerGameModeId(options.initialMode) ? options.initialMode : "name-all";
+   let selectedVariant = options.initialVariant ?? (selectedMode === "puzzle" ? "Africa" : "");
+   let currentUser: AuthUser | null = null;
+ 
+   const modeSelect = el("select", {
+     className: "leaderboard-mode-select",
+     attrs: { id: "leaderboard-mode", name: "leaderboardMode", "aria-label": "Leaderboard game mode" },
+-    children: gameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
++    children: timerGameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
+   });
+   modeSelect.value = selectedMode;
+ 
+@@ -130,7 +130,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
+   modeSelect.addEventListener(
+     "change",
+     () => {
+-      selectedMode = modeSelect.value as GameModeId;
++      selectedMode = modeSelect.value as TimerGameModeId;
+       if (selectedMode === "puzzle" && !selectedVariant) selectedVariant = variantSelect.value;
+       syncVariantVisibility();
+       void loadBoard();
+diff --git a/src/ui/screens/MapTapScreen.ts b/src/ui/screens/MapTapScreen.ts
+new file mode 100644
+index 0000000..3d16d96
+--- /dev/null
++++ b/src/ui/screens/MapTapScreen.ts
+@@ -0,0 +1,255 @@
++import type { Screen } from "../../app/router";
++import { fetchMapTapRound, MAP_TAP_DEFAULT_DECAY_KM, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapRoundTarget } from "../../core/maptap";
++import type { GameModeId } from "../../core/gameModes";
++import { el } from "../dom/createElement";
++import { createGameModeDropdown } from "../dom/gameModeDropdown";
++import { createMapTapGlobe, type MapTapClick } from "../components/MapTapGlobe";
++
++export interface MapTapScreenOptions {
++  readonly onGameModeChange: (gameMode: GameModeId) => void;
++  readonly onMultiplayer?: () => void;
++  readonly onDailyChallenge?: () => void;
++}
++
++const CATEGORIES: readonly { readonly value: "" | MapTapCategory; readonly label: string }[] = [
++  { value: "", label: "All categories" },
++  { value: "city", label: "Cities" },
++  { value: "mountain", label: "Mountains" },
++  { value: "poi", label: "Points of interest" },
++  { value: "landmark", label: "Landmarks" },
++];
++
++const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly label: string }[] = [
++  { value: "", label: "All difficulties" },
++  { value: "easy", label: "Easy" },
++  { value: "medium", label: "Medium" },
++  { value: "hard", label: "Hard" },
++];
++
++function createLogo(): HTMLElement {
++  return el("div", {
++    className: "brand-lockup compact",
++    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
++  });
++}
++
++function formatDistance(distanceKm: number): string {
++  if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
++  return `${Math.round(distanceKm).toLocaleString()} km`;
++}
++
++function formatCategory(category: MapTapCategory): string {
++  if (category === "poi") return "Point of interest";
++  return category.charAt(0).toUpperCase() + category.slice(1);
++}
++
++function optionNodes<T extends string>(items: readonly { readonly value: T; readonly label: string }[]): readonly HTMLOptionElement[] {
++  return items.map((item) => el("option", { text: item.label, attrs: { value: item.value } }));
++}
++
++export function createMapTapScreen(options: MapTapScreenOptions): Screen {
++  const controller = new AbortController();
++  let activeTarget: MapTapRoundTarget | null = null;
++  let activeResult: MapTapGuessResult | null = null;
++  let isSubmitting = false;
++
++  const gameModeDropdown = createGameModeDropdown({
++    selectedMode: "map-tap",
++    signal: controller.signal,
++    name: "maptap-game-mode",
++    onChange: options.onGameModeChange,
++  });
++
++  const promptTarget = el("strong", { text: "Loading..." });
++  const promptMeta = el("span", { className: "maptap-prompt-meta", text: "" });
++  const statusText = el("p", { className: "maptap-status", attrs: { role: "status" }, text: "Loading a target..." });
++  const resultPanel = el("section", { className: "maptap-result-panel", attrs: { hidden: "true" } });
++  const newRoundButton = el("button", { className: "primary-action", text: "Next target", attrs: { type: "button" } });
++  const resetButton = el("button", { className: "ghost-action", text: "Restart target", attrs: { type: "button" } });
++  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) } });
++  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "aria-label": "Open multiplayer", ...(options.onMultiplayer ? {} : { hidden: "true" }) } });
++  const categorySelect = el("select", {
++    className: "maptap-filter-select",
++    attrs: { id: "maptap-category", name: "maptapCategory", "aria-label": "MapTap category" },
++    children: optionNodes(CATEGORIES),
++  });
++  const difficultySelect = el("select", {
++    className: "maptap-filter-select",
++    attrs: { id: "maptap-difficulty", name: "maptapDifficulty", "aria-label": "MapTap difficulty" },
++    children: optionNodes(DIFFICULTIES),
++  });
++  const decayInput = el("input", {
++    className: "maptap-decay-input",
++    attrs: { id: "maptap-decay", name: "maptapDecay", type: "number", min: "100", max: "10000", step: "100", value: String(MAP_TAP_DEFAULT_DECAY_KM), "aria-label": "MapTap score decay in kilometres" },
++  });
++
++  const globe = createMapTapGlobe({
++    signal: controller.signal,
++    onGuess: (point) => {
++      void submitGuess(point);
++    },
++  });
++
++  function selectedCategory(): MapTapCategory | "" {
++    return categorySelect.value as MapTapCategory | "";
++  }
++
++  function selectedDifficulty(): MapTapDifficulty | "" {
++    return difficultySelect.value as MapTapDifficulty | "";
++  }
++
++  function selectedDecayKm(): number {
++    const parsed = Number(decayInput.value);
++    return Number.isFinite(parsed) ? parsed : MAP_TAP_DEFAULT_DECAY_KM;
++  }
++
++  function setControlsDisabled(disabled: boolean): void {
++    categorySelect.disabled = disabled;
++    difficultySelect.disabled = disabled;
++    decayInput.disabled = disabled;
++    newRoundButton.disabled = disabled;
++    resetButton.disabled = disabled || activeResult === null;
++  }
++
++  function renderTarget(target: MapTapRoundTarget | null): void {
++    if (!target) {
++      promptTarget.textContent = "Loading...";
++      promptMeta.textContent = "";
++      return;
++    }
++    promptTarget.textContent = target.name;
++    promptMeta.textContent = `${formatCategory(target.category)} · ${target.difficulty}`;
++  }
++
++  function renderResult(result: MapTapGuessResult): void {
++    resultPanel.hidden = false;
++    resultPanel.replaceChildren(
++      el("div", { className: "maptap-result-score", children: [el("span", { text: "Score" }), el("strong", { text: `${result.score.toLocaleString()}/${result.maxScore.toLocaleString()}` })] }),
++      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Distance" }), el("strong", { text: formatDistance(result.distanceKm) })] }),
++      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Actual" }), el("strong", { text: `${result.target.name} (${result.target.lat.toFixed(4)}, ${result.target.lng.toFixed(4)})` })] }),
++      el("p", { className: "maptap-score-note", text: `Scoring: round(${result.maxScore} × e^(-distanceKm / ${result.decayKm})). Lower decay makes the game stricter.` }),
++      newRoundButton,
++    );
++  }
++
++  async function loadRound(): Promise<void> {
++    activeTarget = null;
++    activeResult = null;
++    isSubmitting = false;
++    resultPanel.hidden = true;
++    resultPanel.replaceChildren();
++    globe.reset();
++    globe.setAcceptingGuesses(false);
++    setControlsDisabled(true);
++    renderTarget(null);
++    statusText.textContent = "Loading a target...";
++
++    const target = await fetchMapTapRound({ category: selectedCategory(), difficulty: selectedDifficulty() });
++    if (controller.signal.aborted) return;
++
++    if (!target) {
++      statusText.textContent = "Could not load a MapTap target. Make sure the Bun server is running so /api/maptap/round is available.";
++      setControlsDisabled(false);
++      return;
++    }
++
++    activeTarget = target;
++    renderTarget(target);
++    statusText.textContent = "Rotate or zoom the globe, then click once as close as you can.";
++    globe.reset();
++    globe.setAcceptingGuesses(true);
++    setControlsDisabled(false);
++  }
++
++  async function submitGuess(point: MapTapClick): Promise<void> {
++    if (!activeTarget || activeResult || isSubmitting) return;
++    isSubmitting = true;
++    globe.setAcceptingGuesses(false);
++    setControlsDisabled(true);
++    statusText.textContent = "Checking your guess...";
++
++    const result = await validateMapTapGuess({
++      targetId: activeTarget.id,
++      guessLat: point.lat,
++      guessLng: point.lng,
++      decayKm: selectedDecayKm(),
++    });
++    if (controller.signal.aborted) return;
++
++    isSubmitting = false;
++    setControlsDisabled(false);
++
++    if (!result) {
++      statusText.textContent = "Could not validate that guess. Try the same target again.";
++      globe.setAcceptingGuesses(true);
++      return;
++    }
++
++    activeResult = result;
++    setControlsDisabled(false);
++    statusText.textContent = "Result revealed.";
++    globe.reveal(result);
++    renderResult(result);
++  }
++
++  categorySelect.addEventListener("change", () => void loadRound(), { signal: controller.signal });
++  difficultySelect.addEventListener("change", () => void loadRound(), { signal: controller.signal });
++  resetButton.addEventListener("click", () => {
++    activeResult = null;
++    resultPanel.hidden = true;
++    resultPanel.replaceChildren();
++    statusText.textContent = activeTarget ? "Target restarted. Click once as close as you can." : "Loading a target...";
++    globe.reset();
++    globe.setAcceptingGuesses(activeTarget !== null);
++    setControlsDisabled(false);
++  }, { signal: controller.signal });
++  newRoundButton.addEventListener("click", () => void loadRound(), { signal: controller.signal });
++  dailyButton.addEventListener("click", () => options.onDailyChallenge?.(), { signal: controller.signal });
++  multiplayerButton.addEventListener("click", () => options.onMultiplayer?.(), { signal: controller.signal });
++
++  const element = el("section", {
++    className: "game-screen maptap-screen",
++    children: [
++      el("header", {
++        className: "game-header",
++        children: [
++          el("div", { className: "game-header-brand", children: [createLogo()] }),
++          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
++        ],
++      }),
++      el("div", { className: "game-setup-row", children: [gameModeDropdown.element] }),
++      el("section", {
++        className: "maptap-layout",
++        children: [
++          el("aside", {
++            className: "maptap-sidebar",
++            children: [
++              el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: "MapTap" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta] }),
++              statusText,
++              el("div", {
++                className: "maptap-filters",
++                children: [
++                  el("label", { children: [el("span", { className: "stat-label", text: "Category" }), categorySelect] }),
++                  el("label", { children: [el("span", { className: "stat-label", text: "Difficulty" }), difficultySelect] }),
++                  el("label", { children: [el("span", { className: "stat-label", text: "Decay km" }), decayInput] }),
++                ],
++              }),
++              el("div", { className: "maptap-actions", children: [resetButton] }),
++              resultPanel,
++            ],
++          }),
++          el("div", { className: "maptap-map-panel", children: [globe.element] }),
++        ],
++      }),
++    ],
++  });
++
++  void loadRound();
++
++  return {
++    element,
++    destroy: () => {
++      controller.abort();
++    },
++  };
++}
+diff --git a/src/ui/screens/SoloGameScreen.ts b/src/ui/screens/SoloGameScreen.ts
+index 5c03770..57efed4 100644
+--- a/src/ui/screens/SoloGameScreen.ts
++++ b/src/ui/screens/SoloGameScreen.ts
+@@ -2,7 +2,7 @@ import type { AuthUser } from "../../core/auth";
+ import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
+ import { getCategory } from "../../core/categories";
+ import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+-import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
++import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
+ import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
+ import type { WorldCountryFeature } from "../../core/map";
+ import { timerKeysForMode } from "../../core/timer/keys";
+@@ -25,7 +25,7 @@ import { createMobileMenu } from "../dom/mobileMenu";
+ export interface SoloGameScreenOptions {
+   readonly countryIndex: CountryIndex;
+   readonly engine: GameEngine;
+-  readonly selectedGameMode: GameModeId;
++  readonly selectedGameMode: PromptGameModeId;
+   readonly storage: Storage;
+   readonly onGameModeChange: (gameMode: GameModeId) => void;
+   readonly onStateChange: (state: GameState) => void;
+diff --git a/tests/maptap.test.ts b/tests/maptap.test.ts
+new file mode 100644
+index 0000000..2722166
+--- /dev/null
++++ b/tests/maptap.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from "vitest";
++import { haversineDistanceKm, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_MAX_SCORE, scoreMapTapDistance } from "../src/core/maptap";
++
++describe("MapTap distance and scoring", () => {
++  it("returns zero distance for the same coordinate", () => {
++    expect(haversineDistanceKm({ lat: -3.0674, lng: 37.3556 }, { lat: -3.0674, lng: 37.3556 })).toBeCloseTo(0, 6);
++  });
++
++  it("scores a perfect guess at max score", () => {
++    expect(scoreMapTapDistance(0)).toBe(MAP_TAP_MAX_SCORE);
++  });
++
++  it("uses exponential decay", () => {
++    expect(scoreMapTapDistance(MAP_TAP_DEFAULT_DECAY_KM)).toBe(Math.round(MAP_TAP_MAX_SCORE * Math.exp(-1)));
++  });
++
++  it("handles antimeridian distance using the shortest path", () => {
++    const distance = haversineDistanceKm({ lat: 0, lng: 179.5 }, { lat: 0, lng: -179.5 });
++    expect(distance).toBeGreaterThan(100);
++    expect(distance).toBeLessThan(120);
++  });
++});
