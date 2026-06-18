@@ -3,7 +3,9 @@ import { soloPromptCategories } from "./categories";
 export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
 export type StreetViewGameModeId = "streetview-country";
-export type GameModeId = PromptGameModeId | WorldMapGameModeId | StreetViewGameModeId;
+export type MapTapGameModeId = "map-tap";
+export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
+export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId;
 
 export interface GameModeOption {
   readonly id: GameModeId;
@@ -15,6 +17,7 @@ export interface GameModeOption {
 const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
 const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
+const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
 
 export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
   const category = soloPromptCategories.find((item) => item.id === id);
@@ -62,7 +65,17 @@ export const streetViewGameModeOptions: readonly GameModeOption[] = [
   },
 ];
 
-export const gameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions, ...streetViewGameModeOptions];
+export const mapTapGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "map-tap",
+    label: "MapTap",
+    description: "Rotate a satellite globe and click the named city, landmark, mountain, or point of interest.",
+    group: "World map games",
+  },
+];
+
+export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
+export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
 
 export function isPromptGameModeId(id: string): id is PromptGameModeId {
   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
@@ -74,6 +87,14 @@ export function isWorldMapGameModeId(id: string): id is WorldMapGameModeId {
 
 export function isStreetViewGameModeId(id: string): id is StreetViewGameModeId {
   return STREET_VIEW_GAME_MODE_IDS.includes(id as StreetViewGameModeId);
+}
+
+export function isMapTapGameModeId(id: string): id is MapTapGameModeId {
+  return MAP_TAP_GAME_MODE_IDS.includes(id as MapTapGameModeId);
+}
+
+export function isTimerGameModeId(id: string): id is TimerGameModeId {
+  return isPromptGameModeId(id) || isWorldMapGameModeId(id);
 }
 
 export function getGameModeOption(id: GameModeId): GameModeOption {

@@ -2,7 +2,7 @@ import type { AuthUser } from "../../core/auth";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
-import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
+import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
@@ -25,7 +25,7 @@ import { createMobileMenu } from "../dom/mobileMenu";
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
-  readonly selectedGameMode: GameModeId;
+  readonly selectedGameMode: PromptGameModeId;
   readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;

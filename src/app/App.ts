@@ -2,7 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
-import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -307,6 +307,11 @@ export function createApp(options: AppOptions): App {
 
     if (isStreetViewGameModeId(gameMode)) {
       navigate({ type: "streetview-country" });
+      return;
+    }
+
+    if (isMapTapGameModeId(gameMode)) {
+      navigate({ type: "map-tap" });
     }
   }
 
@@ -363,6 +368,23 @@ export function createApp(options: AppOptions): App {
     mount(
       createStreetViewCountryScreen({
         countryIndex: options.countryIndex,
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+      }),
+    );
+  }
+
+  async function startMapTap(): Promise<void> {
+    const run = navigationRun;
+    const loading = createLoadingScreen("Loading MapTap...");
+    mount(loading);
+
+    const { createMapTapScreen } = await import("../ui/screens/MapTapScreen");
+    if (run !== navigationRun) return;
+
+    mount(
+      createMapTapScreen({
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
@@ -439,6 +461,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "streetview-country") {
       startStreetViewCountry();
+      return;
+    }
+    if (route.type === "map-tap") {
+      void startMapTap();
       return;
     }
     if (route.type === "multiplayer") {
