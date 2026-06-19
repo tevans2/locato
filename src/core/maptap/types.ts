@@ -8,6 +8,7 @@ export interface MapTapLocation {
   readonly lat: number;
   readonly lng: number;
   readonly difficulty: MapTapDifficulty;
+  readonly wikiSlug: string;
 }
 
 // Public round payload. Do not include lat/lng here when a backend is available.

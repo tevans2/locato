@@ -1,9 +1,10 @@
 import type { Screen } from "../../app/router";
-import { fetchMapTapRound, MAP_TAP_DEFAULT_DECAY_KM, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapRoundTarget } from "../../core/maptap";
+import { fetchMapTapRound, fetchWikipediaSummary, MAP_TAP_DEFAULT_DECAY_KM, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapRoundTarget } from "../../core/maptap";
 import type { GameModeId } from "../../core/gameModes";
 import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createMapTapGlobe, type MapTapClick } from "../components/MapTapGlobe";
+import { createMapTapInfoOverlay } from "../components/MapTapInfoOverlay";
 
 export interface MapTapScreenOptions {
   readonly onGameModeChange: (gameMode: GameModeId) => void;
@@ -90,6 +91,8 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     },
   });
 
+  const infoOverlay = createMapTapInfoOverlay();
+
   function selectedCategory(): MapTapCategory | "" {
     return categorySelect.value as MapTapCategory | "";
   }
@@ -137,6 +140,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     isSubmitting = false;
     resultPanel.hidden = true;
     resultPanel.replaceChildren();
+    infoOverlay.hide();
     globe.reset();
     globe.setAcceptingGuesses(false);
     setControlsDisabled(true);
@@ -189,6 +193,10 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     statusText.textContent = "Result revealed.";
     globe.reveal(result);
     renderResult(result);
+    void fetchWikipediaSummary(result.target.wikiSlug, controller.signal).then((summary) => {
+      if (controller.signal.aborted || activeResult !== result) return;
+      infoOverlay.show(result.target.name, summary);
+    });
   }
 
   categorySelect.addEventListener("change", () => void loadRound(), { signal: controller.signal });
@@ -219,7 +227,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
       el("section", {
         className: "maptap-layout",
         children: [
-          el("div", { className: "maptap-map-panel", children: [globe.element] }),
+          el("div", { className: "maptap-map-panel", children: [globe.element, infoOverlay.element] }),
           el("aside", {
             className: "maptap-sidebar",
             children: [

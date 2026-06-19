@@ -2422,6 +2422,128 @@
   background: #fb7185;
 }
 
+/* ── MapTap info overlay ─────────────────────────────────────────── */
+
+.maptap-info-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  padding: clamp(10px, 2vw, 20px);
+  pointer-events: none;
+  animation: maptap-overlay-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.maptap-info-overlay[hidden] {
+  display: none;
+}
+
+@keyframes maptap-overlay-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.maptap-info-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  max-width: 860px;
+  max-height: 280px;
+  border: 1px solid rgba(232, 226, 211, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(8, 11, 8, 0.82);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  overflow: hidden;
+  position: relative;
+}
+
+.maptap-info-photo-wrap {
+  flex: 0 0 auto;
+  width: clamp(160px, 26%, 240px);
+  overflow: hidden;
+}
+
+.maptap-info-photo-wrap[hidden] {
+  display: none;
+}
+
+.maptap-info-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.maptap-info-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(12px, 2vw, 18px);
+  overflow: hidden;
+}
+
+.maptap-info-name {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.2vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.maptap-info-extract {
+  margin: 0;
+  font-size: clamp(0.84rem, 1.3vw, 0.96rem);
+  line-height: 1.6;
+  color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.maptap-info-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(232, 226, 211, 0.1);
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 160ms, color 160ms;
+}
+
+.maptap-info-close:hover {
+  background: rgba(232, 226, 211, 0.2);
+  color: var(--text);
+}
+
+@media (max-width: 700px) {
+  .maptap-info-card {
+    max-height: 200px;
+  }
+
+  .maptap-info-photo-wrap {
+    width: 120px;
+  }
+}
+
+/* ── MapTap responsive ───────────────────────────────────────────── */
+
 @media (max-width: 700px) {
   .maptap-screen {
     height: auto;
