@@ -1,5 +1,6 @@
 import type { MultiplayerTransport, PublicRoomState, PublicRoundState, RoundResult, FinalResult, ServerMessage, TransportStatus } from "../../core/multiplayer";
 import { gameModeOptions, type GameModeOption } from "../../core/gameModes";
+import { createMultiplayerMapTapGameView, type MapTapMultiplayerReveal } from "../components/MultiplayerMapTapGameView";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
@@ -65,11 +66,11 @@ interface RoundReveal {
   readonly results: readonly RoundResult[];
 }
 
-type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country";
+type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country" | "map-tap";
 
 type MultiplayerModeOption = Omit<GameModeOption, "id"> & { readonly id: MultiplayerPlayMode };
 
-const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country"];
+const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country", "map-tap"];
 
 const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = gameModeOptions
   .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
@@ -86,6 +87,10 @@ function modeToCategoryId(mode: MultiplayerPlayMode): string {
 function categoryIdToMode(categoryId: string): MultiplayerPlayMode | null {
   if (categoryId === "pick-country") return "click-country";
   return MULTIPLAYER_MODE_IDS.includes(categoryId as MultiplayerPlayMode) ? (categoryId as MultiplayerPlayMode) : null;
+}
+
+function isMapTapRoom(room: PublicRoomState | null): boolean {
+  return room?.categoryIds.includes("map-tap") ?? false;
 }
 
 function categoryIdsForModes(modes: readonly MultiplayerPlayMode[]): readonly string[] {
@@ -264,6 +269,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   let room: PublicRoomState | null = null;
   let activeRound: PublicRoundState | null = null;
   let roundReveal: RoundReveal | null = null;
+  let mapTapReveal: MapTapMultiplayerReveal | null = null;
   let finalResults: readonly FinalResult[] | null = null;
   let sessionToken: string | null = null;
   let joinedRoomCode: string | null = null;
@@ -365,6 +371,16 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     },
   });
 
+  const mapTapGameView = createMultiplayerMapTapGameView({
+    signal: controller.signal,
+    onGuess: (lat, lng) => {
+      transport?.send({ type: "SUBMIT_MAPTAP_GUESS", lat, lng, clientSentAt: Date.now() });
+    },
+    onSkip: () => {
+      transport?.send({ type: "VOTE_SKIP" });
+    },
+  });
+
   function disconnectCurrentTransport(): void {
     cleanupMessageHandler?.();
     cleanupStatusHandler?.();
@@ -382,6 +398,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     room = null;
     activeRound = null;
     roundReveal = null;
+    mapTapReveal = null;
     finalResults = null;
     localPlayerId = null;
     sessionToken = null;
@@ -458,7 +475,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     statusText.textContent = `${status}: ${feedback}`;
     setupPanel.hidden = hasRoom;
     lobbyPanel.hidden = !hasRoom || room?.status !== "lobby";
-    gameView.element.hidden = !hasRoom || room?.status === "lobby";
+    const isMapTap = isMapTapRoom(room);
+    gameView.element.hidden = !hasRoom || room?.status === "lobby" || isMapTap;
+    mapTapGameView.element.hidden = !hasRoom || room?.status === "lobby" || !isMapTap;
 
     // Toggle the modal before the no-room early return so leaving the room also dismisses it.
     if (room && room.status === "complete" && finalResults) {
@@ -500,7 +519,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     startButton.disabled = room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !allConnectedPlayersReady(room);
 
     const canSubmit = room.status === "playing" && status === "connected";
-    gameView.update({ room, localPlayerId, round: activeRound, roundResult: roundReveal, finalResults, feedback, canSubmit });
+    if (isMapTap) {
+      mapTapGameView.update({ room, localPlayerId, round: activeRound, reveal: mapTapReveal, finalResults, feedback, canSubmit });
+    } else {
+      gameView.update({ room, localPlayerId, round: activeRound, roundResult: roundReveal, finalResults, feedback, canSubmit });
+    }
   }
 
   function handleMessage(message: ServerMessage): void {
@@ -524,6 +547,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       case "ROUND_STARTED":
         activeRound = message.round;
         roundReveal = null;
+        mapTapReveal = null;
         finalResults = null;
         feedback = `Round ${message.round.roundNumber} is live.`;
         break;
@@ -537,6 +561,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         roundReveal = { answer: message.answer, results: message.results };
         const winner = message.results.find((result) => result.correct);
         feedback = winner ? `${message.answer} — ${winner.name} took it.` : `${message.answer} — nobody got it.`;
+        break;
+      }
+      case "MAPTAP_ROUND_ENDED": {
+        mapTapReveal = { targetName: message.targetName, targetLat: message.targetLat, targetLng: message.targetLng, wikiSlug: message.wikiSlug, results: message.results };
+        const top = message.results[0];
+        feedback = top?.guess ? `${message.targetName} — ${top.name} was closest.` : `${message.targetName} — nobody guessed.`;
         break;
       }
       case "GAME_COMPLETED": {
@@ -702,7 +732,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     children: [
       el("header", { className: "stats-header multiplayer-header", children: [createBrand(), el("div", { className: "screen-header-actions", children: [dailyButton, backButton] })] }),
       statusText,
-      el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element] }),
+      el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element] }),
       endGameModal.element,
     ],
   });
@@ -732,6 +762,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       controller.abort();
       disconnectCurrentTransport();
       gameView.destroy();
+      mapTapGameView.destroy();
     },
   };
 }

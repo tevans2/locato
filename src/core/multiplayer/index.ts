@@ -13,4 +13,4 @@ export {
 export { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl } from "./webSocketTransport";
 export type { MessageParseResult } from "./messageValidation";
 export type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
-export type { FinalResult, PlayerId, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState, RoomCode, RoundResult } from "./roomTypes";
+export type { FinalResult, MapTapRoundResult, PlayerId, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState, RoomCode, RoundResult } from "./roomTypes";

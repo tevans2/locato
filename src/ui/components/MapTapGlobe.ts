@@ -19,10 +19,18 @@ export interface MapTapGlobeOptions {
   readonly signal: AbortSignal;
 }
 
+export interface MapTapMultiplayerGuess {
+  readonly lat: number;
+  readonly lng: number;
+  readonly label: string;
+  readonly color: string;
+}
+
 export interface MapTapGlobe {
   readonly element: HTMLElement;
   readonly reset: () => void;
   readonly reveal: (result: MapTapGuessResult) => void;
+  readonly revealMultiplayer: (target: { lat: number; lng: number }, guesses: readonly MapTapMultiplayerGuess[]) => void;
   readonly setAcceptingGuesses: (accepting: boolean) => void;
   readonly destroy: () => void;
 }
@@ -58,6 +66,7 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
   let acceptingGuesses = true;
   let guessMarker: maplibregl.Marker | null = null;
   let targetMarker: maplibregl.Marker | null = null;
+  let extraMarkers: maplibregl.Marker[] = [];
   let destroyed = false;
 
   const element = document.createElement("div");
@@ -135,6 +144,8 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
     targetMarker?.remove();
     guessMarker = null;
     targetMarker = null;
+    for (const m of extraMarkers) m.remove();
+    extraMarkers = [];
   }
 
   map.on("load", () => {
@@ -176,6 +187,29 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
         .addTo(map);
       setLineData(resultLineData(result));
       const bounds = new maplibregl.LngLatBounds([result.guess.lng, result.guess.lat], [result.guess.lng, result.guess.lat]).extend([result.target.lng, result.target.lat]);
+      map.fitBounds(bounds, { padding: 90, duration: 800, maxZoom: 7 });
+    },
+    revealMultiplayer: (target, guesses) => {
+      acceptingGuesses = false;
+      clearMarkers();
+      targetMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-target", "Actual location"), anchor: "center" })
+        .setLngLat([target.lng, target.lat])
+        .addTo(map);
+      const bounds = new maplibregl.LngLatBounds([target.lng, target.lat], [target.lng, target.lat]);
+      const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+      for (const guess of guesses) {
+        const markerEl = createMarkerElement("maptap-marker", guess.label);
+        markerEl.style.background = guess.color;
+        const marker = new maplibregl.Marker({ element: markerEl, anchor: "center" })
+          .setLngLat([guess.lng, guess.lat])
+          .addTo(map);
+        extraMarkers.push(marker);
+        bounds.extend([guess.lng, guess.lat]);
+        lineFeatures.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[guess.lng, guess.lat], [target.lng, target.lat]] } });
+      }
+      ensureLineLayer();
+      const source = map.getSource(RESULT_LINE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+      source?.setData({ type: "FeatureCollection", features: lineFeatures });
       map.fitBounds(bounds, { padding: 90, duration: 800, maxZoom: 7 });
     },
     setAcceptingGuesses: (accepting) => {

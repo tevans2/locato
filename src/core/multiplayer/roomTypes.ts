@@ -13,7 +13,7 @@ export interface PublicPlayerState {
 }
 
 export interface PublicPromptContent {
-  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe";
   readonly value: string;
 }
 
@@ -55,6 +55,14 @@ export interface RoundResult {
   readonly points: number;
   readonly answeredAt: number | null;
   readonly guess: string | null;
+}
+
+export interface MapTapRoundResult {
+  readonly playerId: PlayerId;
+  readonly name: string;
+  readonly guess: { readonly lat: number; readonly lng: number } | null;
+  readonly distanceKm: number | null;
+  readonly score: number;
 }
 
 export interface FinalResult {

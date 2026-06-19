@@ -1,4 +1,4 @@
-import type { FinalResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
   | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
@@ -10,6 +10,7 @@ export type ClientMessage =
   | { readonly type: "START_GAME" }
   | { readonly type: "PLAY_AGAIN" }
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
+  | { readonly type: "SUBMIT_MAPTAP_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "VOTE_SKIP" }
   | { readonly type: "REQUEST_HINT" };
 
@@ -23,6 +24,7 @@ export type ServerMessage =
   | { readonly type: "ANSWER_ACCEPTED"; readonly playerId: string; readonly points: number }
   | { readonly type: "ANSWER_REJECTED"; readonly reason: string }
   | { readonly type: "ROUND_ENDED"; readonly answer: string; readonly results: readonly RoundResult[] }
+  | { readonly type: "MAPTAP_ROUND_ENDED"; readonly targetName: string; readonly targetLat: number; readonly targetLng: number; readonly wikiSlug: string; readonly results: readonly MapTapRoundResult[] }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
 
