@@ -1,10 +1,11 @@
 import type { ClientMessage, ServerMessage } from "./protocol";
-import type { FinalResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
 export const MAX_PLAYER_NAME_LENGTH = 32;
 export const MAX_ROOM_CODE_LENGTH = 12;
 export const MAX_ANSWER_LENGTH = 80;
+export const MAX_CHAT_MESSAGE_LENGTH = 160;
 export const MAX_ROOM_CATEGORY_IDS = 8;
 export const MIN_ROOM_ROUND_LIMIT = 3;
 export const MAX_ROOM_ROUND_LIMIT = 20;
@@ -53,6 +54,10 @@ export function normalizePlayerName(value: string): string {
 
 export function normalizeRoomCode(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function normalizeChatMessage(value: string): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, MAX_CHAT_MESSAGE_LENGTH);
 }
 
 export function parseJsonMessage(raw: string): MessageParseResult<unknown> {
@@ -140,6 +145,9 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       return { ok: true, message: { type: "SUBMIT_MAPTAP_GUESS", lat: value.lat as number, lng: value.lng as number, clientSentAt: value.clientSentAt as number } };
     case "VOTE_SKIP":
       return { ok: true, message: { type: "VOTE_SKIP" } };
+    case "SEND_CHAT_MESSAGE":
+      if (!isNonEmptyString(value.text, MAX_CHAT_MESSAGE_LENGTH)) return reject("invalid-chat-message", "Chat message is required.");
+      return { ok: true, message: { type: "SEND_CHAT_MESSAGE", text: normalizeChatMessage(value.text) } };
     case "REQUEST_HINT":
       return { ok: true, message: { type: "REQUEST_HINT" } };
     default:
@@ -172,6 +180,17 @@ function isRound(value: unknown): value is PublicRoundState {
   );
 }
 
+function isChatMessage(value: unknown): value is PublicChatMessage {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.playerId === "string" &&
+    typeof value.playerName === "string" &&
+    typeof value.text === "string" &&
+    isFiniteNumber(value.sentAt)
+  );
+}
+
 function isRoom(value: unknown): value is PublicRoomState {
   return (
     isRecord(value) &&
@@ -189,7 +208,9 @@ function isRoom(value: unknown): value is PublicRoomState {
     value.skipVotes.every((id) => typeof id === "string") &&
     isFiniteNumber(value.skipRequired) &&
     (value.phaseStartedAt === null || isFiniteNumber(value.phaseStartedAt)) &&
-    (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt))
+    (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt)) &&
+    Array.isArray(value.chatMessages) &&
+    value.chatMessages.every(isChatMessage)
   );
 }
 

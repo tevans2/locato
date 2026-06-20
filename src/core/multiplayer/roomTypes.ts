@@ -29,6 +29,14 @@ export interface PublicRoomSettings {
   readonly roundDurationMs: number;
 }
 
+export interface PublicChatMessage {
+  readonly id: string;
+  readonly playerId: PlayerId;
+  readonly playerName: string;
+  readonly text: string;
+  readonly sentAt: number;
+}
+
 export interface PublicRoomState {
   readonly roomCode: RoomCode;
   readonly hostPlayerId: PlayerId;
@@ -46,6 +54,7 @@ export interface PublicRoomState {
   // the next round. Null when the phase has no deadline (lobby/complete/untimed round).
   readonly phaseStartedAt: number | null;
   readonly phaseEndsAt: number | null;
+  readonly chatMessages: readonly PublicChatMessage[];
 }
 
 export interface RoundResult {

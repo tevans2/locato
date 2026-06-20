@@ -216,6 +216,9 @@ export class RoomManager {
       case "VOTE_SKIP":
         this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.voteSkip(session.playerId, now)));
         return;
+      case "SEND_CHAT_MESSAGE":
+        this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.sendChatMessage(session.playerId, message.text, now)));
+        return;
       case "REQUEST_HINT":
         sendError(connection, "hints-disabled", "Multiplayer hints are not enabled.");
         return;

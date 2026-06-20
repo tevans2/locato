@@ -1,13 +1,15 @@
 import { createSeededRandom, shuffle } from "../../src/core/game";
 import { MAP_TAP_LOCATIONS } from "../../src/core/maptap/locations";
 import { scoreMapTapGuess, MAP_TAP_DEFAULT_DECAY_KM } from "../../src/core/maptap/distance";
-import type { FinalResult, MapTapRoundResult, PlayerId, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
+import { filterProfanity } from "../../src/core/multiplayer/profanity";
+import type { FinalResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
 import type { ServerMessage } from "../../src/core/multiplayer/protocol";
 import type { RoomResult } from "./Room";
 
 export const DEFAULT_MAPTAP_ROUND_DURATION_MS = 45_000;
 export const DEFAULT_MAPTAP_RESULT_DISPLAY_MS = 8_000;
 export const DEFAULT_MAPTAP_ROUND_LIMIT = 10;
+const MAX_CHAT_HISTORY = 50;
 export const DEFAULT_MAPTAP_MAX_PLAYERS = 8;
 
 interface MapTapPlayerState extends PublicPlayerState {
@@ -60,6 +62,8 @@ export class MapTapRoom {
   private resultStartedAt: number | null = null;
   private resultEndsAt: number | null = null;
   private touchedAt: number;
+  private chatMessages: PublicChatMessage[] = [];
+  private chatSequence = 0;
 
   constructor(options: {
     code: RoomCode;
@@ -115,6 +119,7 @@ export class MapTapRoom {
       skipRequired: this.skipRequired(),
       phaseStartedAt: this.phaseStartedAt,
       phaseEndsAt: this.pendingTransitionAt,
+      chatMessages: this.chatMessages,
     };
   }
 
@@ -232,6 +237,15 @@ export class MapTapRoom {
     return ok([this.snapshotMessage()]);
   }
 
+  sendChatMessage(playerId: PlayerId, text: string, now: number): RoomResult {
+    this.touch(now);
+    const player = this.players.get(playerId);
+    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
+    const message = this.createChatMessage(player, text, now);
+    this.chatMessages = [...this.chatMessages, message].slice(-MAX_CHAT_HISTORY);
+    return ok([this.snapshotMessage()]);
+  }
+
   advanceAfterResult(now: number): RoomResult {
     this.touch(now);
     if (this.status !== "round-result") return fail("round-result-not-open", "Room is not showing a round result.");
@@ -302,6 +316,17 @@ export class MapTapRoom {
 
   private snapshotMessage(): ServerMessage {
     return { type: "ROOM_SNAPSHOT", room: this.snapshot() };
+  }
+
+  private createChatMessage(player: MapTapPlayerState, text: string, now: number): PublicChatMessage {
+    this.chatSequence += 1;
+    return {
+      id: `${this.code}:${now}:${this.chatSequence}`,
+      playerId: player.id,
+      playerName: player.name,
+      text: filterProfanity(text),
+      sentAt: now,
+    };
   }
 
   private beginNextRound(now: number): PublicRoundState | null {

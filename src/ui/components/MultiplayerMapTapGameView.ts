@@ -73,6 +73,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
   const timerBar = el("div", { className: "multiplayer-timer maptap-mp-timer", attrs: { role: "presentation" }, children: [timerFill] });
   const resultList = el("ul", { className: "result-list maptap-mp-result-list" });
   const scoreList = el("ol", { className: "score-list" });
+  const skipButton = el("button", { className: "ghost-action multiplayer-skip-btn", text: "Skip", attrs: { type: "button" } });
 
   const infoOverlay = createMapTapInfoOverlay();
 
@@ -87,6 +88,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
     },
   });
 
+  skipButton.addEventListener("click", () => options.onSkip(), { signal: options.signal });
   function renderTimer(): void {
     if (phaseStartedAt === null || phaseEndsAt === null || phaseEndsAt <= phaseStartedAt) { timerBar.hidden = true; return; }
     timerBar.hidden = false;
@@ -154,6 +156,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
             children: [el("span", { className: "eyebrow", text: "MapTap · Multiplayer" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta],
           }),
           statusText,
+          skipButton,
           resultList,
           el("div", { className: "maptap-mp-scoreboard", children: [el("p", { className: "eyebrow", text: "SCOREBOARD" }), scoreList] }),
         ],
@@ -200,6 +203,13 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
       } else {
         statusText.textContent = canSubmit ? "Rotate the globe and click your best guess." : feedback;
       }
+      const localSkipVoted = localPlayerId !== null && room.skipVotes.includes(localPlayerId);
+      const skipRequired = Math.max(0, room.skipRequired);
+      const skipCount = Math.min(room.skipVotes.length, skipRequired);
+      skipButton.hidden = !canSubmit || skipRequired === 0 || reveal !== null;
+      skipButton.disabled = !canSubmit || localSkipVoted;
+      skipButton.textContent = localSkipVoted ? `Skip voted ${skipCount}/${skipRequired}` : `Skip ${skipCount}/${skipRequired}`;
+
 
       // Reveal — show markers + overlay once
       if (revealKey && revealKey !== renderedRevealKey) {

@@ -1,13 +1,15 @@
 import type { CountryId, CountryIndex } from "../../src/core/countries";
 import { createSeededRandom, shuffle } from "../../src/core/game";
 import { buildPromptSlots, getCategory, resolveCategoryIds, type PromptSlot } from "../../src/core/categories";
-import type { FinalResult, PlayerId, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode, RoundResult, ServerMessage } from "../../src/core/multiplayer";
+import { filterProfanity } from "../../src/core/multiplayer/profanity";
+import type { FinalResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode, RoundResult, ServerMessage } from "../../src/core/multiplayer";
 
 export const DEFAULT_MAX_PLAYERS_PER_ROOM = 8;
 export const DEFAULT_MULTIPLAYER_ROUND_LIMIT = 10;
 export const DEFAULT_ROUND_DURATION_MS = 30_000;
 export const DEFAULT_RESULT_DISPLAY_MS = 2_000;
 
+const MAX_CHAT_HISTORY = 50;
 export type RoomStatus = PublicRoomState["status"];
 
 export interface RoomOptions {
@@ -83,6 +85,8 @@ export class Room {
   private resultStartedAt: number | null = null;
   private resultEndsAt: number | null = null;
   private touchedAt: number;
+  private chatMessages: PublicChatMessage[] = [];
+  private chatSequence = 0;
 
   constructor(options: RoomOptions) {
     this.code = options.code;
@@ -144,6 +148,7 @@ export class Room {
       skipRequired: this.skipRequired(),
       phaseStartedAt: this.phaseStartedAt,
       phaseEndsAt: this.pendingTransitionAt,
+      chatMessages: this.chatMessages,
     };
   }
 
@@ -300,6 +305,15 @@ export class Room {
     return ok([this.snapshotMessage()]);
   }
 
+  sendChatMessage(playerId: PlayerId, text: string, now: number): RoomResult {
+    this.touch(now);
+    const player = this.players.get(playerId);
+    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
+    const message = this.createChatMessage(player, text, now);
+    this.chatMessages = [...this.chatMessages, message].slice(-MAX_CHAT_HISTORY);
+    return ok([this.snapshotMessage()]);
+  }
+
 
   advanceAfterResult(now: number): RoomResult {
     this.touch(now);
@@ -325,6 +339,17 @@ export class Room {
 
   private snapshotMessage(): ServerMessage {
     return { type: "ROOM_SNAPSHOT", room: this.snapshot() };
+  }
+
+  private createChatMessage(player: PrivatePlayerState, text: string, now: number): PublicChatMessage {
+    this.chatSequence += 1;
+    return {
+      id: `${this.code}:${now}:${this.chatSequence}`,
+      playerId: player.id,
+      playerName: player.name,
+      text: filterProfanity(text),
+      sentAt: now,
+    };
   }
 
   private createRoundQueue(categoryIds: readonly string[], seed: string): PromptSlot[] {

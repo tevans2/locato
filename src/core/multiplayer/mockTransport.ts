@@ -1,5 +1,6 @@
 import type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
-import type { FinalResult, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState } from "./roomTypes";
+import { filterProfanity } from "./profanity";
+import type { FinalResult, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState } from "./roomTypes";
 
 const HOST_PLAYER_ID = "host";
 const RIVAL_PLAYER_ID = "rival";
@@ -7,6 +8,7 @@ const DEMO_ROOM_CODE = "PIN42";
 const DEMO_SESSION_TOKEN = "demo-session";
 const DEMO_ROUND_MS = 30_000;
 const DEMO_RESULT_MS = 2_000;
+const MAX_CHAT_HISTORY = 50;
 
 // A tiny scripted game so the local demo exercises the full arc — rounds, the intermission
 // gap, and the end-of-game leaderboard — without a server.
@@ -31,6 +33,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
   let assignedPlayerId = HOST_PLAYER_ID;
   let roundIndex = -1;
   let advanceTimer: ReturnType<typeof setTimeout> | null = null;
+  let chatSequence = 0;
   let room: PublicRoomState = lobbyRoom(["flags", "shapes", "codes", "pick-country"], "You");
 
   function lobbyRoom(categoryIds: readonly string[], hostName: string): PublicRoomState {
@@ -46,6 +49,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
       skipRequired: 0,
       phaseStartedAt: null,
       phaseEndsAt: null,
+      chatMessages: [],
     };
   }
 
@@ -65,6 +69,20 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
 
   function emitSnapshot(): void {
     emit({ type: "ROOM_SNAPSHOT", room });
+  }
+
+  function appendChatMessage(text: string): void {
+    chatSequence += 1;
+    const player = room.players.find((item) => item.id === assignedPlayerId);
+    if (!player) return;
+    const chatMessage: PublicChatMessage = {
+      id: `${room.roomCode}:${Date.now()}:${chatSequence}`,
+      playerId: player.id,
+      playerName: player.name,
+      text: filterProfanity(text),
+      sentAt: Date.now(),
+    };
+    room = { ...room, chatMessages: [...room.chatMessages, chatMessage].slice(-MAX_CHAT_HISTORY) };
   }
 
   function updateAssignedPlayer(update: (player: PublicPlayerState) => PublicPlayerState): void {
@@ -141,6 +159,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           skipVotes: [],
           skipRequired: 0,
           phaseEndsAt: null,
+          chatMessages: [],
         };
         assign("guest");
         emitSnapshot();
@@ -207,6 +226,20 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           phaseEndsAt: null,
           players: room.players.map((player) => ({ ...player, ready: player.id !== assignedPlayerId, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0 })),
         };
+        emitSnapshot();
+        return;
+      }
+
+      if (message.type === "SEND_CHAT_MESSAGE") {
+        appendChatMessage(message.text);
+        emitSnapshot();
+        return;
+      }
+
+      if (message.type === "VOTE_SKIP") {
+        if (room.status !== "playing" || room.skipVotes.includes(assignedPlayerId)) return;
+        const skipVotes = [...room.skipVotes, assignedPlayerId];
+        room = { ...room, skipVotes };
         emitSnapshot();
         return;
       }
