@@ -68,9 +68,9 @@ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
 
 function LandingHome(options: LandingScreenOptions) {
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden dark">
+    <div className="landing-root h-screen flex flex-col bg-background text-foreground overflow-hidden dark">
       {/* Navbar */}
-      <nav className="shrink-0 px-6 md:px-10 h-14 flex justify-between items-center border-b border-border/40 backdrop-blur-md bg-background/80">
+      <nav className="landing-topbar shrink-0 px-6 md:px-10 h-14 flex justify-between items-center border-b border-border/40 backdrop-blur-md bg-background/80">
         <button type="button" onClick={options.onPlay} className="flex items-center gap-2 border-0 bg-transparent p-0 min-h-0 hover:bg-transparent hover:border-transparent">
           <CircleUser className="w-5 h-5 text-primary" />
           <span className="font-display font-bold text-lg tracking-tight">locato</span>
@@ -91,9 +91,9 @@ function LandingHome(options: LandingScreenOptions) {
       </nav>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="landing-main-layout flex-1 flex overflow-hidden">
         {/* Left panel — hero */}
-        <div className="w-72 shrink-0 flex flex-col justify-center px-8 border-r border-border/30 bg-card/30 relative overflow-hidden">
+        <div className="landing-hero-panel w-72 shrink-0 flex flex-col justify-center px-8 border-r border-border/30 bg-card/30 relative overflow-hidden">
           {/* Grid bg */}
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -119,7 +119,7 @@ function LandingHome(options: LandingScreenOptions) {
               <Button data-testid="button-start-exploring" onClick={options.onPlay} className="w-full rounded-full font-bold text-sm shadow-[0_0_20px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.5)] transition-shadow">
                 Start Playing <ArrowRight className="ml-1.5 w-4 h-4" />
               </Button>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="landing-hero-actions grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" data-testid="button-hero-leaderboard" onClick={options.onLeaderboard} className="gap-1.5 font-bold text-xs border-border/50 hover:text-primary">
                   <Trophy className="w-3.5 h-3.5" /> Leaderboard
                 </Button>
@@ -157,7 +157,7 @@ function LandingHome(options: LandingScreenOptions) {
                   <span className={`text-xs font-bold tracking-widest uppercase ${group.color}`}>{group.category}</span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="landing-mode-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {group.modes.map((mode, mi) => (
                     <motion.button
                       key={mode.id}
@@ -168,7 +168,7 @@ function LandingHome(options: LandingScreenOptions) {
                       whileHover={{ y: -2, transition: { duration: 0.15 } }}
                       data-testid={`card-game-mode-${gi}-${mi}`}
                       onClick={() => routeMode(options, mode.id)}
-                      className={`group relative text-left p-4 rounded-xl bg-card border ${group.border} hover:bg-card/80 transition-all cursor-pointer overflow-hidden`}
+                      className={`landing-mode-card group relative text-left p-4 rounded-xl bg-card border ${group.border} hover:bg-card/80 transition-all cursor-pointer overflow-hidden`}
                     >
                       <div className={`w-8 h-8 rounded-lg ${group.bg} ${group.color} flex items-center justify-center mb-3`}>
                         {mode.icon}

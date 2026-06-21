@@ -134,3 +134,128 @@
 .landing-screen-shell .active-elevate-2:active:not(.no-default-active-elevate)::after {
   background-color: var(--elevate-2);
 }
+
+@media (max-width: 767px) {
+  .landing-screen-shell {
+    height: 100dvh;
+    min-height: 100svh;
+    overflow: hidden;
+  }
+
+  .landing-root {
+    height: 100dvh;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .landing-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 72px;
+    height: auto;
+    padding: 14px 20px;
+    gap: 16px;
+  }
+
+  .landing-topbar [data-testid="button-play-now"] {
+    min-height: 40px;
+    padding-inline: 20px;
+    font-size: 0.95rem;
+  }
+
+  .landing-main-layout {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .landing-hero-panel {
+    width: 100%;
+    min-height: auto;
+    padding: 34px 22px 28px;
+    border-right: 0;
+    border-bottom: 1px solid hsl(var(--border) / 0.3);
+  }
+
+  .landing-hero-panel > .absolute {
+    background-size: 48px 48px !important;
+  }
+
+  .landing-hero-panel .relative.z-10 {
+    width: min(100%, 460px);
+    margin: 0 auto;
+  }
+
+  .landing-hero-panel p {
+    max-width: 28rem;
+    font-size: 0.98rem;
+  }
+
+  .landing-hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-game-modes {
+    flex: 0 0 auto;
+    width: 100%;
+    overflow: visible;
+    padding: 28px 18px 36px;
+  }
+
+  .landing-game-modes > .h-full {
+    height: auto;
+  }
+
+  .landing-mode-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .landing-mode-card {
+    min-height: 132px;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 14px;
+    row-gap: 5px;
+    align-items: start;
+    padding: 18px;
+  }
+
+  .landing-mode-card > div:first-child {
+    grid-row: 1 / span 2;
+    margin-bottom: 0;
+  }
+
+  .landing-mode-card .font-display {
+    align-self: end;
+    font-size: 1rem;
+  }
+
+  .landing-mode-card .text-xs {
+    max-width: 30rem;
+    font-size: 0.86rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .landing-topbar {
+    padding-inline: 16px;
+  }
+
+  .landing-topbar [data-testid="button-play-now"] {
+    padding-inline: 16px;
+  }
+
+  .landing-hero-panel {
+    padding-inline: 16px;
+  }
+
+  .landing-game-modes {
+    padding-inline: 14px;
+  }
+}
