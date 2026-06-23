@@ -41,6 +41,9 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only --config fly.toml --app "$FLY_APP"
+        run: >
+          flyctl deploy --remote-only --config fly.toml --app "$FLY_APP"
+          --build-arg VITE_GOOGLE_MAPS_EMBED_API_KEY="$VITE_GOOGLE_MAPS_EMBED_API_KEY"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          VITE_GOOGLE_MAPS_EMBED_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_EMBED_API_KEY }}
