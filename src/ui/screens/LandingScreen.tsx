@@ -1,12 +1,13 @@
 import { createRoot, type Root } from "react-dom/client";
 import { motion } from "framer-motion";
-import { CircleUser, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe } from "lucide-react";
+import { CalendarDays, CircleUser, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
 
 export interface LandingScreenOptions {
   readonly onPlay: () => void;
+  readonly onDailyChallenge: () => void;
   readonly onGameMode: (mode: GameModeId) => void;
   readonly onLeaderboard: () => void;
   readonly onMultiplayer: () => void;
@@ -67,6 +68,8 @@ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
 }
 
 function LandingHome(options: LandingScreenOptions) {
+  const totalModes = GAME_CATEGORIES.reduce((total, group) => total + group.modes.length, 0) + 1;
+
   return (
     <div className="landing-root h-screen flex flex-col bg-background text-foreground overflow-hidden dark">
       {/* Navbar */}
@@ -76,7 +79,7 @@ function LandingHome(options: LandingScreenOptions) {
           <span className="font-display font-bold text-lg tracking-tight">locato</span>
         </button>
         <div className="hidden md:flex gap-1 items-center">
-          <button type="button" onClick={() => document.querySelector(".landing-game-modes")?.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-muted/30 border-0 min-h-0 bg-transparent">Game Modes</button>
+          <button type="button" onClick={() => document.querySelector(".landing-game-modes")?.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-muted/30 border-0 min-h-0 bg-transparent">Modes</button>
           <button type="button" onClick={options.onPlay} className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-muted/30 border-0 min-h-0 bg-transparent">About</button>
           <Button variant="outline" size="sm" data-testid="button-leaderboard" onClick={options.onLeaderboard} className="ml-2 gap-1.5 font-bold text-xs border-border/50 hover:border-primary/50 hover:text-primary h-8">
             <Trophy className="w-3.5 h-3.5" /> Leaderboard
@@ -85,9 +88,14 @@ function LandingHome(options: LandingScreenOptions) {
             <Radio className="w-3.5 h-3.5" /> Multiplayer
           </Button>
         </div>
-        <Button data-testid="button-play-now" size="sm" onClick={options.onPlay} className="font-bold rounded-full px-5 h-8 text-sm">
-          Play Now
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" data-testid="button-daily-challenge" onClick={options.onDailyChallenge} className="gap-1.5 font-bold text-xs border-border/50 hover:border-primary/50 hover:text-primary h-8 px-3">
+            <CalendarDays className="w-3.5 h-3.5" /> Daily
+          </Button>
+          <Button data-testid="button-play-now" size="sm" onClick={options.onPlay} className="font-bold rounded-full px-5 h-8 text-sm">
+            Play Now
+          </Button>
+        </div>
       </nav>
 
       {/* Main content */}
@@ -136,7 +144,7 @@ function LandingHome(options: LandingScreenOptions) {
               </div>
               <div className="flex items-center gap-1">
                 <Globe className="w-3 h-3 text-emerald-400" />
-                <span>11 modes</span>
+                <span>{totalModes} modes</span>
               </div>
             </div>
           </motion.div>

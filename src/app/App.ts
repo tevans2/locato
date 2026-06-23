@@ -81,8 +81,8 @@ export function createApp(options: AppOptions): App {
   });
   const landingButton = el("button", {
     className: "landing-return-action",
-    text: "Landing",
-    attrs: { type: "button", "aria-label": "Back to landing page" },
+    text: "Modes",
+    attrs: { type: "button", "aria-label": "Back to game modes" },
     on: { click: () => navigate({ type: "landing" }) },
   });
 
@@ -534,6 +534,7 @@ export function createApp(options: AppOptions): App {
       mount(
         createLandingScreen({
           onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onGameMode: (gameMode) => handleGameModeChange(gameMode),
           onLeaderboard: () => navigate({ type: "leaderboard" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
