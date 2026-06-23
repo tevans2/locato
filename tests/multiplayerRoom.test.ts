@@ -104,6 +104,18 @@ describe("multiplayer room", () => {
     expect(resultSnapshot.room.skipRequired).toBe(0);
   });
 
+  it("stores room chat messages with filtered profanity", () => {
+    const room = new Room({ code: "CHAT1", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "chat-seed", now: 1000 });
+    expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
+
+    const sent = room.sendChatMessage("guest", "hello shit room", 1020);
+    expect(sent.ok).toBe(true);
+    const snapshot = sent.ok ? sent.messages.find((message) => message.type === "ROOM_SNAPSHOT") : null;
+    expect(snapshot?.type).toBe("ROOM_SNAPSHOT");
+    if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(snapshot.room.chatMessages).toMatchObject([{ playerId: "guest", playerName: "Guest", text: "hello **** room", sentAt: 1020 }]);
+  });
+
   it("keeps answers private until a round is ended by the authoritative room", () => {
     const room = new Room({
       code: "ABCDE",
@@ -378,6 +390,26 @@ describe("room manager", () => {
     expect(guest.messages.some((message) => message.type === "ANSWER_REJECTED")).toBe(false);
   });
 
+
+  it("broadcasts filtered chat messages to every player in a room", () => {
+    const manager = new RoomManager({ countryIndex });
+    const host = new TestConnection();
+    const guest = new TestConnection();
+
+    manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", categoryIds: ["flags"] }, 1000);
+    const assigned = host.messages.find((message) => message.type === "SESSION_ASSIGNED");
+    if (assigned?.type !== "SESSION_ASSIGNED") throw new Error("Expected assigned host session.");
+    manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Guest" }, 1010);
+    manager.handleMessage(guest, { type: "SEND_CHAT_MESSAGE", text: "that was damn close" }, 1020);
+
+    const hostSnapshot = latestRoomMessage(host);
+    const guestSnapshot = latestRoomMessage(guest);
+    expect(hostSnapshot?.type).toBe("ROOM_SNAPSHOT");
+    expect(guestSnapshot?.type).toBe("ROOM_SNAPSHOT");
+    if (hostSnapshot?.type !== "ROOM_SNAPSHOT" || guestSnapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshots.");
+    expect(hostSnapshot.room.chatMessages.at(-1)?.text).toBe("that was **** close");
+    expect(guestSnapshot.room.chatMessages.at(-1)?.text).toBe("that was **** close");
+  });
   it("lets a dropped player reclaim their seat and score with the session token", () => {
     const manager = new RoomManager({ countryIndex });
     const host = new TestConnection();

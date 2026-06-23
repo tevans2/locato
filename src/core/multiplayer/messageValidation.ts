@@ -1,10 +1,11 @@
 import type { ClientMessage, ServerMessage } from "./protocol";
-import type { FinalResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
 export const MAX_PLAYER_NAME_LENGTH = 32;
 export const MAX_ROOM_CODE_LENGTH = 12;
 export const MAX_ANSWER_LENGTH = 80;
+export const MAX_CHAT_MESSAGE_LENGTH = 160;
 export const MAX_ROOM_CATEGORY_IDS = 8;
 export const MIN_ROOM_ROUND_LIMIT = 3;
 export const MAX_ROOM_ROUND_LIMIT = 20;
@@ -55,6 +56,10 @@ export function normalizeRoomCode(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }
 
+function normalizeChatMessage(value: string): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, MAX_CHAT_MESSAGE_LENGTH);
+}
+
 export function parseJsonMessage(raw: string): MessageParseResult<unknown> {
   try {
     return { ok: true, message: JSON.parse(raw) as unknown };
@@ -68,7 +73,7 @@ function isCategoryIdList(value: unknown): value is readonly string[] {
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe") && typeof value.value === "string";
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
@@ -133,8 +138,16 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isNonEmptyString(value.answer, MAX_ANSWER_LENGTH)) return reject("invalid-answer", "Answer is required.");
       if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
       return { ok: true, message: { type: "SUBMIT_ANSWER", answer: value.answer.trim(), clientSentAt: value.clientSentAt } };
+    case "SUBMIT_MAPTAP_GUESS":
+      if (!isFiniteNumber(value.lat) || (value.lat as number) < -90 || (value.lat as number) > 90) return reject("invalid-guess", "Latitude is out of range.");
+      if (!isFiniteNumber(value.lng)) return reject("invalid-guess", "Longitude is required.");
+      if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
+      return { ok: true, message: { type: "SUBMIT_MAPTAP_GUESS", lat: value.lat as number, lng: value.lng as number, clientSentAt: value.clientSentAt as number } };
     case "VOTE_SKIP":
       return { ok: true, message: { type: "VOTE_SKIP" } };
+    case "SEND_CHAT_MESSAGE":
+      if (!isNonEmptyString(value.text, MAX_CHAT_MESSAGE_LENGTH)) return reject("invalid-chat-message", "Chat message is required.");
+      return { ok: true, message: { type: "SEND_CHAT_MESSAGE", text: normalizeChatMessage(value.text) } };
     case "REQUEST_HINT":
       return { ok: true, message: { type: "REQUEST_HINT" } };
     default:
@@ -167,6 +180,17 @@ function isRound(value: unknown): value is PublicRoundState {
   );
 }
 
+function isChatMessage(value: unknown): value is PublicChatMessage {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.playerId === "string" &&
+    typeof value.playerName === "string" &&
+    typeof value.text === "string" &&
+    isFiniteNumber(value.sentAt)
+  );
+}
+
 function isRoom(value: unknown): value is PublicRoomState {
   return (
     isRecord(value) &&
@@ -184,7 +208,9 @@ function isRoom(value: unknown): value is PublicRoomState {
     value.skipVotes.every((id) => typeof id === "string") &&
     isFiniteNumber(value.skipRequired) &&
     (value.phaseStartedAt === null || isFiniteNumber(value.phaseStartedAt)) &&
-    (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt))
+    (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt)) &&
+    Array.isArray(value.chatMessages) &&
+    value.chatMessages.every(isChatMessage)
   );
 }
 
@@ -198,6 +224,15 @@ function isRoundResult(value: unknown): value is RoundResult {
     (value.answeredAt === null || isFiniteNumber(value.answeredAt)) &&
     (value.guess === null || typeof value.guess === "string")
   );
+}
+
+function isMapTapRoundResult(value: unknown): value is MapTapRoundResult {
+  if (!isRecord(value)) return false;
+  if (typeof value.playerId !== "string" || typeof value.name !== "string") return false;
+  if (!isFiniteNumber(value.score)) return false;
+  if (value.guess !== null && !(isRecord(value.guess) && isFiniteNumber(value.guess.lat) && isFiniteNumber(value.guess.lng))) return false;
+  if (value.distanceKm !== null && !isFiniteNumber(value.distanceKm)) return false;
+  return true;
 }
 
 function isFinalResult(value: unknown): value is FinalResult {
@@ -235,6 +270,15 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
         return reject("invalid-round-result", "Round result is invalid.");
       }
       return { ok: true, message: { type: "ROUND_ENDED", answer: value.answer, results: value.results } };
+    case "MAPTAP_ROUND_ENDED": {
+      if (typeof value.targetName !== "string" || !isFiniteNumber(value.targetLat) || !isFiniteNumber(value.targetLng) || typeof value.wikiSlug !== "string") {
+        return reject("invalid-maptap-result", "MapTap round result target is invalid.");
+      }
+      if (!Array.isArray(value.results) || !value.results.every(isMapTapRoundResult)) {
+        return reject("invalid-maptap-result", "MapTap round results are invalid.");
+      }
+      return { ok: true, message: { type: "MAPTAP_ROUND_ENDED", targetName: value.targetName as string, targetLat: value.targetLat as number, targetLng: value.targetLng as number, wikiSlug: value.wikiSlug as string, results: value.results as MapTapRoundResult[] } };
+    }
     case "GAME_COMPLETED":
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");
       return { ok: true, message: { type: "GAME_COMPLETED", results: value.results } };

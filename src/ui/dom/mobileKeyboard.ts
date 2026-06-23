@@ -25,7 +25,7 @@ function isVisibleElement(element: HTMLElement): boolean {
 }
 
 function keyboardAnchorFor(root: HTMLElement): HTMLElement | null {
-  const selectors = [".flag-card", ".world-map-panel", ".world-globe-panel", ".puzzle-board"] as const;
+  const selectors = [".flag-card", ".world-map-panel", ".world-globe-panel", ".streetview-stage", ".puzzle-board"] as const;
   for (const selector of selectors) {
     const element = root.querySelector<HTMLElement>(selector);
     if (element && isVisibleElement(element)) return element;

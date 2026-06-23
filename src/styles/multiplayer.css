@@ -6,6 +6,14 @@
   display: none !important;
 }
 
+.multiplayer-header {
+  margin-bottom: 0;
+}
+
+.multiplayer-header-left {
+  gap: clamp(10px, 1.4vw, 16px);
+}
+
 .multiplayer-status {
   width: fit-content;
   max-width: 100%;
@@ -275,10 +283,6 @@
   height: 100%;
 }
 
-.multiplayer-map-panel .world-map-meta {
-  display: none;
-}
-
 .multiplayer-map-panel.is-disabled .world-map-svg {
   pointer-events: none;
 }
@@ -430,6 +434,167 @@
   text-align: center;
 }
 
+.multiplayer-chat-dock {
+  position: fixed;
+  left: clamp(14px, 2vw, 24px);
+  bottom: clamp(14px, 2vw, 24px);
+  z-index: 35;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.multiplayer-chat-dock[hidden] {
+  display: none !important;
+}
+
+.multiplayer-chat-panel {
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(330px, calc(100dvh - 112px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(86px, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  border: 1px solid rgba(184, 227, 109, 0.18);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.055), transparent 52%),
+    rgba(8, 12, 8, 0.9);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+}
+
+.multiplayer-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.multiplayer-chat-header .eyebrow {
+  font-size: 0.7rem;
+}
+
+.multiplayer-chat-list {
+  min-height: 86px;
+  overflow: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  align-content: end;
+  gap: 6px;
+  scrollbar-width: thin;
+}
+
+.multiplayer-chat-message,
+.multiplayer-chat-empty {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.multiplayer-chat-message.is-local {
+  border-color: rgba(184, 227, 109, 0.28);
+  background: rgba(184, 227, 109, 0.075);
+}
+
+.multiplayer-chat-author {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.multiplayer-chat-text {
+  overflow-wrap: anywhere;
+}
+
+.multiplayer-chat-empty {
+  color: var(--muted);
+}
+
+.multiplayer-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.multiplayer-chat-form input {
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+
+.multiplayer-chat-form button {
+  min-width: 64px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
+.multiplayer-chat-toggle {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(184, 227, 109, 0.32);
+  border-radius: 999px;
+  color: var(--accent);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.18), rgba(255, 255, 255, 0.035)),
+    rgba(10, 14, 10, 0.94);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+}
+
+.multiplayer-chat-toggle:hover,
+.multiplayer-chat-toggle:focus-visible {
+  border-color: rgba(184, 227, 109, 0.58);
+  color: var(--text);
+  outline: none;
+}
+
+.multiplayer-chat-toggle-icon,
+.multiplayer-chat-toggle-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.multiplayer-chat-toggle-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.multiplayer-chat-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(8, 12, 8, 0.96);
+  border-radius: 999px;
+  padding-inline: 4px;
+  color: #11160e;
+  background: var(--accent);
+  font-size: 0.66rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
 @media (max-width: 900px) {
   .multiplayer-screen {
     overflow: auto;
@@ -479,8 +644,10 @@
 
 @media (max-width: 700px) {
   .multiplayer-status {
-    width: 100%;
+    width: auto;
     white-space: normal;
+    padding: 6px 10px;
+    font-size: 0.75rem;
   }
 
   .multiplayer-form-grid,
@@ -503,6 +670,20 @@
 
   .score-meta {
     grid-column: 2 / -1;
+  }
+
+  .multiplayer-chat-dock {
+    left: 12px;
+    bottom: 12px;
+  }
+
+  .multiplayer-chat-panel {
+    width: min(340px, calc(100vw - 24px));
+    max-height: min(320px, calc(100dvh - 94px));
+  }
+
+  .multiplayer-chat-list {
+    min-height: 76px;
   }
 }
 

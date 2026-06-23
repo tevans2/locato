@@ -66,6 +66,13 @@ describe("multiplayer public protocol", () => {
     expect(message.ok ? message.message : null).toEqual({ type: "VOTE_SKIP" });
   });
 
+  it("accepts normalized chat messages", () => {
+    const message = parseClientMessage({ type: "SEND_CHAT_MESSAGE", text: "  hello   room  " });
+    expect(message.ok).toBe(true);
+    expect(message.ok ? message.message : null).toEqual({ type: "SEND_CHAT_MESSAGE", text: "hello room" });
+    expect(parseClientMessage({ type: "SEND_CHAT_MESSAGE", text: "   " }).ok).toBe(false);
+  });
+
   it("reveals the answer only in round-ended messages", () => {
     const message: ServerMessage = {
       type: "ROUND_ENDED",

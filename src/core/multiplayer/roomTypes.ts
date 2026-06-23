@@ -13,7 +13,7 @@ export interface PublicPlayerState {
 }
 
 export interface PublicPromptContent {
-  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe";
   readonly value: string;
 }
 
@@ -27,6 +27,14 @@ export interface PublicRoundState {
 export interface PublicRoomSettings {
   readonly roundLimit: number;
   readonly roundDurationMs: number;
+}
+
+export interface PublicChatMessage {
+  readonly id: string;
+  readonly playerId: PlayerId;
+  readonly playerName: string;
+  readonly text: string;
+  readonly sentAt: number;
 }
 
 export interface PublicRoomState {
@@ -46,6 +54,7 @@ export interface PublicRoomState {
   // the next round. Null when the phase has no deadline (lobby/complete/untimed round).
   readonly phaseStartedAt: number | null;
   readonly phaseEndsAt: number | null;
+  readonly chatMessages: readonly PublicChatMessage[];
 }
 
 export interface RoundResult {
@@ -55,6 +64,14 @@ export interface RoundResult {
   readonly points: number;
   readonly answeredAt: number | null;
   readonly guess: string | null;
+}
+
+export interface MapTapRoundResult {
+  readonly playerId: PlayerId;
+  readonly name: string;
+  readonly guess: { readonly lat: number; readonly lng: number } | null;
+  readonly distanceKm: number | null;
+  readonly score: number;
 }
 
 export interface FinalResult {

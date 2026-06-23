@@ -1,8 +1,8 @@
 import type { AuthUser } from "../../core/auth";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
-import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
-import { isPromptGameModeId, type GameModeId } from "../../core/gameModes";
+import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
@@ -25,7 +25,7 @@ import { createMobileMenu } from "../dom/mobileMenu";
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
-  readonly selectedGameMode: GameModeId;
+  readonly selectedGameMode: PromptGameModeId;
   readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
@@ -74,6 +74,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const dailyMarks: DailyRoundMark[] = [];
   let dailyHintsUsed = 0;
   let dailyRoundHintsUsed = 0;
+  let dailyRoundWrongGuesses = 0;
   let dailyScore = 0;
   let dailyCompleted = false;
   const stats = createStatsView();
@@ -347,7 +348,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       );
       const targetId = current?.id ?? null;
       const mapPromptKey = `${state.roundNumber}:${content.kind}:${targetId ?? "none"}`;
-      updateWorldMapView(dailyMap, isDailyChallenge ? cleanDailyMapCountryIds : state.guessedCountryIds, countries.length);
+      updateWorldMapView(dailyMap, isDailyChallenge ? cleanDailyMapCountryIds : state.guessedCountryIds);
       setWorldMapTargetCountry(dailyMap, content.kind === "map-highlight" ? targetId : null);
       if (activeMapPromptKey !== mapPromptKey) {
         activeMapPromptKey = mapPromptKey;
@@ -414,17 +415,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         continue;
       }
 
+      if (event.type === "GUESS_WRONG") {
+        dailyRoundWrongGuesses += 1;
+        continue;
+      }
+
       if (event.type === "GUESS_CORRECT") {
-        dailyScore += scoreDailyRound(dailyRoundHintsUsed);
-        dailyMarks.push(dailyRoundHintsUsed > 0 ? "hint" : "correct");
+        dailyScore += scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses);
+        dailyMarks.push(dailyRoundHintsUsed > 0 || dailyRoundWrongGuesses > 0 ? "hint" : "correct");
         dailyRoundHintsUsed = 0;
+        dailyRoundWrongGuesses = 0;
         continue;
       }
 
       if (event.type === "ANSWER_REVEALED" || event.type === "ROUND_SKIPPED") {
-        dailyScore += scoreDailyRound(dailyRoundHintsUsed, true);
+        dailyScore += scoreDailyRound(dailyRoundHintsUsed, true, dailyRoundWrongGuesses);
         dailyMarks.push("miss");
         dailyRoundHintsUsed = 0;
+        dailyRoundWrongGuesses = 0;
       }
     }
   }
@@ -434,14 +442,11 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
     dailyCompleted = true;
     const state = engine.getState();
-    const marks = [...dailyMarks];
-    while (marks.length < DAILY_COUNTRY_COUNT) marks.push("miss");
-
     options.dailyChallenge.onComplete({
       score: dailyScore,
       timeMs: Math.max(0, (state.endedAt ?? Date.now()) - (state.startedAt ?? Date.now())),
       hintsUsed: dailyHintsUsed,
-      marks: marks.slice(0, DAILY_COUNTRY_COUNT),
+      marks: [...dailyMarks],
     });
   }
 
@@ -469,6 +474,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   input.addEventListener(
     "input",
     () => {
+      if (isDailyChallenge) return;
       const events = engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now(), auto: true });
       if (events.length > 0) dispatchAndRender(events);
     },

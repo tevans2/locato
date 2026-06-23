@@ -1,5 +1,6 @@
-import type { MultiplayerTransport, PublicRoomState, PublicRoundState, RoundResult, FinalResult, ServerMessage, TransportStatus } from "../../core/multiplayer";
+import { MAX_CHAT_MESSAGE_LENGTH, type MultiplayerTransport, type PublicChatMessage, type PublicRoomState, type PublicRoundState, type RoundResult, type FinalResult, type ServerMessage, type TransportStatus } from "../../core/multiplayer";
 import { gameModeOptions, type GameModeOption } from "../../core/gameModes";
+import { createMultiplayerMapTapGameView, type MapTapMultiplayerReveal } from "../components/MultiplayerMapTapGameView";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
@@ -65,11 +66,11 @@ interface RoundReveal {
   readonly results: readonly RoundResult[];
 }
 
-type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country";
+type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country" | "map-tap";
 
 type MultiplayerModeOption = Omit<GameModeOption, "id"> & { readonly id: MultiplayerPlayMode };
 
-const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country"];
+const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country", "map-tap"];
 
 const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = gameModeOptions
   .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
@@ -86,6 +87,10 @@ function modeToCategoryId(mode: MultiplayerPlayMode): string {
 function categoryIdToMode(categoryId: string): MultiplayerPlayMode | null {
   if (categoryId === "pick-country") return "click-country";
   return MULTIPLAYER_MODE_IDS.includes(categoryId as MultiplayerPlayMode) ? (categoryId as MultiplayerPlayMode) : null;
+}
+
+function isMapTapRoom(room: PublicRoomState | null): boolean {
+  return room?.categoryIds.includes("map-tap") ?? false;
 }
 
 function categoryIdsForModes(modes: readonly MultiplayerPlayMode[]): readonly string[] {
@@ -225,6 +230,12 @@ function createBrand(): HTMLElement {
   });
 }
 
+function createChatIcon(): HTMLElement {
+  const icon = el("span", { className: "multiplayer-chat-toggle-icon" });
+  icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.8A2.8 2.8 0 0 1 7.8 4h8.4A2.8 2.8 0 0 1 19 6.8v5.8a2.8 2.8 0 0 1-2.8 2.8h-4.7L7.1 19v-3.7A2.8 2.8 0 0 1 5 12.6V6.8Z"/><path d="M8 8h8M8 11h5.6"/></svg>';
+  return icon;
+}
+
 function ownPlayer(room: PublicRoomState | null, playerId: string | null) {
   return room && playerId ? room.players.find((player) => player.id === playerId) ?? null : null;
 }
@@ -247,6 +258,19 @@ function createPlayerRows(room: PublicRoomState, localPlayerId: string | null): 
   });
 }
 
+function createChatRows(messages: readonly PublicChatMessage[], localPlayerId: string | null): readonly HTMLElement[] {
+  if (messages.length === 0) return [el("li", { className: "multiplayer-chat-empty", text: "No messages yet." })];
+  return messages.map((message) =>
+    el("li", {
+      className: message.playerId === localPlayerId ? "multiplayer-chat-message is-local" : "multiplayer-chat-message",
+      children: [
+        el("span", { className: "multiplayer-chat-author", text: message.playerName }),
+        el("span", { className: "multiplayer-chat-text", text: message.text }),
+      ],
+    }),
+  );
+}
+
 function safeConnect(transport: MultiplayerTransport, afterConnect: () => void, onError: (message: string) => void): void {
   transport
     .connect()
@@ -264,6 +288,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   let room: PublicRoomState | null = null;
   let activeRound: PublicRoundState | null = null;
   let roundReveal: RoundReveal | null = null;
+  let mapTapReveal: MapTapMultiplayerReveal | null = null;
   let finalResults: readonly FinalResult[] | null = null;
   let sessionToken: string | null = null;
   let joinedRoomCode: string | null = null;
@@ -288,6 +313,8 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     ].map((option) => el("option", { text: option.label, attrs: { value: String(option.value), ...(option.value === 30_000 ? { selected: "" } : {}) } })),
   });
   let playModes: readonly MultiplayerPlayMode[] = ["flags"];
+  let chatOpen = false;
+  let lastSeenChatCount = 0;
   const initialSetupCopy = setupCopyForModes(playModes);
   const setupTitle = el("h1", { text: initialSetupCopy.title });
   const setupDescription = el("p", {
@@ -327,8 +354,35 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const createButton = el("button", { className: "primary-action", text: "Create online room", attrs: { type: "button" } });
   const joinButton = el("button", { className: "secondary-action", text: "Join online room", attrs: { type: "button" } });
   const copyButton = el("button", { className: "ghost-action copy-code", text: "Copy code", attrs: { type: "button" } });
-  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge" } });
-  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
+  const dailyButton = el("button", { className: "ghost-action nav-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge" } });
+  const backButton = el("button", { className: "ghost-action nav-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
+  const chatList = el("ol", { className: "multiplayer-chat-list", attrs: { "aria-live": "polite" } });
+  const chatInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: String(MAX_CHAT_MESSAGE_LENGTH), placeholder: "Message room" } });
+  const chatButton = el("button", { className: "secondary-action", text: "Send", attrs: { type: "submit" } });
+  const chatBadge = el("span", { className: "multiplayer-chat-badge", attrs: { hidden: "true", "aria-hidden": "true" } });
+  const chatToggle = el("button", {
+    className: "multiplayer-chat-toggle",
+    attrs: { type: "button", "aria-label": "Open room chat", "aria-expanded": "false", title: "Room chat" },
+    children: [createChatIcon(), chatBadge],
+  });
+  const chatForm = el("form", {
+    className: "multiplayer-chat-form",
+    children: [chatInput, chatButton],
+  });
+  const chatPanel = el("aside", {
+    className: "multiplayer-chat-panel",
+    attrs: { hidden: "true", "aria-label": "Room chat" },
+    children: [
+      el("div", { className: "multiplayer-chat-header", children: [el("span", { className: "eyebrow", text: "ROOM CHAT" })] }),
+      chatList,
+      chatForm,
+    ],
+  });
+  const chatDock = el("div", {
+    className: "multiplayer-chat-dock",
+    attrs: { hidden: "true" },
+    children: [chatPanel, chatToggle],
+  });
 
   const setupPanel = el("section", {
     className: "multiplayer-card multiplayer-setup",
@@ -365,6 +419,16 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     },
   });
 
+  const mapTapGameView = createMultiplayerMapTapGameView({
+    signal: controller.signal,
+    onGuess: (lat, lng) => {
+      transport?.send({ type: "SUBMIT_MAPTAP_GUESS", lat, lng, clientSentAt: Date.now() });
+    },
+    onSkip: () => {
+      transport?.send({ type: "VOTE_SKIP" });
+    },
+  });
+
   function disconnectCurrentTransport(): void {
     cleanupMessageHandler?.();
     cleanupStatusHandler?.();
@@ -382,10 +446,13 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     room = null;
     activeRound = null;
     roundReveal = null;
+    mapTapReveal = null;
     finalResults = null;
     localPlayerId = null;
     sessionToken = null;
     joinedRoomCode = null;
+    chatOpen = false;
+    lastSeenChatCount = 0;
   }
 
   function leaveRoomFlow(): void {
@@ -458,13 +525,35 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     statusText.textContent = `${status}: ${feedback}`;
     setupPanel.hidden = hasRoom;
     lobbyPanel.hidden = !hasRoom || room?.status !== "lobby";
-    gameView.element.hidden = !hasRoom || room?.status === "lobby";
+    const isMapTap = isMapTapRoom(room);
+    gameView.element.hidden = !hasRoom || room?.status === "lobby" || isMapTap;
+    mapTapGameView.element.hidden = !hasRoom || room?.status === "lobby" || !isMapTap;
 
     // Toggle the modal before the no-room early return so leaving the room also dismisses it.
     if (room && room.status === "complete" && finalResults) {
       endGameModal.show({ localPlayerId, results: finalResults, canPlayAgain: localPlayerId === room.hostPlayerId });
     } else {
       endGameModal.hide();
+    }
+
+    chatDock.hidden = !hasRoom;
+    chatPanel.hidden = !hasRoom || !chatOpen;
+    chatDock.classList.toggle("is-open", hasRoom && chatOpen);
+    chatToggle.setAttribute("aria-expanded", String(hasRoom && chatOpen));
+    chatToggle.setAttribute("aria-label", hasRoom && chatOpen ? "Close room chat" : "Open room chat");
+    chatInput.disabled = !hasRoom || status !== "connected";
+    chatButton.disabled = chatInput.disabled;
+    if (room) {
+      chatList.replaceChildren(...createChatRows(room.chatMessages, localPlayerId));
+      chatList.scrollTop = chatList.scrollHeight;
+      if (chatOpen) lastSeenChatCount = room.chatMessages.length;
+      const unreadCount = Math.max(0, room.chatMessages.length - lastSeenChatCount);
+      chatBadge.hidden = chatOpen || unreadCount === 0;
+      chatBadge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+    } else {
+      chatList.replaceChildren();
+      lastSeenChatCount = 0;
+      chatBadge.hidden = true;
     }
 
     if (!room) return;
@@ -500,7 +589,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     startButton.disabled = room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !allConnectedPlayersReady(room);
 
     const canSubmit = room.status === "playing" && status === "connected";
-    gameView.update({ room, localPlayerId, round: activeRound, roundResult: roundReveal, finalResults, feedback, canSubmit });
+    if (isMapTap) {
+      mapTapGameView.update({ room, localPlayerId, round: activeRound, reveal: mapTapReveal, finalResults, feedback, canSubmit });
+    } else {
+      gameView.update({ room, localPlayerId, round: activeRound, roundResult: roundReveal, finalResults, feedback, canSubmit });
+    }
   }
 
   function handleMessage(message: ServerMessage): void {
@@ -524,6 +617,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       case "ROUND_STARTED":
         activeRound = message.round;
         roundReveal = null;
+        mapTapReveal = null;
         finalResults = null;
         feedback = `Round ${message.round.roundNumber} is live.`;
         break;
@@ -537,6 +631,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         roundReveal = { answer: message.answer, results: message.results };
         const winner = message.results.find((result) => result.correct);
         feedback = winner ? `${message.answer} — ${winner.name} took it.` : `${message.answer} — nobody got it.`;
+        break;
+      }
+      case "MAPTAP_ROUND_ENDED": {
+        mapTapReveal = { targetName: message.targetName, targetLat: message.targetLat, targetLng: message.targetLng, wikiSlug: message.wikiSlug, results: message.results };
+        const top = message.results[0];
+        feedback = top?.guess ? `${message.targetName} — ${top.name} was closest.` : `${message.targetName} — nobody guessed.`;
         break;
       }
       case "GAME_COMPLETED": {
@@ -678,6 +778,27 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   startButton.addEventListener("click", () => transport?.send({ type: "START_GAME" }), { signal: controller.signal });
   leaveButton.addEventListener("click", () => leaveRoomFlow(), { signal: controller.signal });
+  chatToggle.addEventListener(
+    "click",
+    () => {
+      chatOpen = !chatOpen;
+      if (chatOpen && room) lastSeenChatCount = room.chatMessages.length;
+      render();
+      if (chatOpen && !chatInput.disabled) chatInput.focus();
+    },
+    { signal: controller.signal },
+  );
+  chatForm.addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) return;
+      transport?.send({ type: "SEND_CHAT_MESSAGE", text });
+      chatInput.value = "";
+    },
+    { signal: controller.signal },
+  );
   dailyButton.addEventListener(
     "click",
     () => {
@@ -700,9 +821,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const element = el("section", {
     className: "game-screen multiplayer-screen",
     children: [
-      el("header", { className: "stats-header multiplayer-header", children: [createBrand(), el("div", { className: "screen-header-actions", children: [dailyButton, backButton] })] }),
-      statusText,
-      el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element] }),
+      el("header", {
+        className: "game-header multiplayer-header",
+        children: [
+          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrand(), statusText] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, backButton] }),
+        ],
+      }),
+      el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element] }),
+      chatDock,
       endGameModal.element,
     ],
   });
@@ -732,6 +859,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       controller.abort();
       disconnectCurrentTransport();
       gameView.destroy();
+      mapTapGameView.destroy();
     },
   };
 }

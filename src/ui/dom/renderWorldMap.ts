@@ -63,8 +63,6 @@ export interface WorldMapViewOptions {
 
 export interface WorldMapView {
   readonly element: HTMLElement;
-  readonly highlightedCount: HTMLElement;
-  readonly remainingCount: HTMLElement;
   readonly pathByCountryId: ReadonlyMap<CountryId, SVGPathElement>;
   readonly missingDotByCountryId: ReadonlyMap<CountryId, SVGCircleElement>;
   readonly focusCountry: (countryId: CountryId, options?: { readonly animate?: boolean }) => void;
@@ -341,10 +339,6 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   svg.append(mapLayer, markerLayer);
 
-  const highlightedCount = document.createElement("strong");
-  highlightedCount.textContent = "0";
-  const remainingCount = document.createElement("strong");
-  remainingCount.textContent = String(countryIndex.countries.length);
   const countryLabel = document.createElement("div");
   countryLabel.className = "world-map-country-label";
   countryLabel.hidden = true;
@@ -595,22 +589,9 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   const element = document.createElement("div");
   element.className = "world-map-panel";
-  element.append(
-    svg,
-    controls,
-    countryLabel,
-    document.createElement("div"),
-  );
-  const meta = element.lastElementChild as HTMLElement;
-  meta.className = "world-map-meta";
-  meta.append(
-    document.createElement("span"),
-    document.createElement("span"),
-  );
-  meta.children[0]!.append("Found ", highlightedCount);
-  meta.children[1]!.append("Left ", remainingCount);
+  element.append(svg, controls, countryLabel);
 
-  return { element, highlightedCount, remainingCount, pathByCountryId, missingDotByCountryId, focusCountry, resetView, showCountryLabel };
+  return { element, pathByCountryId, missingDotByCountryId, focusCountry, resetView, showCountryLabel };
 }
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {
@@ -635,13 +616,11 @@ export function setWorldMapReviewCountries(view: WorldMapView, countryIds: Reado
   }
 }
 
-export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>, totalCountries: number): void {
+export function updateWorldMapView(view: WorldMapView, guessedCountryIds: ReadonlySet<CountryId>): void {
   for (const [countryId, path] of view.pathByCountryId.entries()) {
     const guessed = guessedCountryIds.has(countryId);
     path.classList.toggle("is-guessed", guessed);
     view.missingDotByCountryId.get(countryId)?.classList.toggle("is-guessed", guessed);
   }
 
-  view.highlightedCount.textContent = String(guessedCountryIds.size);
-  view.remainingCount.textContent = String(Math.max(0, totalCountries - guessedCountryIds.size));
 }

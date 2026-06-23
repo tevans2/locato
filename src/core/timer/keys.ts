@@ -1,4 +1,4 @@
-import type { GameModeId, PromptGameModeId, WorldMapGameModeId } from "../gameModes";
+import type { PromptGameModeId, TimerGameModeId, WorldMapGameModeId } from "../gameModes";
 import type { TimerStorageKeys } from "./playTimer";
 
 const MAP_TIMER_KEYS: Record<WorldMapGameModeId, TimerStorageKeys> = {
@@ -43,7 +43,7 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
   },
 };
 
-export function timerKeysForMode(mode: GameModeId): TimerStorageKeys {
+export function timerKeysForMode(mode: TimerGameModeId): TimerStorageKeys {
   if (mode in MAP_TIMER_KEYS) {
     return MAP_TIMER_KEYS[mode as WorldMapGameModeId];
   }

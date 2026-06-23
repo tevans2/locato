@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDailyChallenge, createDailyShareText, formatDailyTime, scoreDailyRound } from "../src/core/dailyChallenge";
+import { createDailyChallenge, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, formatDailyTime, scoreDailyMapTapRound, scoreDailyRound } from "../src/core/dailyChallenge";
 import { indexCountries, type RawCountry } from "../src/core/countries";
 
 const fixtureCountries = Array.from({ length: 14 }, (_, index) => {
@@ -16,15 +16,17 @@ const fixtureCountries = Array.from({ length: 14 }, (_, index) => {
 }) satisfies readonly RawCountry[];
 
 describe("daily challenge", () => {
-  it("selects the same ten countries for the same date", () => {
+  it("selects the same daily rounds for the same date", () => {
     const index = indexCountries(fixtureCountries);
     const first = createDailyChallenge(index, "2026-06-11");
     const second = createDailyChallenge(index, "2026-06-11");
 
     expect(first.seed).toBe("daily:2026-06-11");
     expect(first.categoryIds).toEqual(["flags", "shapes", "capitals", "pick-country", "spot-country"]);
-    expect(first.countryIds).toHaveLength(10);
-    expect(second.countryIds).toEqual(first.countryIds);
+    expect(first.countryIds).toHaveLength(DAILY_PROMPT_COUNTRY_COUNT);
+    expect(first.mapTapTargetId).toBeTruthy();
+    expect(first.streetViewCountryCode).toBeTruthy();
+    expect(second).toEqual(first);
   });
 
   it("changes the selection when the date changes", () => {
@@ -32,7 +34,7 @@ describe("daily challenge", () => {
     const first = createDailyChallenge(index, "2026-06-11");
     const second = createDailyChallenge(index, "2026-06-12");
 
-    expect(second.countryIds).not.toEqual(first.countryIds);
+    expect([second.countryIds, second.mapTapTargetId, second.streetViewCountryCode]).not.toEqual([first.countryIds, first.mapTapTargetId, first.streetViewCountryCode]);
   });
 
   it("formats time and share text", () => {
@@ -43,10 +45,13 @@ Time: 02:14
 🟩🟩🟥🟩🟨🟩🟩🟥🟩🟩`);
   });
 
-  it("scores each round with hint penalties and zero for revealed answers", () => {
+  it("scores daily rounds with hint, wrong-answer, and miss penalties", () => {
     expect(scoreDailyRound(0)).toBe(10);
     expect(scoreDailyRound(1)).toBe(7);
-    expect(scoreDailyRound(3)).toBe(1);
-    expect(scoreDailyRound(2, true)).toBe(0);
+    expect(scoreDailyRound(0, false, 1)).toBe(8);
+    expect(scoreDailyRound(1, false, 2)).toBe(3);
+    expect(scoreDailyRound(2, true, 2)).toBe(0);
+    expect(scoreDailyMapTapRound(5000, 5000)).toBe(10);
+    expect(scoreDailyMapTapRound(2500, 5000)).toBe(5);
   });
 });

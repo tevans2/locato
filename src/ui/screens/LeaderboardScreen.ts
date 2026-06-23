@@ -1,6 +1,6 @@
 import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
 import { CONTINENTS } from "../../core/countries";
-import { gameModeOptions, type GameModeId } from "../../core/gameModes";
+import { isTimerGameModeId, timerGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
@@ -45,14 +45,14 @@ function renderRows(entries: readonly LeaderboardEntry[], currentUserId: string 
 
 export function createLeaderboardScreen(options: LeaderboardScreenOptions): Screen {
   const controller = new AbortController();
-  let selectedMode: GameModeId = options.initialMode ?? "name-all";
+  let selectedMode: TimerGameModeId = options.initialMode && isTimerGameModeId(options.initialMode) ? options.initialMode : "name-all";
   let selectedVariant = options.initialVariant ?? (selectedMode === "puzzle" ? "Africa" : "");
   let currentUser: AuthUser | null = null;
 
   const modeSelect = el("select", {
     className: "leaderboard-mode-select",
     attrs: { id: "leaderboard-mode", name: "leaderboardMode", "aria-label": "Leaderboard game mode" },
-    children: gameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
+    children: timerGameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
   });
   modeSelect.value = selectedMode;
 
@@ -130,7 +130,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
   modeSelect.addEventListener(
     "change",
     () => {
-      selectedMode = modeSelect.value as GameModeId;
+      selectedMode = modeSelect.value as TimerGameModeId;
       if (selectedMode === "puzzle" && !selectedVariant) selectedVariant = variantSelect.value;
       syncVariantVisibility();
       void loadBoard();
