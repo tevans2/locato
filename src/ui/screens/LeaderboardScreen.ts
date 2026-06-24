@@ -5,21 +5,16 @@ import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface LeaderboardScreenOptions {
   readonly initialMode?: GameModeId;
   readonly initialVariant?: string;
   readonly storage: Storage;
+  readonly onHome: () => void;
   readonly onBack: () => void;
   readonly onDailyChallenge?: () => void;
   readonly onSignIn: () => void;
-}
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
 }
 
 function entryAvatar(entry: LeaderboardEntry): HTMLElement {
@@ -177,7 +172,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
       el("header", {
         className: "stats-header leaderboard-header",
         children: [
-          el("div", { className: "stats-header-title", children: [createLogo(), el("h1", { text: "Leaderboards" })] }),
+          el("div", { className: "stats-header-title", children: [createBrandLockup(options.onHome), el("h1", { text: "Leaderboards" })] }),
           el("div", { className: "screen-header-actions", children: [dailyButton, backButton, signInButton] }),
         ],
       }),

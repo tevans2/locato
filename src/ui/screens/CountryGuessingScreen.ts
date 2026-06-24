@@ -17,6 +17,7 @@ import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzle
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface WorldMapRunResult {
   readonly playMode: WorldMapGameModeId;
@@ -33,6 +34,7 @@ export interface CountryGuessingScreenOptions {
   readonly storage: Storage;
   readonly initialMode: WorldMapGameModeId;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   // Called once per world-map run when it ends (completion, restart, mode change, or leaving).
@@ -47,13 +49,6 @@ export interface CountryGuessingScreenOptions {
 type CountryGuessPlayMode = WorldMapGameModeId;
 type MapSurface = "flat" | "globe";
 
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
-}
 
 export function createCountryGuessingScreen(options: CountryGuessingScreenOptions): Screen {
   const controller = new AbortController();
@@ -834,7 +829,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
           el("div", { className: "game-header-actions", children: [dailyButton, leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),

@@ -12,6 +12,39 @@
   gap: 10px;
 }
 
+body .brand-home-button,
+body:not(:has(.landing-screen-shell)) .brand-home-button,
+.landing-screen-shell .brand-home-button {
+  appearance: none;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+body .brand-home-button:hover,
+body .brand-home-button:active,
+body:not(:has(.landing-screen-shell)) .brand-home-button:hover,
+body:not(:has(.landing-screen-shell)) .brand-home-button:active,
+.landing-screen-shell .brand-home-button:hover,
+.landing-screen-shell .brand-home-button:active {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.brand-home-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
 .brand-logo {
   width: 28px;
   height: 28px;
@@ -41,6 +74,43 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.landing-return-action {
+  position: fixed;
+  top: max(clamp(12px, 2dvh, 22px), env(safe-area-inset-top));
+  right: calc(
+    max(
+      env(safe-area-inset-right),
+      calc((100vw - min(var(--app-shell-max-width), calc(100vw - var(--app-shell-gutter)))) / 2)
+    ) + 104px
+  );
+  bottom: auto;
+  left: auto;
+  z-index: 110;
+  width: auto;
+  min-width: 0;
+  min-height: var(--header-control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border: 1px solid rgba(217, 217, 214, 0.14);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+    rgba(19, 26, 20, 0.92);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+}
+
+.landing-return-action:hover {
+  border-color: rgba(184, 227, 109, 0.42);
+  background:
+    linear-gradient(180deg, rgba(184, 227, 109, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(19, 26, 20, 0.96);
 }
 
 .game-screen {

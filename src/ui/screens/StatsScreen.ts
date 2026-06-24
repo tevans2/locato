@@ -2,8 +2,10 @@ import { fetchFullStats, type CategoryStats, type FullStats, type GameRecord } f
 import { getCategory } from "../../core/categories";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface StatsScreenOptions {
+  readonly onHome: () => void;
   readonly onBack: () => void;
   readonly onDailyChallenge?: () => void;
 }
@@ -184,10 +186,7 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
   const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) } });
   dailyButton.addEventListener("click", () => options.onDailyChallenge?.());
 
-  const logo = el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
+  const logo = createBrandLockup(options.onHome);
 
   const content = el("div", { className: "stats-content" });
   const loading = el("p", { className: "stats-loading", text: "Loading stats…" });

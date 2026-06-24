@@ -1,0 +1,284 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;700&family=Syne:wght@400;600;700;800&display=swap");
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--landing-background));
+  --color-foreground: hsl(var(--landing-foreground));
+  --color-border: hsl(var(--landing-border));
+  --color-input: hsl(var(--landing-input));
+  --color-ring: hsl(var(--landing-ring));
+  --color-card: hsl(var(--landing-card));
+  --color-card-foreground: hsl(var(--landing-card-foreground));
+  --color-primary: hsl(var(--landing-primary));
+  --color-primary-foreground: hsl(var(--landing-primary-foreground));
+  --color-primary-border: var(--landing-primary-border);
+  --color-secondary: hsl(var(--landing-secondary));
+  --color-secondary-foreground: hsl(var(--landing-secondary-foreground));
+  --color-secondary-border: var(--landing-secondary-border);
+  --color-muted: hsl(var(--landing-muted));
+  --color-muted-foreground: hsl(var(--landing-muted-foreground));
+  --color-muted-border: var(--landing-muted-border);
+  --color-accent: hsl(var(--landing-accent));
+  --color-accent-foreground: hsl(var(--landing-accent-foreground));
+  --color-accent-border: var(--landing-accent-border);
+  --color-destructive: hsl(var(--landing-destructive));
+  --color-destructive-foreground: hsl(var(--landing-destructive-foreground));
+  --color-destructive-border: var(--landing-destructive-border);
+  --font-sans: var(--landing-font-sans);
+  --font-display: "Syne", sans-serif;
+}
+
+.app-shell:has(.landing-screen-shell) {
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+.landing-screen-shell {
+  --button-outline: rgba(255,255,255, .08);
+  --badge-outline: rgba(255,255,255, .05);
+  --elevate-1: rgba(255,255,255, .03);
+  --elevate-2: rgba(255,255,255, .07);
+  --landing-background: 110 10% 9%;
+  --landing-foreground: 0 0% 93%;
+  --landing-border: 110 8% 18%;
+  --landing-card: 110 8% 12%;
+  --landing-card-foreground: 0 0% 93%;
+  --landing-primary: 88 52% 50%;
+  --landing-primary-foreground: 110 10% 9%;
+  --landing-primary-border: hsl(88 52% 59%);
+  --landing-secondary: 88 35% 40%;
+  --landing-secondary-foreground: 0 0% 93%;
+  --landing-secondary-border: hsl(88 35% 49%);
+  --landing-muted: 110 8% 18%;
+  --landing-muted-foreground: 0 0% 55%;
+  --landing-muted-border: hsl(110 8% 27%);
+  --landing-accent: 88 35% 40%;
+  --landing-accent-foreground: 0 0% 93%;
+  --landing-accent-border: hsl(88 35% 49%);
+  --landing-destructive: 0 62% 40%;
+  --landing-destructive-foreground: 0 0% 93%;
+  --landing-destructive-border: hsl(0 62% 49%);
+  --landing-input: 110 8% 18%;
+  --landing-ring: 88 52% 50%;
+  --landing-font-sans: "DM Sans", sans-serif;
+  --background: var(--landing-background);
+  --foreground: var(--landing-foreground);
+  --border: var(--landing-border);
+  --card: var(--landing-card);
+  --card-foreground: var(--landing-card-foreground);
+  --primary: var(--landing-primary);
+  --primary-foreground: var(--landing-primary-foreground);
+  --primary-border: var(--landing-primary-border);
+  --secondary: var(--landing-secondary);
+  --secondary-foreground: var(--landing-secondary-foreground);
+  --secondary-border: var(--landing-secondary-border);
+  --muted: var(--landing-muted);
+  --muted-foreground: var(--landing-muted-foreground);
+  --muted-border: var(--landing-muted-border);
+  --accent: var(--landing-accent);
+  --accent-foreground: var(--landing-accent-foreground);
+  --accent-border: var(--landing-accent-border);
+  --destructive: var(--landing-destructive);
+  --destructive-foreground: var(--landing-destructive-foreground);
+  --destructive-border: var(--landing-destructive-border);
+  --input: var(--landing-input);
+  --ring: var(--landing-ring);
+  width: 100%;
+  height: 100dvh;
+  font-family: var(--landing-font-sans);
+}
+
+.landing-screen-shell *,
+.landing-screen-shell *::before,
+.landing-screen-shell *::after {
+  box-sizing: border-box;
+}
+
+.landing-screen-shell button {
+  font: inherit;
+}
+
+.landing-screen-shell .hover-elevate:not(.no-default-hover-elevate),
+.landing-screen-shell .active-elevate:not(.no-default-active-elevate),
+.landing-screen-shell .hover-elevate-2:not(.no-default-hover-elevate),
+.landing-screen-shell .active-elevate-2:not(.no-default-active-elevate) {
+  position: relative;
+  z-index: 0;
+}
+
+.landing-screen-shell .hover-elevate:not(.no-default-hover-elevate)::after,
+.landing-screen-shell .active-elevate:not(.no-default-active-elevate)::after,
+.landing-screen-shell .hover-elevate-2:not(.no-default-hover-elevate)::after,
+.landing-screen-shell .active-elevate-2:not(.no-default-active-elevate)::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 999;
+}
+
+.landing-screen-shell .hover-elevate:hover:not(.no-default-hover-elevate)::after,
+.landing-screen-shell .active-elevate:active:not(.no-default-active-elevate)::after {
+  background-color: var(--elevate-1);
+}
+
+.landing-screen-shell .hover-elevate-2:hover:not(.no-default-hover-elevate)::after,
+.landing-screen-shell .active-elevate-2:active:not(.no-default-active-elevate)::after {
+  background-color: var(--elevate-2);
+}
+
+.landing-hero-copy {
+  border-left: 2px solid hsl(var(--primary) / 0.45);
+  padding-left: 12px;
+}
+
+.landing-quiz-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.landing-quiz-strip > div {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid hsl(var(--border) / 0.52);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, hsl(var(--primary) / 0.09), hsl(var(--card) / 0.2)),
+    hsl(var(--card) / 0.42);
+  color: hsl(var(--foreground));
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.landing-quiz-strip svg {
+  color: hsl(var(--primary));
+}
+
+.landing-daily-route {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid hsl(var(--border) / 0.28);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.landing-daily-route svg {
+  flex: 0 0 auto;
+  color: hsl(var(--primary));
+}
+
+@media (max-width: 767px) {
+  .landing-screen-shell {
+    height: 100dvh;
+    min-height: 100svh;
+    overflow: hidden;
+  }
+
+  .landing-root {
+    height: 100dvh;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .landing-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 72px;
+    height: auto;
+    padding: 14px 20px;
+    gap: 16px;
+  }
+
+  .landing-topbar [data-testid="button-play-now"] {
+    min-height: 40px;
+    padding-inline: 20px;
+    font-size: 0.95rem;
+  }
+
+  .landing-main-layout {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .landing-hero-panel {
+    display: none;
+  }
+
+  .landing-game-modes {
+    flex: 0 0 auto;
+    width: 100%;
+    overflow: visible;
+    padding: 18px 18px 36px;
+  }
+
+  .landing-game-modes > .h-full {
+    height: auto;
+  }
+
+  .landing-mode-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .landing-mode-card {
+    min-height: 132px;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 14px;
+    row-gap: 5px;
+    align-items: start;
+    padding: 18px;
+  }
+
+  .landing-mode-card > div:first-child {
+    grid-row: 1 / span 2;
+    margin-bottom: 0;
+  }
+
+  .landing-mode-card .font-display {
+    align-self: end;
+    font-size: 1rem;
+  }
+
+  .landing-mode-card .text-xs {
+    max-width: 30rem;
+    font-size: 0.86rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .landing-topbar {
+    padding-inline: 16px;
+  }
+
+  .landing-topbar [data-testid="button-play-now"] {
+    padding-inline: 16px;
+  }
+
+  .landing-game-modes {
+    padding-inline: 14px;
+  }
+}

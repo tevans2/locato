@@ -20,6 +20,7 @@ import { createFriendsScreen } from "../ui/screens/FriendsScreen";
 import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClient";
 import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
+import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import type { AppRoute, Screen } from "./router";
@@ -61,7 +62,7 @@ function routeFromLocation(location: Pick<Location, "search">): AppRoute | null 
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
-  let returnRoute: AppRoute = { type: "solo-game", continueSaved: true };
+  let returnRoute: AppRoute = { type: "landing" };
 
   // Tracks the in-flight solo session so it can be recorded when it ends (completion, reset,
   // category change, or navigating away) — not only on full 196-country completion.
@@ -78,9 +79,15 @@ export function createApp(options: AppOptions): App {
     onViewStats: () => navigate({ type: "stats" }),
     onViewFriends: () => navigate({ type: "friends" }),
   });
+  const landingButton = el("button", {
+    className: "landing-return-action",
+    text: "Modes",
+    attrs: { type: "button", "aria-label": "Back to game modes" },
+    on: { click: () => navigate({ type: "landing" }) },
+  });
 
   function attachGlobalControls(): void {
-    options.root.append(authControls.trigger, authControls.panel);
+    options.root.append(landingButton, authControls.trigger, authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
@@ -126,11 +133,11 @@ export function createApp(options: AppOptions): App {
 
   attachGlobalControls();
 
-  function mount(screen: Screen): void {
+  function mount(screen: Screen, showGlobalControls = true): void {
     activeScreen?.destroy();
     activeScreen = screen;
     options.root.replaceChildren(screen.element);
-    attachGlobalControls();
+    if (showGlobalControls) attachGlobalControls();
   }
 
   function dailyAccountResultToLocal(result: DailyChallengeResult): DailyResultSave {
@@ -147,6 +154,7 @@ export function createApp(options: AppOptions): App {
       createDailyResultScreen({
         result,
         storage: options.storage,
+        onHome: () => navigate({ type: "landing" }),
         onBackToSolo: () => {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
@@ -170,6 +178,7 @@ export function createApp(options: AppOptions): App {
         engine,
         selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onHome: () => navigate({ type: "landing" }),
         onReset: () => {
           // Record the finished run before starting a fresh one.
           void recordSoloSession(lastSoloState);
@@ -291,6 +300,7 @@ export function createApp(options: AppOptions): App {
         createStreetViewCountryScreen({
           countryIndex: options.countryIndex,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           dailyChallenge: {
@@ -320,6 +330,7 @@ export function createApp(options: AppOptions): App {
       mount(
         createMapTapScreen({
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           dailyChallenge: {
@@ -352,6 +363,7 @@ export function createApp(options: AppOptions): App {
         storage: options.storage,
         worldCountryFeatures,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onHome: () => navigate({ type: "landing" }),
         onReset: () => undefined,
         onStateChange: () => undefined,
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -426,6 +438,7 @@ export function createApp(options: AppOptions): App {
           storage: options.storage,
           initialMode,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onRecordGame: (r) => void recordWorldMapGame(r),
@@ -450,6 +463,7 @@ export function createApp(options: AppOptions): App {
       createStreetViewCountryScreen({
         countryIndex: options.countryIndex,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
@@ -466,6 +480,7 @@ export function createApp(options: AppOptions): App {
     mount(
       createMapTapScreen({
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
@@ -497,6 +512,7 @@ export function createApp(options: AppOptions): App {
           const save = readSoloSave(options.storage);
           startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
         },
+        onHome: () => navigate({ type: "landing" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
         ...(joinCode ? { initialJoinCode: joinCode } : {}),
@@ -510,6 +526,7 @@ export function createApp(options: AppOptions): App {
         storage: options.storage,
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
+        onHome: () => navigate({ type: "landing" }),
         onBack: () => navigate(returnRoute),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onSignIn: () => authControls.openPanel(),
@@ -522,6 +539,20 @@ export function createApp(options: AppOptions): App {
 
     if (route.type !== "leaderboard") {
       returnRoute = route;
+    }
+    if (route.type === "landing") {
+      mount(
+        createLandingScreen({
+          onHome: () => navigate({ type: "landing" }),
+          onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onGameMode: (gameMode) => handleGameModeChange(gameMode),
+          onLeaderboard: () => navigate({ type: "leaderboard" }),
+          onMultiplayer: () => navigate({ type: "multiplayer" }),
+        }),
+        false,
+      );
+      return;
     }
     if (route.type === "solo-game") {
       startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
@@ -553,7 +584,7 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onBack: () => navigate({ type: "solo-game", continueSaved: true }), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
+      void leavingSolo.then(() => mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => navigate({ type: "solo-game", continueSaved: true }), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
       return;
     }
 
@@ -598,7 +629,7 @@ export function createApp(options: AppOptions): App {
   });
 
   return {
-    start: () => navigate(routeFromLocation(window.location) ?? { type: "solo-game", continueSaved: true }),
+    start: () => navigate(routeFromLocation(window.location) ?? { type: "landing" }),
     navigate,
   };
 }

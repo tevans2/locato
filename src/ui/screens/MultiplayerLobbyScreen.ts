@@ -9,6 +9,7 @@ import { getPlayerEmoji } from "../../core/auth/avatars";
 import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
 import { enhanceDropdown } from "../dom/dropdown";
+import { createBrandLockup } from "../dom/createBrandLockup";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
 
@@ -17,6 +18,7 @@ export interface MultiplayerLobbyScreenOptions {
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly createOnlineTransport: () => MultiplayerTransport;
   readonly onBackToSolo: () => void;
+  readonly onHome: () => void;
   readonly onDailyChallenge: () => void;
   readonly authControls?: AuthControls;
   // When set, auto-join this room code on mount (used by friend game invites).
@@ -221,13 +223,6 @@ function setupCopyForModes(modes: readonly MultiplayerPlayMode[]): { readonly ti
     title: hasMapMode ? "Host or join a mixed map race" : selected.length > 1 ? "Host or join a mixed prompt race" : "Host or join a prompt race",
     description: `${modeSelectionDescription(selected)}. Create a room or join a code to race friends in real time.`,
   };
-}
-
-function createBrand(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
 }
 
 function createChatIcon(): HTMLElement {
@@ -824,7 +819,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("header", {
         className: "game-header multiplayer-header",
         children: [
-          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrand(), statusText] }),
+          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrandLockup(options.onHome), statusText] }),
           el("div", { className: "game-header-actions", children: [dailyButton, backButton] }),
         ],
       }),

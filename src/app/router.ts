@@ -1,6 +1,7 @@
 import type { GameModeId, WorldMapGameModeId } from "../core/gameModes";
 
 export type AppRoute =
+  | { readonly type: "landing" }
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean }
   | { readonly type: "daily-challenge" }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
