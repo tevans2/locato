@@ -21,6 +21,7 @@ import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -30,6 +31,7 @@ export interface SoloGameScreenOptions {
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   readonly onExitDailyChallenge?: () => void;
@@ -584,10 +586,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   );
 
   updateAtlasView(atlas, countries, initialState.guessedCountryIds);
-  const logo = el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
+  const logo = createBrandLockup(options.onHome);
 
   atlas.openButton.addEventListener("click", () => setAtlasOpen(atlas, true), { signal: controller.signal });
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });

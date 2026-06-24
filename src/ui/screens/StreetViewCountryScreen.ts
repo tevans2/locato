@@ -8,10 +8,12 @@ import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createMobileMenu } from "../dom/mobileMenu";
 import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   readonly dailyChallenge?: {
@@ -33,13 +35,6 @@ interface StreetViewPreloadSlot {
   ready: boolean;
   loadSequence: number;
   warmupTimer: number | null;
-}
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
 }
 
 function googleMapsEmbedApiKey(): string {
@@ -274,7 +269,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
           el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),

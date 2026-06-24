@@ -5,9 +5,11 @@ import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createMapTapGlobe, type MapTapClick } from "../components/MapTapGlobe";
 import { createMapTapInfoOverlay } from "../components/MapTapInfoOverlay";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface MapTapScreenOptions {
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
   readonly dailyChallenge?: {
@@ -31,13 +33,6 @@ const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly l
   { value: "medium", label: "Medium" },
   { value: "hard", label: "Hard" },
 ];
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
-}
 
 function formatDistance(distanceKm: number): string {
   if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
@@ -253,7 +248,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
           el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
         ],
       }),

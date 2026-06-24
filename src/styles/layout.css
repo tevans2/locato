@@ -12,6 +12,39 @@
   gap: 10px;
 }
 
+body .brand-home-button,
+body:not(:has(.landing-screen-shell)) .brand-home-button,
+.landing-screen-shell .brand-home-button {
+  appearance: none;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+body .brand-home-button:hover,
+body .brand-home-button:active,
+body:not(:has(.landing-screen-shell)) .brand-home-button:hover,
+body:not(:has(.landing-screen-shell)) .brand-home-button:active,
+.landing-screen-shell .brand-home-button:hover,
+.landing-screen-shell .brand-home-button:active {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.brand-home-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
 .brand-logo {
   width: 28px;
   height: 28px;

@@ -1,11 +1,12 @@
 import { createRoot, type Root } from "react-dom/client";
 import { motion } from "framer-motion";
-import { CalendarDays, CircleUser, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe } from "lucide-react";
+import { CalendarDays, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
 
 export interface LandingScreenOptions {
+  readonly onHome: () => void;
   readonly onPlay: () => void;
   readonly onDailyChallenge: () => void;
   readonly onGameMode: (mode: GameModeId) => void;
@@ -74,9 +75,9 @@ function LandingHome(options: LandingScreenOptions) {
     <div className="landing-root h-screen flex flex-col bg-background text-foreground overflow-hidden dark">
       {/* Navbar */}
       <nav className="landing-topbar shrink-0 px-6 md:px-10 h-14 flex justify-between items-center border-b border-border/40 backdrop-blur-md bg-background/80">
-        <button type="button" onClick={options.onPlay} className="flex items-center gap-2 border-0 bg-transparent p-0 min-h-0 hover:bg-transparent hover:border-transparent">
-          <CircleUser className="w-5 h-5 text-primary" />
-          <span className="font-display font-bold text-lg tracking-tight">locato</span>
+        <button type="button" onClick={options.onHome} className="brand-lockup compact brand-home-button" aria-label="Go to home page">
+          <img src="/logo.svg" alt="" className="brand-logo" />
+          <span className="brand-name">locato</span>
         </button>
         <div className="hidden md:flex gap-1 items-center">
           <button type="button" onClick={() => document.querySelector(".landing-game-modes")?.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-muted/30 border-0 min-h-0 bg-transparent">Modes</button>
@@ -116,12 +117,27 @@ function LandingHome(options: LandingScreenOptions) {
           >
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-bold">
               <Compass className="w-3 h-3" />
-              Explore the World
+              Geo Trivia Atlas
             </div>
 
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              The ultimate geography playground. 11 game modes. Every country on Earth.
+            <p className="landing-hero-copy text-sm text-muted-foreground leading-relaxed">
+              Test your map sense across flags, capitals, country outlines, Street View clues, and globe-tapping challenges.
             </p>
+
+            <div className="landing-quiz-strip" aria-label="Locato quiz clues">
+              <div>
+                <Flag className="w-3.5 h-3.5" />
+                <span>Flags</span>
+              </div>
+              <div>
+                <Crown className="w-3.5 h-3.5" />
+                <span>Capitals</span>
+              </div>
+              <div>
+                <Map className="w-3.5 h-3.5" />
+                <span>Maps</span>
+              </div>
+            </div>
 
             <div className="flex flex-col gap-2 pt-1">
               <Button data-testid="button-start-exploring" onClick={options.onPlay} className="w-full rounded-full font-bold text-sm shadow-[0_0_20px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.5)] transition-shadow">
@@ -140,12 +156,17 @@ function LandingHome(options: LandingScreenOptions) {
             <div className="pt-2 flex items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Zap className="w-3 h-3 text-primary" />
-                <span>195 countries</span>
+                <span>195-country atlas</span>
               </div>
               <div className="flex items-center gap-1">
                 <Globe className="w-3 h-3 text-emerald-400" />
-                <span>{totalModes} modes</span>
+                <span>{totalModes} quiz modes</span>
               </div>
+            </div>
+
+            <div className="landing-daily-route">
+              <CalendarDays className="w-4 h-4" />
+              <span>Daily route: flags, MapTap, then Street View.</span>
             </div>
           </motion.div>
         </div>
