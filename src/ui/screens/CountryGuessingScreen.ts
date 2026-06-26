@@ -156,6 +156,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     );
   }
 
+  function recordWorldProgress(completed: boolean): void {
+    showAchievements(recordWorldAchievements(options.storage, {
+      playMode,
+      completed,
+      countryIndex,
+      guessedCountryIds,
+    }));
+  }
+
   function renderMapReviewState(): void {
     const activeSet = new Set(reviewCountryIds);
     const visibleMissingCountryIds =
@@ -290,6 +299,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     playTimer.startIfNeeded();
     guessedCountryIds.add(country.id);
     lastCountryName.textContent = country.name;
+    recordWorldProgress(false);
 
     if (playMode === "spot-country") {
       targetCountryId = null;
@@ -302,7 +312,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           recordCurrentRun(true);
-          showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+          recordWorldProgress(true);
           void finishTimerRun(finalTimeMs).then((result) => {
             showFeedback(
               feedback,
@@ -314,7 +324,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         }
 
         recordCurrentRun(true);
-        showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+        recordWorldProgress(true);
         showFeedback(
           feedback,
           `World complete. All ${countryIndex.countries.length} countries found. Switch to Timer mode to post a time to the leaderboard.`,
@@ -341,7 +351,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       if (playTimer.mode === "count-up") {
         const finalTimeMs = playTimer.stop();
         recordCurrentRun(true);
-        showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+        recordWorldProgress(true);
         void finishTimerRun(finalTimeMs).then((result) => {
           showFeedback(
             feedback,
@@ -353,7 +363,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       }
 
       recordCurrentRun(true);
-      showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+      recordWorldProgress(true);
       showFeedback(
         feedback,
         `World complete. All ${countryIndex.countries.length} countries found. Switch to Timer mode to post a time to the leaderboard.`,

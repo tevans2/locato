@@ -79,6 +79,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   let dailyRoundWrongGuesses = 0;
   let dailyScore = 0;
   let dailyCompleted = false;
+  let soloHintsUsed = 0;
   const stats = createStatsView();
   const prompt = createPromptView();
   const flagColorReveal = createFlagColorRevealView();
@@ -261,6 +262,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
       if (event.type === "HINT_REVEALED") {
         revealAnswerArmed = false;
+        if (!isDailyChallenge) soloHintsUsed += 1;
         showHintPopover(event.hint.title, event.hint.message);
         showFeedback(views.feedback, "Hint ready.", "neutral");
         continue;
@@ -279,7 +281,18 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (event.type === "GAME_COMPLETED") {
         revealAnswerArmed = false;
         hideHintPopover();
-        if (!isDailyChallenge) showAchievements(recordSoloAchievements(options.storage, { completed: true, wrongAnswers: engine.getState().wrongAnswers, bestStreak: engine.getState().bestStreak, gameMode: options.selectedGameMode }));
+        if (!isDailyChallenge) {
+          const state = engine.getState();
+          showAchievements(recordSoloAchievements(options.storage, {
+            completed: true,
+            wrongAnswers: state.wrongAnswers,
+            bestStreak: state.bestStreak,
+            gameMode: options.selectedGameMode,
+            hintsUsed: soloHintsUsed,
+            countryIndex,
+            guessedCountryIds: state.guessedCountryIds,
+          }));
+        }
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           void finishTimerRun(finalTimeMs).then((result) => {
@@ -325,6 +338,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     updateAtlasView(atlas, countries, new Set());
     options.onReset();
     playTimer.reset();
+    soloHintsUsed = 0;
     dispatchAndRender(engine.dispatch({ type: "RESET_GAME", now: Date.now() }));
     showFeedback(feedback, message, "neutral");
   }
