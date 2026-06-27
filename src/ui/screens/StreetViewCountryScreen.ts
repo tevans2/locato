@@ -25,10 +25,10 @@ export interface StreetViewCountryScreenOptions {
 
 type RoundStatus = "playing" | "won" | "lost";
 
-const ROUND_CACHE_TARGET_SIZE = 3;
-const STREETVIEW_PRELOAD_SLOT_COUNT = 3;
-const STREETVIEW_VISUAL_WARMUP_MS = 700;
-const STREETVIEW_LOAD_TIMEOUT_MS = 7000;
+const ROUND_CACHE_TARGET_SIZE = 1;
+const STREETVIEW_PRELOAD_SLOT_COUNT = 1;
+const STREETVIEW_VISUAL_WARMUP_MS = 150;
+const STREETVIEW_LOAD_TIMEOUT_MS = 1800;
 
 interface StreetViewPreloadSlot {
   iframe: HTMLIFrameElement;
