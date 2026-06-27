@@ -25,9 +25,10 @@ export interface StreetViewCountryScreenOptions {
 
 type RoundStatus = "playing" | "won" | "lost";
 
-const ROUND_CACHE_TARGET_SIZE = 8;
-const STREETVIEW_PRELOAD_SLOT_COUNT = ROUND_CACHE_TARGET_SIZE + 4;
-const STREETVIEW_VISUAL_WARMUP_MS = 2000;
+const ROUND_CACHE_TARGET_SIZE = 3;
+const STREETVIEW_PRELOAD_SLOT_COUNT = 3;
+const STREETVIEW_VISUAL_WARMUP_MS = 700;
+const STREETVIEW_LOAD_TIMEOUT_MS = 7000;
 
 interface StreetViewPreloadSlot {
   iframe: HTMLIFrameElement;
@@ -35,6 +36,7 @@ interface StreetViewPreloadSlot {
   ready: boolean;
   loadSequence: number;
   warmupTimer: number | null;
+  loadTimeout: number | null;
 }
 
 function googleMapsEmbedApiKey(): string {
@@ -174,7 +176,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const streetViewPreloadSlots: StreetViewPreloadSlot[] = Array.from({ length: STREETVIEW_PRELOAD_SLOT_COUNT }, (_, index) => {
     const iframe = createStreetViewIframe(`Preloaded Street View frame ${index + 1}`, "streetview-frame is-buffer", true);
     streetViewIframes.push(iframe);
-    return { iframe, url: "", ready: false, loadSequence: 0, warmupTimer: null };
+    return { iframe, url: "", ready: false, loadSequence: 0, warmupTimer: null, loadTimeout: null };
   });
   let activeIframe = initialStreetViewFrame;
   const missingKeyPanel = el("div", {
@@ -334,6 +336,10 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       window.clearTimeout(slot.warmupTimer);
       slot.warmupTimer = null;
     }
+    if (slot.loadTimeout) {
+      window.clearTimeout(slot.loadTimeout);
+      slot.loadTimeout = null;
+    }
 
     slot.loadSequence += 1;
     slot.ready = false;
@@ -454,18 +460,40 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     slot.loadSequence = loadSequence;
     slot.url = url;
     slot.ready = false;
-    slot.iframe.onload = () => {
+    const finishLoading = (waitForVisualWarmup: boolean): void => {
       if (controller.signal.aborted || slot.loadSequence !== loadSequence || slot.url !== url) return;
+      if (slot.loadTimeout) {
+        window.clearTimeout(slot.loadTimeout);
+        slot.loadTimeout = null;
+      }
 
-      // The Google iframe fires load before the panorama tiles have necessarily painted.
-      // Keep it hidden for a short warm-up period so the promoted iframe is not a black screen.
-      slot.warmupTimer = window.setTimeout(() => {
-        slot.warmupTimer = null;
+      const markReady = (): void => {
         if (controller.signal.aborted || slot.loadSequence !== loadSequence || slot.url !== url) return;
         slot.ready = true;
         if (desiredStreetViewUrl === url) promoteStreetViewPreloadSlot(slot);
-      }, STREETVIEW_VISUAL_WARMUP_MS);
+      };
+
+      // The Google iframe fires load before the panorama tiles have necessarily painted.
+      // Keep it hidden for a short warm-up period so the promoted iframe is not a black screen.
+      if (waitForVisualWarmup) {
+        slot.warmupTimer = window.setTimeout(() => {
+          slot.warmupTimer = null;
+          markReady();
+        }, STREETVIEW_VISUAL_WARMUP_MS);
+      } else {
+        markReady();
+      }
     };
+
+    slot.iframe.onload = () => {
+      finishLoading(true);
+    };
+    slot.loadTimeout = window.setTimeout(() => {
+      // Some embed failures never dispatch iframe load/error events. Show the iframe anyway so
+      // the player is not trapped behind the loading overlay while Google retries or reports its
+      // own API message.
+      finishLoading(false);
+    }, STREETVIEW_LOAD_TIMEOUT_MS);
     slot.iframe.setAttribute("src", url);
   }
 
