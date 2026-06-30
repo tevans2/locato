@@ -41,6 +41,10 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
     last: "locato:solo:capitals:timer-last-ms:v1",
     best: "locato:solo:capitals:timer-best-ms:v1",
   },
+  "capital-recall": {
+    last: "locato:solo:capital-recall:timer-last-ms:v1",
+    best: "locato:solo:capital-recall:timer-best-ms:v1",
+  },
 };
 
 export function timerKeysForMode(mode: TimerGameModeId): TimerStorageKeys {

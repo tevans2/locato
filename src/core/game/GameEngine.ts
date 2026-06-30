@@ -24,7 +24,36 @@ function countNameWords(name: string): number {
   return name.split(/\s+/).filter(Boolean).length;
 }
 
-function createHint(country: Country, level: number): Hint {
+function createCapitalHint(country: Country, level: number): Hint {
+  const hintLevel = Math.min(level, TOTAL_HINTS - 1);
+  if (hintLevel === 0) {
+    return {
+      title: "Capital clue",
+      message: `${country.continent}. ${country.capitalAliases.length > 0 ? "Alternate capital spellings are accepted." : "The official capital name is expected."}`,
+      level: hintLevel,
+    };
+  }
+
+  if (hintLevel === 1) {
+    const letterCount = countNameLetters(country.capital);
+    const wordCount = countNameWords(country.capital);
+    return {
+      title: "Capital shape",
+      message: `Starts with “${country.capital.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
+      level: hintLevel,
+    };
+  }
+
+  return {
+    title: "Capital trace",
+    message: country.capitalAliases.length > 0 ? `Also accepted: ${country.capitalAliases[0]}.` : `One letter inside it is “${country.capital.charAt(Math.max(0, Math.floor(country.capital.length / 2))).toUpperCase()}”.`,
+    level: hintLevel,
+  };
+}
+
+function createHint(country: Country, level: number, categoryId: string): Hint {
+  if (categoryId === "capital-recall") return createCapitalHint(country, level);
+
   const hintLevel = Math.min(level, TOTAL_HINTS - 1);
   if (hintLevel === 0) {
     return {
@@ -171,7 +200,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
       if (!currentCountry || !category) return events;
 
       if (command.type === "REQUEST_HINT") {
-        const hint = createHint(currentCountry, state.hintLevel);
+        const hint = createHint(currentCountry, state.hintLevel, category.id);
         state = {
           ...state,
           hintLevel: state.hintLevel + 1,

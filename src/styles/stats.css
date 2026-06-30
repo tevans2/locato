@@ -13,6 +13,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
+  padding-bottom: 14px;
 }
 
 .stats-header-title {
@@ -24,7 +26,9 @@
 
 .stats-header h1 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.35rem;
+  letter-spacing: 0;
 }
 
 .screen-back-button {
@@ -76,17 +80,25 @@
   display: grid;
   gap: 5px;
   padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(184, 227, 109, 0.16);
+  border-radius: var(--radius-md);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+    rgba(13, 18, 13, 0.78);
+  box-shadow: var(--shadow-panel);
 }
 
 .stats-hero-card.is-highlight {
   border-color: rgba(184, 227, 109, 0.4);
-  background: rgba(184, 227, 109, 0.055);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(134, 200, 63, 0.12), rgba(255, 255, 255, 0.018)),
+    rgba(13, 18, 13, 0.86);
 }
 
 .stats-hero-value {
+  font-family: var(--font-display);
   font-size: clamp(1.6rem, 5vw, 2.4rem);
   font-weight: 820;
   color: var(--text);
@@ -118,9 +130,12 @@
 
 .stats-card {
   padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(184, 227, 109, 0.15);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.016)),
+    rgba(13, 18, 13, 0.72);
+  box-shadow: var(--shadow-panel);
   display: grid;
   gap: 10px;
   min-width: 0;
@@ -198,8 +213,14 @@
 }
 
 .recent-game-row { border: 1px solid transparent; }
-.recent-game-row:hover { background: rgba(255, 255, 255, 0.03); }
-.recent-game-row.is-win { border-color: rgba(184, 227, 109, 0.3); background: rgba(184, 227, 109, 0.045); }
+.recent-game-row:hover {
+  border-color: rgba(217, 217, 214, 0.1);
+  background: rgba(255, 255, 255, 0.032);
+}
+.recent-game-row.is-win {
+  border-color: rgba(184, 227, 109, 0.34);
+  background: rgba(184, 227, 109, 0.07);
+}
 
 .game-row-mode { font-weight: 760; color: var(--muted); }
 .game-row-cats { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

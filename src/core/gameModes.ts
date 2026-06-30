@@ -1,6 +1,6 @@
 import { soloPromptCategories } from "./categories";
 
-export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
+export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "capital-recall";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
 export type StreetViewGameModeId = "streetview-country";
 export type MapTapGameModeId = "map-tap";
@@ -14,7 +14,7 @@ export interface GameModeOption {
   readonly group: "Prompt games" | "World map games" | "Street View games";
 }
 
-const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
+const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
 const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
 const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];

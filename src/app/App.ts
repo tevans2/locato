@@ -165,11 +165,29 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  function startSolo(categoryIds: readonly string[], continueSaved = false): void {
+  async function startSolo(categoryIds: readonly string[], continueSaved = false): Promise<void> {
+    const run = navigationRun;
     const resolved = resolveCategoryIds(categoryIds);
     const save = continueSaved ? readSoloSave(options.storage) : null;
     const initialState = save ? hydrateGameState(options.countryIndex, save) : null;
     const activeCategories = initialState ? initialState.categoryIds : resolved;
+    let worldCountryFeatures: readonly WorldCountryFeature[] | undefined;
+
+    if (activeCategories.includes("capital-recall")) {
+      const loading = createLoadingScreen("Loading capital map...");
+      mount(loading);
+
+      try {
+        worldCountryFeatures = await loadWorldCountryFeatures();
+      } catch (error) {
+        if (run !== navigationRun) return;
+        loading.element.textContent = error instanceof Error ? error.message : "Unable to load capital map data.";
+        return;
+      }
+
+      if (run !== navigationRun) return;
+    }
+
     const engine = createEngine(options.countryIndex, activeCategories, initialState);
 
     mount(
@@ -201,6 +219,7 @@ export function createApp(options: AppOptions): App {
         getAuthUser: () => authControls.getUser(),
         authControls,
         storage: options.storage,
+        ...(worldCountryFeatures ? { worldCountryFeatures } : {}),
       }),
     );
   }
@@ -386,6 +405,7 @@ export function createApp(options: AppOptions): App {
   }
 
   function handleGameModeChange(gameMode: GameModeId): void {
+    navigationRun += 1;
     clearSoloSave(options.storage);
 
     if (isPromptGameModeId(gameMode)) {

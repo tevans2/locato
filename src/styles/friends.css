@@ -12,6 +12,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
 }
 
 .friend-link-hint {
@@ -22,17 +24,23 @@
 
 .friends-header h1 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.4rem;
+  letter-spacing: 0;
 }
 
 .friend-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+    rgba(13, 18, 13, 0.78);
+  border: 1px solid rgba(184, 227, 109, 0.16);
+  border-radius: var(--radius-md);
   padding: 14px 16px;
+  box-shadow: var(--shadow-panel);
 }
 
 .friend-section h2 {
@@ -51,8 +59,8 @@
 .friend-add-input {
   flex: 1;
   min-width: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  background: rgba(6, 10, 7, 0.62);
+  border: 1px solid rgba(217, 217, 214, 0.14);
   border-radius: var(--radius-md);
   color: var(--text);
   padding: 9px 12px;
@@ -85,8 +93,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.014)),
+    rgba(8, 12, 8, 0.52);
+  border: 1px solid rgba(217, 217, 214, 0.1);
   border-radius: var(--radius-md);
   padding: 8px 12px;
 }
@@ -97,7 +107,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--accent-soft);
+  background:
+    linear-gradient(135deg, rgba(134, 200, 63, 0.22), rgba(104, 217, 189, 0.16));
   font-size: 1rem;
   flex: none;
 }
@@ -168,8 +179,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(18, 25, 18, 0.96), rgba(8, 12, 8, 0.96));
+  border: 1px solid rgba(184, 227, 109, 0.2);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 10px 14px;
@@ -205,10 +218,14 @@
 .friend-profile-panel {
   display: grid;
   gap: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+    rgba(13, 18, 13, 0.78);
+  border: 1px solid rgba(184, 227, 109, 0.18);
+  border-radius: var(--radius-md);
   padding: 14px 16px;
+  box-shadow: var(--shadow-panel);
 }
 
 .friend-profile-header {

@@ -3,6 +3,7 @@ export const GAME_MODE_IDS = [
   "shapes",
   "codes",
   "capitals",
+  "capital-recall",
   "name-all",
   "click-country",
   "spot-country",

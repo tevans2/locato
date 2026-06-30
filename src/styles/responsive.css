@@ -206,6 +206,42 @@
     min-height: clamp(220px, 34dvh, 300px);
   }
 
+  .capital-recall-map-panel {
+    min-height: clamp(260px, 45dvh, 420px);
+  }
+
+  .capital-map-current {
+    gap: 8px;
+  }
+
+  .capital-map-current-copy {
+    max-width: min(100%, calc(100% - 74px));
+    padding: 8px 9px;
+  }
+
+  .capital-map-current-name {
+    font-size: clamp(1.25rem, 8vw, 2rem);
+  }
+
+  .capital-map-progress {
+    padding: 7px 8px;
+    font-size: 0.68rem;
+  }
+
+  .capital-map-recent {
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .capital-map-recent-chip {
+    max-width: 132px;
+    padding: 6px 8px;
+  }
+
+  .capital-map-recent-chip:nth-child(n+4) {
+    display: none;
+  }
+
   .stats-panel {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 7px;
@@ -317,8 +353,8 @@
     border: 1px solid rgba(232, 226, 211, 0.14);
     border-radius: 18px;
     background:
-      radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
-      rgba(16, 20, 16, 0.98);
+      var(--panel-grid),
+      linear-gradient(180deg, rgba(20, 27, 18, 0.98), rgba(8, 12, 8, 0.98));
     box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
     backdrop-filter: blur(14px);
   }

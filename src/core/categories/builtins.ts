@@ -1,4 +1,4 @@
-import { matchesCountryName } from "./matching";
+import { matchesCapitalName, matchesCountryName } from "./matching";
 import type { PromptCategory } from "./types";
 
 export const flagsCategory: PromptCategory = {
@@ -71,4 +71,14 @@ export const capitalsCategory: PromptCategory = {
   // The capital city is the prompt — only accept the country name, not the city itself.
   accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, false),
   reveal: (country) => `${country.name} (capital: ${country.capital})`,
+};
+
+export const capitalRecallCategory: PromptCategory = {
+  id: "capital-recall",
+  label: "Capital recall",
+  description: "Name the capital city for the country shown.",
+  eligible: (country) => country.capital.length > 0,
+  prompt: (country) => ({ kind: "text", value: country.name }),
+  accepts: (country, guess, auto) => matchesCapitalName(country, guess, auto),
+  reveal: (country) => `${country.capital} (${country.name})`,
 };

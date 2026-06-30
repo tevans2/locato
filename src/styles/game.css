@@ -120,8 +120,8 @@
   display: grid;
   gap: 8px;
   background:
-    radial-gradient(circle at 20% 0%, rgba(184, 227, 109, 0.12), transparent 45%),
-    rgba(16, 20, 16, 0.98);
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(20, 27, 18, 0.98), rgba(8, 12, 8, 0.98));
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
   backdrop-filter: blur(12px);
   animation: dropdown-pop 120ms ease-out;
@@ -204,6 +204,212 @@
 .daily-map-prompt .world-map-panel {
   min-height: 320px;
   border-radius: var(--radius-md);
+}
+
+.flag-slot:has(.capital-recall-map-panel) {
+  place-items: stretch;
+  padding: 0;
+}
+
+.capital-recall-map-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: clamp(390px, 62dvh, 680px);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 16% 20%, rgba(184, 227, 109, 0.16), transparent 32%),
+    radial-gradient(circle at 82% 74%, rgba(187, 130, 86, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(8, 16, 13, 0.98), rgba(7, 10, 8, 0.98));
+  isolation: isolate;
+}
+
+.capital-recall-map-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.capital-recall-country {
+  fill: rgba(116, 136, 108, 0.24);
+  stroke: rgba(232, 226, 211, 0.16);
+  stroke-width: 0.72;
+  transition: fill 220ms ease, stroke 220ms ease, opacity 220ms ease;
+}
+
+.capital-recall-country.is-unplayable {
+  opacity: 0.3;
+}
+
+.capital-recall-country.is-solved {
+  fill: rgba(184, 227, 109, 0.46);
+  stroke: rgba(184, 227, 109, 0.38);
+}
+
+.capital-recall-country.is-current {
+  fill: rgba(187, 130, 86, 0.44);
+  stroke: rgba(232, 226, 211, 0.52);
+}
+
+.capital-recall-marker {
+  opacity: 0;
+  transform: scale(0.42);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.2, .9, .2, 1.2);
+  pointer-events: none;
+}
+
+.capital-recall-marker.is-solved {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.capital-recall-marker-halo {
+  fill: rgba(184, 227, 109, 0.16);
+  stroke: rgba(184, 227, 109, 0.22);
+  stroke-width: 1.1;
+}
+
+.capital-recall-marker-dot {
+  fill: var(--accent);
+  stroke: rgba(8, 12, 8, 0.92);
+  stroke-width: 1.2;
+}
+
+.capital-recall-marker.is-latest .capital-recall-marker-halo {
+  fill: rgba(187, 130, 86, 0.26);
+  stroke: rgba(232, 226, 211, 0.5);
+}
+
+.capital-recall-marker.is-latest .capital-recall-marker-dot {
+  fill: var(--earth);
+}
+
+.capital-recall-marker.is-popping .capital-recall-marker-halo {
+  animation: capital-marker-pop 620ms ease-out;
+}
+
+.capital-recall-marker-label {
+  opacity: 0;
+  fill: var(--text);
+  stroke: rgba(6, 10, 7, 0.94);
+  stroke-width: 4px;
+  paint-order: stroke;
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0;
+  transition: opacity 160ms ease;
+}
+
+.capital-recall-marker-label.is-recent,
+.capital-recall-marker.is-latest .capital-recall-marker-label {
+  opacity: 1;
+}
+
+@keyframes capital-marker-pop {
+  0% { r: 4; opacity: 0.2; }
+  45% { r: 17; opacity: 0.85; }
+  100% { r: 8.4; opacity: 1; }
+}
+
+.capital-map-current {
+  position: absolute;
+  top: clamp(10px, 1.8vw, 18px);
+  left: clamp(10px, 1.8vw, 18px);
+  right: clamp(10px, 1.8vw, 18px);
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.capital-map-current-copy {
+  display: grid;
+  gap: 2px;
+  max-width: min(520px, 72%);
+  padding: 10px 12px;
+  border: 1px solid rgba(232, 226, 211, 0.15);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 10, 8, 0.76);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.capital-map-current-prefix,
+.capital-map-progress {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 760;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.capital-map-current-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: clamp(1.45rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.capital-map-progress {
+  flex: none;
+  padding: 8px 10px;
+  border: 1px solid rgba(184, 227, 109, 0.24);
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(6, 10, 8, 0.74);
+  backdrop-filter: blur(10px);
+}
+
+.capital-map-recent {
+  position: absolute;
+  right: clamp(10px, 1.8vw, 18px);
+  bottom: clamp(10px, 1.8vw, 18px);
+  left: clamp(10px, 1.8vw, 18px);
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.capital-map-recent-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 178px;
+  padding: 7px 9px;
+  border: 1px solid rgba(232, 226, 211, 0.13);
+  border-radius: 999px;
+  background: rgba(6, 10, 8, 0.74);
+  color: var(--text);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.capital-map-recent-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.capital-map-recent-chip span {
+  flex: none;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 840;
+  letter-spacing: 0.04em;
 }
 
 .stats-panel {
@@ -314,8 +520,8 @@
   border: 1px solid rgba(217, 217, 214, 0.1);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(circle at center, rgba(134, 200, 63, 0.1), transparent 62%),
-    linear-gradient(135deg, rgba(217, 217, 214, 0.02) 25%, transparent 25%) 0 0 / 28px 28px,
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(9, 14, 9, 0.48), rgba(6, 10, 7, 0.94)),
     #0b100c;
   position: relative;
   overflow: hidden;
@@ -1147,8 +1353,9 @@
   border: 1px solid rgba(184, 227, 109, 0.26);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(circle at 8% 16%, rgba(184, 227, 109, 0.12), transparent 42%),
-    rgba(184, 227, 109, 0.055);
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(134, 200, 63, 0.08), rgba(255, 255, 255, 0.016)),
+    rgba(8, 12, 8, 0.56);
 }
 
 .country-click-target-label {
@@ -1164,7 +1371,7 @@
   font-size: clamp(1.45rem, 3vw, 2.2rem);
   font-weight: 820;
   line-height: 1;
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .country-click-prompt p {
@@ -1733,8 +1940,8 @@
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at center, rgba(184, 227, 109, 0.18), transparent 30%),
-    radial-gradient(circle at center, rgba(4, 7, 5, 0.08), rgba(4, 7, 5, 0.6));
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(8, 12, 8, 0.38), rgba(8, 12, 8, 0.74));
   opacity: 0;
   pointer-events: none;
   backdrop-filter: blur(1.5px) saturate(1.08);
@@ -2645,4 +2852,347 @@
   .maptap-sidebar {
     overflow: visible;
   }
+}
+
+/* Landing-aligned gameplay skin. */
+body:not(:has(.landing-screen-shell)) .game-header {
+  padding-bottom: clamp(8px, 1.2dvh, 12px);
+  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action,
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
+body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
+  border-color: rgba(217, 217, 214, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.024)),
+    rgba(16, 23, 16, 0.92);
+}
+
+.flag-card,
+.answer-panel,
+.daily-result-stats article,
+.achievement-panel,
+.hint-popover,
+.country-click-prompt,
+.map-review-panel {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-panel);
+}
+
+.flag-card,
+.answer-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.flag-card::before,
+.answer-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--panel-grid);
+  opacity: 0.24;
+  pointer-events: none;
+}
+
+.flag-card > *,
+.answer-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.flag-card-top {
+  min-height: 38px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
+}
+
+.round-status,
+.round-kicker,
+.guess-form label,
+.country-click-target-label,
+.stat-label,
+.progress-copy {
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.round-kicker,
+.country-click-target-label {
+  color: var(--accent);
+}
+
+.flag-slot {
+  border-color: rgba(184, 227, 109, 0.16);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(9, 14, 9, 0.48), rgba(6, 10, 7, 0.94)),
+    #080d09;
+}
+
+.flag-slot::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(184, 227, 109, 0.08);
+  border-radius: calc(var(--radius-md) - 2px);
+  pointer-events: none;
+}
+
+.flag-image {
+  border: 1px solid rgba(6, 8, 6, 0.18);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.prompt-text,
+.complete-card,
+.daily-result-panel h1,
+.room-code,
+.country-click-target-name {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+.prompt-text,
+.complete-card,
+.room-code {
+  color: var(--accent);
+  text-shadow: 0 0 26px rgba(134, 200, 63, 0.16);
+}
+
+.stat-card,
+.progress-card,
+.daily-badge,
+.daily-share-text,
+.daily-history-row,
+.achievement-chip,
+.feedback,
+.map-review-country,
+.maptap-result-score,
+.maptap-result-stat,
+.maptap-mp-result-row {
+  border-color: rgba(217, 217, 214, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.036), rgba(255, 255, 255, 0.016)),
+    rgba(13, 18, 13, 0.64);
+}
+
+.stat-card,
+.progress-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.stat-value {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.progress-track,
+.atlas-progress-track,
+.cat-bar-track,
+.multiplayer-timer {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill,
+.atlas-progress-fill,
+.cat-bar-fill,
+.multiplayer-timer-fill {
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--earth));
+}
+
+.guess-form {
+  padding: 10px;
+  border: 1px solid rgba(217, 217, 214, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(5, 8, 5, 0.22);
+}
+
+.guess-form input,
+.maptap-filter-select,
+.maptap-decay-input,
+.puzzle-continent-select,
+.country-guess-timer-select {
+  border-color: rgba(217, 217, 214, 0.14);
+  background-color: rgba(6, 10, 7, 0.62);
+}
+
+.guess-submit-action::before {
+  color: rgba(14, 21, 15, 0.72);
+}
+
+.feedback {
+  min-height: 40px;
+}
+
+.feedback.good,
+.achievement-panel {
+  border-color: rgba(152, 223, 116, 0.34);
+  background:
+    linear-gradient(180deg, rgba(152, 223, 116, 0.08), rgba(255, 255, 255, 0.018)),
+    rgba(13, 18, 13, 0.72);
+}
+
+.feedback.bad,
+.map-review-panel {
+  border-color: rgba(238, 125, 107, 0.28);
+}
+
+.mobile-nav-sheet:not([hidden]),
+.category-dropdown-menu,
+.action-menu-panel {
+  border-color: rgba(184, 227, 109, 0.18);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(20, 27, 18, 0.98), rgba(8, 12, 8, 0.98));
+}
+
+.world-map-panel,
+.world-globe-panel,
+.puzzle-board-shell,
+.puzzle-piece-tray,
+.streetview-stage,
+.maptap-map-panel,
+.maptap-globe {
+  border-color: var(--panel-border);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(10, 16, 10, 0.58), rgba(5, 8, 5, 0.96)),
+    #070b08;
+  box-shadow: var(--shadow-panel);
+}
+
+.world-map-panel::before,
+.world-globe-panel::before,
+.puzzle-board-shell::before,
+.streetview-stage::before,
+.maptap-map-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 1px solid rgba(184, 227, 109, 0.07);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.world-map-panel > *,
+.world-globe-panel > *,
+.puzzle-board-shell > *,
+.streetview-stage > *,
+.maptap-map-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.world-map-country {
+  fill: rgba(217, 217, 214, 0.1);
+  stroke: rgba(217, 217, 214, 0.32);
+}
+
+.world-map-country.is-guessed,
+.puzzle-country-piece.is-placed,
+.puzzle-country-piece.is-accuracy-close {
+  fill: rgba(134, 200, 63, 0.82);
+  stroke: rgba(245, 244, 206, 0.96);
+}
+
+.world-map-country.is-target,
+.world-map-country.is-review-missed,
+.world-map-country.is-review-active,
+.puzzle-country-piece.is-accuracy-far {
+  fill: rgba(238, 125, 107, 0.82);
+  stroke: rgba(255, 220, 209, 0.94);
+}
+
+.world-map-control-button,
+.puzzle-border-toggle,
+.maptap-attribution {
+  border-color: rgba(217, 217, 214, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.02)),
+    rgba(8, 12, 8, 0.78);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+}
+
+.world-map-country-label,
+.maptap-info-card,
+.country-guess-screen.is-map-fullscreen .country-guess-panel,
+.streetview-country-screen.is-streetview-fullscreen .game-header,
+.streetview-country-screen.is-streetview-fullscreen .streetview-panel {
+  border-color: rgba(184, 227, 109, 0.2);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(18, 25, 18, 0.88), rgba(8, 12, 8, 0.9));
+  box-shadow: 0 24px 76px rgba(0, 0, 0, 0.46);
+}
+
+.puzzle-piece-card,
+.player-row,
+.score-row,
+.result-row,
+.leaderboard-row {
+  border-color: rgba(217, 217, 214, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.014)),
+    rgba(8, 12, 8, 0.52);
+}
+
+.puzzle-piece-card:hover,
+.puzzle-piece-card:focus-visible,
+.puzzle-piece-card.is-in-play,
+.map-review-country.is-active,
+.leaderboard-row.is-winner {
+  border-color: rgba(184, 227, 109, 0.44);
+  background:
+    linear-gradient(180deg, rgba(134, 200, 63, 0.12), rgba(255, 255, 255, 0.018)),
+    rgba(8, 12, 8, 0.66);
+}
+
+.puzzle-piece-card-path {
+  fill: rgba(134, 200, 63, 0.78);
+}
+
+.maptap-sidebar {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-panel);
+}
+
+.maptap-sidebar .panel-title {
+  border-color: rgba(184, 227, 109, 0.26);
+  background:
+    var(--panel-grid),
+    linear-gradient(180deg, rgba(134, 200, 63, 0.08), rgba(255, 255, 255, 0.016)),
+    rgba(9, 14, 9, 0.72);
+}
+
+.maptap-sidebar .panel-title h1,
+.maptap-info-name {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+.maptap-status,
+.maptap-prompt-meta,
+.maptap-info-extract {
+  line-height: 1.45;
+}
+
+.streetview-stage {
+  background-color: #070b08;
+}
+
+.streetview-loader {
+  background:
+    linear-gradient(180deg, rgba(8, 12, 8, 0.38), rgba(8, 12, 8, 0.74)),
+    var(--panel-grid);
 }

@@ -19,6 +19,7 @@ import { createPromptView, updatePromptView, type PromptView } from "../dom/rend
 import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
+import { createCapitalRecallMapView, type CapitalRecallMapView } from "../dom/renderCapitalRecallMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
 import { createBrandLockup } from "../dom/createBrandLockup";
@@ -90,6 +91,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const input = el("input", {
     attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
+  const guessLabel = el("label", { text: "Your guess", attrs: { for: "guess-input" } });
   const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
   const hintButton = el("button", { className: "secondary-action hint-action", text: "Hint", attrs: { type: "button", "aria-label": "Get a hint" } });
   const skipButton = el("button", { className: "secondary-action", text: "Pass", attrs: { type: "button", "aria-label": "Reveal this answer" } });
@@ -173,8 +175,13 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
   let activeMapPromptKey: string | null = null;
+  let latestCapitalRecallCountryId: CountryId | null = null;
   let revealAnswerArmed = false;
   const cleanDailyMapCountryIds: ReadonlySet<CountryId> = new Set();
+  const capitalRecallMap: CapitalRecallMapView | null =
+    !isDailyChallenge && options.selectedGameMode === "capital-recall" && options.worldCountryFeatures && options.worldCountryFeatures.length > 0
+      ? createCapitalRecallMapView(options.worldCountryFeatures, countryIndex)
+      : null;
   const dailyMap =
     options.worldCountryFeatures && options.worldCountryFeatures.length > 0
       ? createWorldMapView(options.worldCountryFeatures, countryIndex, {
@@ -225,6 +232,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
+  function answerLabelFor(country: Country): string {
+    return options.selectedGameMode === "capital-recall" ? country.capital : country.name;
+  }
+
   async function finishTimerRun(finalTimeMs: number): Promise<{ readonly isNewLocalBest: boolean; readonly serverAccepted: boolean | null }> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
     const serverAccepted = await submitTimerToLeaderboard({
@@ -243,7 +254,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         playTimer.startIfNeeded();
         hideHintPopover();
         const country = countryIndex.byId[event.countryId];
-        if (country) showFeedback(views.feedback, `Correct: ${country.name}. +${event.points} points.`, "good");
+        if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
+        if (country) showFeedback(views.feedback, `Correct: ${answerLabelFor(country)}. +${event.points} points.`, "good");
         continue;
       }
 
@@ -272,8 +284,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         revealAnswerArmed = false;
         const country = countryIndex.byId[event.countryId];
         if (country) {
-          showHintPopover("Answer", country.name);
-          showFeedback(views.feedback, `Answer: ${country.name}.`, "bad");
+          if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
+          showHintPopover("Answer", answerLabelFor(country));
+          showFeedback(views.feedback, `Answer: ${answerLabelFor(country)}.`, "bad");
         }
         continue;
       }
@@ -326,7 +339,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const form = el("form", {
     className: "guess-form",
     children: [
-      el("label", { text: "Your guess", attrs: { for: "guess-input" } }),
+      guessLabel,
       el("div", { className: "input-row", children: [input, submitButton, mobileHintButton] }),
       el("div", { className: "mobile-daily-actions", children: [mobileSkipButton] }),
     ],
@@ -334,6 +347,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   function resetRun(message: string): void {
     activeMapPromptKey = null;
+    latestCapitalRecallCountryId = null;
     setAtlasOpen(atlas, false);
     updateAtlasView(atlas, countries, new Set());
     options.onReset();
@@ -348,8 +362,21 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const current = getCurrentCountry(countryIndex, state);
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
+    const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
+    guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
+    input.placeholder = isCapitalRecallMode ? "e.g. Tokyo, Abuja, Brasília..." : "e.g. Brazil, Japan, ZA...";
     updateStatsView(stats, countryIndex, state);
-    if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
+    if (isCapitalRecallMode && capitalRecallMap) {
+      activeFlagColorTarget = null;
+      activeMapPromptKey = null;
+      if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
+      prompt.status.textContent = state.status === "complete" ? "Complete" : `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = "Capital recall";
+      if (prompt.imageSlot.firstElementChild !== capitalRecallMap.element) {
+        prompt.imageSlot.replaceChildren(capitalRecallMap.element);
+      }
+      capitalRecallMap.update(state.guessedCountryIds, current?.id ?? null, latestCapitalRecallCountryId);
+    } else if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
       activeFlagColorTarget = null;
       prompt.status.textContent = `Round ${state.roundNumber}`;
       prompt.kicker.textContent = category?.label ?? "Map";

@@ -10,9 +10,9 @@ body {
   min-height: 100vh;
   color: var(--text);
   background:
-    radial-gradient(circle at 10% -10%, rgba(134, 200, 63, 0.12), transparent 28rem),
-    radial-gradient(circle at 92% 10%, rgba(104, 217, 189, 0.08), transparent 26rem),
-    linear-gradient(180deg, #070d08, var(--bg));
+    linear-gradient(rgba(217, 217, 214, 0.024) 1px, transparent 1px) 0 0 / 84px 84px,
+    linear-gradient(90deg, rgba(217, 217, 214, 0.018) 1px, transparent 1px) 0 0 / 84px 84px,
+    linear-gradient(180deg, #070b08 0%, #0b110c 42%, var(--bg) 100%);
   overflow: hidden;
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
@@ -24,11 +24,11 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background-image:
-    linear-gradient(rgba(217, 217, 214, 0.026) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(217, 217, 214, 0.02) 1px, transparent 1px);
-  background-size: 84px 84px;
-  mask-image: linear-gradient(to bottom, #000, transparent 74%);
+  border-top: 1px solid rgba(184, 227, 109, 0.16);
+  background:
+    linear-gradient(90deg, transparent, rgba(184, 227, 109, 0.08), transparent) 50% 0 / min(860px, 100%) 1px no-repeat,
+    linear-gradient(to bottom, rgba(184, 227, 109, 0.055), transparent 38%);
+  pointer-events: none;
 }
 
 button, input, select { font: inherit; }
@@ -38,19 +38,27 @@ body:not(:has(.landing-screen-shell)) select,
 body:not(:has(.landing-screen-shell)) input {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(18, 25, 18, 0.78);
   color: var(--text);
 }
 
 body:not(:has(.landing-screen-shell)) button {
   min-height: 40px;
   padding: 0 14px;
-  font-weight: 690;
+  font-weight: 760;
   cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
-body:not(:has(.landing-screen-shell)) button:hover:not(:disabled) { border-color: var(--accent); background: rgba(134, 200, 63, 0.09); }
+body:not(:has(.landing-screen-shell)) button:hover:not(:disabled) {
+  border-color: var(--panel-border-strong);
+  background:
+    linear-gradient(180deg, rgba(134, 200, 63, 0.14), rgba(255, 255, 255, 0.03)),
+    rgba(18, 25, 18, 0.92);
+  box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 body:not(:has(.landing-screen-shell)) button:active:not(:disabled) { transform: translateY(1px); }
 body:not(:has(.landing-screen-shell)) button:disabled { cursor: not-allowed; opacity: 0.45; }
 body:not(:has(.landing-screen-shell)) button:focus-visible,
@@ -87,17 +95,18 @@ select:hover {
 select option { color: var(--text); background: #11160f; }
 
 h1, h2, p { margin-top: 0; }
-h1, h2 { letter-spacing: -0.03em; }
+h1, h2 { font-family: var(--font-display); letter-spacing: 0; }
 h1 { font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1; margin-bottom: 0; }
 h2 { font-size: clamp(1.35rem, 2.8vw, 2rem); line-height: 1.04; margin-bottom: 10px; }
 p { line-height: 1.5; }
 
 .primary-action {
   border-radius: 999px;
-  background: var(--accent);
+  background:
+    linear-gradient(180deg, #a4df59, var(--accent));
   color: #0e150f;
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(134, 200, 63, 0.16), 0 12px 30px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 0 0 1px rgba(134, 200, 63, 0.18), 0 12px 30px rgba(0, 0, 0, 0.22);
 }
 
 .primary-action:hover:not(:disabled) {
@@ -109,7 +118,7 @@ p { line-height: 1.5; }
 .secondary-action, .ghost-action {
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.018)),
-    rgba(19, 26, 20, 0.88);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.022)),
+    rgba(18, 25, 18, 0.88);
 }
 .muted { color: var(--muted); }

@@ -4,6 +4,7 @@
   margin: 0 auto;
   padding: clamp(12px, 2dvh, 22px) 0;
   display: flex;
+  isolation: isolate;
 }
 
 .brand-lockup {
@@ -55,16 +56,17 @@ body:not(:has(.landing-screen-shell)) .brand-home-button:active,
 
 .brand-name {
   color: var(--text);
+  font-family: var(--font-display);
   font-size: 1.12rem;
-  font-weight: 760;
-  letter-spacing: -0.045em;
+  font-weight: 800;
+  letter-spacing: 0;
   text-transform: lowercase;
 }
 
 .eyebrow {
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 760;
   letter-spacing: 0.04em;
   margin: 0;
 }
@@ -99,7 +101,7 @@ body:not(:has(.landing-screen-shell)) .brand-home-button:active,
   border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
-    rgba(19, 26, 20, 0.92);
+    rgba(18, 25, 18, 0.94);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.18);
   white-space: nowrap;

@@ -1,6 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
 import { motion } from "framer-motion";
-import { CalendarDays, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe } from "lucide-react";
+import { CalendarDays, Map, Target, Users, Zap, Compass, Flag, Crown, ArrowRight, Eye, Hash, LayoutGrid, MousePointer, Layers, Trophy, Radio, Globe, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
@@ -27,6 +27,7 @@ const GAME_CATEGORIES = [
       { id: "shapes", title: "Country Outlines", icon: <Target className="w-4 h-4" />, desc: "Name the country from its outline." },
       { id: "codes", title: "Country Codes", icon: <Hash className="w-4 h-4" />, desc: "Name the country from its ISO code." },
       { id: "capitals", title: "Capitals", icon: <Crown className="w-4 h-4" />, desc: "Name the country whose capital city is shown." },
+      { id: "capital-recall", title: "Capital Recall", icon: <MapPin className="w-4 h-4" />, desc: "Name the capital city for the country shown." },
     ],
   },
   {
