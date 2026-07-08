@@ -59,10 +59,25 @@ function routeFromLocation(location: Pick<Location, "search">): AppRoute | null 
   return null;
 }
 
+interface NavigateOptions {
+  /** Push a browser history entry (default). Pass false when rendering an existing entry (popstate/start). */
+  readonly push?: boolean;
+}
+
+interface HistoryState {
+  readonly route: AppRoute;
+  readonly idx: number;
+}
+
+function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathname">): string {
+  if (route.type === "multiplayer" && route.joinCode) return `${location.pathname}?room=${encodeURIComponent(route.joinCode)}`;
+  if (route.type === "friends" && route.username) return `${location.pathname}?friend=${encodeURIComponent(route.username)}`;
+  return location.pathname;
+}
+
 export function createApp(options: AppOptions): App {
   let activeScreen: Screen | null = null;
   let navigationRun = 0;
-  let returnRoute: AppRoute = { type: "landing" };
 
   // Tracks the in-flight solo session so it can be recorded when it ends (completion, reset,
   // category change, or navigating away) — not only on full 196-country completion.
@@ -81,10 +96,32 @@ export function createApp(options: AppOptions): App {
   });
   const landingButton = el("button", {
     className: "landing-return-action",
-    text: "Modes",
-    attrs: { type: "button", "aria-label": "Back to game modes" },
+    text: "Home",
+    attrs: { type: "button", "aria-label": "Go to the home page" },
     on: { click: () => navigate({ type: "landing" }) },
   });
+
+  // Every navigation is mirrored into the browser history (the state carries the
+  // route), so the browser back/forward buttons move through the app, and in-app
+  // "Back" buttons can simply pop the real history.
+  function historyState(): HistoryState | null {
+    const state = window.history.state as Partial<HistoryState> | null;
+    return state && typeof state === "object" && state.route ? (state as HistoryState) : null;
+  }
+
+  function pushRoute(route: AppRoute): void {
+    const current = historyState();
+    // Re-selecting the current screen shouldn't stack duplicate history entries.
+    if (current && JSON.stringify(current.route) === JSON.stringify(route)) return;
+    window.history.pushState({ route, idx: (current?.idx ?? 0) + 1 } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+  }
+
+  function goBack(): void {
+    // If this is the first in-app entry (e.g. the tab opened on this screen),
+    // going back would leave the site — fall back to home instead.
+    if ((historyState()?.idx ?? 0) > 0) window.history.back();
+    else navigate({ type: "landing" });
+  }
 
   function attachGlobalControls(): void {
     options.root.append(landingButton, authControls.trigger, authControls.panel);
@@ -409,7 +446,7 @@ export function createApp(options: AppOptions): App {
     clearSoloSave(options.storage);
 
     if (isPromptGameModeId(gameMode)) {
-      startSolo([gameMode], false);
+      navigate({ type: "solo-game", categoryIds: [gameMode] });
       return;
     }
 
@@ -528,10 +565,7 @@ export function createApp(options: AppOptions): App {
         countryIndex: options.countryIndex,
         worldCountryFeatures,
         createOnlineTransport: createDefaultOnlineTransport,
-        onBackToSolo: () => {
-          const save = readSoloSave(options.storage);
-          startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
-        },
+        onBackToSolo: () => goBack(),
         onHome: () => navigate({ type: "landing" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
@@ -547,19 +581,17 @@ export function createApp(options: AppOptions): App {
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
         onHome: () => navigate({ type: "landing" }),
-        onBack: () => navigate(returnRoute),
+        onBack: () => goBack(),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onSignIn: () => authControls.openPanel(),
       }),
     );
   }
 
-  function navigate(route: AppRoute): void {
+  function navigate(route: AppRoute, navigateOptions?: NavigateOptions): void {
     navigationRun += 1;
+    if (navigateOptions?.push !== false) pushRoute(route);
 
-    if (route.type !== "leaderboard") {
-      returnRoute = route;
-    }
     if (route.type === "landing") {
       mount(
         createLandingScreen({
@@ -569,6 +601,8 @@ export function createApp(options: AppOptions): App {
           onGameMode: (gameMode) => handleGameModeChange(gameMode),
           onLeaderboard: () => navigate({ type: "leaderboard" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
+          storage: options.storage,
+          getAuthUser: () => authControls.getUser(),
         }),
         false,
       );
@@ -604,14 +638,14 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => navigate({ type: "solo-game", continueSaved: true }), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
+      void leavingSolo.then(() => mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
       return;
     }
 
     if (route.type === "friends") {
       const currentUser = authControls.getUser();
       mount(createFriendsScreen({
-        onBack: () => navigate({ type: "solo-game", continueSaved: true }),
+        onBack: () => goBack(),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         ...(route.username ? { initialUsername: route.username } : {}),
         currentUsername: currentUser?.displayName ?? null,
@@ -649,7 +683,15 @@ export function createApp(options: AppOptions): App {
   });
 
   return {
-    start: () => navigate(routeFromLocation(window.location) ?? { type: "landing" }),
+    start: () => {
+      const initialRoute = routeFromLocation(window.location) ?? { type: "landing" };
+      window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", buildRouteUrl(initialRoute, window.location));
+      window.addEventListener("popstate", (event) => {
+        const state = event.state as Partial<HistoryState> | null;
+        navigate(state?.route ?? { type: "landing" }, { push: false });
+      });
+      navigate(initialRoute, { push: false });
+    },
     navigate,
   };
 }
