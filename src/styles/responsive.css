@@ -228,7 +228,14 @@
     font-size: 0.68rem;
   }
 
+  .capital-map-gesture-hint {
+    display: none;
+  }
+
   .capital-map-recent {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
     justify-content: flex-start;
     overflow: hidden;
   }
@@ -593,6 +600,7 @@
   }
 
   .country-guess-screen .world-map-svg,
+  .game-screen .capital-recall-map-svg,
   .country-guess-screen .world-globe-canvas {
     touch-action: none;
   }

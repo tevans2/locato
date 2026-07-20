@@ -231,6 +231,20 @@
   width: 100%;
   height: 100%;
   display: block;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+
+.capital-recall-map-svg.is-panning {
+  cursor: grabbing;
+}
+
+.capital-recall-map-svg:focus-visible {
+  outline: 2px solid rgba(184, 227, 109, 0.62);
+  outline-offset: -3px;
 }
 
 .capital-recall-country {
@@ -252,6 +266,8 @@
 .capital-recall-country.is-current {
   fill: rgba(187, 130, 86, 0.44);
   stroke: rgba(232, 226, 211, 0.52);
+  stroke-width: 1.35;
+  filter: drop-shadow(0 0 7px rgba(187, 130, 86, 0.46));
 }
 
 .capital-recall-marker {
@@ -268,10 +284,17 @@
   transform: scale(1);
 }
 
+.capital-recall-marker.is-current {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .capital-recall-marker-halo {
   fill: rgba(184, 227, 109, 0.16);
   stroke: rgba(184, 227, 109, 0.22);
   stroke-width: 1.1;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .capital-recall-marker-dot {
@@ -286,6 +309,15 @@
 }
 
 .capital-recall-marker.is-latest .capital-recall-marker-dot {
+  fill: var(--earth);
+}
+
+.capital-recall-marker.is-current .capital-recall-marker-halo {
+  fill: rgba(187, 130, 86, 0.2);
+  stroke: rgba(232, 226, 211, 0.62);
+}
+
+.capital-recall-marker.is-current .capital-recall-marker-dot {
   fill: var(--earth);
 }
 
@@ -306,14 +338,15 @@
 }
 
 .capital-recall-marker-label.is-recent,
+.capital-recall-marker.is-solved.is-zoom-visible .capital-recall-marker-label,
 .capital-recall-marker.is-latest .capital-recall-marker-label {
   opacity: 1;
 }
 
 @keyframes capital-marker-pop {
-  0% { r: 4; opacity: 0.2; }
-  45% { r: 17; opacity: 0.85; }
-  100% { r: 8.4; opacity: 1; }
+  0% { transform: scale(0.5); opacity: 0.2; }
+  45% { transform: scale(2); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .capital-map-current {
@@ -327,6 +360,28 @@
   justify-content: space-between;
   gap: 12px;
   pointer-events: none;
+}
+
+.capital-map-gesture-hint {
+  position: absolute;
+  bottom: clamp(10px, 1.8vw, 18px);
+  left: clamp(10px, 1.8vw, 18px);
+  z-index: 2;
+  max-width: 190px;
+  padding: 7px 9px;
+  border: 1px solid rgba(232, 226, 211, 0.12);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(6, 10, 8, 0.7);
+  font-size: 0.68rem;
+  font-weight: 720;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  transition: opacity 180ms ease;
+}
+
+.capital-recall-map-panel.has-map-interaction .capital-map-gesture-hint {
+  opacity: 0;
 }
 
 .capital-map-current-copy {
@@ -372,7 +427,7 @@
   position: absolute;
   right: clamp(10px, 1.8vw, 18px);
   bottom: clamp(10px, 1.8vw, 18px);
-  left: clamp(10px, 1.8vw, 18px);
+  left: clamp(218px, 24vw, 250px);
   z-index: 2;
   display: flex;
   justify-content: flex-end;

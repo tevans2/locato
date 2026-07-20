@@ -180,7 +180,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const cleanDailyMapCountryIds: ReadonlySet<CountryId> = new Set();
   const capitalRecallMap: CapitalRecallMapView | null =
     !isDailyChallenge && options.selectedGameMode === "capital-recall" && options.worldCountryFeatures && options.worldCountryFeatures.length > 0
-      ? createCapitalRecallMapView(options.worldCountryFeatures, countryIndex)
+      ? createCapitalRecallMapView(options.worldCountryFeatures, countryIndex, { signal: controller.signal })
       : null;
   const dailyMap =
     options.worldCountryFeatures && options.worldCountryFeatures.length > 0
