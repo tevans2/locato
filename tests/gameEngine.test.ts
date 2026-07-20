@@ -181,7 +181,7 @@ describe("game engine", () => {
     expect(engine.getState().currentCategoryId).toBe("shapes");
     const current = getCurrentCountry(countryIndex, engine.getState());
     const category = getCategory("shapes");
-    expect(category?.prompt(current!).value).toBe(`assets/country-shapes/${current!.code.toLowerCase()}.svg`);
+    expect(category?.prompt(current!).value).toBe(`/assets/country-shapes/${current!.code.toLowerCase()}.svg`);
     const events = engine.dispatch({ type: "SUBMIT_GUESS", value: current!.name, now: 1100 });
 
     expect(events[0]?.type).toBe("GUESS_CORRECT");

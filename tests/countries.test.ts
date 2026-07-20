@@ -14,7 +14,8 @@ describe("country dataset", () => {
 
   it("points every country at existing prompt image assets", () => {
     for (const country of countryIndex.countries) {
-      expect(existsSync(resolve("public", country.flagSrc)), `${country.name} flag is missing`).toBe(true);
+      expect(country.flagSrc).toMatch(/^\/assets\/flags\/[a-z]{2}\.svg$/);
+      expect(existsSync(resolve("public", country.flagSrc.slice(1))), `${country.name} flag is missing`).toBe(true);
       const outlinePath = resolve("public", "assets", "country-shapes", `${country.code.toLowerCase()}.svg`);
       expect(existsSync(outlinePath), `${country.name} outline is missing`).toBe(true);
       const outline = readFileSync(outlinePath, "utf8");

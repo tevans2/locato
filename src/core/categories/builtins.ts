@@ -1,5 +1,6 @@
 import { matchesCapitalName, matchesCountryName } from "./matching";
 import type { PromptCategory } from "./types";
+import { rootAssetPath } from "../assets";
 
 export const flagsCategory: PromptCategory = {
   id: "flags",
@@ -26,7 +27,7 @@ export const shapesCategory: PromptCategory = {
   label: "Country outlines",
   description: "Name the country from its outline.",
   eligible: () => true,
-  prompt: (country) => ({ kind: "image", value: `assets/country-shapes/${country.code.toLowerCase()}.svg` }),
+  prompt: (country) => ({ kind: "image", value: rootAssetPath(`assets/country-shapes/${country.code.toLowerCase()}.svg`) }),
   accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, true),
   reveal: (country) => country.name,
 };
