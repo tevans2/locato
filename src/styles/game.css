@@ -1040,6 +1040,34 @@
 .feedback.good { color: var(--good); border-color: rgba(152, 223, 116, 0.42); background: rgba(152,223,116,0.08); }
 .feedback.bad { color: var(--bad); border-color: rgba(238,125,107,0.45); background: rgba(238,125,107,0.08); }
 
+.feedback.celebration {
+  color: var(--text);
+  border-color: rgba(164, 223, 89, 0.7);
+  background:
+    radial-gradient(circle at 85% 10%, rgba(104, 217, 189, 0.18), transparent 34%),
+    linear-gradient(120deg, rgba(134, 200, 63, 0.18), rgba(134, 200, 63, 0.07));
+  box-shadow: 0 0 28px rgba(134, 200, 63, 0.16);
+  animation: completion-pop 420ms cubic-bezier(.2, .9, .2, 1.2);
+}
+
+.stat-value.is-popping { animation: stat-pop 260ms cubic-bezier(.2, .9, .2, 1.25); }
+
+.scoring-note {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+@keyframes stat-pop {
+  50% { color: var(--accent-bright, #a4df59); transform: translateY(-2px) scale(1.1); }
+}
+
+@keyframes completion-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .loading-screen {
   align-items: center;
   justify-content: center;

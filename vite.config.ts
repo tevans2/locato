@@ -4,7 +4,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  base: "./",
+  // Absolute asset URLs keep JS/CSS working when a shareable SPA route such as
+  // /play/flags is opened or refreshed directly.
+  base: "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

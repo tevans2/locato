@@ -197,11 +197,11 @@ export function recordSoloAchievements(
   if (input.completed && input.wrongAnswers === 0 && (input.hintsUsed ?? 0) === 0 && input.countryIndex && input.guessedCountryIds) {
     for (const continent of PUZZLE_CONTINENTS) {
       const achievementId = CLEAN_SOLO_CONTINENT_ACHIEVEMENTS[continent];
-      if (!achievementId || state.completedNoHintSoloContinents.includes(continent)) continue;
+      if (state.completedNoHintSoloContinents.includes(continent)) continue;
       const countryIds = countryIdsForContinent(input.countryIndex, continent);
       if (countryIds.length > 0 && countryIds.every((countryId) => input.guessedCountryIds?.has(countryId))) {
         state.completedNoHintSoloContinents.push(continent);
-        unlock(state, unlocked, achievementId);
+        if (achievementId) unlock(state, unlocked, achievementId);
       }
     }
   }
@@ -237,11 +237,11 @@ export function recordWorldAchievements(
   if (input.playMode !== "puzzle" && input.countryIndex && input.guessedCountryIds) {
     for (const continent of PUZZLE_CONTINENTS) {
       const achievementId = WORLD_CONTINENT_ACHIEVEMENTS[continent];
-      if (!achievementId || state.completedWorldContinents.includes(continent)) continue;
+      if (state.completedWorldContinents.includes(continent)) continue;
       const countryIds = countryIdsForContinent(input.countryIndex, continent);
       if (countryIds.length > 0 && countryIds.every((countryId) => input.guessedCountryIds?.has(countryId))) {
         state.completedWorldContinents.push(continent);
-        unlock(state, unlocked, achievementId);
+        if (achievementId) unlock(state, unlocked, achievementId);
       }
     }
 

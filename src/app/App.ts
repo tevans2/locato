@@ -8,22 +8,14 @@ import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResu
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
-import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
-import { createStreetViewCountryScreen } from "../ui/screens/StreetViewCountryScreen";
+import type { WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { findMapTapLocation } from "../core/maptap/locations";
 import { streetViewCountryRounds } from "../core/streetview";
-import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
-import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
-import { createStatsScreen } from "../ui/screens/StatsScreen";
-import { createFriendsScreen } from "../ui/screens/FriendsScreen";
 import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClient";
 import type { SocialServerMessage } from "../core/social/socialProtocol";
-import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
-import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
-import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
-import type { AppRoute, Screen } from "./router";
+import { routeFromLocation, routeUrl, type AppRoute, type Screen } from "./router";
 
 export interface AppOptions {
   readonly root: HTMLElement;
@@ -50,15 +42,6 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
   return createWebSocketMultiplayerTransport(resolveDefaultWebSocketUrl(window.location));
 }
 
-function routeFromLocation(location: Pick<Location, "search">): AppRoute | null {
-  const params = new URLSearchParams(location.search);
-  const room = params.get("room")?.trim();
-  if (room) return { type: "multiplayer", joinCode: room };
-  const friend = params.get("friend")?.trim();
-  if (friend) return { type: "friends", username: friend };
-  return null;
-}
-
 interface NavigateOptions {
   /** Push a browser history entry (default). Pass false when rendering an existing entry (popstate/start). */
   readonly push?: boolean;
@@ -67,12 +50,6 @@ interface NavigateOptions {
 interface HistoryState {
   readonly route: AppRoute;
   readonly idx: number;
-}
-
-function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathname">): string {
-  if (route.type === "multiplayer" && route.joinCode) return `${location.pathname}?room=${encodeURIComponent(route.joinCode)}`;
-  if (route.type === "friends" && route.username) return `${location.pathname}?friend=${encodeURIComponent(route.username)}`;
-  return location.pathname;
 }
 
 export function createApp(options: AppOptions): App {
@@ -113,7 +90,7 @@ export function createApp(options: AppOptions): App {
     const current = historyState();
     // Re-selecting the current screen shouldn't stack duplicate history entries.
     if (current && JSON.stringify(current.route) === JSON.stringify(route)) return;
-    window.history.pushState({ route, idx: (current?.idx ?? 0) + 1 } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+    window.history.pushState({ route, idx: (current?.idx ?? 0) + 1 } satisfies HistoryState, "", routeUrl(route));
   }
 
   function goBack(): void {
@@ -187,8 +164,10 @@ export function createApp(options: AppOptions): App {
   }
 
   function mountDailyResult(result: DailyResultSave): void {
-    mount(
-      createDailyResultScreen({
+    const run = navigationRun;
+    void import("../ui/screens/DailyResultScreen").then(({ createDailyResultScreen }) => {
+      if (run !== navigationRun) return;
+      mount(createDailyResultScreen({
         result,
         storage: options.storage,
         onHome: () => navigate({ type: "landing" }),
@@ -198,8 +177,8 @@ export function createApp(options: AppOptions): App {
         },
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
-      }),
-    );
+      }));
+    });
   }
 
   async function startSolo(categoryIds: readonly string[], continueSaved = false): Promise<void> {
@@ -226,6 +205,8 @@ export function createApp(options: AppOptions): App {
     }
 
     const engine = createEngine(options.countryIndex, activeCategories, initialState);
+    const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
+    if (run !== navigationRun) return;
 
     mount(
       createSoloGameScreen({
@@ -344,13 +325,16 @@ export function createApp(options: AppOptions): App {
       }
     }
 
-    function startDailyStreetViewRound(): void {
+    async function startDailyStreetViewRound(): Promise<void> {
       const round = streetViewCountryRounds.find((item) => item.countryCode === challenge.streetViewCountryCode && options.countryIndex.byCode.has(item.countryCode));
       if (!round) {
         addDailyMark("miss");
         finishDailyChallenge();
         return;
       }
+
+      const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
+      if (run !== navigationRun) return;
 
       mount(
         createStreetViewCountryScreen({
@@ -376,7 +360,7 @@ export function createApp(options: AppOptions): App {
       const location = findMapTapLocation(challenge.mapTapTargetId);
       if (!location) {
         addDailyMark("miss");
-        startDailyStreetViewRound();
+        void startDailyStreetViewRound();
         return;
       }
 
@@ -386,6 +370,7 @@ export function createApp(options: AppOptions): App {
       mount(
         createMapTapScreen({
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          storage: options.storage,
           onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
@@ -396,7 +381,7 @@ export function createApp(options: AppOptions): App {
               const points = scoreDailyMapTapRound(mapTapResult.score, mapTapResult.maxScore);
               dailyScore += points;
               addDailyMark(points >= DAILY_POINTS_PER_ROUND ? "correct" : points > 0 ? "hint" : "miss");
-              startDailyStreetViewRound();
+              void startDailyStreetViewRound();
             },
           },
         }),
@@ -410,6 +395,9 @@ export function createApp(options: AppOptions): App {
       poolCountryIds: challenge.countryIds,
       now: dailyStartedAt,
     });
+
+    const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
+    if (run !== navigationRun) return;
 
     mount(
       createSoloGameScreen({
@@ -488,6 +476,9 @@ export function createApp(options: AppOptions): App {
         return;
       }
 
+      const { createCountryGuessingScreen } = await import("../ui/screens/CountryGuessingScreen");
+      if (run !== navigationRun) return;
+
       mount(
         createCountryGuessingScreen({
           countryIndex: options.countryIndex,
@@ -515,7 +506,10 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  function startStreetViewCountry(): void {
+  async function startStreetViewCountry(): Promise<void> {
+    const run = navigationRun;
+    const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
+    if (run !== navigationRun) return;
     mount(
       createStreetViewCountryScreen({
         countryIndex: options.countryIndex,
@@ -537,6 +531,7 @@ export function createApp(options: AppOptions): App {
     mount(
       createMapTapScreen({
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        storage: options.storage,
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
@@ -560,6 +555,9 @@ export function createApp(options: AppOptions): App {
 
     if (run !== navigationRun) return;
 
+    const { createMultiplayerLobbyScreen } = await import("../ui/screens/MultiplayerLobbyScreen");
+    if (run !== navigationRun) return;
+
     mount(
       createMultiplayerLobbyScreen({
         countryIndex: options.countryIndex,
@@ -574,9 +572,11 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  function startLeaderboard(mode?: GameModeId, variant?: string): void {
-    mount(
-      createLeaderboardScreen({
+  async function startLeaderboard(mode?: GameModeId, variant?: string): Promise<void> {
+    const run = navigationRun;
+    const { createLeaderboardScreen } = await import("../ui/screens/LeaderboardScreen");
+    if (run !== navigationRun) return;
+    mount(createLeaderboardScreen({
         storage: options.storage,
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
@@ -584,37 +584,40 @@ export function createApp(options: AppOptions): App {
         onBack: () => goBack(),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onSignIn: () => authControls.openPanel(),
-      }),
-    );
+    }));
   }
 
   function navigate(route: AppRoute, navigateOptions?: NavigateOptions): void {
     navigationRun += 1;
+    const run = navigationRun;
     if (navigateOptions?.push !== false) pushRoute(route);
+    document.title = route.type === "landing" ? "locato — geography arcade" : `${route.type.replaceAll("-", " ")} · locato`;
+
+    const leavingSolo = route.type === "solo-game" ? Promise.resolve() : recordSoloSession(lastSoloState);
+    if (route.type !== "solo-game") lastSoloState = null;
 
     if (route.type === "landing") {
-      mount(
-        createLandingScreen({
+      mount(createLoadingScreen("Loading locato..."), false);
+      void import("../ui/screens/LandingScreen").then(({ createLandingScreen }) => {
+        if (run !== navigationRun) return;
+        mount(createLandingScreen({
           onHome: () => navigate({ type: "landing" }),
           onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onGameMode: (gameMode) => handleGameModeChange(gameMode),
           onLeaderboard: () => navigate({ type: "leaderboard" }),
+          onProgress: () => navigate({ type: "progress" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           storage: options.storage,
           getAuthUser: () => authControls.getUser(),
-        }),
-        false,
-      );
+        }), false);
+      });
       return;
     }
     if (route.type === "solo-game") {
-      startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
+      void startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
       return;
     }
-    // Leaving solo for any other screen ends the current run — record it first.
-    const leavingSolo = recordSoloSession(lastSoloState);
-    lastSoloState = null;
     if (route.type === "daily-challenge") {
       void startDailyChallenge();
       return;
@@ -625,7 +628,7 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "streetview-country") {
-      startStreetViewCountry();
+      void startStreetViewCountry();
       return;
     }
     if (route.type === "map-tap") {
@@ -638,27 +641,49 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
+      void leavingSolo.then(async () => {
+        const { createStatsScreen } = await import("../ui/screens/StatsScreen");
+        if (run !== navigationRun) return;
+        mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) }));
+      });
+      return;
+    }
+
+    if (route.type === "progress") {
+      void import("../ui/screens/ProgressScreen").then(({ createProgressScreen }) => {
+        if (run !== navigationRun) return;
+        mount(createProgressScreen({
+          storage: options.storage,
+          onHome: () => navigate({ type: "landing" }),
+          onBack: () => goBack(),
+          onStats: () => navigate({ type: "stats" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onPlayMode: (mode) => handleGameModeChange(mode),
+        }));
+      });
       return;
     }
 
     if (route.type === "friends") {
       const currentUser = authControls.getUser();
-      mount(createFriendsScreen({
-        onBack: () => goBack(),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-        ...(route.username ? { initialUsername: route.username } : {}),
-        currentUsername: currentUser?.displayName ?? null,
-        appOrigin: window.location.origin,
-        subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
-          if (message.type !== "GAME_INVITE") listener();
-        }),
-      }));
+      void import("../ui/screens/FriendsScreen").then(({ createFriendsScreen }) => {
+        if (run !== navigationRun) return;
+        mount(createFriendsScreen({
+          onBack: () => goBack(),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          ...(route.username ? { initialUsername: route.username } : {}),
+          currentUsername: currentUser?.displayName ?? null,
+          appOrigin: window.location.origin,
+          subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
+            if (message.type !== "GAME_INVITE") listener();
+          }),
+        }));
+      });
       return;
     }
 
     if (route.type === "leaderboard") {
-      startLeaderboard(route.mode, route.variant);
+      void startLeaderboard(route.mode, route.variant);
       return;
     }
   }
@@ -684,11 +709,11 @@ export function createApp(options: AppOptions): App {
 
   return {
     start: () => {
-      const initialRoute = routeFromLocation(window.location) ?? { type: "landing" };
-      window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", buildRouteUrl(initialRoute, window.location));
+      const initialRoute = routeFromLocation(window.location);
+      window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", routeUrl(initialRoute));
       window.addEventListener("popstate", (event) => {
         const state = event.state as Partial<HistoryState> | null;
-        navigate(state?.route ?? { type: "landing" }, { push: false });
+        navigate(state?.route ?? routeFromLocation(window.location), { push: false });
       });
       navigate(initialRoute, { push: false });
     },

@@ -6,8 +6,10 @@ import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createMapTapGlobe, type MapTapClick } from "../components/MapTapGlobe";
 import { createMapTapInfoOverlay } from "../components/MapTapInfoOverlay";
 import { createBrandLockup } from "../dom/createBrandLockup";
+import { playGameFeedback } from "../feedback/gameFeedback";
 
 export interface MapTapScreenOptions {
+  readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
   readonly onMultiplayer?: () => void;
@@ -33,6 +35,12 @@ const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly l
   { value: "medium", label: "Medium" },
   { value: "hard", label: "Hard" },
 ];
+
+const SCORING_PRESETS = [
+  { value: "1200", label: "Strict", description: "Rewards precise regional knowledge." },
+  { value: String(MAP_TAP_DEFAULT_DECAY_KM), label: "Balanced", description: "A forgiving default for most players." },
+  { value: "5000", label: "Forgiving", description: "Better for learning unfamiliar places." },
+] as const;
 
 function formatDistance(distanceKm: number): string {
   if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
@@ -80,10 +88,12 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     attrs: { id: "maptap-difficulty", name: "maptapDifficulty", "aria-label": "MapTap difficulty" },
     children: optionNodes(DIFFICULTIES),
   });
-  const decayInput = el("input", {
+  const decayInput = el("select", {
     className: "maptap-decay-input",
-    attrs: { id: "maptap-decay", name: "maptapDecay", type: "number", min: "100", max: "10000", step: "100", value: String(MAP_TAP_DEFAULT_DECAY_KM), "aria-label": "MapTap score decay in kilometres" },
-  });
+    attrs: { id: "maptap-decay", name: "maptapDecay", "aria-label": "MapTap scoring forgiveness" },
+    children: SCORING_PRESETS.map((preset) => el("option", { text: preset.label, attrs: { value: preset.value, title: preset.description } })),
+  }) as HTMLSelectElement;
+  decayInput.value = String(MAP_TAP_DEFAULT_DECAY_KM);
 
   const globe = createMapTapGlobe({
     signal: controller.signal,
@@ -209,6 +219,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     }
 
     activeResult = result;
+    playGameFeedback(options.storage, result.score >= result.maxScore * 0.7 ? "correct" : "wrong");
     setControlsDisabled(false);
     statusText.textContent = isDailyChallenge ? "Result revealed. Continue to the next daily round." : "Result revealed.";
     globe.reveal(result);
@@ -267,9 +278,10 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
                 children: [
                   el("label", { children: [el("span", { className: "stat-label", text: "Category" }), categorySelect] }),
                   el("label", { children: [el("span", { className: "stat-label", text: "Difficulty" }), difficultySelect] }),
-                  el("label", { children: [el("span", { className: "stat-label", text: "Decay km" }), decayInput] }),
+                  el("label", { children: [el("span", { className: "stat-label", text: "Scoring" }), decayInput] }),
                 ],
               }),
+              el("p", { className: "scoring-note", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [document.createTextNode("Closer guesses score more. Strict rewards precision; Forgiving is best for learning.")] }),
               el("div", { className: "maptap-actions", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [resetButton] }),
               resultPanel,
             ],

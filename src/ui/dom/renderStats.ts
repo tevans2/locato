@@ -43,10 +43,18 @@ export function createStatsView(): StatsView {
 
 export function updateStatsView(view: StatsView, index: CountryIndex, state: GameState): void {
   const stats = getGameStats(index, state);
+  const previousScore = view.score.textContent;
+  const previousStreak = view.streak.textContent;
   view.score.textContent = String(state.score);
   view.streak.textContent = String(state.streak);
   view.accuracy.textContent = `${Math.round(stats.accuracy * 100)}%`;
   view.remaining.textContent = String(stats.remainingCount);
   view.progress.textContent = `${stats.guessedCount} guessed, ${stats.remainingCount} hidden`;
   view.progressFill.style.transform = `scaleX(${stats.progress.toFixed(4)})`;
+  for (const [element, changed] of [[view.score, previousScore !== view.score.textContent], [view.streak, previousStreak !== view.streak.textContent]] as const) {
+    if (!changed) continue;
+    element.classList.remove("is-popping");
+    void element.offsetWidth;
+    element.classList.add("is-popping");
+  }
 }

@@ -13,7 +13,7 @@ export function hideFeedback(view: FeedbackView): void {
   view.element.textContent = "";
 }
 
-export function showFeedback(view: FeedbackView, message: string, tone: "neutral" | "good" | "bad" = "neutral"): void {
+export function showFeedback(view: FeedbackView, message: string, tone: "neutral" | "good" | "bad" | "celebration" = "neutral"): void {
   view.element.hidden = false;
   view.element.className = `feedback ${tone}`;
   view.element.textContent = message;

@@ -23,6 +23,7 @@ import { createCapitalRecallMapView, type CapitalRecallMapView } from "../dom/re
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
 import { createBrandLockup } from "../dom/createBrandLockup";
+import { playGameFeedback } from "../feedback/gameFeedback";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -250,6 +251,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   function applyEvents(events: readonly GameEvent[]): void {
     for (const event of events) {
       if (event.type === "GUESS_CORRECT") {
+        playGameFeedback(options.storage, "correct");
         revealAnswerArmed = false;
         playTimer.startIfNeeded();
         hideHintPopover();
@@ -260,6 +262,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "GUESS_WRONG") {
+        playGameFeedback(options.storage, "wrong");
         revealAnswerArmed = false;
         showFeedback(views.feedback, "Not quite. Streak reset, prompt still live.", "bad");
         continue;
@@ -292,6 +295,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "GAME_COMPLETED") {
+        playGameFeedback(options.storage, "complete");
         revealAnswerArmed = false;
         hideHintPopover();
         if (!isDailyChallenge) {
@@ -312,14 +316,14 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             showFeedback(
               views.feedback,
               `Complete. Every prompt solved in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`,
-              "good",
+              "celebration",
             );
           });
         } else {
           showFeedback(
             views.feedback,
             "Complete. Every prompt in this mix has been solved. Switch to Timer mode to post a time to the leaderboard.",
-            "good",
+            "celebration",
           );
         }
       }
@@ -663,6 +667,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             children: [
               el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" })] }),
               form,
+              el("p", { className: "scoring-note", text: "Scoring: 100 points per answer, plus 10 for each streak step (up to +100)." }),
               hintPopover,
               mobileExtrasToggle,
               mobileExtrasPanel,

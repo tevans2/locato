@@ -3,12 +3,14 @@ export const SETTINGS_KEY = "locato:settings:v1";
 export interface Settings {
   readonly reducedMotion: boolean;
   readonly soundEnabled: boolean;
+  readonly hapticsEnabled: boolean;
   readonly showAutocomplete: boolean;
 }
 
 export const defaultSettings: Settings = {
   reducedMotion: false,
   soundEnabled: false,
+  hapticsEnabled: true,
   showAutocomplete: false,
 };
 
@@ -21,6 +23,7 @@ export function readSettings(storage: Storage): Settings {
     return {
       reducedMotion: Boolean(parsed.reducedMotion),
       soundEnabled: Boolean(parsed.soundEnabled),
+      hapticsEnabled: parsed.hapticsEnabled !== false,
       showAutocomplete: Boolean(parsed.showAutocomplete),
     };
   } catch {

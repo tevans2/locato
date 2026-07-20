@@ -1,3 +1,4 @@
+import { useEffect, useState, type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { motion } from "framer-motion";
 import {
@@ -24,7 +25,6 @@ import { readDailyResult } from "../../storage/dailySave";
 import { readSoloSave } from "../../storage/localSave";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
-import { LandingSatelliteGlobe } from "../components/LandingSatelliteGlobe";
 
 export interface LandingScreenOptions {
   readonly onHome: () => void;
@@ -32,6 +32,7 @@ export interface LandingScreenOptions {
   readonly onDailyChallenge: () => void;
   readonly onGameMode: (mode: GameModeId) => void;
   readonly onLeaderboard: () => void;
+  readonly onProgress: () => void;
   readonly onMultiplayer: () => void;
   readonly storage?: Storage;
   readonly getAuthUser?: () => { readonly id: string } | null;
@@ -162,6 +163,30 @@ function createLandingStars(count: number) {
 const LANDING_STARS = createLandingStars(148);
 
 function LandingSpaceBackdrop() {
+  const [Globe, setGlobe] = useState<ComponentType | null>(null);
+
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData) return;
+    let cancelled = false;
+    const load = () => {
+      void import("../components/LandingSatelliteGlobe").then(({ LandingSatelliteGlobe }) => {
+        if (!cancelled) setGlobe(() => LandingSatelliteGlobe);
+      });
+    };
+    const idleWindow = window as typeof window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const idleId = idleWindow.requestIdleCallback?.(load, { timeout: 1200 });
+    const timeoutId = idleId === undefined ? window.setTimeout(load, 350) : undefined;
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
   return (
     <div className="landing-space-backdrop" aria-hidden="true">
       <div className="landing-star-field">
@@ -183,7 +208,7 @@ function LandingSpaceBackdrop() {
       </div>
       <span className="landing-space-nebula landing-space-nebula-one" />
       <span className="landing-space-nebula landing-space-nebula-two" />
-      <LandingSatelliteGlobe />
+      {Globe ? <Globe /> : null}
     </div>
   );
 }
@@ -208,6 +233,9 @@ function LandingHome(options: LandingScreenOptions) {
           </button>
           <button type="button" className="lp-btn lp-desktop-only" data-testid="button-leaderboard" onClick={options.onLeaderboard}>
             Leaderboards
+          </button>
+          <button type="button" className="lp-btn lp-desktop-only" data-testid="button-progress" onClick={options.onProgress}>
+            Progress
           </button>
           <button type="button" className="lp-btn lp-desktop-only" data-testid="button-multiplayer" onClick={options.onMultiplayer}>
             Multiplayer
@@ -330,6 +358,9 @@ function LandingHome(options: LandingScreenOptions) {
                 </button>
                 <button type="button" className="lp-btn lp-btn-ghost" data-testid="button-hero-leaderboard" onClick={options.onLeaderboard}>
                   <Trophy size={15} /> Leaderboards
+                </button>
+                <button type="button" className="lp-btn lp-btn-ghost" data-testid="button-hero-progress" onClick={options.onProgress}>
+                  <Orbit size={15} /> Your journey
                 </button>
               </div>
             </motion.section>
