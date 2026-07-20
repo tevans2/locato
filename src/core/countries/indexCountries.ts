@@ -1,5 +1,6 @@
 import { addNormalizedAnswer, isToleratedMisspelling, normalizeAnswer, normalizeAnswerVariants } from "./normalize";
 import type { AnswerOptions, Country, CountryId, CountryIndex, RawCountry } from "./types";
+import { rootAssetPath } from "../assets";
 
 const DEFAULT_ANSWER_OPTIONS: AnswerOptions = {
   includeCodes: true,
@@ -48,7 +49,7 @@ export function indexCountries(
     code: country.code.toUpperCase(),
     aliases: [...country.aliases],
     continent: country.continent,
-    flagSrc: country.flagSrc,
+    flagSrc: rootAssetPath(country.flagSrc),
     normalizedName: normalizeAnswer(country.name),
     acceptedAnswers: buildAcceptedAnswers(country, options),
     capital: country.capital,

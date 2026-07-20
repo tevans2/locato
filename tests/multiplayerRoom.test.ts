@@ -173,7 +173,7 @@ describe("multiplayer room", () => {
     expect(start.ok).toBe(true);
     const startedRound = start.ok ? start.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
     expect(startedRound?.prompt.kind).toBe("flag-colors");
-    expect(startedRound?.prompt.value).toMatch(/^assets\/flags\/[a-z]{2}\.svg$/);
+    expect(startedRound?.prompt.value).toMatch(/^\/assets\/flags\/[a-z]{2}\.svg$/);
 
     const correctAnswer = countryNameForRound(startedRound!);
     const correct = room.submitAnswer("host", correctAnswer, 1020);

@@ -15,8 +15,8 @@ const MAX_CHAT_HISTORY = 50;
 // A tiny scripted, category-mixed game: rounds cover flags, country outlines, and ISO codes —
 // proving prompt categories interleave in one deck, plus the intermission gap and leaderboard.
 const DEMO_ROUNDS: ReadonlyArray<{ readonly prompt: PublicPromptContent; readonly answer: string; readonly reveal: string }> = [
-  { prompt: { kind: "image", value: "assets/flags/jp.svg" }, answer: "japan", reveal: "Japan" },
-  { prompt: { kind: "image", value: "assets/country-shapes/ca.svg" }, answer: "canada", reveal: "Canada" },
+  { prompt: { kind: "image", value: "/assets/flags/jp.svg" }, answer: "japan", reveal: "Japan" },
+  { prompt: { kind: "image", value: "/assets/country-shapes/ca.svg" }, answer: "canada", reveal: "Canada" },
   { prompt: { kind: "text", value: "BR" }, answer: "brazil", reveal: "Brazil (BR)" },
   { prompt: { kind: "map-click", value: "Japan" }, answer: "jp", reveal: "Japan" },
   { prompt: { kind: "map-highlight", value: "CA" }, answer: "canada", reveal: "Canada" },
