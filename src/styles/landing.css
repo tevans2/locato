@@ -4,6 +4,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Bridge for the React/Tailwind component kit (src/components/ui). The page
+   itself is styled with the site tokens from tokens.css further below. */
 @theme inline {
   --color-background: hsl(var(--landing-background));
   --color-foreground: hsl(var(--landing-foreground));
@@ -31,19 +33,11 @@
   --font-display: "Syne", sans-serif;
 }
 
-.app-shell:has(.landing-screen-shell) {
-  width: 100%;
-  height: 100dvh;
-  margin: 0;
-  padding: 0;
-  display: block;
-}
-
 .landing-screen-shell {
-  --button-outline: rgba(255,255,255, .08);
-  --badge-outline: rgba(255,255,255, .05);
-  --elevate-1: rgba(255,255,255, .03);
-  --elevate-2: rgba(255,255,255, .07);
+  --button-outline: rgba(255, 255, 255, 0.08);
+  --badge-outline: rgba(255, 255, 255, 0.05);
+  --elevate-1: rgba(255, 255, 255, 0.03);
+  --elevate-2: rgba(255, 255, 255, 0.07);
   --landing-background: 110 10% 9%;
   --landing-foreground: 0 0% 93%;
   --landing-border: 110 8% 18%;
@@ -66,7 +60,7 @@
   --landing-destructive-border: hsl(0 62% 49%);
   --landing-input: 110 8% 18%;
   --landing-ring: 88 52% 50%;
-  --landing-font-sans: "DM Sans", sans-serif;
+  --landing-font-sans: var(--font-sans);
   --background: var(--landing-background);
   --foreground: var(--landing-foreground);
   --border: var(--landing-border);
@@ -89,9 +83,37 @@
   --destructive-border: var(--landing-destructive-border);
   --input: var(--landing-input);
   --ring: var(--landing-ring);
+
+  /* Page palette — mirrors tokens.css values that the shell shadows above,
+     plus the chrome recipes shared with the game screens (game.css). */
+  --lp-accent: #86c83f;
+  --lp-accent-bright: #a4df59;
+  --lp-accent-soft: rgba(134, 200, 63, 0.14);
+  --lp-earth: #68d9bd;
+  --lp-earth-soft: rgba(104, 217, 189, 0.12);
+  --lp-route: #e0b45d;
+  --lp-route-soft: rgba(224, 180, 93, 0.12);
+  --lp-muted: #9c9c98;
+  --lp-chrome-border: rgba(232, 226, 211, 0.16);
+  --lp-chrome-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+    rgba(17, 23, 16, 0.94);
+  --lp-chrome-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.18);
+  --lp-chrome-hover-border: rgba(184, 227, 109, 0.42);
+  --lp-chrome-hover-bg:
+    linear-gradient(180deg, rgba(184, 227, 109, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(17, 23, 16, 0.96);
+  --lp-chrome-hover-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.22);
+  --lp-panel-border: rgba(134, 200, 63, 0.16);
+  --lp-panel-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), transparent 46%),
+    rgba(19, 26, 20, 0.86);
+  --lp-panel-shadow: 0 20px 56px rgba(0, 0, 0, 0.3);
+
   width: 100%;
-  height: 100dvh;
-  font-family: var(--landing-font-sans);
+  min-height: 0;
+  color: var(--text);
+  font-family: var(--font-sans);
 }
 
 .landing-screen-shell *,
@@ -134,65 +156,540 @@
   background-color: var(--elevate-2);
 }
 
-.landing-hero-copy {
-  border-left: 2px solid hsl(var(--primary) / 0.45);
-  padding-left: 12px;
-}
+/* ---------- buttons (same recipe as the game-header nav pills) ---------- */
 
-.landing-quiz-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.landing-quiz-strip > div {
-  min-width: 0;
-  min-height: 58px;
-  display: flex;
-  flex-direction: column;
+.lp-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  border: 1px solid hsl(var(--border) / 0.52);
-  border-radius: 10px;
-  background:
-    linear-gradient(180deg, hsl(var(--primary) / 0.09), hsl(var(--card) / 0.2)),
-    hsl(var(--card) / 0.42);
-  color: hsl(var(--foreground));
-  font-size: 0.72rem;
-  font-weight: 750;
+  gap: 9px;
+  min-height: var(--header-control-height);
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-chrome-border);
+  background: var(--lp-chrome-bg);
+  box-shadow: var(--lp-chrome-shadow);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 760;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
-.landing-quiz-strip svg {
-  color: hsl(var(--primary));
+.lp-btn:hover {
+  border-color: var(--lp-chrome-hover-border);
+  background: var(--lp-chrome-hover-bg);
+  box-shadow: var(--lp-chrome-hover-shadow);
 }
 
-.landing-daily-route {
+.lp-btn:active {
+  transform: translateY(1px);
+}
+
+.lp-btn:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 3px;
+}
+
+.lp-btn svg {
+  flex: 0 0 auto;
+}
+
+.lp-btn-primary {
+  background: linear-gradient(180deg, var(--lp-accent-bright), var(--lp-accent));
+  color: #0e150f;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 1px rgba(134, 200, 63, 0.18), 0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+.lp-btn-primary:hover {
+  background: #9ad94f;
+  border-color: #9ad94f;
+  color: #0e150f;
+  box-shadow: 0 0 0 1px rgba(134, 200, 63, 0.28), 0 0 26px rgba(134, 200, 63, 0.3);
+}
+
+.lp-btn-lg {
+  width: 100%;
+}
+
+.lp-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--lp-muted);
+  box-shadow: none;
+}
+
+.lp-btn-ghost:hover {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.lp-narrow-only {
+  display: none;
+}
+
+/* ---------- frame (mirrors .game-screen inside .app-shell) ---------- */
+
+.landing-root {
+  height: 100%;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 0 0;
-  border-top: 1px solid hsl(var(--border) / 0.28);
-  color: hsl(var(--muted-foreground));
+  flex-direction: column;
+  overflow: hidden;
+  animation: enter 180ms ease both;
+}
+
+.landing-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: clamp(10px, 1.6dvh, 16px);
+}
+
+.landing-topbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.landing-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(360px, 0.4fr) minmax(0, 1fr);
+  gap: clamp(12px, 1.6vw, 18px);
+  align-items: stretch;
+}
+
+/* ---------- hero panel ---------- */
+
+.landing-hero,
+.landing-catalog {
+  border: 1px solid var(--lp-panel-border);
+  border-radius: var(--radius-lg);
+  background: var(--lp-panel-bg);
+  box-shadow: var(--lp-panel-shadow);
+  min-height: 0;
+}
+
+.landing-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(24px, 3.5dvh, 44px) clamp(22px, 2.2vw, 36px);
+  overflow: hidden;
+}
+
+.landing-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(200deg, rgba(134, 200, 63, 0.05), transparent 42%),
+    var(--panel-grid);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.landing-globe-lines {
+  position: absolute;
+  left: -150px;
+  bottom: -150px;
+  width: 440px;
+  height: 440px;
+  color: rgba(184, 227, 109, 0.1);
+  pointer-events: none;
+}
+
+.landing-globe-pin {
+  fill: var(--lp-accent);
+  animation: lp-pin-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes lp-pin-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
+}
+
+.landing-hero-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
   font-size: 0.78rem;
+  font-weight: 760;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lp-accent);
+}
+
+.landing-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  box-shadow: 0 0 10px var(--lp-accent);
+}
+
+.landing-title {
+  margin: 14px 0 12px;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 2.7vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+.landing-title em {
+  font-style: normal;
+  color: var(--lp-accent);
+}
+
+.landing-sub {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--lp-muted);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.landing-hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.landing-daily {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  padding: 13px 16px 14px;
+  border: 1px solid var(--lp-chrome-border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.08), transparent 55%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.landing-daily:hover {
+  border-color: var(--lp-chrome-hover-border);
+  background:
+    linear-gradient(135deg, rgba(184, 227, 109, 0.12), transparent 58%),
+    rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 1px rgba(184, 227, 109, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.landing-daily:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 3px;
+}
+
+.landing-daily-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.landing-daily-head svg {
+  color: var(--lp-accent);
+}
+
+.landing-daily-date {
+  margin-left: auto;
+  color: var(--lp-muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.76rem;
+}
+
+.landing-daily-desc {
+  color: var(--lp-muted);
+  font-size: 0.84rem;
+  font-weight: 620;
+  line-height: 1.45;
+}
+
+.landing-daily-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 760;
+  color: var(--lp-accent);
+}
+
+.landing-daily-state[data-played="true"] {
+  color: var(--lp-route);
+}
+
+.landing-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 20px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(232, 226, 211, 0.12);
+  list-style: none;
+  color: var(--lp-muted);
+  font-size: 0.8rem;
+  font-weight: 620;
+}
+
+.landing-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.landing-facts li::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--subtle);
+}
+
+/* ---------- catalog panel ---------- */
+
+.landing-catalog {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: clamp(16px, 2.2dvh, 24px) clamp(16px, 1.8vw, 26px) clamp(22px, 3dvh, 32px);
+}
+
+.landing-catalog-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.landing-catalog-label {
+  margin: 0 0 -12px;
+  font-size: 0.78rem;
+  font-weight: 760;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+/* Each group carries its own hue; cards below inherit it. New game families
+   only need a data-hue rule here (or reuse an existing one). */
+.landing-group {
+  --g: var(--lp-accent);
+  --g-soft: var(--lp-accent-soft);
+}
+
+.landing-group[data-hue="earth"] {
+  --g: var(--lp-earth);
+  --g-soft: var(--lp-earth-soft);
+}
+
+.landing-group[data-hue="route"] {
+  --g: var(--lp-route);
+  --g-soft: var(--lp-route-soft);
+}
+
+.landing-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+
+.landing-group-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.04;
+  color: var(--g);
+}
+
+.landing-group-head h2::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g);
+  box-shadow: 0 0 12px var(--g);
+}
+
+.landing-group-head p {
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 0.86rem;
   line-height: 1.35;
 }
 
-.landing-daily-route svg {
-  flex: 0 0 auto;
-  color: hsl(var(--primary));
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
 
-@media (max-width: 767px) {
-  .landing-screen-shell {
-    height: 100dvh;
-    min-height: 100svh;
-    overflow: hidden;
-  }
+.landing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 15px 15px;
+  border: 1px solid rgba(232, 226, 211, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
 
+.landing-card:hover {
+  border-color: color-mix(in srgb, var(--g) 45%, transparent);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px color-mix(in srgb, var(--g) 14%, transparent),
+    0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.landing-card:focus-visible {
+  outline: 2px solid var(--g);
+  outline-offset: 3px;
+}
+
+.landing-card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--g) 24%, transparent);
+  border-radius: 10px;
+  color: var(--g);
+  background: var(--g-soft);
+}
+
+.landing-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.landing-card-title {
+  font-family: var(--font-display);
+  font-size: 0.96rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.landing-card-desc {
+  color: var(--lp-muted);
+  font-size: 0.84rem;
+  font-weight: 620;
+  line-height: 1.4;
+}
+
+.landing-card-badge {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--lp-accent-bright), var(--lp-accent));
+  color: #0e150f;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-card.wide {
+  grid-column: span 2;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.landing-card.wide .landing-card-icon {
+  width: 44px;
+  height: 44px;
+}
+
+/* ---------- together band ---------- */
+
+.landing-together {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(232, 226, 211, 0.14);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(120deg, rgba(134, 200, 63, 0.07), transparent 55%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.landing-together-copy h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.04;
+}
+
+.landing-together-copy p {
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 0.86rem;
+}
+
+.landing-together-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- responsive ---------- */
+
+/* Match the site's breakpoints: game screens stack their two panels at 980px
+   (responsive.css) and switch to mobile chrome at 700px. */
+@media (max-width: 980px) {
   .landing-root {
-    height: 100dvh;
-    min-height: 100svh;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -202,82 +699,118 @@
     position: sticky;
     top: 0;
     z-index: 20;
-    min-height: 72px;
-    height: auto;
-    padding: 14px 20px;
-    gap: 16px;
+    margin-bottom: 0;
+    min-height: 60px;
+    padding: 8px 0 10px;
+    border-bottom: 1px solid rgba(232, 226, 211, 0.1);
+    background: rgba(10, 15, 10, 0.82);
+    backdrop-filter: blur(14px);
   }
 
-  .landing-topbar [data-testid="button-play-now"] {
-    min-height: 40px;
-    padding-inline: 20px;
-    font-size: 0.95rem;
-  }
-
-  .landing-main-layout {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    overflow: visible;
-  }
-
-  .landing-hero-panel {
+  .landing-topbar-actions .lp-desktop-only {
     display: none;
   }
 
-  .landing-game-modes {
+  .landing-main {
     flex: 0 0 auto;
-    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 0 28px;
     overflow: visible;
-    padding: 18px 18px 36px;
   }
 
-  .landing-game-modes > .h-full {
+  .landing-hero {
+    justify-content: flex-start;
+    padding: 24px 20px 22px;
+  }
+
+  .landing-globe-lines {
+    left: auto;
+    right: -200px;
+    bottom: -240px;
+  }
+
+  .landing-catalog {
+    overflow: visible;
+    padding: 20px 16px 24px;
+  }
+
+  .landing-together {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .landing-together-actions .lp-btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  .landing-screen-shell {
     height: auto;
+    min-height: 100dvh;
   }
 
-  .landing-mode-grid {
+  .landing-root {
+    height: 100dvh;
+    min-height: 100svh;
+  }
+
+  .landing-topbar {
+    min-height: 64px;
+    padding: 10px 16px;
+  }
+
+  /* The site hides the wordmark on small screens, but the landing page is the
+     front door — keep the name visible next to the logo here. */
+  .landing-topbar .brand-name {
+    display: inline;
+  }
+
+  .landing-topbar-actions {
+    gap: 8px;
+  }
+
+  .landing-screen-shell .lp-btn {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 0.92rem;
+  }
+
+  .landing-screen-shell .lp-btn-lg {
+    min-height: 46px;
+    font-size: 1rem;
+  }
+
+  .lp-wide-only {
+    display: none;
+  }
+
+  .lp-narrow-only {
+    display: inline;
+  }
+
+  .landing-main {
+    padding: 12px 10px 32px;
+  }
+
+  .landing-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
-  .landing-mode-card {
-    min-height: 132px;
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    column-gap: 14px;
-    row-gap: 5px;
-    align-items: start;
-    padding: 18px;
-  }
-
-  .landing-mode-card > div:first-child {
-    grid-row: 1 / span 2;
-    margin-bottom: 0;
-  }
-
-  .landing-mode-card .font-display {
-    align-self: end;
-    font-size: 1rem;
-  }
-
-  .landing-mode-card .text-xs {
-    max-width: 30rem;
-    font-size: 0.86rem;
+  .landing-card.wide {
+    grid-column: auto;
   }
 }
 
 @media (max-width: 420px) {
   .landing-topbar {
-    padding-inline: 16px;
+    padding-inline: 12px;
   }
 
-  .landing-topbar [data-testid="button-play-now"] {
-    padding-inline: 16px;
-  }
-
-  .landing-game-modes {
-    padding-inline: 14px;
+  .landing-main {
+    padding-inline: 8px;
   }
 }
