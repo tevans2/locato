@@ -9,3 +9,7 @@ i-want-to-create-an-html/work/
 i-want-to-create-an-html/outputs/
 
 .env
+
+# Browser regression artifacts
+playwright-report/
+test-results/
