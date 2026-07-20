@@ -136,20 +136,79 @@ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
   }
 }
 
-function GlobeLines() {
+const LANDING_STARS = Array.from({ length: 56 }, (_, index) => ({
+  left: (index * 37 + (index % 7) * 11) % 100,
+  top: (index * 61 + (index % 5) * 13) % 100,
+  size: index % 13 === 0 ? 2.6 : index % 5 === 0 ? 1.7 : 1,
+  opacity: 0.28 + (index % 6) * 0.1,
+  delay: -(index % 9) * 0.47,
+}));
+
+function LandingSpaceBackdrop() {
   return (
-    <svg className="landing-globe-lines" viewBox="0 0 420 420" aria-hidden="true">
-      <g fill="none" stroke="currentColor" strokeWidth="1">
-        <circle cx="210" cy="210" r="205" />
-        <ellipse cx="210" cy="210" rx="150" ry="205" />
-        <ellipse cx="210" cy="210" rx="82" ry="205" />
-        <ellipse cx="210" cy="210" rx="205" ry="150" />
-        <ellipse cx="210" cy="210" rx="205" ry="82" />
-        <line x1="210" y1="5" x2="210" y2="415" />
-        <line x1="5" y1="210" x2="415" y2="210" />
-      </g>
-      <circle className="landing-globe-pin" cx="89" cy="89" r="4" />
-    </svg>
+    <div className="landing-space-backdrop" aria-hidden="true">
+      <div className="landing-star-field">
+        {LANDING_STARS.map((star, index) => (
+          <span
+            key={index}
+            className={star.size > 2 ? "landing-star is-bright" : "landing-star"}
+            style={{
+              left: `${star.left}%`,
+              top: `${star.top}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              animationDelay: `${star.delay}s`,
+            }}
+          />
+        ))}
+      </div>
+      <span className="landing-space-nebula landing-space-nebula-one" />
+      <span className="landing-space-nebula landing-space-nebula-two" />
+      <svg className="landing-space-globe" viewBox="0 0 760 760">
+        <defs>
+          <radialGradient id="landing-planet-light" cx="31%" cy="24%" r="75%">
+            <stop offset="0%" stopColor="#466a42" />
+            <stop offset="38%" stopColor="#1d3c31" />
+            <stop offset="76%" stopColor="#0a1c19" />
+            <stop offset="100%" stopColor="#040a09" />
+          </radialGradient>
+          <linearGradient id="landing-atmosphere" x1="16%" y1="10%" x2="84%" y2="90%">
+            <stop offset="0%" stopColor="#b8e36d" stopOpacity="0.7" />
+            <stop offset="48%" stopColor="#68d9bd" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#68d9bd" stopOpacity="0" />
+          </linearGradient>
+          <clipPath id="landing-planet-clip">
+            <circle cx="380" cy="380" r="246" />
+          </clipPath>
+        </defs>
+
+        <ellipse className="landing-space-orbit" cx="380" cy="380" rx="348" ry="136" transform="rotate(-20 380 380)" />
+        <ellipse className="landing-space-orbit is-secondary" cx="380" cy="380" rx="326" ry="116" transform="rotate(28 380 380)" />
+        <circle className="landing-space-orbit-dot" cx="693" cy="225" r="5" />
+        <circle className="landing-space-atmosphere" cx="380" cy="380" r="264" stroke="url(#landing-atmosphere)" />
+        <circle className="landing-space-planet" cx="380" cy="380" r="246" fill="url(#landing-planet-light)" />
+
+        <g clipPath="url(#landing-planet-clip)" transform="rotate(-9 380 380)">
+          <path className="landing-space-land" d="M116 264c45-45 95-72 146-78l35 18 33-1 21 28-14 34-40 14-18 42-30 10-17 52-35 8-18-39-31-18-18-36-14-34z" />
+          <path className="landing-space-land is-dim" d="M282 380l38 15 32 37-6 46 27 36-18 81-33 42-17-38 7-54-31-47-18-48z" />
+          <path className="landing-space-land" d="M350 194l53-27 97 5 48 29 61 12 53 40-9 36-55 8-31 30-52-5-24 29-46-14-43 12-31-31 17-47-34-28z" />
+          <path className="landing-space-land is-dim" d="M443 342l49-6 32 33 9 56-29 39-12 69-44 54-35-25 13-63-25-38 2-54z" />
+          <path className="landing-space-land" d="M568 501l39-16 48 23 5 34-47 17-40-19z" />
+
+          <g className="landing-space-grid">
+            <ellipse cx="380" cy="380" rx="176" ry="246" />
+            <ellipse cx="380" cy="380" rx="86" ry="246" />
+            <ellipse cx="380" cy="380" rx="246" ry="176" />
+            <ellipse cx="380" cy="380" rx="246" ry="86" />
+            <line x1="134" y1="380" x2="626" y2="380" />
+            <line x1="380" y1="134" x2="380" y2="626" />
+          </g>
+          <ellipse className="landing-space-terminator" cx="507" cy="380" rx="176" ry="246" />
+        </g>
+        <circle className="landing-space-rim" cx="380" cy="380" r="246" />
+      </svg>
+    </div>
   );
 }
 
@@ -160,6 +219,7 @@ function LandingHome(options: LandingScreenOptions) {
 
   return (
     <div className="landing-root">
+      <LandingSpaceBackdrop />
       <nav className="landing-topbar">
         <button type="button" onClick={options.onHome} className="brand-lockup compact brand-home-button" aria-label="Go to home page">
           <img src="/logo.svg" alt="" className="brand-logo" />
@@ -184,7 +244,6 @@ function LandingHome(options: LandingScreenOptions) {
 
       <div className="landing-main">
         <aside className="landing-hero">
-          <GlobeLines />
           <motion.div
             className="landing-hero-inner"
             initial={{ opacity: 0, y: 14 }}

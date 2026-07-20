@@ -235,14 +235,167 @@
 /* ---------- frame (mirrors .game-screen inside .app-shell) ---------- */
 
 .landing-root {
+  position: relative;
+  isolation: isolate;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 72%, rgba(104, 217, 189, 0.1), transparent 32%),
+    radial-gradient(circle at 21% 18%, rgba(134, 200, 63, 0.075), transparent 27%),
+    linear-gradient(150deg, #070c09 0%, #08110f 48%, #050908 100%);
   animation: enter 180ms ease both;
 }
 
+.landing-space-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-space-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.26;
+  background-image:
+    radial-gradient(circle, rgba(232, 226, 211, 0.72) 0 0.7px, transparent 0.9px),
+    radial-gradient(circle, rgba(104, 217, 189, 0.5) 0 0.6px, transparent 0.9px);
+  background-position: 17px 11px, 66px 48px;
+  background-size: 93px 87px, 157px 139px;
+  -webkit-mask-image: linear-gradient(to bottom, black, rgba(0, 0, 0, 0.55) 72%, transparent);
+  mask-image: linear-gradient(to bottom, black, rgba(0, 0, 0, 0.55) 72%, transparent);
+}
+
+.landing-star-field {
+  position: absolute;
+  inset: 0;
+}
+
+.landing-star {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(232, 226, 211, 0.95);
+  box-shadow: 0 0 6px rgba(232, 226, 211, 0.5);
+  animation: landing-star-twinkle 4.2s ease-in-out infinite;
+}
+
+.landing-star.is-bright {
+  background: #b8e36d;
+  box-shadow: 0 0 5px #b8e36d, 0 0 14px rgba(104, 217, 189, 0.68);
+}
+
+.landing-space-nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.2;
+}
+
+.landing-space-nebula-one {
+  top: -24%;
+  right: 10%;
+  width: 46vw;
+  height: 40vw;
+  background: rgba(104, 217, 189, 0.25);
+}
+
+.landing-space-nebula-two {
+  bottom: -30%;
+  left: -12%;
+  width: 52vw;
+  height: 44vw;
+  background: rgba(134, 200, 63, 0.2);
+}
+
+.landing-space-globe {
+  position: absolute;
+  right: -13vw;
+  bottom: -34vh;
+  width: min(72vw, 980px);
+  min-width: 680px;
+  overflow: visible;
+  opacity: 0.66;
+  filter: drop-shadow(-24px -18px 58px rgba(104, 217, 189, 0.11));
+  animation: landing-globe-drift 18s ease-in-out infinite alternate;
+}
+
+.landing-space-orbit {
+  fill: none;
+  stroke: rgba(184, 227, 109, 0.2);
+  stroke-width: 1.15;
+  stroke-dasharray: 3 8;
+}
+
+.landing-space-orbit.is-secondary {
+  stroke: rgba(104, 217, 189, 0.13);
+  stroke-dasharray: 1 11;
+}
+
+.landing-space-orbit-dot {
+  fill: #b8e36d;
+  filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.9));
+  animation: landing-orbit-pulse 3.4s ease-in-out infinite;
+}
+
+.landing-space-atmosphere {
+  fill: none;
+  stroke-width: 28;
+  opacity: 0.72;
+}
+
+.landing-space-planet {
+  stroke: rgba(184, 227, 109, 0.24);
+  stroke-width: 1.5;
+}
+
+.landing-space-land {
+  fill: rgba(134, 200, 63, 0.16);
+  stroke: rgba(184, 227, 109, 0.14);
+  stroke-width: 1.2;
+}
+
+.landing-space-land.is-dim {
+  fill: rgba(104, 217, 189, 0.1);
+}
+
+.landing-space-grid {
+  fill: none;
+  stroke: rgba(184, 227, 109, 0.1);
+  stroke-width: 1;
+}
+
+.landing-space-terminator {
+  fill: rgba(1, 5, 5, 0.42);
+}
+
+.landing-space-rim {
+  fill: none;
+  stroke: rgba(184, 227, 109, 0.22);
+  stroke-width: 1.25;
+}
+
+@keyframes landing-star-twinkle {
+  0%, 100% { transform: scale(0.75); opacity: 0.26; }
+  50% { transform: scale(1.3); opacity: 0.9; }
+}
+
+@keyframes landing-globe-drift {
+  from { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
+  to { transform: translate3d(-12px, -8px, 0) rotate(1.2deg); }
+}
+
+@keyframes landing-orbit-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
 .landing-topbar {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
@@ -260,6 +413,8 @@
 }
 
 .landing-main {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
@@ -274,8 +429,11 @@
 .landing-catalog {
   border: 1px solid var(--lp-panel-border);
   border-radius: var(--radius-lg);
-  background: var(--lp-panel-bg);
-  box-shadow: var(--lp-panel-shadow);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 44%),
+    rgba(10, 17, 13, 0.76);
+  box-shadow: var(--lp-panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(15px) saturate(112%);
   min-height: 0;
 }
 
@@ -293,30 +451,11 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(200deg, rgba(134, 200, 63, 0.05), transparent 42%),
+    radial-gradient(circle at 22% 88%, rgba(104, 217, 189, 0.08), transparent 32%),
+    linear-gradient(200deg, rgba(134, 200, 63, 0.065), transparent 42%),
     var(--panel-grid);
   border-radius: inherit;
   pointer-events: none;
-}
-
-.landing-globe-lines {
-  position: absolute;
-  left: -150px;
-  bottom: -150px;
-  width: 440px;
-  height: 440px;
-  color: rgba(184, 227, 109, 0.1);
-  pointer-events: none;
-}
-
-.landing-globe-pin {
-  fill: var(--lp-accent);
-  animation: lp-pin-pulse 3.2s ease-in-out infinite;
-}
-
-@keyframes lp-pin-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.85; }
 }
 
 .landing-hero-inner {
@@ -703,7 +842,7 @@
     min-height: 60px;
     padding: 8px 0 10px;
     border-bottom: 1px solid rgba(232, 226, 211, 0.1);
-    background: rgba(10, 15, 10, 0.82);
+    background: rgba(7, 13, 11, 0.82);
     backdrop-filter: blur(14px);
   }
 
@@ -725,10 +864,12 @@
     padding: 24px 20px 22px;
   }
 
-  .landing-globe-lines {
-    left: auto;
-    right: -200px;
-    bottom: -240px;
+  .landing-space-globe {
+    right: -260px;
+    bottom: -180px;
+    width: 680px;
+    min-width: 680px;
+    opacity: 0.52;
   }
 
   .landing-catalog {
@@ -755,6 +896,27 @@
   .landing-root {
     height: 100dvh;
     min-height: 100svh;
+  }
+
+  .landing-space-globe {
+    right: -330px;
+    bottom: -120px;
+    width: 590px;
+    min-width: 590px;
+    opacity: 0.46;
+  }
+
+  .landing-space-nebula-one {
+    top: 8%;
+    right: -35%;
+    width: 90vw;
+    height: 90vw;
+  }
+
+  .landing-hero,
+  .landing-catalog {
+    background: rgba(9, 16, 12, 0.82);
+    backdrop-filter: blur(12px) saturate(108%);
   }
 
   .landing-topbar {
