@@ -1,4 +1,5 @@
 import type { AuthUser } from "../../core/auth";
+import { matchFreestyleCapital, type CapitalRecallPlayStyle } from "../../core/capitalRecall";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
@@ -74,6 +75,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const isDailyChallenge = options.dailyChallenge !== undefined;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
+  const playableCapitalCountries = countries.filter((country) => country.capital.length > 0);
   const dailyMarks: DailyRoundMark[] = [];
   let dailyHintsUsed = 0;
   let dailyRoundHintsUsed = 0;
@@ -171,11 +173,44 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
     ],
   });
+  const randomisedRecallButton = el("button", {
+    className: "capital-recall-style-button is-active",
+    text: "Randomised",
+    attrs: { type: "button", "aria-pressed": "true" },
+  });
+  const freestyleRecallButton = el("button", {
+    className: "capital-recall-style-button",
+    text: "Freestyle",
+    attrs: { type: "button", "aria-pressed": "false" },
+  });
+  const capitalRecallStyleHelp = el("p", {
+    className: "capital-recall-style-help",
+    text: "A random country is highlighted — type its capital.",
+  });
+  const capitalRecallStylePicker = el("section", {
+    className: "capital-recall-style-picker",
+    attrs: { "aria-label": "Capital Recall play style" },
+    children: [
+      el("div", {
+        className: "capital-recall-style-toggle",
+        attrs: { role: "group", "aria-label": "Choose randomised or freestyle play" },
+        children: [randomisedRecallButton, freestyleRecallButton],
+      }),
+      capitalRecallStyleHelp,
+    ],
+  });
 
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
   let activeMapPromptKey: string | null = null;
   let latestCapitalRecallCountryId: CountryId | null = null;
+  let capitalRecallPlayStyle: CapitalRecallPlayStyle = "randomised";
+  const freestyleGuessedCountryIds = new Set<CountryId>();
+  let latestFreestyleCountryId: CountryId | null = null;
+  let freestyleCorrectGuesses = 0;
+  let freestyleWrongGuesses = 0;
+  let freestyleStreak = 0;
+  let resumeRandomTimerAfterFreestyle = false;
   let revealAnswerArmed = false;
   const cleanDailyMapCountryIds: ReadonlySet<CountryId> = new Set();
   const capitalRecallMap: CapitalRecallMapView | null =
@@ -344,8 +379,106 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("div", { className: "mobile-daily-actions", children: [mobileSkipButton] }),
     ],
   });
+  let answerPanel: HTMLElement;
+
+  function isFreestyleCapitalRecall(): boolean {
+    return options.selectedGameMode === "capital-recall" && capitalRecallPlayStyle === "freestyle";
+  }
+
+  function updateFreestyleStats(): void {
+    const guessed = freestyleGuessedCountryIds.size;
+    const total = playableCapitalCountries.length;
+    const remaining = Math.max(0, total - guessed);
+    const attempts = freestyleCorrectGuesses + freestyleWrongGuesses;
+    const accuracy = attempts === 0 ? 1 : freestyleCorrectGuesses / attempts;
+    stats.score.textContent = String(guessed);
+    stats.streak.textContent = String(freestyleStreak);
+    stats.accuracy.textContent = `${Math.round(accuracy * 100)}%`;
+    stats.remaining.textContent = String(remaining);
+    stats.progress.textContent = `${guessed} named, ${remaining} remaining`;
+    stats.progressFill.style.transform = `scaleX(${(total === 0 ? 1 : guessed / total).toFixed(4)})`;
+  }
+
+  function formatCapitalMatch(country: Country): string {
+    return `${country.capital} — ${country.name}`;
+  }
+
+  function submitFreestyleCapital(guess: string, auto: boolean): void {
+    if (!guess.trim() || freestyleGuessedCountryIds.size >= playableCapitalCountries.length) return;
+    const result = matchFreestyleCapital(countryIndex, guess, freestyleGuessedCountryIds, auto);
+
+    if (result.newCountries.length > 0) {
+      for (const country of result.newCountries) freestyleGuessedCountryIds.add(country.id);
+      latestFreestyleCountryId = result.newCountries.at(-1)?.id ?? null;
+      freestyleCorrectGuesses += 1;
+      freestyleStreak += 1;
+      input.value = "";
+      hideHintPopover();
+      render(false);
+
+      const complete = freestyleGuessedCountryIds.size >= playableCapitalCountries.length;
+      showFeedback(
+        views.feedback,
+        complete
+          ? `Complete — you named all ${playableCapitalCountries.length} capitals.`
+          : `Correct: ${result.newCountries.map(formatCapitalMatch).join(", ")}. ${freestyleGuessedCountryIds.size} named.`,
+        "good",
+      );
+      if (!complete && shouldAutoFocusTextInput()) input.focus();
+      return;
+    }
+
+    if (auto) return;
+    if (result.alreadySolvedCountries.length > 0) {
+      showFeedback(views.feedback, `Already named: ${result.alreadySolvedCountries.map(formatCapitalMatch).join(", ")}.`, "neutral");
+    } else {
+      freestyleWrongGuesses += 1;
+      freestyleStreak = 0;
+      render(false);
+      showFeedback(views.feedback, "No capital matched that answer. Try another city.", "bad");
+    }
+    if (shouldAutoFocusTextInput()) input.select();
+  }
+
+  function setCapitalRecallPlayStyle(nextStyle: CapitalRecallPlayStyle): void {
+    if (capitalRecallPlayStyle === nextStyle) return;
+    if (nextStyle === "freestyle" && playTimer.mode === "count-up") {
+      resumeRandomTimerAfterFreestyle = playTimer.currentElapsedMs() > 0;
+      playTimer.stop();
+    }
+    capitalRecallPlayStyle = nextStyle;
+    revealAnswerArmed = false;
+    input.value = "";
+    hideHintPopover();
+    render(false);
+    showFeedback(
+      views.feedback,
+      nextStyle === "freestyle"
+        ? "Freestyle ready. Type any capital you know — each unique answer counts once."
+        : "Randomised mode restored. Name the capital of the highlighted country.",
+      "neutral",
+    );
+    if (nextStyle === "randomised" && resumeRandomTimerAfterFreestyle) {
+      resumeRandomTimerAfterFreestyle = false;
+      playTimer.startIfNeeded();
+    }
+    if (!input.disabled && shouldAutoFocusTextInput()) input.focus();
+  }
 
   function resetRun(message: string): void {
+    if (isFreestyleCapitalRecall()) {
+      freestyleGuessedCountryIds.clear();
+      latestFreestyleCountryId = null;
+      freestyleCorrectGuesses = 0;
+      freestyleWrongGuesses = 0;
+      freestyleStreak = 0;
+      input.value = "";
+      updateAtlasView(atlas, countries, freestyleGuessedCountryIds);
+      render(false);
+      showFeedback(feedback, "Fresh freestyle run started.", "neutral");
+      if (shouldAutoFocusTextInput()) input.focus();
+      return;
+    }
     activeMapPromptKey = null;
     latestCapitalRecallCountryId = null;
     setAtlasOpen(atlas, false);
@@ -363,19 +496,34 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
+    const isFreestyle = isFreestyleCapitalRecall();
     guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
-    input.placeholder = isCapitalRecallMode ? "e.g. Tokyo, Abuja, Brasília..." : "e.g. Brazil, Japan, ZA...";
-    updateStatsView(stats, countryIndex, state);
+    input.placeholder = isFreestyle
+      ? "Type any capital city..."
+      : isCapitalRecallMode
+        ? "e.g. Tokyo, Abuja, Brasília..."
+        : "e.g. Brazil, Japan, ZA...";
+    if (isFreestyle) updateFreestyleStats();
+    else updateStatsView(stats, countryIndex, state);
     if (isCapitalRecallMode && capitalRecallMap) {
       activeFlagColorTarget = null;
       activeMapPromptKey = null;
       if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
-      prompt.status.textContent = state.status === "complete" ? "Complete" : `Round ${state.roundNumber}`;
-      prompt.kicker.textContent = "Capital recall";
+      prompt.status.textContent = isFreestyle
+        ? `${freestyleGuessedCountryIds.size} named`
+        : state.status === "complete"
+          ? "Complete"
+          : `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = isFreestyle ? "Capital freestyle" : "Capital recall";
       if (prompt.imageSlot.firstElementChild !== capitalRecallMap.element) {
         prompt.imageSlot.replaceChildren(capitalRecallMap.element);
       }
-      capitalRecallMap.update(state.guessedCountryIds, current?.id ?? null, latestCapitalRecallCountryId);
+      capitalRecallMap.update(
+        isFreestyle ? freestyleGuessedCountryIds : state.guessedCountryIds,
+        isFreestyle ? null : current?.id ?? null,
+        isFreestyle ? latestFreestyleCountryId : latestCapitalRecallCountryId,
+        capitalRecallPlayStyle,
+      );
     } else if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
       activeFlagColorTarget = null;
       prompt.status.textContent = `Round ${state.roundNumber}`;
@@ -417,25 +565,38 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
       updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
     }
-    updateAtlasView(atlas, countries, state.guessedCountryIds);
-    const playing = state.status === "playing";
+    updateAtlasView(atlas, countries, isFreestyle ? freestyleGuessedCountryIds : state.guessedCountryIds);
+    const playing = isFreestyle ? freestyleGuessedCountryIds.size < playableCapitalCountries.length : state.status === "playing";
     if (!playing || state.hintLevel < TOTAL_HINTS) revealAnswerArmed = false;
     const revealAnswerReady = state.hintLevel >= TOTAL_HINTS;
     const hintLabel = revealAnswerReady ? (revealAnswerArmed ? "Reveal answer" : "Reveal answer?") : "Hint";
     input.disabled = !playing;
     submitButton.disabled = !playing;
-    hintButton.disabled = !playing;
-    mobileHintButton.disabled = !playing;
+    hintButton.disabled = !playing || isFreestyle;
+    mobileHintButton.disabled = !playing || isFreestyle;
     hintButton.textContent = hintLabel;
     mobileHintButton.textContent = hintLabel;
     hintButton.classList.toggle("is-reveal-armed", revealAnswerReady);
     mobileHintButton.classList.toggle("is-reveal-armed", revealAnswerReady);
     hintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
     mobileHintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
-    skipButton.disabled = !playing;
-    mobileSkipButton.disabled = !playing;
+    skipButton.disabled = !playing || isFreestyle;
+    mobileSkipButton.disabled = !playing || isFreestyle;
+    hintButton.hidden = isFreestyle;
+    mobileHintButton.hidden = isFreestyle;
+    skipButton.hidden = isFreestyle;
+    mobileSkipButton.hidden = isFreestyle;
+    timerPanel.hidden = isFreestyle;
+    randomisedRecallButton.classList.toggle("is-active", !isFreestyle);
+    freestyleRecallButton.classList.toggle("is-active", isFreestyle);
+    randomisedRecallButton.setAttribute("aria-pressed", String(!isFreestyle));
+    freestyleRecallButton.setAttribute("aria-pressed", String(isFreestyle));
+    capitalRecallStyleHelp.textContent = isFreestyle
+      ? `Type capitals in any order. ${freestyleGuessedCountryIds.size} of ${playableCapitalCountries.length} named.`
+      : "A random country is highlighted — type its capital.";
+    answerPanel.classList.toggle("is-capital-recall-freestyle", isFreestyle);
     renderTimer();
-    if (persist) options.onStateChange(state);
+    if (persist && !isFreestyle) options.onStateChange(state);
   }
 
   function dispatchAndRender(events: readonly GameEvent[], persist = true): void {
@@ -504,6 +665,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "submit",
     (event) => {
       event.preventDefault();
+      if (isFreestyleCapitalRecall()) {
+        submitFreestyleCapital(input.value, false);
+        return;
+      }
       if (engine.getState().currentCategoryId === "flag-colors") {
         const guessedCountry = countryForGuess(countryIndex, input.value);
         if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
@@ -518,6 +683,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "input",
     () => {
       if (isDailyChallenge) return;
+      if (isFreestyleCapitalRecall()) {
+        submitFreestyleCapital(input.value, true);
+        return;
+      }
       const events = engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now(), auto: true });
       if (events.length > 0) dispatchAndRender(events);
     },
@@ -586,6 +755,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     },
     { signal: controller.signal },
   );
+  randomisedRecallButton.addEventListener("click", () => setCapitalRecallPlayStyle("randomised"), { signal: controller.signal });
+  freestyleRecallButton.addEventListener("click", () => setCapitalRecallPlayStyle("freestyle"), { signal: controller.signal });
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
   mobileDailyNavButton.addEventListener("click", () => (isDailyChallenge ? options.onExitDailyChallenge?.() : options.onDailyChallenge()), { signal: controller.signal });
   mobileLeaderboardNavButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
@@ -633,13 +804,29 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
   atlas.overlay.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
 
+  const soloActions = el("div", {
+    className: "actions solo-action-grid",
+    children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element],
+  });
   mobileExtrasPanel.replaceChildren(
     timerPanel,
     stats.element,
     feedback.element,
     achievementPanel,
-    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
+    soloActions,
   );
+
+  answerPanel = el("aside", {
+    className: "answer-panel",
+    children: [
+      el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" })] }),
+      ...(options.selectedGameMode === "capital-recall" ? [capitalRecallStylePicker] : []),
+      form,
+      hintPopover,
+      mobileExtrasToggle,
+      mobileExtrasPanel,
+    ],
+  });
 
   const element = el("section", {
     className: isDailyChallenge ? "game-screen daily-game-screen" : "game-screen",
@@ -658,16 +845,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         className: "play-layout",
         children: [
           prompt.element,
-          el("aside", {
-            className: "answer-panel",
-            children: [
-              el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" })] }),
-              form,
-              hintPopover,
-              mobileExtrasToggle,
-              mobileExtrasPanel,
-            ],
-          }),
+          answerPanel,
         ],
       }),
     ],

@@ -1,4 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
+import type { CapitalRecallPlayStyle } from "../../core/capitalRecall";
 import {
   MAP_VIEWBOX_HEIGHT,
   MAP_VIEWBOX_WIDTH,
@@ -58,7 +59,12 @@ export interface CapitalRecallMapViewOptions {
 
 export interface CapitalRecallMapView {
   readonly element: HTMLElement;
-  readonly update: (guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null) => void;
+  readonly update: (
+    guessedCountryIds: ReadonlySet<CountryId>,
+    currentCountryId: CountryId | null,
+    latestCountryId: CountryId | null,
+    playStyle?: CapitalRecallPlayStyle,
+  ) => void;
 }
 
 interface MarkerEntry {
@@ -575,7 +581,12 @@ export function createCapitalRecallMapView(
     { once: true },
   );
 
-  function update(guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null): void {
+  function update(
+    guessedCountryIds: ReadonlySet<CountryId>,
+    currentCountryId: CountryId | null,
+    latestCountryId: CountryId | null,
+    playStyle: CapitalRecallPlayStyle = "randomised",
+  ): void {
     const recentLabelIds = new Set(recentCountries(countryIndex, guessedCountryIds, RECENT_LABEL_COUNT).map((country) => country.id));
     for (const [countryId, path] of pathByCountryId) {
       path.classList.toggle("is-solved", guessedCountryIds.has(countryId));
@@ -598,7 +609,14 @@ export function createCapitalRecallMapView(
 
     previousLatestCountryId = latestCountryId;
     const currentCountry = currentCountryId === null ? null : countryIndex.byId[currentCountryId] ?? null;
-    currentName.textContent = currentCountry?.name ?? "Complete";
+    const freestyle = playStyle === "freestyle";
+    element.classList.toggle("is-freestyle", freestyle);
+    currentPrefix.textContent = freestyle ? "Freestyle" : "Capital of";
+    currentName.textContent = freestyle
+      ? guessedCountryIds.size >= playableCapitalTotal
+        ? "Every capital named"
+        : "Name any capital"
+      : currentCountry?.name ?? "Complete";
     progress.textContent = `${Math.min(guessedCountryIds.size, playableCapitalTotal)} / ${playableCapitalTotal}`;
 
     const recent = recentCountries(countryIndex, guessedCountryIds, RECENT_LIST_COUNT);
