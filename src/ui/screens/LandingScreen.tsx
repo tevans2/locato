@@ -24,6 +24,7 @@ import { readDailyResult } from "../../storage/dailySave";
 import { readSoloSave } from "../../storage/localSave";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
+import { LandingSatelliteGlobe } from "../components/LandingSatelliteGlobe";
 
 export interface LandingScreenOptions {
   readonly onHome: () => void;
@@ -136,20 +137,54 @@ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
   }
 }
 
-function GlobeLines() {
+function createLandingStars(count: number) {
+  let state = 0x57a25;
+  const random = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+
+  return Array.from({ length: count }, (_, index) => {
+    const magnitude = random();
+    const size = magnitude > 0.975 ? 2.4 + random() * 0.8 : magnitude > 0.82 ? 1.25 + random() * 0.9 : 0.7 + random() * 0.7;
+    return {
+      left: random() * 100,
+      top: random() * 100,
+      size,
+      opacity: 0.55 + random() * 0.45,
+      delay: -random() * 7,
+      duration: 3.8 + random() * 5.2,
+      tone: index % 23 === 0 ? "is-warm" : index % 17 === 0 ? "is-cool" : "",
+    };
+  });
+}
+
+const LANDING_STARS = createLandingStars(148);
+
+function LandingSpaceBackdrop() {
   return (
-    <svg className="landing-globe-lines" viewBox="0 0 420 420" aria-hidden="true">
-      <g fill="none" stroke="currentColor" strokeWidth="1">
-        <circle cx="210" cy="210" r="205" />
-        <ellipse cx="210" cy="210" rx="150" ry="205" />
-        <ellipse cx="210" cy="210" rx="82" ry="205" />
-        <ellipse cx="210" cy="210" rx="205" ry="150" />
-        <ellipse cx="210" cy="210" rx="205" ry="82" />
-        <line x1="210" y1="5" x2="210" y2="415" />
-        <line x1="5" y1="210" x2="415" y2="210" />
-      </g>
-      <circle className="landing-globe-pin" cx="89" cy="89" r="4" />
-    </svg>
+    <div className="landing-space-backdrop" aria-hidden="true">
+      <div className="landing-star-field">
+        {LANDING_STARS.map((star, index) => (
+          <span
+            key={index}
+            className={`landing-star${star.size > 2 ? " is-bright" : ""}${star.tone ? ` ${star.tone}` : ""}`}
+            style={{
+              left: `${star.left}%`,
+              top: `${star.top}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              animationDelay: `${star.delay}s`,
+              animationDuration: `${star.duration}s`,
+            }}
+          />
+        ))}
+      </div>
+      <span className="landing-space-nebula landing-space-nebula-one" />
+      <span className="landing-space-nebula landing-space-nebula-two" />
+      <LandingSatelliteGlobe />
+    </div>
   );
 }
 
@@ -160,6 +195,7 @@ function LandingHome(options: LandingScreenOptions) {
 
   return (
     <div className="landing-root">
+      <LandingSpaceBackdrop />
       <nav className="landing-topbar">
         <button type="button" onClick={options.onHome} className="brand-lockup compact brand-home-button" aria-label="Go to home page">
           <img src="/logo.svg" alt="" className="brand-logo" />
@@ -184,7 +220,6 @@ function LandingHome(options: LandingScreenOptions) {
 
       <div className="landing-main">
         <aside className="landing-hero">
-          <GlobeLines />
           <motion.div
             className="landing-hero-inner"
             initial={{ opacity: 0, y: 14 }}
