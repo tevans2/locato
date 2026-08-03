@@ -3,6 +3,7 @@ import { indexCountries, type RawCountry } from "../src/core/countries";
 import type { PublicRoundState, ServerMessage } from "../src/core/multiplayer";
 import { Room } from "../server/rooms/Room";
 import { RoomManager, type MultiplayerConnection } from "../server/rooms/RoomManager";
+import { MapTapRoom } from "../server/rooms/MapTapRoom";
 
 const fixtureCountries = [
   { name: "Japan", code: "JP", aliases: ["Nippon"], continent: "Asia", flagSrc: "assets/flags/jp.svg", capital: "Tokyo", capitalAliases: [] },
@@ -11,6 +12,39 @@ const fixtureCountries = [
 ] as const satisfies readonly RawCountry[];
 
 const countryIndex = indexCountries(fixtureCountries);
+
+describe("multiplayer MapTap room", () => {
+  it("builds authoritative rounds only from the host's selected location categories", () => {
+    const room = new MapTapRoom({
+      code: "TAP01",
+      hostPlayerId: "host",
+      hostName: "Host",
+      seed: "ocean-only",
+      now: 1000,
+      roundLimit: 5,
+      mapTapCategories: ["ocean"],
+    });
+
+    expect(room.snapshot().settings.mapTapCategories).toEqual(["ocean"]);
+    const started = room.startGame("host", 1010);
+    expect(started.ok).toBe(true);
+    const round = started.ok ? started.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
+    expect(round?.prompt.kind).toBe("maptap-globe");
+    expect(JSON.parse(round?.prompt.value ?? "{}")).toMatchObject({ category: "ocean" });
+  });
+
+  it("lets only the host update MapTap categories and resets guest readiness", () => {
+    const room = new MapTapRoom({ code: "TAP02", hostPlayerId: "host", hostName: "Host", seed: "settings", now: 1000 });
+    expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
+    expect(room.setReady("guest", true, 1020).ok).toBe(true);
+    expect(room.updateOptions("guest", { mapTapCategories: ["city"] }, 1030).ok).toBe(false);
+
+    const updated = room.updateOptions("host", { mapTapCategories: ["city", "region"] }, 1040);
+    expect(updated.ok).toBe(true);
+    expect(room.snapshot().settings.mapTapCategories).toEqual(["city", "region"]);
+    expect(room.snapshot().players.find((player) => player.id === "guest")?.ready).toBe(false);
+  });
+});
 
 class TestConnection implements MultiplayerConnection {
   readonly authenticatedName: string | null = null;
@@ -315,6 +349,23 @@ describe("multiplayer room", () => {
 });
 
 describe("room manager", () => {
+  it("carries MapTap categories from room creation into server-owned rounds", () => {
+    const manager = new RoomManager({ countryIndex });
+    const host = new TestConnection();
+
+    manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", categoryIds: ["map-tap"], mapTapCategories: ["region"], roundLimit: 5 }, 1000);
+    const snapshot = latestRoomMessage(host);
+    expect(snapshot?.type).toBe("ROOM_SNAPSHOT");
+    if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(snapshot.room.settings.mapTapCategories).toEqual(["region"]);
+
+    manager.handleMessage(host, { type: "START_GAME" }, 1010);
+    const started = host.messages.find((message) => message.type === "GAME_STARTED");
+    expect(started?.type).toBe("GAME_STARTED");
+    if (started?.type !== "GAME_STARTED") throw new Error("Expected MapTap game start.");
+    expect(JSON.parse(started.round.prompt.value)).toMatchObject({ category: "region" });
+  });
+
   it("lets two connections join the same room and receive the same public round", () => {
     const manager = new RoomManager({ countryIndex, resultDisplayMs: 1000 });
     const host = new TestConnection();

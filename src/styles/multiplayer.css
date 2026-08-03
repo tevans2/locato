@@ -82,6 +82,31 @@
   width: 100%;
 }
 
+.maptap-multiplayer-category-selector {
+  width: 100%;
+}
+
+.maptap-multiplayer-category-menu {
+  width: var(--dropdown-width, min(560px, calc(100vw - 24px)));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.maptap-multiplayer-category-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 52px;
+}
+
+.maptap-multiplayer-category-selector.is-disabled .category-dropdown-summary {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.maptap-multiplayer-category-selector.is-disabled .category-dropdown-summary::after {
+  display: none;
+}
+
 .room-code-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -789,6 +814,16 @@
 .lobby-panel .multiplayer-mode-dropdown {
   width: 100%;
   margin: -2px 0 14px;
+}
+
+.lobby-panel .maptap-multiplayer-category-selector {
+  margin: -6px 0 14px;
+}
+
+@media (max-width: 700px) {
+  .maptap-multiplayer-category-menu {
+    grid-template-columns: 1fr;
+  }
 }
 
 .multiplayer-mode-dropdown.is-disabled .category-dropdown-summary {

@@ -1,5 +1,7 @@
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { FinalResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import { isMapTapCategory } from "../maptap/locations";
+import type { MapTapCategory } from "../maptap/types";
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
 export const MAX_PLAYER_NAME_LENGTH = 32;
@@ -72,6 +74,10 @@ function isCategoryIdList(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length > 0 && value.length <= MAX_ROOM_CATEGORY_IDS && value.every((item) => typeof item === "string" && item.trim().length > 0);
 }
 
+function isMapTapCategoryList(value: unknown): value is readonly MapTapCategory[] {
+  return Array.isArray(value) && value.length > 0 && value.length <= 7 && value.every((item) => typeof item === "string" && isMapTapCategory(item));
+}
+
 function isPromptContent(value: unknown): boolean {
   return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe") && typeof value.value === "string";
 }
@@ -87,12 +93,14 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
+      if (value.mapTapCategories !== undefined && !isMapTapCategoryList(value.mapTapCategories)) return reject("invalid-maptap-categories", "MapTap categories are invalid.");
       return {
         ok: true,
         message: {
           type: "CREATE_ROOM",
           playerName: normalizePlayerName(value.playerName),
           categoryIds: value.categoryIds.map((id) => id.trim()),
+          ...(value.mapTapCategories !== undefined ? { mapTapCategories: [...value.mapTapCategories] } : {}),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
         },
@@ -120,11 +128,13 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
+      if (value.mapTapCategories !== undefined && !isMapTapCategoryList(value.mapTapCategories)) return reject("invalid-maptap-categories", "MapTap categories are invalid.");
       return {
         ok: true,
         message: {
           type: "SET_ROOM_OPTIONS",
           categoryIds: value.categoryIds.map((id) => id.trim()),
+          ...(value.mapTapCategories !== undefined ? { mapTapCategories: [...value.mapTapCategories] } : {}),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
         },
@@ -200,6 +210,7 @@ function isRoom(value: unknown): value is PublicRoomState {
     isRecord(value.settings) &&
     isFiniteNumber(value.settings.roundLimit) &&
     isFiniteNumber(value.settings.roundDurationMs) &&
+    (value.settings.mapTapCategories === undefined || isMapTapCategoryList(value.settings.mapTapCategories)) &&
     (value.status === "lobby" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&

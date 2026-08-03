@@ -60,6 +60,17 @@ describe("multiplayer public protocol", () => {
     expect(parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["flags", "codes", "capitals", "shapes", "flag-colors", "pick-country", "spot-country", "extra", "too-many"] }).ok).toBe(false);
   });
 
+  it("validates MapTap category selections on room creation and updates", () => {
+    const created = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["map-tap"], mapTapCategories: ["city", "ocean"] });
+    expect(created.ok).toBe(true);
+    expect(created.ok ? created.message : null).toMatchObject({ type: "CREATE_ROOM", mapTapCategories: ["city", "ocean"] });
+
+    const updated = parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"], mapTapCategories: ["region", "mountain-range"] });
+    expect(updated.ok).toBe(true);
+    expect(parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"], mapTapCategories: [] }).ok).toBe(false);
+    expect(parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"], mapTapCategories: ["not-a-place-type"] }).ok).toBe(false);
+  });
+
   it("accepts skip votes as a client message", () => {
     const message = parseClientMessage({ type: "VOTE_SKIP" });
     expect(message.ok).toBe(true);

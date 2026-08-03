@@ -11,6 +11,7 @@ import { el } from "../dom/createElement";
 import { enhanceDropdown } from "../dom/dropdown";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
+import { MAP_TAP_CATEGORIES, MAP_TAP_CATEGORY_OPTIONS, MAP_TAP_LOCATIONS, type MapTapCategory } from "../../core/maptap";
 
 export interface MultiplayerLobbyScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -113,6 +114,15 @@ function modeSelectionDescription(modes: readonly MultiplayerPlayMode[]): string
   return modes.map((mode) => getMultiplayerModeOption(mode).label).join(", ");
 }
 
+function isMapTapModeSelection(modes: readonly MultiplayerPlayMode[]): boolean {
+  return modes.length === 1 && modes[0] === "map-tap";
+}
+
+function mapTapCategoryDescription(categories: readonly MapTapCategory[]): string {
+  if (categories.length === MAP_TAP_CATEGORIES.length) return "All MapTap locations";
+  return categories.map((category) => MAP_TAP_CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? category).join(", ");
+}
+
 function createMultiplayerModeSelector(options: {
   readonly selectedModes: readonly MultiplayerPlayMode[];
   readonly signal: AbortSignal;
@@ -161,7 +171,9 @@ function createMultiplayerModeSelector(options: {
       "change",
       () => {
         if (disabled) return;
-        const next = modeControls.filter((item) => item.checkbox.checked).map((item) => item.modeOption.id);
+        let next = modeControls.filter((item) => item.checkbox.checked).map((item) => item.modeOption.id);
+        if (control.modeOption.id === "map-tap" && control.checkbox.checked) next = ["map-tap"];
+        else if (control.modeOption.id !== "map-tap" && control.checkbox.checked) next = next.filter((mode) => mode !== "map-tap");
         if (next.length === 0) {
           control.checkbox.checked = true;
           return;
@@ -214,11 +226,86 @@ function createMultiplayerModeSelector(options: {
   return { element, selectedModes: () => selectedModes, setSelectedModes, setDisabled };
 }
 
+function createMultiplayerMapTapCategorySelector(options: {
+  readonly selectedCategories: readonly MapTapCategory[];
+  readonly signal: AbortSignal;
+  readonly name: string;
+  readonly onChange: (categories: readonly MapTapCategory[]) => void;
+}): { readonly element: HTMLDetailsElement; readonly selectedCategories: () => readonly MapTapCategory[]; readonly setSelectedCategories: (categories: readonly MapTapCategory[]) => void; readonly setDisabled: (disabled: boolean) => void } {
+  let selectedCategories: readonly MapTapCategory[] = [...options.selectedCategories];
+  let disabled = false;
+  let element: HTMLDetailsElement;
+  const selectedText = el("span", { className: "category-dropdown-selected" });
+  const selectedDescription = el("span", { className: "category-dropdown-selected-description" });
+  const controls = MAP_TAP_CATEGORY_OPTIONS.map((category) => {
+    const checkbox = el("input", { attrs: { type: "checkbox", name: options.name, value: category.value } });
+    const count = MAP_TAP_LOCATIONS.filter((location) => location.category === category.value).length;
+    const label = el("label", {
+      className: "category-option maptap-multiplayer-category-option",
+      children: [
+        checkbox,
+        el("span", { className: "maptap-category-copy", children: [el("strong", { text: category.label }), el("small", { text: category.description })] }),
+        el("span", { className: "maptap-category-count", text: String(count), attrs: { "aria-label": `${count} locations` } }),
+      ],
+    });
+    return { category, checkbox, label };
+  });
+
+  function setSelectedCategories(categories: readonly MapTapCategory[]): void {
+    const valid = MAP_TAP_CATEGORIES.filter((category) => categories.includes(category));
+    selectedCategories = valid.length > 0 ? valid : MAP_TAP_CATEGORIES;
+    const locationCount = MAP_TAP_LOCATIONS.filter((location) => selectedCategories.includes(location.category)).length;
+    selectedText.textContent = selectedCategories.length === MAP_TAP_CATEGORIES.length ? "All location types" : `${selectedCategories.length} types selected`;
+    selectedDescription.textContent = `${locationCount} possible locations`;
+    for (const control of controls) control.checkbox.checked = selectedCategories.includes(control.category.value);
+  }
+
+  function setDisabled(nextDisabled: boolean): void {
+    disabled = nextDisabled;
+    element.classList.toggle("is-disabled", disabled);
+    for (const control of controls) control.checkbox.disabled = disabled;
+    if (disabled) element.open = false;
+  }
+
+  for (const control of controls) {
+    control.checkbox.addEventListener("change", () => {
+      if (disabled) return;
+      const next = controls.filter((item) => item.checkbox.checked).map((item) => item.category.value);
+      if (next.length === 0) {
+        control.checkbox.checked = true;
+        return;
+      }
+      setSelectedCategories(next);
+      options.onChange(selectedCategories);
+    }, { signal: options.signal });
+  }
+
+  const summary = el("summary", {
+    className: "category-dropdown-summary",
+    children: [
+      el("span", { className: "category-row-label", text: "MapTap locations" }),
+      el("span", { className: "game-mode-selected-copy", children: [selectedText, selectedDescription] }),
+    ],
+  });
+  element = el("details", {
+    className: "category-dropdown maptap-multiplayer-category-selector",
+    children: [summary, el("div", { className: "category-dropdown-menu maptap-multiplayer-category-menu", attrs: { role: "group", "aria-label": "MapTap location categories" }, children: controls.map((control) => control.label) })],
+  });
+  summary.addEventListener("click", (event) => {
+    if (!disabled) return;
+    event.preventDefault();
+  }, { signal: options.signal });
+
+  setSelectedCategories(selectedCategories);
+  enhanceDropdown(element, { signal: options.signal, closeOnSelect: false });
+  return { element, selectedCategories: () => selectedCategories, setSelectedCategories, setDisabled };
+}
+
 function setupCopyForModes(modes: readonly MultiplayerPlayMode[]): { readonly title: string; readonly description: string } {
   const selected: readonly MultiplayerPlayMode[] = modes.length > 0 ? modes : ["flags"];
   const hasMapMode = selected.some((mode) => mode === "click-country" || mode === "spot-country");
   return {
-    title: hasMapMode ? "Host or join a mixed map race" : selected.length > 1 ? "Host or join a mixed prompt race" : "Host or join a prompt race",
+    title: isMapTapModeSelection(selected) ? "Host or join a globe race" : hasMapMode ? "Host or join a mixed map race" : selected.length > 1 ? "Host or join a mixed prompt race" : "Host or join a prompt race",
     description: `${modeSelectionDescription(selected)}. Create a room or join a code to race friends in real time.`,
   };
 }
@@ -330,6 +417,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       const setupCopy = setupCopyForModes(modes);
       setupTitle.textContent = setupCopy.title;
       setupDescription.textContent = setupCopy.description;
+      setupMapTapCategorySelector.element.hidden = !isMapTapModeSelection(modes);
     },
   });
   const lobbyModeDropdown = createMultiplayerModeSelector({
@@ -339,9 +427,32 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     label: "Room modes",
     onChange: (modes) => {
       if (!room || room.status !== "lobby" || localPlayerId !== room.hostPlayerId) return;
+      if (isMapTapModeSelection(modes) !== isMapTapRoom(room)) {
+        feedback = "MapTap is chosen when the room is created; start a new room to switch room type.";
+        lobbyModeDropdown.setSelectedModes(modesFromCategoryIds(room.categoryIds));
+        render();
+        return;
+      }
       transport?.send({ type: "SET_ROOM_OPTIONS", categoryIds: categoryIdsForModes(modes) });
     },
   });
+  const setupMapTapCategorySelector = createMultiplayerMapTapCategorySelector({
+    selectedCategories: MAP_TAP_CATEGORIES,
+    signal: controller.signal,
+    name: "multiplayer-setup-maptap-category",
+    onChange: () => {},
+  });
+  setupMapTapCategorySelector.element.hidden = true;
+  const lobbyMapTapCategorySelector = createMultiplayerMapTapCategorySelector({
+    selectedCategories: MAP_TAP_CATEGORIES,
+    signal: controller.signal,
+    name: "multiplayer-lobby-maptap-category",
+    onChange: (categories) => {
+      if (!room || room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !isMapTapRoom(room)) return;
+      transport?.send({ type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"], mapTapCategories: categories });
+    },
+  });
+  lobbyMapTapCategorySelector.element.hidden = true;
   const statusText = el("p", { className: "multiplayer-status", text: feedback });
   const roomCode = el("strong", { className: "room-code", text: "----" });
   const roomSettings = el("p", { className: "room-settings", text: "" });
@@ -390,7 +501,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("p", { className: "eyebrow", text: "MULTIPLAYER" }),
       setupTitle,
       setupDescription,
-      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, roundLimitSelect, roundDurationSelect, joinCodeInput] }),
+      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, setupMapTapCategorySelector.element, roundLimitSelect, roundDurationSelect, joinCodeInput] }),
       el("div", { className: "actions", children: [createButton, joinButton] }),
     ],
   });
@@ -402,6 +513,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("div", { className: "room-code-row", children: [el("span", { text: "Code" }), roomCode, copyButton] }),
       roomSettings,
       lobbyModeDropdown.element,
+      lobbyMapTapCategorySelector.element,
       playerList,
       inviteSection,
       el("div", { className: "actions", children: [readyButton, startButton, leaveButton] }),
@@ -562,8 +674,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     const roomModes = modesFromCategoryIds(room.categoryIds);
     const localIsHost = localPlayerId === room.hostPlayerId;
     lobbyModeDropdown.setSelectedModes(roomModes);
-    lobbyModeDropdown.setDisabled(room.status !== "lobby" || !localIsHost);
-    roomSettings.textContent = `${modeSelectionDescription(roomModes)} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
+    lobbyModeDropdown.setDisabled(room.status !== "lobby" || !localIsHost || isMapTap);
+    const roomMapTapCategories = room.settings.mapTapCategories ?? MAP_TAP_CATEGORIES;
+    lobbyMapTapCategorySelector.element.hidden = !isMapTap;
+    lobbyMapTapCategorySelector.setSelectedCategories(roomMapTapCategories);
+    lobbyMapTapCategorySelector.setDisabled(room.status !== "lobby" || !localIsHost);
+    roomSettings.textContent = `${modeSelectionDescription(roomModes)}${isMapTap ? ` · ${mapTapCategoryDescription(roomMapTapCategories)}` : ""} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
     playerList.replaceChildren(...createPlayerRows(room, localPlayerId));
     // Show "invite friends" only to signed-in users while waiting in the lobby. Friends are fetched
     // once per room, then re-filtered every render so anyone in the lobby is excluded live.
@@ -712,6 +828,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
           type: "CREATE_ROOM",
           playerName,
           categoryIds: categoryIdsForModes(modeDropdown.selectedModes()),
+          ...(isMapTapModeSelection(modeDropdown.selectedModes()) ? { mapTapCategories: setupMapTapCategorySelector.selectedCategories() } : {}),
           roundLimit: Number(roundLimitSelect.value),
           roundDurationMs: Number(roundDurationSelect.value),
         }),

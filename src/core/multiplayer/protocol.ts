@@ -1,12 +1,13 @@
 import type { FinalResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { MapTapCategory } from "../maptap/types";
 
 export type ClientMessage =
-  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
+  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly mapTapCategories?: readonly MapTapCategory[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
   | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string }
   | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
   | { readonly type: "LEAVE_ROOM" }
   | { readonly type: "SET_READY"; readonly ready: boolean }
-  | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
+  | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly mapTapCategories?: readonly MapTapCategory[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
   | { readonly type: "START_GAME" }
   | { readonly type: "PLAY_AGAIN" }
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
