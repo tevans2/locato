@@ -12,6 +12,7 @@ import { enhanceDropdown } from "../dom/dropdown";
 import { createBrandLockup } from "../dom/createBrandLockup";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
+import { flashScreen, playCorrect, playRoundTaken, playTimeUp, playVictory, playWrong } from "../dom/sfx";
 
 export interface MultiplayerLobbyScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -655,25 +656,46 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         break;
       case "ANSWER_ACCEPTED":
         feedback = message.playerId === localPlayerId ? `You took the round for ${message.points} points.` : `${playerName(message.playerId)} took the round.`;
+        // Everyone hears that the round was taken; only the winner gets the full fanfare + flash.
+        if (message.playerId === localPlayerId) {
+          playCorrect();
+          flashScreen("good");
+        } else {
+          playRoundTaken();
+        }
         break;
       case "ANSWER_REJECTED":
         feedback = message.reason;
+        playWrong();
+        flashScreen("bad");
         break;
       case "ROUND_ENDED": {
         roundReveal = { answer: message.answer, results: message.results };
         const winner = message.results.find((result) => result.correct);
         feedback = winner ? `${message.answer} — ${winner.name} took it.` : `${message.answer} — nobody got it.`;
+        // A correct winner already played its cue via ANSWER_ACCEPTED; silence here would
+        // double-fire. The expiry sting only covers rounds nobody answered.
+        if (!winner) playTimeUp();
         break;
       }
       case "MAPTAP_ROUND_ENDED": {
         mapTapReveal = { targetName: message.targetName, targetLat: message.targetLat, targetLng: message.targetLng, wikiSlug: message.wikiSlug, results: message.results };
         const top = message.results[0];
         feedback = top?.guess ? `${message.targetName} — ${top.name} was closest.` : `${message.targetName} — nobody guessed.`;
+        if (top && top.playerId === localPlayerId) {
+          playCorrect();
+          flashScreen("good");
+        } else if (top) {
+          playRoundTaken();
+        } else {
+          playTimeUp();
+        }
         break;
       }
       case "GAME_COMPLETED": {
         finalResults = message.results;
         feedback = "Game complete.";
+        playVictory();
         // Record this player's stats to their account if they're signed in.
         // The server has already validated the results; we just forward our own row.
         const myResult = message.results.find((result) => result.playerId === localPlayerId);

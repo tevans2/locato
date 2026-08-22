@@ -6,6 +6,7 @@ import { el } from "../dom/createElement";
 import { promptImageClass } from "../dom/renderPrompt";
 import { createWorldMapView, setWorldMapTargetCountry } from "../dom/renderWorldMap";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
+import { playTick } from "../dom/sfx";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -45,6 +46,7 @@ function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null):
     const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
     return el("li", {
       className: player.id === localPlayerId ? "score-row is-local" : "score-row",
+      attrs: { "data-player-id": player.id },
       children: [
         el("span", { className: "score-rank", text: `#${index + 1}` }),
         el("span", { className: "player-emoji score-emoji", text: emoji, attrs: { "aria-hidden": "true" } }),
@@ -61,7 +63,7 @@ function createResultRows(results: readonly RoundResult[]): readonly HTMLElement
     const guess = result.guess ? ` guessed ${result.guess}` : " did not answer";
     const outcome = result.correct ? `+${result.points}` : "missed";
     return el("li", {
-      className: result.correct ? "result-row good" : "result-row",
+      className: result.correct ? "result-row good" : "result-row miss",
       text: `${result.name}${guess} · ${outcome}`,
     });
   });
@@ -133,6 +135,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   let phaseStartedAt: number | null = null;
   let phaseEndsAt: number | null = null;
   let rafId: number | null = null;
+  let lastTickSecond: number | null = null;
+  let phaseIsIntermission = false;
 
   // The bar is driven by its own animation frame, not by server messages, so it drains smoothly
   // between snapshots. The server stays authoritative; the bar only clamps to [0,1] to stay sane
@@ -146,6 +150,12 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     const total = phaseEndsAt - phaseStartedAt;
     const remaining = phaseEndsAt - Date.now();
     const fraction = Math.max(0, Math.min(1, remaining / total));
+    // One quiet click per second across the final three seconds of live play only.
+    const remainingSeconds = Math.ceil(remaining / 1000);
+    if (!phaseIsIntermission && fraction > 0 && remainingSeconds >= 1 && remainingSeconds <= 3 && lastTickSecond !== remainingSeconds) {
+      lastTickSecond = remainingSeconds;
+      playTick();
+    }
     timerFill.style.transform = `scaleX(${fraction})`;
   }
 
@@ -214,7 +224,10 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       const isMapHighlightRound = visibleRound?.prompt.kind === "map-highlight";
       const isFlagColorRound = visibleRound?.prompt.kind === "flag-colors";
       const isNewRound = roundKey !== null && roundKey !== renderedRoundKey;
-      if (isNewRound) answerInput.value = "";
+      if (isNewRound) {
+        answerInput.value = "";
+        lastTickSecond = null;
+      }
       renderedRoundKey = roundKey;
       allowMapClickSubmit = isMapClickRound && state.canSubmit;
 
@@ -306,6 +319,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       phaseStartedAt = state.room.phaseStartedAt;
       phaseEndsAt = state.room.phaseEndsAt;
       timerBar.classList.toggle("is-intermission", intermission);
+      phaseIsIntermission = intermission;
       if ((state.room.status === "playing" || intermission) && phaseEndsAt !== null) {
         renderTimer();
         ensureTimerLoop();
@@ -322,6 +336,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       } else resultList.replaceChildren(el("li", { className: "result-row", text: "No result yet." }));
 
       scoreList.replaceChildren(...createScoreRows(state.room, state.localPlayerId));
+      const bumpWinner = state.roundResult?.results.find((result) => result.correct);
+      if (bumpWinner) scoreList.querySelector(`[data-player-id="${bumpWinner.playerId}"]`)?.classList.add("score-bump");
     },
     destroy: stopTimerLoop,
   };

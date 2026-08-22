@@ -1,0 +1,116 @@
+/* Sound-effect feedback layer: full-viewport tone flash, round-reveal animations,
+   and the global sound toggle that sits beside the theme switch. */
+
+.sfx-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.sfx-flash.is-good {
+  box-shadow:
+    inset 0 0 0 6px var(--good),
+    inset 0 0 140px color-mix(in srgb, var(--good) 28%, transparent);
+  animation: sfx-flash-fade 650ms ease-out;
+}
+
+.sfx-flash.is-bad {
+  box-shadow:
+    inset 0 0 0 6px var(--bad),
+    inset 0 0 140px color-mix(in srgb, var(--bad) 28%, transparent);
+  animation: sfx-flash-fade 650ms ease-out;
+}
+
+@keyframes sfx-flash-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Multiplayer round reveal: results pop in staggered, correct answers highlighted. */
+
+.multiplayer-round-panel .result-row {
+  animation: sfx-row-pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
+}
+
+.multiplayer-round-panel .result-row:nth-child(2) { animation-delay: 60ms; }
+.multiplayer-round-panel .result-row:nth-child(3) { animation-delay: 120ms; }
+.multiplayer-round-panel .result-row:nth-child(4) { animation-delay: 180ms; }
+.multiplayer-round-panel .result-row:nth-child(5) { animation-delay: 240ms; }
+.multiplayer-round-panel .result-row:nth-child(6) { animation-delay: 300ms; }
+.multiplayer-round-panel .result-row:nth-child(7) { animation-delay: 360ms; }
+.multiplayer-round-panel .result-row:nth-child(8) { animation-delay: 420ms; }
+.multiplayer-round-panel .result-row:nth-child(9) { animation-delay: 480ms; }
+
+@keyframes sfx-row-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.multiplayer-round-panel .result-row.good {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.multiplayer-round-panel .result-row.miss {
+  color: var(--bad);
+}
+
+/* Scoreboard entry bumps when its player scores in the freshly revealed round. */
+
+.score-row.score-bump .score-value {
+  animation: sfx-score-bump 700ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  color: var(--good);
+}
+
+@keyframes sfx-score-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
+/* Global sound toggle — matches the fixed header strip next to the theme switch. */
+
+body:not(:has(.landing-screen-shell)) .global-sound-switch {
+  position: fixed;
+  z-index: 111;
+  top: 21px;
+  right: 196px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  body:not(:has(.landing-screen-shell)) .global-sound-switch {
+    top: 13px;
+    right: 124px;
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 0.62rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sfx-flash.is-good,
+  .sfx-flash.is-bad {
+    animation-duration: 150ms;
+  }
+
+  .multiplayer-round-panel .result-row,
+  .score-row.score-bump .score-value {
+    animation: none;
+  }
+}
