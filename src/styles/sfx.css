@@ -83,6 +83,9 @@ body:not(:has(.landing-screen-shell)) .global-sound-switch {
   z-index: 111;
   top: 21px;
   right: 196px;
+  /* Fixed elements ignore the flow layout — without this the mobile `button { width: 100% }`
+     rule stretches the toggle across the viewport and shoves it off-screen. */
+  width: auto;
   min-height: 34px;
   padding: 0 11px;
   border: 0;

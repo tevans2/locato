@@ -23,8 +23,8 @@ const WHEEL_DELTA_LINE_PIXELS = 40;
 const WHEEL_DELTA_PAGE_PIXELS = 800;
 const MAX_WHEEL_DELTA_PIXELS = 140;
 const MIN_WHEEL_DELTA_PIXELS = 0.35;
-const VIEWBOX_ANIMATION_MS = 520;
 const ZOOM_LABEL_THRESHOLD = 2.15;
+const VIEWBOX_ANIMATION_MS = 520;
 
 interface ViewBoxState {
   x: number;
@@ -56,9 +56,15 @@ export interface CapitalRecallMapViewOptions {
   readonly signal?: AbortSignal;
 }
 
+/** Copy overrides for the "Capital of <name>" panel — free play reads differently. */
+export interface CapitalRecallUpdateLabels {
+  readonly prefixLabel?: string;
+  readonly emptyLabel?: string;
+}
+
 export interface CapitalRecallMapView {
   readonly element: HTMLElement;
-  readonly update: (guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null) => void;
+  readonly update: (guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null, labels?: CapitalRecallUpdateLabels) => void;
 }
 
 interface MarkerEntry {
@@ -244,9 +250,10 @@ export function createCapitalRecallMapView(
   let pinchState: PinchState | null = null;
   let pendingWheelDelta = 0;
   let pendingWheelClientX = 0;
-  let pendingWheelClientY = 0;
   let wheelAnimationFrame: number | null = null;
   let viewBoxAnimationFrame: number | null = null;
+  // Country path under the pointer at press time, kept to distinguish taps from pans.
+  let pressTarget: { pointerId: number; clientX: number; clientY: number; countryId: string } | null = null;
 
   const svg = createSvgElement("svg");
   applyViewBox(svg, DEFAULT_VIEWBOX);
@@ -535,6 +542,7 @@ export function createCapitalRecallMapView(
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
   }
 
+
   svg.addEventListener("pointerup", finishPan, eventOptions);
   svg.addEventListener("pointercancel", finishPan, eventOptions);
   svg.addEventListener("dragstart", (event) => event.preventDefault(), eventOptions);
@@ -575,7 +583,7 @@ export function createCapitalRecallMapView(
     { once: true },
   );
 
-  function update(guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null): void {
+  function update(guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null, labels: CapitalRecallUpdateLabels = {}): void {
     const recentLabelIds = new Set(recentCountries(countryIndex, guessedCountryIds, RECENT_LABEL_COUNT).map((country) => country.id));
     for (const [countryId, path] of pathByCountryId) {
       path.classList.toggle("is-solved", guessedCountryIds.has(countryId));
@@ -598,7 +606,8 @@ export function createCapitalRecallMapView(
 
     previousLatestCountryId = latestCountryId;
     const currentCountry = currentCountryId === null ? null : countryIndex.byId[currentCountryId] ?? null;
-    currentName.textContent = currentCountry?.name ?? "Complete";
+    currentPrefix.textContent = labels.prefixLabel ?? "Capital of";
+    currentName.textContent = currentCountry?.name ?? labels.emptyLabel ?? "Complete";
     progress.textContent = `${Math.min(guessedCountryIds.size, playableCapitalTotal)} / ${playableCapitalTotal}`;
 
     const recent = recentCountries(countryIndex, guessedCountryIds, RECENT_LIST_COUNT);

@@ -49,7 +49,7 @@ body:not(:has(.landing-screen-shell)) .auth-trigger:hover {
 body:not(:has(.landing-screen-shell)) .game-header {
   min-height: 64px;
   margin: 0 0 18px;
-  padding: 0 186px 14px 0;
+  padding: 0 var(--floating-controls-clearance) 14px 0;
   align-items: center;
   border-bottom: 1px solid var(--border-strong);
 }
@@ -310,6 +310,57 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   margin: 0;
   font-size: 1.55rem;
   letter-spacing: -.045em;
+}
+
+.panel-title.has-freeplay-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.freeplay-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 740;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.freeplay-toggle:hover {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.freeplay-toggle.is-active {
+  border-color: var(--accent);
+  color: #172116;
+  background: var(--accent);
+}
+
+@media (max-width: 700px) {
+  /* Keep the pill compact instead of inheriting the full-width mobile button treatment —
+     the heading shares the row and a stretched pill wraps it into three lines. */
+  .panel-title.has-freeplay-toggle {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .panel-title.has-freeplay-toggle .freeplay-toggle {
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+  }
 }
 
 .guess-form {
@@ -927,7 +978,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 @media (max-width: 900px) {
   body:not(:has(.landing-screen-shell)) .game-header {
-    padding-right: 0;
+    padding-right: var(--floating-controls-clearance);
   }
 
   .play-layout,
