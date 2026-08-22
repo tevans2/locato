@@ -1,5 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
-import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
+import { isStreetViewGameModeId, type GameModeId } from "../../core/gameModes";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
 import { submitCountryGuess } from "../../core/map";
 import type { Screen } from "../../app/router";
@@ -242,7 +242,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     signal: controller.signal,
     onChange: (gameMode) => {
       if (isStreetViewGameModeId(gameMode)) return;
-      if (isPromptGameModeId(gameMode) || isWorldMapGameModeId(gameMode)) options.onGameModeChange(gameMode);
+      options.onGameModeChange(gameMode);
     },
   });
 

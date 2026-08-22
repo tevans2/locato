@@ -1,0 +1,1707 @@
+diff --git a/src/app/App.ts b/src/app/App.ts
+index f68d2ec..7fed5ae 100644
+--- a/src/app/App.ts
++++ b/src/app/App.ts
+@@ -2,7 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
+ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
+ import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
+ import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
+-import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
++import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+ import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
+ import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
+ import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
+@@ -464,6 +464,11 @@ export function createApp(options: AppOptions): App {
+ 
+     if (isMapTapGameModeId(gameMode)) {
+       navigate({ type: "map-tap" });
++      return;
++    }
++
++    if (isWorldSplitGameModeId(gameMode)) {
++      navigate({ type: "worldsplit" });
+     }
+   }
+ 
+@@ -546,6 +551,34 @@ export function createApp(options: AppOptions): App {
+     );
+   }
+ 
++  async function startWorldSplit(): Promise<void> {
++    const run = navigationRun;
++    const loading = createLoadingScreen("Loading Worldsplit...");
++    mount(loading);
++
++    try {
++      const [worldCountryFeatures, screenModule] = await Promise.all([
++        loadWorldCountryFeatures(),
++        import("../ui/screens/WorldSplitScreen"),
++      ]);
++      if (run !== navigationRun) return;
++
++      mount(
++        screenModule.createWorldSplitScreen({
++          worldCountryFeatures,
++          storage: options.storage,
++          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
++          onHome: () => navigate({ type: "landing" }),
++          onMultiplayer: () => navigate({ type: "multiplayer" }),
++          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
++        }),
++      );
++    } catch (error) {
++      if (run !== navigationRun) return;
++      loading.element.textContent = error instanceof Error ? error.message : "Unable to load Worldsplit.";
++    }
++  }
++
+   async function startMultiplayer(joinCode?: string): Promise<void> {
+     const run = navigationRun;
+     const loading = createLoadingScreen("Loading multiplayer...");
+@@ -634,6 +667,10 @@ export function createApp(options: AppOptions): App {
+       void startMapTap();
+       return;
+     }
++    if (route.type === "worldsplit") {
++      void startWorldSplit();
++      return;
++    }
+     if (route.type === "multiplayer") {
+       void startMultiplayer(route.joinCode);
+       return;
+diff --git a/src/app/router.ts b/src/app/router.ts
+index d168a77..89c76eb 100644
+--- a/src/app/router.ts
++++ b/src/app/router.ts
+@@ -7,6 +7,7 @@ export type AppRoute =
+   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
+   | { readonly type: "streetview-country" }
+   | { readonly type: "map-tap" }
++  | { readonly type: "worldsplit" }
+   | { readonly type: "multiplayer"; readonly joinCode?: string }
+   | { readonly type: "stats" }
+   | { readonly type: "friends"; readonly username?: string }
+diff --git a/src/core/gameModes.ts b/src/core/gameModes.ts
+index 52e2de8..0e89c85 100644
+--- a/src/core/gameModes.ts
++++ b/src/core/gameModes.ts
+@@ -4,8 +4,9 @@ export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "c
+ export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
+ export type StreetViewGameModeId = "streetview-country";
+ export type MapTapGameModeId = "map-tap";
++export type WorldSplitGameModeId = "worldsplit";
+ export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
+-export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId;
++export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId | WorldSplitGameModeId;
+ 
+ export interface GameModeOption {
+   readonly id: GameModeId;
+@@ -18,6 +19,7 @@ const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors
+ const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
+ const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
+ const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
++const WORLD_SPLIT_GAME_MODE_IDS: readonly WorldSplitGameModeId[] = ["worldsplit"];
+ 
+ export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
+   const category = soloPromptCategories.find((item) => item.id === id);
+@@ -56,6 +58,15 @@ export const worldMapGameModeOptions: readonly GameModeOption[] = [
+   },
+ ];
+ 
++export const worldSplitGameModeOptions: readonly GameModeOption[] = [
++  {
++    id: "worldsplit",
++    label: "Worldsplit",
++    description: "Draw one straight line that divides a population as evenly as possible.",
++    group: "World map games",
++  },
++];
++
+ export const streetViewGameModeOptions: readonly GameModeOption[] = [
+   {
+     id: "streetview-country",
+@@ -75,7 +86,7 @@ export const mapTapGameModeOptions: readonly GameModeOption[] = [
+ ];
+ 
+ export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
+-export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
++export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...worldSplitGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
+ 
+ export function isPromptGameModeId(id: string): id is PromptGameModeId {
+   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
+@@ -93,6 +104,10 @@ export function isMapTapGameModeId(id: string): id is MapTapGameModeId {
+   return MAP_TAP_GAME_MODE_IDS.includes(id as MapTapGameModeId);
+ }
+ 
++export function isWorldSplitGameModeId(id: string): id is WorldSplitGameModeId {
++  return WORLD_SPLIT_GAME_MODE_IDS.includes(id as WorldSplitGameModeId);
++}
++
+ export function isTimerGameModeId(id: string): id is TimerGameModeId {
+   return isPromptGameModeId(id) || isWorldMapGameModeId(id);
+ }
+diff --git a/src/core/worldsplit/index.ts b/src/core/worldsplit/index.ts
+new file mode 100644
+index 0000000..73ab282
+--- /dev/null
++++ b/src/core/worldsplit/index.ts
+@@ -0,0 +1,17 @@
++export { WORLD_SPLIT_POPULATION_MILLIONS } from "./population";
++export {
++  DEFAULT_WORLD_SPLIT_LINE,
++  WORLD_SPLIT_MAX_ROUND_SCORE,
++  WORLD_SPLIT_ROUNDS,
++  buildWorldSplitCountries,
++  extendSplitLineToMap,
++  formatPopulationMillions,
++  isCountryInWorldSplitRound,
++  rotateSplitLine,
++  scoreWorldSplit,
++  shiftSplitLine,
++  splitLineLength,
++  worldSplitCountryCenter,
++  worldSplitSideForPoint,
++} from "./worldSplit";
++export type { SplitLine, WorldSplitCountryPoint, WorldSplitResult, WorldSplitRound, WorldSplitSide } from "./worldSplit";
+diff --git a/src/core/worldsplit/population.ts b/src/core/worldsplit/population.ts
+new file mode 100644
+index 0000000..60f0997
+--- /dev/null
++++ b/src/core/worldsplit/population.ts
+@@ -0,0 +1,29 @@
++/**
++ * Rounded 2024 population estimates, in millions, used as stable gameplay weights.
++ * The values intentionally trade false precision for reproducible rounds. They are
++ * based on the UN World Population Prospects 2024 estimates distributed by Our
++ * World in Data (https://ourworldindata.org/population-growth-over-time).
++ */
++export const WORLD_SPLIT_POPULATION_MILLIONS: Readonly<Record<string, number>> = {
++  AF: 43, AL: 2.8, DZ: 47, AD: 0.082, AO: 38, AG: 0.094, AR: 46, AM: 3, AU: 27, AT: 9.2, AZ: 10.4,
++  BS: 0.4, BH: 1.6, BD: 174, BB: 0.28, BY: 9.1, BE: 12, BZ: 0.42, BJ: 14, BT: 0.79, BO: 12,
++  BA: 3.2, BW: 2.7, BR: 212, BN: 0.46, BG: 6.7, BF: 24, BI: 14, CV: 0.53, KH: 17, CM: 30,
++  CA: 40, CF: 5.3, TD: 20, CL: 20, CN: 1419, CO: 53, KM: 0.87, CG: 6.3, CR: 5.2, CI: 31,
++  HR: 3.9, CU: 11, CY: 1.4, CZ: 11, CD: 109, DK: 6, DJ: 1.2, DM: 0.066, DO: 11, EC: 18,
++  EG: 117, SV: 6.4, GQ: 1.9, ER: 3.7, EE: 1.4, SZ: 1.2, ET: 132, FJ: 0.93, FI: 5.6,
++  FR: 66, GA: 2.5, GM: 2.8, GE: 3.8, DE: 85, GH: 35, GR: 10, GD: 0.12, GT: 18, GN: 15,
++  GW: 2.2, GY: 0.83, HT: 12, HN: 11, HU: 9.6, IS: 0.39, IN: 1450, ID: 283, IR: 91,
++  IQ: 46, IE: 5.3, IL: 9.8, IT: 59, JM: 2.8, JP: 124, JO: 11, KZ: 20, KE: 56, KI: 0.13,
++  KW: 5, KG: 7.2, LA: 7.8, LV: 1.9, LB: 5.8, LS: 2.3, LR: 5.5, LY: 7.4, LI: 0.04,
++  LT: 2.9, LU: 0.67, MG: 32, MW: 22, MY: 36, MV: 0.53, ML: 25, MT: 0.54, MH: 0.042,
++  MR: 5.2, MU: 1.3, MX: 130, FM: 0.11, MD: 3, MC: 0.039, MN: 3.5, ME: 0.64, MA: 38,
++  MZ: 35, MM: 55, NA: 3, NR: 0.013, NP: 30, NL: 18, NZ: 5.3, NI: 7, NE: 27, NG: 233,
++  KP: 26, MK: 1.8, NO: 5.6, OM: 5.3, PK: 251, PW: 0.018, PA: 4.5, PG: 10, PY: 7,
++  PE: 34, PH: 116, PL: 38, PT: 10.5, QA: 2.7, RO: 19, RU: 145, RW: 14, KN: 0.048,
++  LC: 0.18, VC: 0.1, WS: 0.22, SM: 0.034, ST: 0.24, SA: 34, SN: 18, RS: 6.6, SC: 0.13,
++  SL: 8.8, SG: 6, SK: 5.4, SI: 2.1, SB: 0.82, SO: 19, ZA: 64, KR: 52, SS: 12,
++  ES: 48, LK: 23, SD: 50, SR: 0.64, SE: 10.6, CH: 9, SY: 25, TJ: 10, TZ: 69,
++  TH: 72, TL: 1.4, TG: 9.5, TO: 0.1, TT: 1.5, TN: 12, TR: 87, TM: 7.5, TV: 0.011,
++  UG: 50, UA: 38, AE: 10, GB: 69, US: 345, UY: 3.4, UZ: 36, VU: 0.34, VE: 29,
++  VN: 101, YE: 41, ZM: 21, ZW: 17, VA: 0.001, PS: 5.5, TW: 23.5,
++};
+diff --git a/src/core/worldsplit/worldSplit.ts b/src/core/worldsplit/worldSplit.ts
+new file mode 100644
+index 0000000..d41f9df
+--- /dev/null
++++ b/src/core/worldsplit/worldSplit.ts
+@@ -0,0 +1,283 @@
++import {
++  MAP_VIEWBOX_HEIGHT,
++  MAP_VIEWBOX_WIDTH,
++  projectWorldMapPosition,
++  type ProjectedPoint,
++  type WorldCountryFeature,
++  type WorldMapPolygon,
++} from "../map";
++import { WORLD_SPLIT_POPULATION_MILLIONS } from "./population";
++
++export type WorldSplitSide = "a" | "b";
++export type SplitLine = readonly [ProjectedPoint, ProjectedPoint];
++
++export interface WorldSplitRound {
++  readonly id: string;
++  readonly label: string;
++  readonly prompt: string;
++  readonly detail: string;
++  readonly continents: readonly string[] | null;
++}
++
++export interface WorldSplitCountryPoint {
++  readonly code: string;
++  readonly name: string;
++  readonly continent: string;
++  readonly point: ProjectedPoint;
++  readonly populationMillions: number;
++}
++
++export interface WorldSplitResult {
++  readonly sideAPercent: number;
++  readonly sideBPercent: number;
++  readonly sideAPopulationMillions: number;
++  readonly sideBPopulationMillions: number;
++  readonly totalPopulationMillions: number;
++  readonly errorPercentagePoints: number;
++  readonly score: number;
++}
++
++export const WORLD_SPLIT_MAX_ROUND_SCORE = 100;
++export const WORLD_SPLIT_ROUNDS: readonly WorldSplitRound[] = [
++  {
++    id: "world",
++    label: "Whole world",
++    prompt: "Split the world’s population in half.",
++    detail: "Draw one straight line. Every country is counted by the side containing its centre.",
++    continents: null,
++  },
++  {
++    id: "asia",
++    label: "Asia",
++    prompt: "Split Asia’s population in half.",
++    detail: "Only countries in Asia count this round. The rest of the map is context.",
++    continents: ["Asia"],
++  },
++  {
++    id: "africa",
++    label: "Africa",
++    prompt: "Split Africa’s population in half.",
++    detail: "Find a line that balances Africa’s population, not its land area.",
++    continents: ["Africa"],
++  },
++  {
++    id: "europe",
++    label: "Europe",
++    prompt: "Split Europe’s population in half.",
++    detail: "Small moves matter when many countries sit close together.",
++    continents: ["Europe"],
++  },
++  {
++    id: "americas",
++    label: "The Americas",
++    prompt: "Split the Americas’ population in half.",
++    detail: "North America and South America are counted together.",
++    continents: ["North America", "South America"],
++  },
++];
++
++export const DEFAULT_WORLD_SPLIT_LINE: SplitLine = [[180, MAP_VIEWBOX_HEIGHT / 2], [820, MAP_VIEWBOX_HEIGHT / 2]];
++
++function ringArea(points: readonly ProjectedPoint[]): number {
++  let area = 0;
++  for (let index = 0; index < points.length; index += 1) {
++    const [x1, y1] = points[index]!;
++    const [x2, y2] = points[(index + 1) % points.length]!;
++    area += x1 * y2 - x2 * y1;
++  }
++  return area / 2;
++}
++
++function ringCentroid(points: readonly ProjectedPoint[]): ProjectedPoint | null {
++  let twiceArea = 0;
++  let xTotal = 0;
++  let yTotal = 0;
++
++  for (let index = 0; index < points.length; index += 1) {
++    const [x1, y1] = points[index]!;
++    const [x2, y2] = points[(index + 1) % points.length]!;
++    const cross = x1 * y2 - x2 * y1;
++    twiceArea += cross;
++    xTotal += (x1 + x2) * cross;
++    yTotal += (y1 + y2) * cross;
++  }
++
++  if (Math.abs(twiceArea) < 0.0001) return null;
++  return [xTotal / (3 * twiceArea), yTotal / (3 * twiceArea)];
++}
++
++function centerOfBounds(points: readonly ProjectedPoint[]): ProjectedPoint {
++  let minX = Number.POSITIVE_INFINITY;
++  let maxX = Number.NEGATIVE_INFINITY;
++  let minY = Number.POSITIVE_INFINITY;
++  let maxY = Number.NEGATIVE_INFINITY;
++
++  for (const [x, y] of points) {
++    minX = Math.min(minX, x);
++    maxX = Math.max(maxX, x);
++    minY = Math.min(minY, y);
++    maxY = Math.max(maxY, y);
++  }
++
++  return [(minX + maxX) / 2, (minY + maxY) / 2];
++}
++
++function polygonArea(polygon: WorldMapPolygon): number {
++  const outerRing = polygon[0];
++  if (!outerRing) return 0;
++  return Math.abs(ringArea(outerRing.map(projectWorldMapPosition)));
++}
++
++export function worldSplitCountryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
++  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
++  let largestPolygon: WorldMapPolygon | null = null;
++  let largestArea = -1;
++
++  for (const polygon of polygons) {
++    const area = polygonArea(polygon);
++    if (area > largestArea) {
++      largestPolygon = polygon;
++      largestArea = area;
++    }
++  }
++
++  const outerRing = largestPolygon?.[0];
++  if (!outerRing || outerRing.length === 0) return null;
++  const points = outerRing.map(projectWorldMapPosition);
++  return ringCentroid(points) ?? centerOfBounds(points);
++}
++
++export function buildWorldSplitCountries(features: readonly WorldCountryFeature[]): readonly WorldSplitCountryPoint[] {
++  return features.flatMap((feature) => {
++    const point = worldSplitCountryCenter(feature);
++    const populationMillions = WORLD_SPLIT_POPULATION_MILLIONS[feature.code];
++    if (!point || populationMillions === undefined || populationMillions <= 0) return [];
++    return [{ code: feature.code, name: feature.name, continent: feature.continent, point, populationMillions }];
++  });
++}
++
++export function isCountryInWorldSplitRound(country: Pick<WorldSplitCountryPoint, "continent">, round: WorldSplitRound): boolean {
++  return round.continents === null || round.continents.includes(country.continent);
++}
++
++export function worldSplitSideForPoint(point: ProjectedPoint, line: SplitLine): WorldSplitSide {
++  const [[startX, startY], [endX, endY]] = line;
++  const cross = (endX - startX) * (point[1] - startY) - (endY - startY) * (point[0] - startX);
++  return cross >= 0 ? "a" : "b";
++}
++
++export function splitLineLength(line: SplitLine): number {
++  const [[startX, startY], [endX, endY]] = line;
++  return Math.hypot(endX - startX, endY - startY);
++}
++
++export function scoreWorldSplit(
++  countries: readonly WorldSplitCountryPoint[],
++  round: WorldSplitRound,
++  line: SplitLine,
++): WorldSplitResult {
++  let sideAPopulationMillions = 0;
++  let sideBPopulationMillions = 0;
++
++  for (const country of countries) {
++    if (!isCountryInWorldSplitRound(country, round)) continue;
++    if (worldSplitSideForPoint(country.point, line) === "a") sideAPopulationMillions += country.populationMillions;
++    else sideBPopulationMillions += country.populationMillions;
++  }
++
++  const totalPopulationMillions = sideAPopulationMillions + sideBPopulationMillions;
++  const sideAPercent = totalPopulationMillions > 0 ? (sideAPopulationMillions / totalPopulationMillions) * 100 : 50;
++  const sideBPercent = 100 - sideAPercent;
++  const errorPercentagePoints = Math.abs(sideAPercent - 50);
++  const score = Math.max(0, Math.round(WORLD_SPLIT_MAX_ROUND_SCORE - errorPercentagePoints * 4));
++
++  return {
++    sideAPercent,
++    sideBPercent,
++    sideAPopulationMillions,
++    sideBPopulationMillions,
++    totalPopulationMillions,
++    errorPercentagePoints,
++    score,
++  };
++}
++
++export function rotateSplitLine(line: SplitLine, degrees: number): SplitLine {
++  const [[startX, startY], [endX, endY]] = line;
++  const midpointX = (startX + endX) / 2;
++  const midpointY = (startY + endY) / 2;
++  const radians = (degrees * Math.PI) / 180;
++  const cos = Math.cos(radians);
++  const sin = Math.sin(radians);
++
++  function rotatePoint([x, y]: ProjectedPoint): ProjectedPoint {
++    const localX = x - midpointX;
++    const localY = y - midpointY;
++    return [midpointX + localX * cos - localY * sin, midpointY + localX * sin + localY * cos];
++  }
++
++  return [rotatePoint(line[0]), rotatePoint(line[1])];
++}
++
++export function shiftSplitLine(line: SplitLine, distance: number): SplitLine {
++  const [[startX, startY], [endX, endY]] = line;
++  const dx = endX - startX;
++  const dy = endY - startY;
++  const length = Math.hypot(dx, dy);
++  if (length < 0.0001) return line;
++  const shiftX = (-dy / length) * distance;
++  const shiftY = (dx / length) * distance;
++  return [[startX + shiftX, startY + shiftY], [endX + shiftX, endY + shiftY]];
++}
++
++export function extendSplitLineToMap(line: SplitLine): SplitLine {
++  const [[startX, startY], [endX, endY]] = line;
++  const dx = endX - startX;
++  const dy = endY - startY;
++  if (Math.hypot(dx, dy) < 0.0001) return line;
++
++  const candidates: ProjectedPoint[] = [];
++  const add = (x: number, y: number): void => {
++    if (x < -0.001 || x > MAP_VIEWBOX_WIDTH + 0.001 || y < -0.001 || y > MAP_VIEWBOX_HEIGHT + 0.001) return;
++    if (candidates.some(([existingX, existingY]) => Math.hypot(existingX - x, existingY - y) < 0.01)) return;
++    candidates.push([Math.min(MAP_VIEWBOX_WIDTH, Math.max(0, x)), Math.min(MAP_VIEWBOX_HEIGHT, Math.max(0, y))]);
++  };
++
++  if (Math.abs(dx) > 0.0001) {
++    let t = (0 - startX) / dx;
++    add(0, startY + t * dy);
++    t = (MAP_VIEWBOX_WIDTH - startX) / dx;
++    add(MAP_VIEWBOX_WIDTH, startY + t * dy);
++  }
++  if (Math.abs(dy) > 0.0001) {
++    let t = (0 - startY) / dy;
++    add(startX + t * dx, 0);
++    t = (MAP_VIEWBOX_HEIGHT - startY) / dy;
++    add(startX + t * dx, MAP_VIEWBOX_HEIGHT);
++  }
++
++  if (candidates.length < 2) return line;
++  let first = candidates[0]!;
++  let second = candidates[1]!;
++  let farthest = 0;
++  for (let index = 0; index < candidates.length; index += 1) {
++    for (let next = index + 1; next < candidates.length; next += 1) {
++      const a = candidates[index]!;
++      const b = candidates[next]!;
++      const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
++      if (distance > farthest) {
++        farthest = distance;
++        first = a;
++        second = b;
++      }
++    }
++  }
++  return [first, second];
++}
++
++export function formatPopulationMillions(value: number): string {
++  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 2).replace(/\.00$/, "")}B`;
++  if (value >= 10) return `${Math.round(value)}M`;
++  if (value >= 1) return `${value.toFixed(1).replace(/\.0$/, "")}M`;
++  return `${Math.max(1, Math.round(value * 1000))}K`;
++}
+diff --git a/src/main.ts b/src/main.ts
+index 9ba7fbb..19edfdc 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -6,6 +6,7 @@ import "./styles/base.css";
+ import "./styles/layout.css";
+ import "./styles/landing.css";
+ import "./styles/game.css";
++import "./styles/worldsplit.css";
+ import "./styles/board.css";
+ import "./styles/multiplayer.css";
+ import "./styles/auth.css";
+diff --git a/src/styles/landing.css b/src/styles/landing.css
+index f6a0f0c..8560a93 100644
+--- a/src/styles/landing.css
++++ b/src/styles/landing.css
+@@ -159,15 +159,21 @@
+ 
+ .landing-hero {
+   width: min(1180px, calc(100% - 40px));
+-  min-height: 590px;
++  min-height: 620px;
+   margin: 0 auto;
+-  padding: 64px 0 82px;
++  padding: 56px 0 82px;
+   display: grid;
+-  grid-template-columns: .82fr 1.18fr;
+-  gap: clamp(42px, 6vw, 76px);
++  grid-template-columns: minmax(0, 1.1fr) minmax(430px, .9fr);
++  gap: clamp(22px, 4vw, 52px);
+   align-items: center;
+ }
+ 
++.landing-hero-copy {
++  position: relative;
++  z-index: 3;
++  max-width: 680px;
++}
++
+ .landing-eyebrow {
+   margin: 0 0 17px;
+   color: #54742f;
+@@ -178,30 +184,44 @@
+ }
+ 
+ .landing-title {
+-  max-width: 620px;
++  max-width: 680px;
+   margin: 0;
+   font-family: var(--font-display);
+-  font-size: clamp(3.3rem, 6vw, 5.35rem);
++  font-size: clamp(3.15rem, 5.05vw, 4.95rem);
+   font-weight: 760;
+-  line-height: .97;
+-  letter-spacing: -.06em;
++  line-height: .94;
++  letter-spacing: -.062em;
+ }
+ 
++.landing-title span { display: block; }
++
+ .landing-sub {
+-  max-width: 520px;
+-  margin: 24px 0 28px;
++  max-width: 560px;
++  margin: 25px 0 28px;
+   color: var(--muted);
+   font-size: clamp(.98rem, 1.4vw, 1.1rem);
+   line-height: 1.58;
+ }
+ 
+ .landing-hero-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+-.landing-free { margin: 18px 0 0; color: var(--muted); font-size: .7rem; }
++.landing-browse-link {
++  width: fit-content;
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  margin-top: 17px;
++  color: var(--text);
++  font-size: .72rem;
++  font-weight: 720;
++  text-underline-offset: 4px;
++}
++.landing-browse-link:hover { color: #4f742d; }
++.landing-free { margin: 14px 0 0; color: var(--muted); font-size: .68rem; }
+ 
+ .landing-globe-stage {
+   position: relative;
+-  width: min(100%, 640px);
+-  aspect-ratio: 1.08;
++  width: min(100%, 575px);
++  aspect-ratio: 1.04;
+   justify-self: center;
+   display: grid;
+   place-items: center;
+@@ -232,9 +252,96 @@
+ }
+ 
+ .landing-globe-stage .landing-satellite-globe {
+-  width: 100%;
+-  height: 100%;
++  width: 96%;
++  height: 96%;
++}
++
++.landing-hero-split-line {
++  position: absolute;
++  z-index: 3;
++  left: 12%;
++  top: 42%;
++  width: 77%;
++  height: 3px;
++  border-radius: 99px;
++  background: var(--route);
++  box-shadow: 0 0 0 6px color-mix(in srgb, var(--route) 18%, transparent), 0 6px 18px rgba(25,35,31,.18);
++  transform: rotate(-24deg);
++  transform-origin: center;
++  pointer-events: none;
++}
++
++.landing-hero-split-line::before,
++.landing-hero-split-line::after {
++  content: "";
++  position: absolute;
++  top: 50%;
++  width: 9px;
++  height: 9px;
++  border: 2px solid var(--route);
++  border-radius: 50%;
++  background: var(--surface);
++  transform: translateY(-50%);
++}
++.landing-hero-split-line::before { left: -4px; }
++.landing-hero-split-line::after { right: -4px; }
++
++.landing-hero-split-score {
++  position: absolute;
++  z-index: 4;
++  min-width: 68px;
++  padding: 8px 10px;
++  border: 1px solid var(--border-strong);
++  color: var(--text);
++  background: color-mix(in srgb, var(--surface) 90%, transparent);
++  box-shadow: var(--shadow-panel);
++  font-size: .76rem;
++  font-weight: 780;
++  text-align: center;
++  pointer-events: none;
++  backdrop-filter: blur(8px);
++}
++.landing-hero-split-score.is-a { left: 18%; top: 25%; border-top: 3px solid var(--accent); }
++.landing-hero-split-score.is-b { right: 13%; top: 59%; border-top: 3px solid var(--earth); }
++
++.landing-featured-game {
++  position: absolute;
++  z-index: 5;
++  left: -3%;
++  bottom: 1%;
++  width: min(272px, 48%);
++  display: grid;
++  gap: 8px;
++  padding: 17px 18px;
++  border: 1px solid var(--text);
++  border-radius: 0;
++  color: var(--text);
++  background: color-mix(in srgb, var(--surface) 94%, transparent);
++  box-shadow: 0 18px 42px rgba(25,35,31,.14);
++  text-align: left;
++  cursor: pointer;
++  backdrop-filter: blur(12px);
++  transition: transform 150ms ease, box-shadow 150ms ease;
++}
++.landing-featured-game:hover {
++  border-color: var(--text);
++  background: var(--surface);
++  box-shadow: 0 22px 46px rgba(25,35,31,.2);
++  transform: translateY(-3px);
++}
++.landing-featured-kicker {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  color: #54742f;
++  font-size: .6rem;
++  font-weight: 780;
++  letter-spacing: .08em;
++  text-transform: uppercase;
+ }
++.landing-featured-game > strong { font-size: 1.25rem; letter-spacing: -.035em; }
++.landing-featured-game > span:not(.landing-featured-kicker):not(.landing-featured-play) { color: var(--muted); font-size: .68rem; line-height: 1.45; }
++.landing-featured-play { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; font-size: .68rem; font-weight: 760; }
+ 
+ .landing-satellite-canvas { width: 100%; height: 100%; display: block; }
+ 
+@@ -320,9 +427,10 @@
+ }
+ 
+ @media (max-width: 900px) {
+-  .landing-hero { grid-template-columns: 1fr; padding-block: 54px 72px; }
++  .landing-hero { grid-template-columns: 1fr; padding-block: 54px 92px; }
+   .landing-hero-copy { max-width: 720px; }
+-  .landing-globe-stage { width: min(620px,100%); }
++  .landing-globe-stage { width: min(575px,100%); margin-bottom: 38px; }
++  .landing-featured-game { left: 3%; bottom: -42px; }
+   .landing-section-head { grid-template-columns: 1fr; gap: 14px; }
+   .landing-feature-row { grid-template-columns: 1fr; }
+ }
+@@ -333,9 +441,12 @@
+   .landing-topbar-actions .lp-desktop-only { display: none; }
+   .landing-topbar-actions .lp-btn { min-height: 34px; padding-inline: 11px; }
+   .landing-hero,.landing-catalog,.landing-feature-row,.landing-footer { width: calc(100% - 28px); }
+-  .landing-hero { padding: 46px 0 58px; gap: 36px; }
+-  .landing-title { font-size: clamp(3rem,14.5vw,4.3rem); }
+-  .landing-globe-stage { width: min(440px, 112%); margin-inline: -6%; }
++  .landing-hero { padding: 44px 0 100px; gap: 42px; }
++  .landing-title { font-size: clamp(2.7rem,12vw,3.75rem); }
++  .landing-globe-stage { width: min(440px, 108%); margin: 0 -4% 30px; }
++  .landing-hero-split-score { min-width: 58px; padding: 6px 8px; font-size: .68rem; }
++  .landing-featured-game { left: 50%; bottom: -72px; width: min(280px, 82%); transform: translateX(-50%); }
++  .landing-featured-game:hover { transform: translateX(-50%) translateY(-2px); }
+   .landing-facts { grid-template-columns: 1fr; }
+   .landing-facts > span { border-right: 0; border-bottom: 1px solid var(--border-strong); }
+   .landing-facts > span:last-child { border-bottom: 0; }
+diff --git a/src/styles/worldsplit.css b/src/styles/worldsplit.css
+new file mode 100644
+index 0000000..738c5de
+--- /dev/null
++++ b/src/styles/worldsplit.css
+@@ -0,0 +1,328 @@
++.worldsplit-screen {
++  --worldsplit-a: #86ca3d;
++  --worldsplit-b: #4c9c9b;
++  --worldsplit-line: #f26f43;
++}
++
++.worldsplit-layout {
++  flex: 1;
++  min-height: 0;
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(310px, 390px);
++  gap: clamp(16px, 2vw, 28px);
++}
++
++.worldsplit-map-shell {
++  position: relative;
++  min-width: 0;
++  min-height: 360px;
++  display: grid;
++  place-items: center;
++  overflow: hidden;
++  border: 1px solid var(--border-strong);
++  background:
++    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 82%, #fff), transparent 52%),
++    var(--sea);
++  isolation: isolate;
++}
++
++.worldsplit-map {
++  width: 100%;
++  height: 100%;
++  min-height: 360px;
++  display: block;
++  cursor: crosshair;
++  touch-action: none;
++  user-select: none;
++}
++
++.worldsplit-map:focus-visible {
++  outline: 3px solid var(--accent);
++  outline-offset: -4px;
++}
++
++.worldsplit-map.is-drawing { cursor: grabbing; }
++.worldsplit-ocean { fill: transparent; }
++
++.worldsplit-graticule line {
++  stroke: color-mix(in srgb, var(--text) 13%, transparent);
++  stroke-width: .7;
++  stroke-dasharray: 2 7;
++  vector-effect: non-scaling-stroke;
++}
++
++.worldsplit-country {
++  fill: color-mix(in srgb, var(--land) 86%, var(--surface));
++  stroke: color-mix(in srgb, var(--text) 45%, transparent);
++  stroke-width: .7;
++  vector-effect: non-scaling-stroke;
++  transition: fill 150ms ease, opacity 150ms ease, filter 150ms ease;
++}
++
++.worldsplit-country.is-side-a { fill: var(--worldsplit-a); }
++.worldsplit-country.is-side-b { fill: var(--worldsplit-b); }
++.worldsplit-country.is-outside {
++  fill: color-mix(in srgb, var(--land) 60%, var(--sea));
++  opacity: .27;
++}
++
++.worldsplit-line-glow.is-hidden,
++.worldsplit-line.is-hidden,
++.worldsplit-line-handle.is-hidden { display: none; }
++
++.worldsplit-line-glow,
++.worldsplit-line {
++  pointer-events: none;
++  vector-effect: non-scaling-stroke;
++}
++
++.worldsplit-line-glow {
++  stroke: color-mix(in srgb, var(--worldsplit-line) 46%, transparent);
++  stroke-width: 12;
++  stroke-linecap: round;
++}
++
++.worldsplit-line {
++  stroke: var(--worldsplit-line);
++  stroke-width: 3;
++  stroke-linecap: round;
++  stroke-dasharray: 10 5;
++}
++
++.worldsplit-line-handle {
++  pointer-events: none;
++  fill: var(--surface);
++  stroke: var(--worldsplit-line);
++  stroke-width: 3;
++  vector-effect: non-scaling-stroke;
++}
++
++.worldsplit-map.is-locked .worldsplit-line {
++  stroke-dasharray: none;
++}
++
++.worldsplit-map-hint {
++  position: absolute;
++  left: 50%;
++  top: 50%;
++  z-index: 2;
++  width: min(290px, calc(100% - 32px));
++  display: grid;
++  gap: 5px;
++  padding: 14px 16px;
++  border: 1px solid var(--border-strong);
++  color: var(--text);
++  background: color-mix(in srgb, var(--surface) 91%, transparent);
++  box-shadow: var(--shadow-panel);
++  text-align: center;
++  transform: translate(-50%, -50%);
++  pointer-events: none;
++  backdrop-filter: blur(8px);
++  transition: opacity 150ms ease, transform 150ms ease;
++}
++
++.worldsplit-map-hint strong { font-size: .86rem; }
++.worldsplit-map-hint span { color: var(--muted); font-size: .7rem; line-height: 1.4; }
++.worldsplit-map-hint.is-hidden { opacity: 0; transform: translate(-50%, -45%); }
++
++.worldsplit-map-label {
++  position: absolute;
++  left: 14px;
++  bottom: 12px;
++  z-index: 2;
++  padding: 6px 8px;
++  color: var(--muted);
++  background: color-mix(in srgb, var(--surface) 84%, transparent);
++  font-size: .62rem;
++  pointer-events: none;
++}
++
++.worldsplit-panel {
++  min-height: 0;
++  overflow-y: auto;
++  padding: clamp(22px, 3vw, 32px);
++  border: 1px solid var(--border-strong);
++  background: var(--surface);
++}
++
++.worldsplit-panel-title {
++  padding-bottom: 22px;
++  border-bottom: 1px solid var(--border);
++}
++
++.worldsplit-eyebrow {
++  color: #557932;
++  letter-spacing: .1em;
++  text-transform: uppercase;
++}
++
++.worldsplit-panel-title h1 {
++  margin: 10px 0 13px;
++  font-size: clamp(2rem, 3.6vw, 3.2rem);
++  line-height: .98;
++  letter-spacing: -.045em;
++}
++
++.worldsplit-round-detail {
++  margin: 0;
++  color: var(--muted);
++  font-size: .84rem;
++  line-height: 1.55;
++}
++
++.worldsplit-progress {
++  display: grid;
++  gap: 11px;
++  padding: 18px 0;
++  border-bottom: 1px solid var(--border);
++}
++
++.worldsplit-progress > div:first-child {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++}
++
++.worldsplit-progress-label {
++  color: var(--muted);
++  font-size: .7rem;
++  font-weight: 700;
++  text-transform: uppercase;
++  letter-spacing: .06em;
++}
++
++.worldsplit-running-score { font-size: .82rem; }
++.worldsplit-progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
++.worldsplit-progress-dot { height: 4px; background: var(--surface-soft); }
++.worldsplit-progress-dot.is-active { background: var(--worldsplit-line); }
++.worldsplit-progress-dot.is-complete { background: var(--accent); }
++
++.worldsplit-status {
++  min-height: 44px;
++  margin: 18px 0 13px;
++  color: var(--text);
++  font-size: .82rem;
++  font-weight: 680;
++}
++
++.worldsplit-side-cards {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 8px;
++}
++
++.worldsplit-side-card {
++  min-width: 0;
++  display: grid;
++  gap: 7px;
++  padding: 14px;
++  border: 1px solid var(--border-strong);
++  background: var(--surface-soft);
++}
++
++.worldsplit-side-card.is-a { border-top: 4px solid var(--worldsplit-a); }
++.worldsplit-side-card.is-b { border-top: 4px solid var(--worldsplit-b); }
++.worldsplit-side-name { color: var(--muted); font-size: .65rem; font-weight: 760; text-transform: uppercase; }
++.worldsplit-side-value { font-size: clamp(1.45rem, 2.7vw, 2.15rem); line-height: 1; letter-spacing: -.045em; }
++.worldsplit-side-population { min-height: 28px; color: var(--muted); font-size: .63rem; line-height: 1.35; }
++
++.worldsplit-result-callout {
++  margin-top: 10px;
++  padding: 14px;
++  border-left: 4px solid var(--accent);
++  background: var(--accent-soft);
++}
++
++.worldsplit-result-callout strong,
++.worldsplit-result-callout span { display: block; }
++.worldsplit-result-callout strong { margin-bottom: 5px; font-size: .88rem; }
++.worldsplit-result-callout span { color: var(--muted); font-size: .68rem; line-height: 1.45; }
++
++.worldsplit-adjustments {
++  display: grid;
++  gap: 7px;
++  margin-top: 14px;
++}
++
++.worldsplit-adjust-row {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 7px;
++}
++
++.worldsplit-adjust-button,
++.worldsplit-reset-line {
++  min-height: 36px;
++  padding: 0 10px;
++  font-size: .7rem;
++  font-weight: 700;
++}
++
++.worldsplit-reset-line {
++  border: 0;
++  color: var(--muted);
++  background: transparent;
++  text-decoration: underline;
++  text-underline-offset: 3px;
++}
++
++.worldsplit-panel-actions {
++  display: grid;
++  gap: 8px;
++  margin-top: 15px;
++}
++
++.worldsplit-primary,
++.worldsplit-copy {
++  width: 100%;
++  min-height: 44px;
++}
++
++.worldsplit-data-note {
++  margin: 16px 0 0;
++  color: var(--subtle);
++  font-size: .6rem;
++  line-height: 1.45;
++}
++
++:root[data-theme="dark"] .worldsplit-map-shell {
++  background:
++    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 84%, #1e5a5c), transparent 55%),
++    var(--sea);
++}
++
++:root[data-theme="dark"] .worldsplit-country {
++  fill: #d8dacb;
++  stroke: rgba(12, 20, 17, .68);
++}
++
++:root[data-theme="dark"] .worldsplit-country.is-side-a { fill: #91cf4d; }
++:root[data-theme="dark"] .worldsplit-country.is-side-b { fill: #63b5ad; }
++:root[data-theme="dark"] .worldsplit-country.is-outside { fill: #7f9185; }
++
++@media (max-width: 980px) {
++  .worldsplit-layout {
++    grid-template-columns: 1fr;
++    overflow-y: auto;
++  }
++
++  .worldsplit-map-shell { min-height: 420px; }
++  .worldsplit-map { min-height: 420px; }
++  .worldsplit-panel { overflow: visible; }
++}
++
++@media (max-width: 700px) {
++  .worldsplit-layout { gap: 10px; }
++  .worldsplit-map-shell,
++  .worldsplit-map { min-height: 290px; }
++  .worldsplit-panel { padding: 20px; }
++  .worldsplit-panel-title h1 { font-size: 2rem; }
++  .worldsplit-map-label { display: none; }
++  .worldsplit-map-hint { width: min(250px, calc(100% - 24px)); }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .worldsplit-country,
++  .worldsplit-map-hint { transition: none; }
++}
+diff --git a/src/ui/screens/LandingScreen.tsx b/src/ui/screens/LandingScreen.tsx
+index d04c2e4..4ed5b05 100644
+--- a/src/ui/screens/LandingScreen.tsx
++++ b/src/ui/screens/LandingScreen.tsx
+@@ -17,13 +17,14 @@ import {
+   Palette,
+   Puzzle,
+   Shapes,
++  Split,
+   Trophy,
+   Users,
+ } from "lucide-react";
+ import { getLocalDailyDate } from "../../core/dailyChallenge";
+ import { readDailyResult } from "../../storage/dailySave";
+ import { readSoloSave } from "../../storage/localSave";
+-import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
++import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, type GameModeId } from "../../core/gameModes";
+ import type { Screen } from "../../app/router";
+ import { LandingSatelliteGlobe } from "../components/LandingSatelliteGlobe";
+ import { currentTheme, LOCATO_THEME_EVENT, toggleTheme, type LocatoTheme } from "../theme";
+@@ -75,6 +76,7 @@ const MODE_GROUPS: readonly LandingGroup[] = [
+     name: "On the map",
+     tagline: "Point, click and drag your way around the world.",
+     modes: [
++      { id: "worldsplit", title: "Worldsplit", icon: Split, desc: "Draw one line to divide a population in half.", badge: "New" },
+       { id: "name-all", title: "Name All Countries", icon: Globe, desc: "Type every country you know." },
+       { id: "click-country", title: "Click the Country", icon: MousePointerClick, desc: "Find the named country quickly." },
+       { id: "spot-country", title: "Spot the Country", icon: Eye, desc: "Name the country that lights up." },
+@@ -118,7 +120,7 @@ function hasResumableSolo(storage?: Storage): boolean {
+ }
+ 
+ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
+-  if (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || isStreetViewGameModeId(mode) || isMapTapGameModeId(mode)) {
++  if (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || isStreetViewGameModeId(mode) || isMapTapGameModeId(mode) || isWorldSplitGameModeId(mode)) {
+     options.onGameMode(mode);
+   }
+ }
+@@ -175,21 +177,33 @@ function LandingHome(options: LandingScreenOptions) {
+       <div className="landing-scroll">
+         <section className="landing-hero">
+           <motion.div className="landing-hero-copy" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+-            <p className="landing-eyebrow">Geography games on the real map</p>
+-            <h1 className="landing-title">locato, the world is yours to find.</h1>
+-            <p className="landing-sub">Learn countries, flags, capitals and landmarks through short quizzes that feel more like playing than studying.</p>
++            <p className="landing-eyebrow">The map is the game</p>
++            <h1 className="landing-title">Play your way <span>around the world.</span></h1>
++            <p className="landing-sub">Race flags, rebuild continents, hunt landmarks and draw the line in Worldsplit. Quick geography games built on real maps.</p>
+             <div className="landing-hero-actions">
+-              <button type="button" className="lp-btn lp-btn-primary" data-testid="button-start-exploring" onClick={options.onPlay}>
+-                {resumable ? "Continue playing" : "Start playing"} <ArrowRight size={16} />
++              <button type="button" className="lp-btn lp-btn-primary" data-testid="button-play-worldsplit" onClick={() => routeMode(options, "worldsplit")}>
++                Play Worldsplit <ArrowRight size={16} />
++              </button>
++              <button type="button" className="lp-btn" data-testid="button-start-exploring" onClick={options.onPlay}>
++                {resumable ? "Continue last game" : "Start with flags"}
+               </button>
+-              <a className="lp-btn" href="#games">See all games</a>
+             </div>
++            <a className="landing-browse-link" href="#games">Browse all {totalModes} games <ArrowRight size={14} /></a>
+             <p className="landing-free">Free to play · No account needed</p>
+           </motion.div>
+ 
+-          <motion.div className="landing-globe-stage" initial={{ opacity: 0, scale: .97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.55, delay: 0.08 }} aria-label="Slowly rotating globe">
++          <motion.div className="landing-globe-stage" initial={{ opacity: 0, scale: .97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.55, delay: 0.08 }} aria-label="Slowly rotating globe previewing Worldsplit">
+             <span className="landing-globe-orbit" aria-hidden="true" />
+             <LandingSatelliteGlobe />
++            <span className="landing-hero-split-line" aria-hidden="true" />
++            <span className="landing-hero-split-score is-a" aria-hidden="true">49.8%</span>
++            <span className="landing-hero-split-score is-b" aria-hidden="true">50.2%</span>
++            <button type="button" className="landing-featured-game" onClick={() => routeMode(options, "worldsplit")}>
++              <span className="landing-featured-kicker"><Split size={14} /> New game</span>
++              <strong>Worldsplit</strong>
++              <span>One line. Two sides. How evenly can you divide the population?</span>
++              <span className="landing-featured-play">Play now <ArrowRight size={14} /></span>
++            </button>
+           </motion.div>
+         </section>
+ 
+diff --git a/src/ui/screens/StreetViewCountryScreen.ts b/src/ui/screens/StreetViewCountryScreen.ts
+index a8d6f6b..bec1071 100644
+--- a/src/ui/screens/StreetViewCountryScreen.ts
++++ b/src/ui/screens/StreetViewCountryScreen.ts
+@@ -1,5 +1,5 @@
+ import type { Country, CountryId, CountryIndex } from "../../core/countries";
+-import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
++import { isStreetViewGameModeId, type GameModeId } from "../../core/gameModes";
+ import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
+ import { submitCountryGuess } from "../../core/map";
+ import type { Screen } from "../../app/router";
+@@ -242,7 +242,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
+     signal: controller.signal,
+     onChange: (gameMode) => {
+       if (isStreetViewGameModeId(gameMode)) return;
+-      if (isPromptGameModeId(gameMode) || isWorldMapGameModeId(gameMode)) options.onGameModeChange(gameMode);
++      options.onGameModeChange(gameMode);
+     },
+   });
+ 
+diff --git a/src/ui/screens/WorldSplitScreen.ts b/src/ui/screens/WorldSplitScreen.ts
+new file mode 100644
+index 0000000..9abb6f1
+--- /dev/null
++++ b/src/ui/screens/WorldSplitScreen.ts
+@@ -0,0 +1,502 @@
++import {
++  DEFAULT_WORLD_SPLIT_LINE,
++  WORLD_SPLIT_MAX_ROUND_SCORE,
++  WORLD_SPLIT_ROUNDS,
++  buildWorldSplitCountries,
++  extendSplitLineToMap,
++  formatPopulationMillions,
++  isCountryInWorldSplitRound,
++  rotateSplitLine,
++  scoreWorldSplit,
++  shiftSplitLine,
++  splitLineLength,
++  worldSplitSideForPoint,
++  type SplitLine,
++  type WorldSplitResult,
++} from "../../core/worldsplit";
++import {
++  MAP_VIEWBOX_HEIGHT,
++  MAP_VIEWBOX_WIDTH,
++  projectWorldMapPosition,
++  type ProjectedPoint,
++  type WorldCountryFeature,
++  type WorldMapPolygon,
++  type WorldMapPosition,
++} from "../../core/map";
++import type { GameModeId } from "../../core/gameModes";
++import type { Screen } from "../../app/router";
++import { createBrandLockup } from "../dom/createBrandLockup";
++import { el } from "../dom/createElement";
++import { createGameModeDropdown } from "../dom/gameModeDropdown";
++
++const SVG_NS = "http://www.w3.org/2000/svg";
++const MIN_DRAW_LENGTH = 24;
++const BEST_SCORE_KEY = "locato:worldsplit:best-score:v1";
++
++export interface WorldSplitScreenOptions {
++  readonly worldCountryFeatures: readonly WorldCountryFeature[];
++  readonly storage: Storage;
++  readonly onGameModeChange: (mode: GameModeId) => void;
++  readonly onHome: () => void;
++  readonly onDailyChallenge?: () => void;
++  readonly onMultiplayer?: () => void;
++}
++
++function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVGElementTagNameMap[K] {
++  return document.createElementNS(SVG_NS, tagName);
++}
++
++function formatPoint(point: WorldMapPosition): string {
++  const [x, y] = projectWorldMapPosition(point);
++  return `${x.toFixed(3)} ${y.toFixed(3)}`;
++}
++
++function polygonToPath(polygon: WorldMapPolygon): string {
++  return polygon
++    .map((ring) => ring.map((point, index) => `${index === 0 ? "M" : "L"} ${formatPoint(point)}`).join(" ") + " Z")
++    .join(" ");
++}
++
++function geometryToPath(feature: WorldCountryFeature): string {
++  if (feature.geometry.type === "Polygon") return polygonToPath(feature.geometry.coordinates);
++  return feature.geometry.coordinates.map(polygonToPath).join(" ");
++}
++
++function pointerToMap(svg: SVGSVGElement, clientX: number, clientY: number): ProjectedPoint {
++  const rect = svg.getBoundingClientRect();
++  const relativeX = rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
++  const relativeY = rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
++  return [
++    Math.min(MAP_VIEWBOX_WIDTH, Math.max(0, relativeX * MAP_VIEWBOX_WIDTH)),
++    Math.min(MAP_VIEWBOX_HEIGHT, Math.max(0, relativeY * MAP_VIEWBOX_HEIGHT)),
++  ];
++}
++
++function feedbackForScore(score: number): string {
++  if (score === WORLD_SPLIT_MAX_ROUND_SCORE) return "Perfect split";
++  if (score >= 96) return "Almost perfectly balanced";
++  if (score >= 85) return "Excellent geographic instinct";
++  if (score >= 65) return "Nicely judged";
++  if (score >= 40) return "Close — try shifting the line";
++  return "The population is more uneven than the map looks";
++}
++
++function readBestScore(storage: Storage): number {
++  const value = Number.parseInt(storage.getItem(BEST_SCORE_KEY) ?? "0", 10);
++  return Number.isFinite(value) ? Math.max(0, value) : 0;
++}
++
++export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen {
++  const controller = new AbortController();
++  const countries = buildWorldSplitCountries(options.worldCountryFeatures);
++  const countryByCode = new Map(countries.map((country) => [country.code, country]));
++  const pathByCode = new Map<string, SVGPathElement>();
++  const scores: number[] = [];
++  let roundIndex = 0;
++  let line: SplitLine | null = null;
++  let submittedResult: WorldSplitResult | null = null;
++  let activePointerId: number | null = null;
++  let dragStart: ProjectedPoint | null = null;
++  let finished = false;
++
++  const gameModeDropdown = createGameModeDropdown({
++    selectedMode: "worldsplit",
++    signal: controller.signal,
++    name: "worldsplit-game-mode",
++    onChange: options.onGameModeChange,
++  });
++
++  const dailyButton = el("button", { className: "nav-action", text: "Daily challenge", attrs: { type: "button" } });
++  const multiplayerButton = el("button", { className: "nav-action", text: "Multiplayer", attrs: { type: "button" } });
++  dailyButton.hidden = !options.onDailyChallenge;
++  multiplayerButton.hidden = !options.onMultiplayer;
++
++  const svg = createSvgElement("svg");
++  svg.classList.add("worldsplit-map");
++  svg.setAttribute("viewBox", `0 0 ${MAP_VIEWBOX_WIDTH} ${MAP_VIEWBOX_HEIGHT}`);
++  svg.setAttribute("role", "img");
++  svg.setAttribute("aria-label", "World map. Draw a straight line across the map to split the selected population.");
++  svg.setAttribute("tabindex", "0");
++
++  const ocean = createSvgElement("rect");
++  ocean.classList.add("worldsplit-ocean");
++  ocean.setAttribute("width", String(MAP_VIEWBOX_WIDTH));
++  ocean.setAttribute("height", String(MAP_VIEWBOX_HEIGHT));
++  svg.append(ocean);
++
++  const graticule = createSvgElement("g");
++  graticule.classList.add("worldsplit-graticule");
++  for (let x = 125; x < MAP_VIEWBOX_WIDTH; x += 125) {
++    const lineElement = createSvgElement("line");
++    lineElement.setAttribute("x1", String(x));
++    lineElement.setAttribute("x2", String(x));
++    lineElement.setAttribute("y1", "0");
++    lineElement.setAttribute("y2", String(MAP_VIEWBOX_HEIGHT));
++    graticule.append(lineElement);
++  }
++  for (let y = 100; y < MAP_VIEWBOX_HEIGHT; y += 100) {
++    const lineElement = createSvgElement("line");
++    lineElement.setAttribute("x1", "0");
++    lineElement.setAttribute("x2", String(MAP_VIEWBOX_WIDTH));
++    lineElement.setAttribute("y1", String(y));
++    lineElement.setAttribute("y2", String(y));
++    graticule.append(lineElement);
++  }
++  svg.append(graticule);
++
++  const countriesGroup = createSvgElement("g");
++  countriesGroup.classList.add("worldsplit-countries");
++  for (const feature of options.worldCountryFeatures) {
++    const path = createSvgElement("path");
++    path.classList.add("worldsplit-country");
++    path.setAttribute("d", geometryToPath(feature));
++    path.dataset.code = feature.code;
++    const title = createSvgElement("title");
++    title.textContent = feature.name;
++    path.append(title);
++    pathByCode.set(feature.code, path);
++    countriesGroup.append(path);
++  }
++  svg.append(countriesGroup);
++
++  const splitGlow = createSvgElement("line");
++  splitGlow.classList.add("worldsplit-line-glow");
++  const splitStroke = createSvgElement("line");
++  splitStroke.classList.add("worldsplit-line");
++  const startHandle = createSvgElement("circle");
++  startHandle.classList.add("worldsplit-line-handle");
++  startHandle.setAttribute("r", "7");
++  const endHandle = createSvgElement("circle");
++  endHandle.classList.add("worldsplit-line-handle");
++  endHandle.setAttribute("r", "7");
++  svg.append(splitGlow, splitStroke, startHandle, endHandle);
++
++  const mapHint = el("div", {
++    className: "worldsplit-map-hint",
++    children: [el("strong", { text: "Draw across the map" }), el("span", { text: "Click and drag. The line extends forever." })],
++  });
++  const mapShell = el("div", {
++    className: "worldsplit-map-shell",
++    children: [svg, mapHint, el("div", { className: "worldsplit-map-label", text: "Countries are counted by their geographic centre" })],
++  });
++
++  const roundEyebrow = el("span", { className: "eyebrow worldsplit-eyebrow", text: "Worldsplit" });
++  const roundTitle = el("h1");
++  const roundDetail = el("p", { className: "worldsplit-round-detail" });
++  const progressLabel = el("span", { className: "worldsplit-progress-label" });
++  const scoreLabel = el("strong", { className: "worldsplit-running-score", text: "0 pts" });
++  const progressDots = WORLD_SPLIT_ROUNDS.map(() => el("span", { className: "worldsplit-progress-dot" }));
++  const statusText = el("p", { className: "worldsplit-status", text: "Draw a line to make your split." });
++
++  const sideAValue = el("strong", { className: "worldsplit-side-value", text: "?" });
++  const sideBValue = el("strong", { className: "worldsplit-side-value", text: "?" });
++  const sideAPopulation = el("span", { className: "worldsplit-side-population", text: "Hidden until you lock" });
++  const sideBPopulation = el("span", { className: "worldsplit-side-population", text: "Hidden until you lock" });
++  const sideCards = el("div", {
++    className: "worldsplit-side-cards",
++    children: [
++      el("div", {
++        className: "worldsplit-side-card is-a",
++        children: [el("span", { className: "worldsplit-side-name", text: "Side A" }), sideAValue, sideAPopulation],
++      }),
++      el("div", {
++        className: "worldsplit-side-card is-b",
++        children: [el("span", { className: "worldsplit-side-name", text: "Side B" }), sideBValue, sideBPopulation],
++      }),
++    ],
++  });
++
++  const rotateLeftButton = el("button", { className: "worldsplit-adjust-button", text: "↺ 5°", attrs: { type: "button", "aria-label": "Rotate line five degrees anticlockwise" } });
++  const rotateRightButton = el("button", { className: "worldsplit-adjust-button", text: "5° ↻", attrs: { type: "button", "aria-label": "Rotate line five degrees clockwise" } });
++  const shiftBackButton = el("button", { className: "worldsplit-adjust-button", text: "Toward B", attrs: { type: "button", "aria-label": "Shift line toward side B" } });
++  const shiftForwardButton = el("button", { className: "worldsplit-adjust-button", text: "Toward A", attrs: { type: "button", "aria-label": "Shift line toward side A" } });
++  const resetLineButton = el("button", { className: "worldsplit-reset-line", text: "Clear line", attrs: { type: "button" } });
++  const adjustControls = el("div", {
++    className: "worldsplit-adjustments",
++    children: [
++      el("div", { className: "worldsplit-adjust-row", children: [rotateLeftButton, rotateRightButton] }),
++      el("div", { className: "worldsplit-adjust-row", children: [shiftBackButton, shiftForwardButton] }),
++      resetLineButton,
++    ],
++  });
++
++  const lockButton = el("button", { className: "primary-action worldsplit-primary", text: "Lock split", attrs: { type: "button" } });
++  lockButton.disabled = true;
++  const nextButton = el("button", { className: "primary-action worldsplit-primary", text: "Next round", attrs: { type: "button" } });
++  nextButton.hidden = true;
++  const copyButton = el("button", { className: "ghost-action worldsplit-copy", text: "Copy result", attrs: { type: "button" } });
++  copyButton.hidden = true;
++  const playAgainButton = el("button", { className: "primary-action worldsplit-primary", text: "Play again", attrs: { type: "button" } });
++  playAgainButton.hidden = true;
++
++  const resultCallout = el("div", { className: "worldsplit-result-callout" });
++  resultCallout.hidden = true;
++
++  const panel = el("aside", {
++    className: "worldsplit-panel",
++    children: [
++      el("div", { className: "worldsplit-panel-title", children: [roundEyebrow, roundTitle, roundDetail] }),
++      el("div", {
++        className: "worldsplit-progress",
++        children: [el("div", { children: [progressLabel, scoreLabel] }), el("div", { className: "worldsplit-progress-dots", children: progressDots })],
++      }),
++      statusText,
++      sideCards,
++      resultCallout,
++      adjustControls,
++      el("div", { className: "worldsplit-panel-actions", children: [lockButton, nextButton, playAgainButton, copyButton] }),
++      el("p", { className: "worldsplit-data-note", text: "Population weights use rounded 2024 estimates so every round stays reproducible." }),
++    ],
++  });
++
++  function currentRound() {
++    return WORLD_SPLIT_ROUNDS[roundIndex]!;
++  }
++
++  function totalScore(): number {
++    return scores.reduce((sum, score) => sum + score, 0);
++  }
++
++  function updateProgress(): void {
++    progressLabel.textContent = finished ? "Run complete" : `Round ${roundIndex + 1} of ${WORLD_SPLIT_ROUNDS.length}`;
++    scoreLabel.textContent = `${totalScore()} pts`;
++    progressDots.forEach((dot, index) => {
++      dot.classList.toggle("is-complete", index < scores.length);
++      dot.classList.toggle("is-active", !finished && index === roundIndex);
++    });
++  }
++
++  function setCountryClasses(): void {
++    const round = currentRound();
++    for (const [code, path] of pathByCode) {
++      const country = countryByCode.get(code);
++      const active = country ? isCountryInWorldSplitRound(country, round) : false;
++      path.classList.toggle("is-outside", !active);
++      path.classList.remove("is-side-a", "is-side-b");
++      if (!active || !country || !line) continue;
++      path.classList.add(worldSplitSideForPoint(country.point, line) === "a" ? "is-side-a" : "is-side-b");
++    }
++  }
++
++  function renderLine(): void {
++    const hasLine = line !== null && splitLineLength(line) >= MIN_DRAW_LENGTH;
++    splitGlow.classList.toggle("is-hidden", !hasLine);
++    splitStroke.classList.toggle("is-hidden", !hasLine);
++    startHandle.classList.toggle("is-hidden", !hasLine);
++    endHandle.classList.toggle("is-hidden", !hasLine);
++    lockButton.disabled = !hasLine || submittedResult !== null || finished;
++    resetLineButton.disabled = !hasLine || submittedResult !== null || finished;
++    mapHint.classList.toggle("is-hidden", hasLine || submittedResult !== null || finished);
++
++    if (hasLine && line) {
++      const [extendedStart, extendedEnd] = extendSplitLineToMap(line);
++      for (const lineElement of [splitGlow, splitStroke]) {
++        lineElement.setAttribute("x1", extendedStart[0].toFixed(3));
++        lineElement.setAttribute("y1", extendedStart[1].toFixed(3));
++        lineElement.setAttribute("x2", extendedEnd[0].toFixed(3));
++        lineElement.setAttribute("y2", extendedEnd[1].toFixed(3));
++      }
++      startHandle.setAttribute("cx", line[0][0].toFixed(3));
++      startHandle.setAttribute("cy", line[0][1].toFixed(3));
++      endHandle.setAttribute("cx", line[1][0].toFixed(3));
++      endHandle.setAttribute("cy", line[1][1].toFixed(3));
++      statusText.textContent = submittedResult ? statusText.textContent : "Fine-tune the line, then lock your split.";
++    } else if (!submittedResult && !finished) {
++      statusText.textContent = "Draw a line to make your split.";
++    }
++
++    setCountryClasses();
++  }
++
++  function setAdjustmentDisabled(disabled: boolean): void {
++    rotateLeftButton.disabled = disabled;
++    rotateRightButton.disabled = disabled;
++    shiftBackButton.disabled = disabled;
++    shiftForwardButton.disabled = disabled;
++  }
++
++  function renderRound(): void {
++    const round = currentRound();
++    finished = false;
++    line = null;
++    submittedResult = null;
++    roundEyebrow.textContent = `Worldsplit · ${round.label}`;
++    roundTitle.textContent = round.prompt;
++    roundDetail.textContent = round.detail;
++    sideAValue.textContent = "?";
++    sideBValue.textContent = "?";
++    sideAPopulation.textContent = "Hidden until you lock";
++    sideBPopulation.textContent = "Hidden until you lock";
++    resultCallout.hidden = true;
++    resultCallout.replaceChildren();
++    adjustControls.hidden = false;
++    sideCards.hidden = false;
++    lockButton.hidden = false;
++    nextButton.hidden = true;
++    playAgainButton.hidden = true;
++    copyButton.hidden = true;
++    setAdjustmentDisabled(false);
++    svg.classList.remove("is-locked");
++    updateProgress();
++    renderLine();
++  }
++
++  function submitRound(): void {
++    if (!line || splitLineLength(line) < MIN_DRAW_LENGTH || submittedResult || finished) return;
++    submittedResult = scoreWorldSplit(countries, currentRound(), line);
++    scores.push(submittedResult.score);
++    sideAValue.textContent = `${submittedResult.sideAPercent.toFixed(1)}%`;
++    sideBValue.textContent = `${submittedResult.sideBPercent.toFixed(1)}%`;
++    sideAPopulation.textContent = `≈ ${formatPopulationMillions(submittedResult.sideAPopulationMillions)} people`;
++    sideBPopulation.textContent = `≈ ${formatPopulationMillions(submittedResult.sideBPopulationMillions)} people`;
++    statusText.textContent = feedbackForScore(submittedResult.score);
++    resultCallout.hidden = false;
++    resultCallout.replaceChildren(
++      el("strong", { text: `+${submittedResult.score} points` }),
++      el("span", { text: `${submittedResult.errorPercentagePoints.toFixed(1)} percentage points from a perfect half.` }),
++    );
++    lockButton.hidden = true;
++    nextButton.hidden = false;
++    nextButton.textContent = roundIndex === WORLD_SPLIT_ROUNDS.length - 1 ? "See final score" : "Next round";
++    setAdjustmentDisabled(true);
++    resetLineButton.disabled = true;
++    svg.classList.add("is-locked");
++    updateProgress();
++    renderLine();
++  }
++
++  function finishGame(): void {
++    finished = true;
++    const score = totalScore();
++    const maximum = WORLD_SPLIT_ROUNDS.length * WORLD_SPLIT_MAX_ROUND_SCORE;
++    const previousBest = readBestScore(options.storage);
++    const best = Math.max(previousBest, score);
++    options.storage.setItem(BEST_SCORE_KEY, String(best));
++    const newBest = score > previousBest;
++
++    roundEyebrow.textContent = "Worldsplit complete";
++    roundTitle.textContent = `${score} / ${maximum}`;
++    roundDetail.textContent = newBest ? "New personal best. Your population instinct is sharp." : `Personal best: ${best} points.`;
++    statusText.textContent = score >= 450 ? "You can read population patterns at a glance." : score >= 350 ? "A strong run across five different maps." : "Every line teaches you where people really live.";
++    sideCards.hidden = true;
++    resultCallout.hidden = false;
++    resultCallout.replaceChildren(
++      el("strong", { text: newBest ? "New best score" : "Run summary" }),
++      el("span", { text: scores.map((roundScore, index) => `${WORLD_SPLIT_ROUNDS[index]!.label}: ${roundScore}`).join(" · ") }),
++    );
++    adjustControls.hidden = true;
++    lockButton.hidden = true;
++    nextButton.hidden = true;
++    playAgainButton.hidden = false;
++    copyButton.hidden = false;
++    updateProgress();
++  }
++
++  function nextRound(): void {
++    if (!submittedResult) return;
++    if (roundIndex >= WORLD_SPLIT_ROUNDS.length - 1) {
++      finishGame();
++      return;
++    }
++    roundIndex += 1;
++    renderRound();
++  }
++
++  function playAgain(): void {
++    scores.splice(0, scores.length);
++    roundIndex = 0;
++    renderRound();
++  }
++
++  function ensureLine(): SplitLine {
++    if (!line || splitLineLength(line) < MIN_DRAW_LENGTH) line = DEFAULT_WORLD_SPLIT_LINE;
++    return line;
++  }
++
++  function applyLineAdjustment(adjust: (activeLine: SplitLine) => SplitLine): void {
++    if (submittedResult || finished) return;
++    line = adjust(ensureLine());
++    renderLine();
++  }
++
++  function stopDrawing(event: PointerEvent): void {
++    if (event.pointerId !== activePointerId) return;
++    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
++    activePointerId = null;
++    dragStart = null;
++    if (line && splitLineLength(line) < MIN_DRAW_LENGTH) line = null;
++    renderLine();
++  }
++
++  svg.addEventListener("pointerdown", (event) => {
++    if (submittedResult || finished || event.button !== 0) return;
++    const start = pointerToMap(svg, event.clientX, event.clientY);
++    activePointerId = event.pointerId;
++    dragStart = start;
++    line = [start, start];
++    svg.setPointerCapture(event.pointerId);
++    svg.classList.add("is-drawing");
++    renderLine();
++  }, { signal: controller.signal });
++
++  svg.addEventListener("pointermove", (event) => {
++    if (event.pointerId !== activePointerId || !dragStart || submittedResult || finished) return;
++    line = [dragStart, pointerToMap(svg, event.clientX, event.clientY)];
++    renderLine();
++  }, { signal: controller.signal });
++
++  svg.addEventListener("pointerup", (event) => {
++    svg.classList.remove("is-drawing");
++    stopDrawing(event);
++  }, { signal: controller.signal });
++  svg.addEventListener("pointercancel", (event) => {
++    svg.classList.remove("is-drawing");
++    stopDrawing(event);
++  }, { signal: controller.signal });
++
++  rotateLeftButton.addEventListener("click", () => applyLineAdjustment((activeLine) => rotateSplitLine(activeLine, -5)), { signal: controller.signal });
++  rotateRightButton.addEventListener("click", () => applyLineAdjustment((activeLine) => rotateSplitLine(activeLine, 5)), { signal: controller.signal });
++  shiftBackButton.addEventListener("click", () => applyLineAdjustment((activeLine) => shiftSplitLine(activeLine, -15)), { signal: controller.signal });
++  shiftForwardButton.addEventListener("click", () => applyLineAdjustment((activeLine) => shiftSplitLine(activeLine, 15)), { signal: controller.signal });
++  resetLineButton.addEventListener("click", () => {
++    if (submittedResult || finished) return;
++    line = null;
++    renderLine();
++  }, { signal: controller.signal });
++  lockButton.addEventListener("click", submitRound, { signal: controller.signal });
++  nextButton.addEventListener("click", nextRound, { signal: controller.signal });
++  playAgainButton.addEventListener("click", playAgain, { signal: controller.signal });
++  copyButton.addEventListener("click", () => {
++    const maximum = WORLD_SPLIT_ROUNDS.length * WORLD_SPLIT_MAX_ROUND_SCORE;
++    const text = `Worldsplit ${totalScore()}/${maximum}\n${scores.map((score) => score >= 90 ? "🟩" : score >= 70 ? "🟨" : score >= 50 ? "🟧" : "⬜").join("")}\nlocato.quest`;
++    void navigator.clipboard?.writeText(text).then(() => {
++      copyButton.textContent = "Copied";
++      window.setTimeout(() => { copyButton.textContent = "Copy result"; }, 1600);
++    }).catch(() => {
++      copyButton.textContent = "Copy unavailable";
++    });
++  }, { signal: controller.signal });
++  dailyButton.addEventListener("click", () => options.onDailyChallenge?.(), { signal: controller.signal });
++  multiplayerButton.addEventListener("click", () => options.onMultiplayer?.(), { signal: controller.signal });
++
++  const element = el("section", {
++    className: "game-screen worldsplit-screen",
++    children: [
++      el("header", {
++        className: "game-header",
++        children: [
++          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
++          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
++        ],
++      }),
++      el("main", { className: "worldsplit-layout", children: [mapShell, panel] }),
++    ],
++  });
++
++  renderRound();
++
++  return {
++    element,
++    destroy: () => controller.abort(),
++  };
++}
+diff --git a/tests/worldsplit.test.ts b/tests/worldsplit.test.ts
+new file mode 100644
+index 0000000..311396c
+--- /dev/null
++++ b/tests/worldsplit.test.ts
+@@ -0,0 +1,48 @@
++import { describe, expect, it } from "vitest";
++import { rawCountries } from "../src/core/countries";
++import {
++  WORLD_SPLIT_POPULATION_MILLIONS,
++  extendSplitLineToMap,
++  scoreWorldSplit,
++  type WorldSplitCountryPoint,
++  type WorldSplitRound,
++} from "../src/core/worldsplit";
++
++const testRound: WorldSplitRound = {
++  id: "test",
++  label: "Test",
++  prompt: "Test split",
++  detail: "Test split",
++  continents: null,
++};
++
++function country(code: string, x: number, populationMillions: number): WorldSplitCountryPoint {
++  return { code, name: code, continent: "Test", point: [x, 5], populationMillions };
++}
++
++describe("Worldsplit", () => {
++  it("has a stable population weight for every playable country", () => {
++    const missing = rawCountries.filter((item) => WORLD_SPLIT_POPULATION_MILLIONS[item.code] === undefined).map((item) => item.code);
++    expect(missing).toEqual([]);
++    expect(Object.keys(WORLD_SPLIT_POPULATION_MILLIONS)).toHaveLength(rawCountries.length);
++  });
++
++  it("awards 100 points for a perfect half", () => {
++    const result = scoreWorldSplit([country("AA", -1, 50), country("BB", 1, 50)], testRound, [[0, 0], [0, 10]]);
++    expect(result.sideAPercent).toBe(50);
++    expect(result.sideBPercent).toBe(50);
++    expect(result.score).toBe(100);
++  });
++
++  it("penalises each percentage point away from half", () => {
++    const result = scoreWorldSplit([country("AA", -1, 60), country("BB", 1, 40)], testRound, [[0, 0], [0, 10]]);
++    expect(result.errorPercentagePoints).toBe(10);
++    expect(result.score).toBe(60);
++  });
++
++  it("extends a player segment to both edges of the map", () => {
++    const [start, end] = extendSplitLineToMap([[250, 125], [750, 375]]);
++    expect(start[0] === 0 || start[0] === 1000 || start[1] === 0 || start[1] === 500).toBe(true);
++    expect(end[0] === 0 || end[0] === 1000 || end[1] === 0 || end[1] === 500).toBe(true);
++  });
++});

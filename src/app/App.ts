@@ -2,7 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
-import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -23,6 +23,7 @@ import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
+import { createThemeToggle } from "../ui/theme";
 import type { AppRoute, Screen } from "./router";
 
 export interface AppOptions {
@@ -100,6 +101,7 @@ export function createApp(options: AppOptions): App {
     attrs: { type: "button", "aria-label": "Go to the home page" },
     on: { click: () => navigate({ type: "landing" }) },
   });
+  const themeToggle = createThemeToggle(options.storage);
 
   // Every navigation is mirrored into the browser history (the state carries the
   // route), so the browser back/forward buttons move through the app, and in-app
@@ -124,7 +126,7 @@ export function createApp(options: AppOptions): App {
   }
 
   function attachGlobalControls(): void {
-    options.root.append(landingButton, authControls.trigger, authControls.panel);
+    options.root.append(landingButton, themeToggle, authControls.trigger, authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
@@ -462,6 +464,11 @@ export function createApp(options: AppOptions): App {
 
     if (isMapTapGameModeId(gameMode)) {
       navigate({ type: "map-tap" });
+      return;
+    }
+
+    if (isWorldSplitGameModeId(gameMode)) {
+      navigate({ type: "worldsplit" });
     }
   }
 
@@ -542,6 +549,34 @@ export function createApp(options: AppOptions): App {
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
     );
+  }
+
+  async function startWorldSplit(): Promise<void> {
+    const run = navigationRun;
+    const loading = createLoadingScreen("Loading Worldsplit...");
+    mount(loading);
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/WorldSplitScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createWorldSplitScreen({
+          worldCountryFeatures,
+          storage: options.storage,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
+          onMultiplayer: () => navigate({ type: "multiplayer" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      loading.element.textContent = error instanceof Error ? error.message : "Unable to load Worldsplit.";
+    }
   }
 
   async function startMultiplayer(joinCode?: string): Promise<void> {
@@ -630,6 +665,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "map-tap") {
       void startMapTap();
+      return;
+    }
+    if (route.type === "worldsplit") {
+      void startWorldSplit();
       return;
     }
     if (route.type === "multiplayer") {

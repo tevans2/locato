@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { loadWorldCountryFeatures, type WorldCountryFeature, type WorldMapPolygon, type WorldMapPosition } from "../../core/map";
+import { currentTheme, LOCATO_THEME_EVENT } from "../theme";
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -43,7 +44,7 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function createEarthTexture(features: readonly WorldCountryFeature[]): THREE.CanvasTexture {
+function createEarthTexture(features: readonly WorldCountryFeature[], dark: boolean): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = TEXTURE_WIDTH;
   canvas.height = TEXTURE_HEIGHT;
@@ -51,25 +52,25 @@ function createEarthTexture(features: readonly WorldCountryFeature[]): THREE.Can
   if (!context) throw new Error("Unable to create landing globe texture.");
 
   const ocean = context.createLinearGradient(0, 0, 0, TEXTURE_HEIGHT);
-  ocean.addColorStop(0, "#143d52");
-  ocean.addColorStop(0.42, "#0a3044");
-  ocean.addColorStop(0.72, "#082838");
-  ocean.addColorStop(1, "#102f3d");
+  ocean.addColorStop(0, dark ? "#163c3c" : "#d5e8e6");
+  ocean.addColorStop(0.42, dark ? "#0f302f" : "#bfdcd9");
+  ocean.addColorStop(0.72, dark ? "#0a2526" : "#b1d1cf");
+  ocean.addColorStop(1, dark ? "#173b39" : "#cce2df");
   context.fillStyle = ocean;
   context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
   const oceanGlow = context.createRadialGradient(TEXTURE_WIDTH * 0.32, TEXTURE_HEIGHT * 0.3, 20, TEXTURE_WIDTH * 0.32, TEXTURE_HEIGHT * 0.3, TEXTURE_WIDTH * 0.65);
-  oceanGlow.addColorStop(0, "rgba(85, 166, 177, 0.28)");
-  oceanGlow.addColorStop(1, "rgba(3, 17, 25, 0)");
+  oceanGlow.addColorStop(0, dark ? "rgba(114, 207, 190, 0.16)" : "rgba(255, 255, 255, 0.24)");
+  oceanGlow.addColorStop(1, "rgba(255, 255, 255, 0)");
   context.fillStyle = oceanGlow;
   context.fillRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
   const land = context.createLinearGradient(0, 0, 0, TEXTURE_HEIGHT);
-  land.addColorStop(0, "#9aa58a");
-  land.addColorStop(0.2, "#6f8769");
-  land.addColorStop(0.48, "#4d704f");
-  land.addColorStop(0.72, "#65805d");
-  land.addColorStop(1, "#9aa58a");
+  land.addColorStop(0, dark ? "#b7c88f" : "#f4f1e5");
+  land.addColorStop(0.2, dark ? "#8eab72" : "#e4e8d4");
+  land.addColorStop(0.48, dark ? "#698f5b" : "#cad9b8");
+  land.addColorStop(0.72, dark ? "#86a56d" : "#dce4cb");
+  land.addColorStop(1, dark ? "#b7c88f" : "#f4f1e5");
   context.fillStyle = land;
   context.beginPath();
   for (const feature of features) {
@@ -78,13 +79,22 @@ function createEarthTexture(features: readonly WorldCountryFeature[]): THREE.Can
   }
   context.fill("evenodd");
 
+  context.strokeStyle = dark ? "rgba(11, 25, 20, 0.72)" : "rgba(62, 84, 75, 0.72)";
+  context.lineWidth = 1.15;
+  for (const feature of features) {
+    context.beginPath();
+    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+    for (const polygon of polygons) addPolygonPath(context, polygon);
+    context.stroke();
+  }
+
   context.globalCompositeOperation = "soft-light";
   const random = seededRandom(0x10ca70);
   for (let index = 0; index < 1800; index += 1) {
     const x = random() * TEXTURE_WIDTH;
     const y = random() * TEXTURE_HEIGHT;
     const radius = 0.4 + random() * 2.2;
-    context.fillStyle = random() > 0.46 ? `rgba(255,255,225,${0.015 + random() * 0.045})` : `rgba(0,18,21,${0.02 + random() * 0.05})`;
+    context.fillStyle = random() > 0.46 ? `rgba(255,255,245,${0.012 + random() * 0.03})` : `rgba(44,73,62,${0.01 + random() * 0.03})`;
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
     context.fill();
@@ -167,7 +177,7 @@ export function LandingSatelliteGlobe() {
         renderer.domElement.className = "landing-satellite-canvas";
         container.append(renderer.domElement);
 
-        earthTexture = createEarthTexture(features);
+        earthTexture = createEarthTexture(features, currentTheme() === "dark");
         cloudTexture = createCloudTexture();
         const globe = new THREE.Group();
         globe.rotation.set(-0.12, -0.65, -0.1);
@@ -177,10 +187,10 @@ export function LandingSatelliteGlobe() {
         earthMaterial = new THREE.MeshStandardMaterial({
           map: earthTexture,
           color: 0xffffff,
-          roughness: 0.82,
+          roughness: 0.9,
           metalness: 0.02,
-          emissive: 0x03100d,
-          emissiveIntensity: 0.28,
+          emissive: 0x1c2c25,
+          emissiveIntensity: 0.04,
         });
         const earth = new THREE.Mesh(earthGeometry, earthMaterial);
         globe.add(earth);
@@ -188,9 +198,9 @@ export function LandingSatelliteGlobe() {
         cloudGeometry = new THREE.SphereGeometry(GLOBE_RADIUS + 0.025, 80, 48);
         cloudMaterial = new THREE.MeshPhongMaterial({
           map: cloudTexture,
-          color: 0xf4faef,
+          color: 0xffffff,
           transparent: true,
-          opacity: 0.42,
+          opacity: 0.18,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         });
@@ -199,19 +209,19 @@ export function LandingSatelliteGlobe() {
 
         atmosphereGeometry = new THREE.SphereGeometry(GLOBE_RADIUS + 0.09, 80, 48);
         atmosphereMaterial = new THREE.MeshBasicMaterial({
-          color: 0x69e1cd,
+          color: currentTheme() === "dark" ? 0x65c8b6 : 0x8bd23f,
           transparent: true,
-          opacity: 0.1,
+          opacity: 0.045,
           side: THREE.BackSide,
           depthWrite: false,
         });
         globe.add(new THREE.Mesh(atmosphereGeometry, atmosphereMaterial));
 
-        scene.add(new THREE.HemisphereLight(0xc9f7eb, 0x03100e, 1.55));
-        const sunlight = new THREE.DirectionalLight(0xfff4d2, 3.4);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x617169, 1.7));
+        const sunlight = new THREE.DirectionalLight(0xffffff, 3.1);
         sunlight.position.set(-2.4, 3.1, 4.8);
         scene.add(sunlight);
-        const rimLight = new THREE.DirectionalLight(0x68d9bd, 1.7);
+        const rimLight = new THREE.DirectionalLight(0x8bd23f, 0.65);
         rimLight.position.set(4.2, -0.5, -2.6);
         scene.add(rimLight);
 
@@ -219,6 +229,18 @@ export function LandingSatelliteGlobe() {
         const frameInterval = 1000 / 30;
         let isVisible = true;
         let lastRenderTime = performance.now();
+
+        const updateTheme = () => {
+          if (!earthMaterial || !atmosphereMaterial || !renderer) return;
+          const replacement = createEarthTexture(features, currentTheme() === "dark");
+          const previous = earthTexture;
+          earthTexture = replacement;
+          earthMaterial.map = replacement;
+          earthMaterial.needsUpdate = true;
+          atmosphereMaterial.color.set(currentTheme() === "dark" ? 0x65c8b6 : 0x8bd23f);
+          renderer.render(scene, camera);
+          previous?.dispose();
+        };
 
         const resize = () => {
           if (!renderer) return;
@@ -277,6 +299,7 @@ export function LandingSatelliteGlobe() {
           else requestRender();
         };
         document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener(LOCATO_THEME_EVENT, updateTheme, { signal: controller.signal });
 
         resize();
         requestRender();
