@@ -1,6 +1,7 @@
 import type { AuthUser } from "../../core/auth";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
+import { matchesCapitalName } from "../../core/categories/matching";
 import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
 import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
@@ -370,42 +371,29 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     freePlayGuessedCountryIds.clear();
   }
 
-  // Exact normalized match of the typed value against a playable country's capital.
-  // `solved` selects which pool to scan: unsolved for scoring, solved for the "already named" hint.
-  function findCapitalMatch(value: string, solved: boolean): Country | null {
-    const guesses = normalizeAnswerVariants(value);
-    if (guesses.length === 0) return null;
-    for (const country of countryIndex.countries) {
-      if (country.capital.length === 0 || freePlayGuessedCountryIds.has(country.id) !== solved) continue;
-      const accepted = new Set<string>();
-      for (const answer of [country.capital, ...country.capitalAliases]) {
-        for (const variant of normalizeAnswerVariants(answer)) accepted.add(variant);
-      }
-      if (guesses.some((guess) => accepted.has(guess))) return country;
-    }
-    return null;
+  // `solved` selects which pool to scan: unsolved for scoring, solved for the
+  // "already named" hint. Auto-submit accepts exact answers only; Enter also
+  // accepts the same close misspellings as guided Capital Recall.
+  function findCapitalMatch(value: string, solved: boolean, auto: boolean): Country | null {
+    return (
+      countryIndex.countries.find(
+        (country) =>
+          country.capital.length > 0 &&
+          freePlayGuessedCountryIds.has(country.id) === solved &&
+          matchesCapitalName(country, value, auto),
+      ) ?? null
+    );
   }
 
   function handleFreePlayGuess(auto: boolean): void {
     const value = input.value;
     if (value.trim().length === 0) return;
 
-    let match = findCapitalMatch(value, false);
-    if (match === null && !auto) {
-      // Enter also tolerates near-misses, mirroring guided mode's submit matching.
-      const guesses = normalizeAnswerVariants(value);
-      match =
-        countryIndex.countries.find(
-          (country) =>
-            country.capital.length > 0 &&
-            !freePlayGuessedCountryIds.has(country.id) &&
-            [country.capital, ...country.capitalAliases].some((answer) => guesses.some((guess) => isToleratedMisspelling(guess, answer))),
-        ) ?? null;
-    }
+    const match = findCapitalMatch(value, false, auto);
 
     if (match === null) {
       if (auto) return; // keep typing — no penalty until Enter
-      const solved = findCapitalMatch(value, true);
+      const solved = findCapitalMatch(value, true, auto);
       freePlayAttempts += 1;
       freePlayStreak = 0;
       render(false);
@@ -496,7 +484,6 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         freePlayEnabled ? freePlayGuessedCountryIds : state.guessedCountryIds,
         freePlayEnabled ? freePlayLatestCountryId : current?.id ?? null,
         freePlayEnabled ? freePlayLatestCountryId : latestCapitalRecallCountryId,
-        freePlayEnabled ? { prefixLabel: "Latest", emptyLabel: "Type a capital to begin" } : undefined,
       );
     } else if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
       activeFlagColorTarget = null;

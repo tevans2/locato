@@ -56,15 +56,9 @@ export interface CapitalRecallMapViewOptions {
   readonly signal?: AbortSignal;
 }
 
-/** Copy overrides for the "Capital of <name>" panel — free play reads differently. */
-export interface CapitalRecallUpdateLabels {
-  readonly prefixLabel?: string;
-  readonly emptyLabel?: string;
-}
-
 export interface CapitalRecallMapView {
   readonly element: HTMLElement;
-  readonly update: (guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null, labels?: CapitalRecallUpdateLabels) => void;
+  readonly update: (guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null) => void;
 }
 
 interface MarkerEntry {
@@ -250,6 +244,7 @@ export function createCapitalRecallMapView(
   let pinchState: PinchState | null = null;
   let pendingWheelDelta = 0;
   let pendingWheelClientX = 0;
+  let pendingWheelClientY = 0;
   let wheelAnimationFrame: number | null = null;
   let viewBoxAnimationFrame: number | null = null;
   // Country path under the pointer at press time, kept to distinguish taps from pans.
@@ -583,7 +578,7 @@ export function createCapitalRecallMapView(
     { once: true },
   );
 
-  function update(guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null, labels: CapitalRecallUpdateLabels = {}): void {
+  function update(guessedCountryIds: ReadonlySet<CountryId>, currentCountryId: CountryId | null, latestCountryId: CountryId | null): void {
     const recentLabelIds = new Set(recentCountries(countryIndex, guessedCountryIds, RECENT_LABEL_COUNT).map((country) => country.id));
     for (const [countryId, path] of pathByCountryId) {
       path.classList.toggle("is-solved", guessedCountryIds.has(countryId));
@@ -606,8 +601,8 @@ export function createCapitalRecallMapView(
 
     previousLatestCountryId = latestCountryId;
     const currentCountry = currentCountryId === null ? null : countryIndex.byId[currentCountryId] ?? null;
-    currentPrefix.textContent = labels.prefixLabel ?? "Capital of";
-    currentName.textContent = currentCountry?.name ?? labels.emptyLabel ?? "Complete";
+    currentPrefix.textContent = "Capital of";
+    currentName.textContent = currentCountry?.name ?? "Complete";
     progress.textContent = `${Math.min(guessedCountryIds.size, playableCapitalTotal)} / ${playableCapitalTotal}`;
 
     const recent = recentCountries(countryIndex, guessedCountryIds, RECENT_LIST_COUNT);

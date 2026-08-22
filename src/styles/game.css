@@ -364,6 +364,10 @@
   pointer-events: none;
 }
 
+.capital-recall-map-panel.is-freeplay .capital-map-current {
+  display: none;
+}
+
 .capital-map-gesture-hint {
   position: absolute;
   bottom: clamp(10px, 1.8vw, 18px);
