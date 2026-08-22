@@ -15,6 +15,7 @@ import "./styles/friends.css";
 import "./styles/responsive.css";
 import "./styles/theme-refresh.css";
 import "./styles/experience-refresh.css";
+import "./styles/sfx.css";
 
 const root = document.getElementById("app");
 

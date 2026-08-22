@@ -1,6 +1,47 @@
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { LOCATO_THEME_EVENT, currentTheme } from "../theme";
 import type { MapTapGuessResult } from "../../core/maptap";
+
+const ESRI_ATTRIBUTION = "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
+const RESULT_LINE_COLOR_DARK = "#ffffff";
+const RESULT_LINE_COLOR_LIGHT = "#33453c";
+
+// Dark keeps the satellite imagery the mode shipped with; light swaps to a light cartographic
+// basemap so every map surface follows the active theme.
+function mapTapStyle(): maplibregl.StyleSpecification {
+  const dark = currentTheme() === "dark";
+  return {
+    version: 8,
+    // MapLibre GL JS v5 configures globe projection in the style object.
+    projection: { type: "globe" },
+    sources: {
+      "esri-basemap": {
+        type: "raster",
+        tiles: [
+          dark
+            ? "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            : "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        ],
+        tileSize: 256,
+        attribution: ESRI_ATTRIBUTION,
+        maxzoom: 19,
+      },
+    },
+    layers: [
+      {
+        id: "maptap-space-background",
+        type: "background",
+        paint: { "background-color": "rgba(0, 0, 0, 0)" },
+      },
+      {
+        id: "esri-basemap-layer",
+        type: "raster",
+        source: "esri-basemap",
+      },
+    ],
+  };
+}
 
 const RESULT_LINE_SOURCE_ID = "maptap-result-line";
 const RESULT_LINE_LAYER_ID = "maptap-result-line-layer";
@@ -84,33 +125,7 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
     maxZoom: 16,
     attributionControl: false,
     canvasContextAttributes: { alpha: true, antialias: true },
-    style: {
-      version: 8,
-      // MapLibre GL JS v5 configures globe projection in the style object.
-      // This is the v5 equivalent of the older map option `projection: "globe"`.
-      projection: { type: "globe" },
-      sources: {
-        "esri-world-imagery": {
-          type: "raster",
-          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-          tileSize: 256,
-          attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-          maxzoom: 19,
-        },
-      },
-      layers: [
-        {
-          id: "maptap-space-background",
-          type: "background",
-          paint: { "background-color": "rgba(0, 0, 0, 0)" },
-        },
-        {
-          id: "esri-world-imagery-layer",
-          type: "raster",
-          source: "esri-world-imagery",
-        },
-      ],
-    },
+    style: mapTapStyle(),
   });
 
   element.append(attribution);
@@ -128,12 +143,15 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
         type: "line",
         source: RESULT_LINE_SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-width": 3, "line-color": "#ffffff", "line-opacity": 0.9 },
+        paint: { "line-width": 3, "line-color": currentTheme() === "dark" ? RESULT_LINE_COLOR_DARK : RESULT_LINE_COLOR_LIGHT, "line-opacity": 0.9 },
       });
     }
   }
 
+  let lastLineData: Parameters<maplibregl.GeoJSONSource["setData"]>[0] = EMPTY_LINE_DATA;
+
   function setLineData(data: Parameters<maplibregl.GeoJSONSource["setData"]>[0]): void {
+    lastLineData = data;
     ensureLineLayer();
     const source = map.getSource(RESULT_LINE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
     source?.setData(data);
@@ -160,8 +178,24 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
   function removeMap(): void {
     if (destroyed) return;
     destroyed = true;
+    window.removeEventListener(LOCATO_THEME_EVENT, onThemeChange);
     map.remove();
   }
+
+  // setStyle replaces all sources/layers, so re-add the result line and restore its data
+  // once the new style is ready. DOM markers survive the swap.
+  function onThemeChange(): void {
+    if (destroyed) return;
+    map.setStyle(mapTapStyle());
+    map.once("styledata", () => {
+      if (destroyed) return;
+      ensureLineLayer();
+      const source = map.getSource(RESULT_LINE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+      source?.setData(lastLineData);
+    });
+  }
+
+  window.addEventListener(LOCATO_THEME_EVENT, onThemeChange);
 
   options.signal.addEventListener("abort", removeMap);
 
@@ -207,9 +241,7 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
         bounds.extend([guess.lng, guess.lat]);
         lineFeatures.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[guess.lng, guess.lat], [target.lng, target.lat]] } });
       }
-      ensureLineLayer();
-      const source = map.getSource(RESULT_LINE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
-      source?.setData({ type: "FeatureCollection", features: lineFeatures });
+      setLineData({ type: "FeatureCollection", features: lineFeatures });
       map.fitBounds(bounds, { padding: 90, duration: 800, maxZoom: 7 });
     },
     setAcceptingGuesses: (accepting) => {

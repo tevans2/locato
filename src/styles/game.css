@@ -219,9 +219,11 @@
   overflow: hidden;
   border-radius: var(--radius-md);
   background:
-    radial-gradient(circle at 16% 20%, rgba(184, 227, 109, 0.16), transparent 32%),
-    radial-gradient(circle at 82% 74%, rgba(187, 130, 86, 0.16), transparent 34%),
-    linear-gradient(180deg, rgba(8, 16, 13, 0.98), rgba(7, 10, 8, 0.98));
+    radial-gradient(circle at 16% 20%, rgba(139, 210, 63, 0.14), transparent 32%),
+    radial-gradient(circle at 82% 74%, rgba(239, 106, 69, 0.1), transparent 34%),
+    linear-gradient(rgba(25, 35, 31, 0.055) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(25, 35, 31, 0.045) 1px, transparent 1px) 0 0 / 64px 64px,
+    var(--sea);
   isolation: isolate;
 }
 
@@ -248,8 +250,8 @@
 }
 
 .capital-recall-country {
-  fill: rgba(116, 136, 108, 0.24);
-  stroke: rgba(232, 226, 211, 0.16);
+  fill: var(--land);
+  stroke: #668078;
   stroke-width: 0.72;
   transition: fill 220ms ease, stroke 220ms ease, opacity 220ms ease;
 }
@@ -259,15 +261,15 @@
 }
 
 .capital-recall-country.is-solved {
-  fill: rgba(184, 227, 109, 0.46);
-  stroke: rgba(184, 227, 109, 0.38);
+  fill: var(--accent);
+  stroke: #4b6d2a;
 }
 
 .capital-recall-country.is-current {
-  fill: rgba(187, 130, 86, 0.44);
-  stroke: rgba(232, 226, 211, 0.52);
+  fill: var(--route);
+  stroke: #923d28;
   stroke-width: 1.35;
-  filter: drop-shadow(0 0 7px rgba(187, 130, 86, 0.46));
+  filter: drop-shadow(0 0 6px rgba(146, 61, 40, 0.3));
 }
 
 .capital-recall-marker {
@@ -290,8 +292,8 @@
 }
 
 .capital-recall-marker-halo {
-  fill: rgba(184, 227, 109, 0.16);
-  stroke: rgba(184, 227, 109, 0.22);
+  fill: rgba(75, 109, 42, 0.16);
+  stroke: rgba(75, 109, 42, 0.26);
   stroke-width: 1.1;
   transform-box: fill-box;
   transform-origin: center;
@@ -299,13 +301,13 @@
 
 .capital-recall-marker-dot {
   fill: var(--accent);
-  stroke: rgba(8, 12, 8, 0.92);
+  stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 1.2;
 }
 
 .capital-recall-marker.is-latest .capital-recall-marker-halo {
-  fill: rgba(187, 130, 86, 0.26);
-  stroke: rgba(232, 226, 211, 0.5);
+  fill: rgba(95, 169, 157, 0.24);
+  stroke: rgba(31, 102, 92, 0.5);
 }
 
 .capital-recall-marker.is-latest .capital-recall-marker-dot {
@@ -313,8 +315,8 @@
 }
 
 .capital-recall-marker.is-current .capital-recall-marker-halo {
-  fill: rgba(187, 130, 86, 0.2);
-  stroke: rgba(232, 226, 211, 0.62);
+  fill: rgba(95, 169, 157, 0.2);
+  stroke: rgba(31, 102, 92, 0.62);
 }
 
 .capital-recall-marker.is-current .capital-recall-marker-dot {
@@ -328,8 +330,7 @@
 .capital-recall-marker-label {
   opacity: 0;
   fill: var(--text);
-  stroke: rgba(6, 10, 7, 0.94);
-  stroke-width: 4px;
+  stroke: rgba(255, 255, 255, 0.94);
   paint-order: stroke;
   font-size: 10px;
   font-weight: 820;
@@ -369,10 +370,10 @@
   z-index: 2;
   max-width: 190px;
   padding: 7px 9px;
-  border: 1px solid rgba(232, 226, 211, 0.12);
+  border: 1px solid rgba(25, 35, 31, 0.16);
   border-radius: 999px;
   color: var(--muted);
-  background: rgba(6, 10, 8, 0.7);
+  background: rgba(255, 255, 255, 0.78);
   font-size: 0.68rem;
   font-weight: 720;
   pointer-events: none;
@@ -389,10 +390,10 @@
   gap: 2px;
   max-width: min(520px, 72%);
   padding: 10px 12px;
-  border: 1px solid rgba(232, 226, 211, 0.15);
+  border: 1px solid rgba(25, 35, 31, 0.15);
   border-radius: var(--radius-sm);
-  background: rgba(6, 10, 8, 0.76);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-panel);
   backdrop-filter: blur(10px);
 }
 
@@ -416,10 +417,10 @@
 .capital-map-progress {
   flex: none;
   padding: 8px 10px;
-  border: 1px solid rgba(184, 227, 109, 0.24);
+  border: 1px solid rgba(75, 109, 42, 0.35);
   border-radius: 999px;
-  color: var(--accent);
-  background: rgba(6, 10, 8, 0.74);
+  color: #49771f;
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
 }
 
@@ -443,11 +444,11 @@
   gap: 7px;
   max-width: 178px;
   padding: 7px 9px;
-  border: 1px solid rgba(232, 226, 211, 0.13);
+  border: 1px solid rgba(25, 35, 31, 0.13);
   border-radius: 999px;
-  background: rgba(6, 10, 8, 0.74);
+  background: rgba(255, 255, 255, 0.84);
   color: var(--text);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-panel);
   backdrop-filter: blur(10px);
 }
 
@@ -461,10 +462,80 @@
 
 .capital-map-recent-chip span {
   flex: none;
-  color: var(--accent);
+  color: #49771f;
   font-size: 0.7rem;
   font-weight: 840;
   letter-spacing: 0.04em;
+}
+
+/* Capital Recall dark theme: restores the original always-dark map presentation. */
+:root[data-theme="dark"] .capital-recall-map-panel {
+  background:
+    radial-gradient(circle at 16% 20%, rgba(184, 227, 109, 0.16), transparent 32%),
+    radial-gradient(circle at 82% 74%, rgba(187, 130, 86, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(8, 16, 13, 0.98), rgba(7, 10, 8, 0.98));
+}
+
+:root[data-theme="dark"] .capital-recall-country {
+  fill: rgba(116, 136, 108, 0.24);
+  stroke: rgba(232, 226, 211, 0.16);
+}
+
+:root[data-theme="dark"] .capital-recall-country.is-solved {
+  fill: rgba(184, 227, 109, 0.46);
+  stroke: rgba(184, 227, 109, 0.38);
+}
+
+:root[data-theme="dark"] .capital-recall-country.is-current {
+  fill: rgba(187, 130, 86, 0.44);
+  stroke: rgba(232, 226, 211, 0.52);
+  filter: drop-shadow(0 0 7px rgba(187, 130, 86, 0.46));
+}
+
+:root[data-theme="dark"] .capital-recall-marker-halo {
+  fill: rgba(184, 227, 109, 0.16);
+  stroke: rgba(184, 227, 109, 0.22);
+}
+
+:root[data-theme="dark"] .capital-recall-marker-dot {
+  stroke: rgba(8, 12, 8, 0.92);
+}
+
+:root[data-theme="dark"] .capital-recall-marker.is-latest .capital-recall-marker-halo,
+:root[data-theme="dark"] .capital-recall-marker.is-current .capital-recall-marker-halo {
+  fill: rgba(187, 130, 86, 0.24);
+  stroke: rgba(232, 226, 211, 0.55);
+}
+
+:root[data-theme="dark"] .capital-recall-marker-label {
+  stroke: rgba(6, 10, 7, 0.94);
+}
+
+:root[data-theme="dark"] .capital-map-gesture-hint {
+  border-color: rgba(232, 226, 211, 0.12);
+  background: rgba(6, 10, 8, 0.7);
+}
+
+:root[data-theme="dark"] .capital-map-current-copy {
+  border-color: rgba(232, 226, 211, 0.15);
+  background: rgba(6, 10, 8, 0.76);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] .capital-map-progress {
+  border-color: rgba(184, 227, 109, 0.24);
+  color: var(--accent);
+  background: rgba(6, 10, 8, 0.74);
+}
+
+:root[data-theme="dark"] .capital-map-recent-chip {
+  border-color: rgba(232, 226, 211, 0.13);
+  background: rgba(6, 10, 8, 0.74);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="dark"] .capital-map-recent-chip span {
+  color: var(--accent);
 }
 
 .stats-panel {
@@ -603,6 +674,12 @@
   background-repeat: no-repeat;
   background-size: contain;
   pointer-events: none;
+}
+
+/* Outline assets are white-filled SVGs (see tests/countries.test.ts), so they vanish on the pale
+   light-mode board. Flip luminance in light mode only; hue-rotate keeps accent marker dots (SI) true. */
+:root:not([data-theme="dark"]) .country-shape-prompt {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .country-shape-image {

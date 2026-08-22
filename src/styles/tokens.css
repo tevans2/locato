@@ -36,6 +36,21 @@
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: var(--font-sans);
   font-family: var(--font-sans);
+
+  /* Shared map palette. Consumed by CSS map classes and by canvas/WebGL/MapLibre renderers
+     (which read these at paint time) so every game mode draws the same world per theme. */
+  --map-ocean-top: #d8eae7;
+  --map-ocean-mid: #c9e0df;
+  --map-ocean-bottom: #bcd6d3;
+  --map-land-fill: rgba(247, 245, 235, 0.94);
+  --map-land-fill-unplayable: rgba(247, 245, 235, 0.5);
+  --map-line-country: #668078;
+  --map-line-guessed: #4b6d2a;
+  --map-line-hit: #923d28;
+  --map-line-target: #923d28;
+  --map-fill-guessed: rgba(139, 210, 63, 0.8);
+  --map-fill-target: rgba(239, 106, 69, 0.85);
+  --map-fill-missed: rgba(239, 106, 69, 0.72);
 }
 
 :root[data-theme="dark"] {
@@ -51,6 +66,19 @@
   --subtle: #748078;
   --accent: #98d94f;
   --accent-soft: #273a1e;
+  /* Dark map palette: preserves the previous always-dark renderer values. */
+  --map-ocean-top: #121a10;
+  --map-ocean-mid: #0b100b;
+  --map-ocean-bottom: #11180f;
+  --map-land-fill: rgba(232, 226, 211, 0.09);
+  --map-land-fill-unplayable: rgba(232, 226, 211, 0.04);
+  --map-line-country: #e8e2d3;
+  --map-line-guessed: #f5f4ce;
+  --map-line-hit: #ffdcd1;
+  --map-line-target: #ffebdb;
+  --map-fill-guessed: rgba(184, 227, 109, 0.74);
+  --map-fill-target: rgba(237, 74, 67, 0.9);
+  --map-fill-missed: rgba(237, 74, 67, 0.72);
   --earth: #66b6a8;
   --route: #f07a58;
   --good: #9bd45b;

@@ -1,16 +1,56 @@
 import * as THREE from "three";
 import type { CountryId, CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import { LOCATO_THEME_EVENT, currentTheme } from "../theme";
 
 const GLOBE_RADIUS = 2;
 const MARKER_RADIUS = 0.012;
-const COLOR_COUNTRY_LINE = 0xe8e2d3;
-const COLOR_GUESSED_LINE = 0xf5f4ce;
-const COLOR_MISSED_LINE = 0xffdcd1;
-const COLOR_TARGET_LINE = 0xffebdb;
 const COLOR_GUESSED_MARKER = 0xb8e36d;
 const COLOR_MISSED_MARKER = 0xed4a43;
 const COLOR_TARGET_MARKER = 0xed4a43;
+
+interface MapPalette {
+  readonly oceanTop: string;
+  readonly oceanMid: string;
+  readonly oceanBottom: string;
+  readonly countryFill: string;
+  readonly unplayableCountryFill: string;
+  readonly guessedFill: string;
+  readonly targetFill: string;
+  readonly missedFill: string;
+  readonly countryLine: number;
+  readonly guessedLine: number;
+  readonly missedLine: number;
+  readonly targetLine: number;
+}
+
+function cssVar(name: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (!value) throw new Error(`Missing required CSS variable ${name}.`);
+  return value;
+}
+
+function hexToNumber(value: string): number {
+  return Number.parseInt(value.replace("#", ""), 16);
+}
+
+function mapPalette(): MapPalette {
+  return {
+    oceanTop: cssVar("--map-ocean-top"),
+    oceanMid: cssVar("--map-ocean-mid"),
+    oceanBottom: cssVar("--map-ocean-bottom"),
+    countryFill: cssVar("--map-land-fill"),
+    unplayableCountryFill: cssVar("--map-land-fill-unplayable"),
+    guessedFill: cssVar("--map-fill-guessed"),
+    targetFill: cssVar("--map-fill-target"),
+    missedFill: cssVar("--map-fill-missed"),
+    countryLine: hexToNumber(cssVar("--map-line-country")),
+    guessedLine: hexToNumber(cssVar("--map-line-guessed")),
+    missedLine: hexToNumber(cssVar("--map-line-hit")),
+    targetLine: hexToNumber(cssVar("--map-line-target")),
+  };
+}
+
 const OPACITY_COUNTRY_LINE = 0.34;
 const OPACITY_GUESSED_LINE = 0.9;
 const OPACITY_MISSED_LINE = 0.9;
@@ -31,11 +71,6 @@ const MIN_MARKER_ZOOM_SCALE = 0.08;
 const GLOBE_OUTLINE_RADIUS = GLOBE_RADIUS + 0.0022;
 const DRAG_ROTATION_Y = 0.008;
 const DRAG_ROTATION_X = 0.006;
-const COLOR_COUNTRY_FILL = "rgba(232, 226, 211, 0.09)";
-const COLOR_UNPLAYABLE_COUNTRY_FILL = "rgba(232, 226, 211, 0.04)";
-const COLOR_GUESSED_FILL = "rgba(184, 227, 109, 0.74)";
-const COLOR_TARGET_FILL = "rgba(237, 74, 67, 0.9)";
-const COLOR_MISSED_FILL = "rgba(237, 74, 67, 0.72)";
 
 
 interface GlobeTouchPoint {
@@ -119,18 +154,18 @@ function countryCenter(feature: WorldCountryFeature): WorldMapPosition | null {
   return [longitude / outerRing.length, latitude / outerRing.length];
 }
 
-function colorForCountry(state: GlobeMapState, countryId: CountryId): number {
-  if (state.missedCountryIds.has(countryId)) return COLOR_MISSED_LINE;
-  if (state.targetCountryId === countryId) return COLOR_TARGET_LINE;
-  if (state.guessedCountryIds.has(countryId)) return COLOR_GUESSED_LINE;
-  return COLOR_COUNTRY_LINE;
+function colorForCountry(palette: MapPalette, state: GlobeMapState, countryId: CountryId): number {
+  if (state.missedCountryIds.has(countryId)) return palette.missedLine;
+  if (state.targetCountryId === countryId) return palette.targetLine;
+  if (state.guessedCountryIds.has(countryId)) return palette.guessedLine;
+  return palette.countryLine;
 }
 
-function markerColorForCountry(state: GlobeMapState, countryId: CountryId): number {
+function markerColorForCountry(palette: MapPalette, state: GlobeMapState, countryId: CountryId): number {
   if (state.missedCountryIds.has(countryId)) return COLOR_MISSED_MARKER;
   if (state.targetCountryId === countryId) return COLOR_TARGET_MARKER;
   if (state.guessedCountryIds.has(countryId)) return COLOR_GUESSED_MARKER;
-  return COLOR_COUNTRY_LINE;
+  return palette.countryLine;
 }
 
 function lineOpacityForCountry(state: GlobeMapState, countryId: CountryId): number {
@@ -140,13 +175,18 @@ function lineOpacityForCountry(state: GlobeMapState, countryId: CountryId): numb
   return OPACITY_COUNTRY_LINE;
 }
 
-function fillStyleForCountry(playableCountryId: CountryId | null, state: GlobeMapState | null): string {
-  if (playableCountryId === null) return COLOR_UNPLAYABLE_COUNTRY_FILL;
-  if (!state) return COLOR_COUNTRY_FILL;
-  if (state.missedCountryIds.has(playableCountryId)) return COLOR_MISSED_FILL;
-  if (state.targetCountryId === playableCountryId) return COLOR_TARGET_FILL;
-  if (state.guessedCountryIds.has(playableCountryId)) return COLOR_GUESSED_FILL;
-  return COLOR_COUNTRY_FILL;
+function fillStyleForCountry(palette: MapPalette, playableCountryId: CountryId | null, state: GlobeMapState | null): string {
+  if (playableCountryId === null) return palette.unplayableCountryFill;
+  const stateFill = state === null
+    ? null
+    : state.missedCountryIds.has(playableCountryId)
+      ? palette.missedFill
+      : state.targetCountryId === playableCountryId
+        ? palette.targetFill
+        : state.guessedCountryIds.has(playableCountryId)
+          ? palette.guessedFill
+          : null;
+  return stateFill ?? palette.countryFill;
 }
 
 function longitudeToTextureX(longitude: number, width: number): number {
@@ -188,18 +228,19 @@ function fillTexturePolygon(context: CanvasRenderingContext2D, polygon: WorldMap
 }
 
 function paintGlobeTexture(context: CanvasRenderingContext2D, features: readonly WorldCountryFeature[], countryIndex: CountryIndex, state: GlobeMapState | null): void {
+  const palette = mapPalette();
   const { width, height } = context.canvas;
   const oceanGradient = context.createLinearGradient(0, 0, 0, height);
-  oceanGradient.addColorStop(0, "#121a10");
-  oceanGradient.addColorStop(0.5, "#0b100b");
-  oceanGradient.addColorStop(1, "#11180f");
+  oceanGradient.addColorStop(0, palette.oceanTop);
+  oceanGradient.addColorStop(0.5, palette.oceanMid);
+  oceanGradient.addColorStop(1, palette.oceanBottom);
   context.clearRect(0, 0, width, height);
   context.fillStyle = oceanGradient;
   context.fillRect(0, 0, width, height);
 
   for (const feature of features) {
     const playableCountryId = countryIndex.byCode.get(feature.code.toUpperCase())?.id ?? null;
-    const fillStyle = fillStyleForCountry(playableCountryId, state);
+    const fillStyle = fillStyleForCountry(palette, playableCountryId, state);
     const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
     for (const polygon of polygons) fillTexturePolygon(context, polygon, fillStyle);
   }
@@ -223,7 +264,7 @@ function createGlobeTexture(renderer: THREE.WebGLRenderer, features: readonly Wo
   return texture;
 }
 
-function repaintGlobeTexture(texture: THREE.CanvasTexture, features: readonly WorldCountryFeature[], countryIndex: CountryIndex, state: GlobeMapState): void {
+function repaintGlobeTexture(texture: THREE.CanvasTexture, features: readonly WorldCountryFeature[], countryIndex: CountryIndex, state: GlobeMapState | null): void {
   const canvas = texture.image as HTMLCanvasElement;
   const context = canvas.getContext("2d");
   if (!context) return;
@@ -291,13 +332,37 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   );
   root.add(atmosphere);
 
-  scene.add(new THREE.AmbientLight(0xfff6e5, 1.55));
+  const ambientLight = new THREE.AmbientLight(0xfff6e5, 1.55);
   const keyLight = new THREE.DirectionalLight(0xfff7dd, 1.9);
   keyLight.position.set(2.4, 2.8, 4.6);
-  scene.add(keyLight);
   const rimLight = new THREE.DirectionalLight(0xb8e36d, 0.48);
   rimLight.position.set(-3.5, 1.4, -2.5);
-  scene.add(rimLight);
+  scene.add(ambientLight, keyLight, rimLight);
+
+  // The standard material multiplies the texture by incident light: a neutral, near-unity rig
+  // keeps the pale light-theme texture at its true palette instead of clipping or warming
+  // under the dark-theme spotlights.
+  function applyLightingForTheme(): void {
+    const isDark = currentTheme() === "dark";
+    ambientLight.color.set(isDark ? 0xfff6e5 : 0xffffff);
+    ambientLight.intensity = isDark ? 1.55 : 1;
+    keyLight.intensity = isDark ? 1.9 : 0;
+    rimLight.intensity = isDark ? 0.48 : 0;
+  }
+
+
+  // Light theme: render the texture unlit through an emissive map so the pale palette shows
+  // exactly as painted; the lit standard-material path stays for the dark theme.
+  function applyGlobeShadingForTheme(): void {
+    const material = globe.material as THREE.MeshStandardMaterial;
+    const isDark = currentTheme() === "dark";
+    material.map = isDark ? globeTexture : null;
+    material.emissiveMap = isDark ? null : globeTexture;
+    material.emissive.set(isDark ? 0x000000 : 0xffffff);
+    material.needsUpdate = true;
+  }
+  applyLightingForTheme();
+  applyGlobeShadingForTheme();
 
   const countryObjects: GlobeCountryObject[] = [];
   const pickables: THREE.Object3D[] = [];
@@ -305,6 +370,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   raycaster.params.Line = { threshold: 0.035 };
   const pointer = new THREE.Vector2();
   let frameId: number | null = null;
+  const initialPalette = mapPalette();
   const touchPointers = new Map<number, GlobeTouchPoint>();
   let pinchDistance: number | null = null;
   let pinchCameraZ = camera.position.z;
@@ -320,8 +386,8 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     const country = countryIndex.byCode.get(feature.code.toUpperCase());
     if (!country) continue;
 
-    const lineMaterial = new THREE.LineBasicMaterial({ color: COLOR_COUNTRY_LINE, transparent: true, opacity: OPACITY_COUNTRY_LINE, depthWrite: false });
-    const markerMaterial = new THREE.MeshBasicMaterial({ color: COLOR_COUNTRY_LINE, transparent: true, opacity: 0, depthWrite: false });
+    const lineMaterial = new THREE.LineBasicMaterial({ color: initialPalette.countryLine, transparent: true, opacity: OPACITY_COUNTRY_LINE, depthWrite: false });
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: COLOR_GUESSED_MARKER, transparent: true, opacity: 0, depthWrite: false });
     const center = countryCenter(feature);
     const marker = new THREE.Mesh(new THREE.SphereGeometry(MARKER_RADIUS, 10, 8), markerMaterial);
     marker.userData.countryId = country.id;
@@ -513,24 +579,43 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   resize();
   render();
 
+  let currentState: GlobeMapState | null = null;
+
   function showCountryLabel(countryId: CountryId | null): void {
     const country = countryId === null ? null : countryIndex.byId[countryId] ?? null;
     label.hidden = country === null;
     label.textContent = country ? country.name : "";
   }
 
+  function applyThemePalette(): void {
+    const palette = mapPalette();
+    repaintGlobeTexture(globeTexture, features, countryIndex, currentState);
+    for (const countryObject of countryObjects) {
+      countryObject.lineMaterial.color.setHex(currentState ? colorForCountry(palette, currentState, countryObject.countryId) : palette.countryLine);
+    }
+  }
+
+  window.addEventListener(LOCATO_THEME_EVENT, onThemeChange);
+  function onThemeChange(): void {
+    applyLightingForTheme();
+    applyGlobeShadingForTheme();
+    applyThemePalette();
+  }
+
   function update(state: GlobeMapState): void {
     clickableCountryIds = state.clickableCountryIds;
+    currentState = state;
+    const palette = mapPalette();
     repaintGlobeTexture(globeTexture, features, countryIndex, state);
     for (const countryObject of countryObjects) {
       const isMissed = state.missedCountryIds.has(countryObject.countryId);
       const isTarget = state.targetCountryId === countryObject.countryId;
       const isGuessed = state.guessedCountryIds.has(countryObject.countryId);
       const isShownMissing = state.showMissingCountryIds?.has(countryObject.countryId) ?? false;
-      const color = colorForCountry(state, countryObject.countryId);
+      const color = colorForCountry(palette, state, countryObject.countryId);
       countryObject.lineMaterial.color.setHex(color);
       countryObject.lineMaterial.opacity = lineOpacityForCountry(state, countryObject.countryId);
-      countryObject.markerMaterial.color.setHex(markerColorForCountry(state, countryObject.countryId));
+      countryObject.markerMaterial.color.setHex(markerColorForCountry(palette, state, countryObject.countryId));
       countryObject.markerMaterial.opacity = isMissed || isTarget ? 0.92 : isShownMissing ? 0.66 : 0;
       countryObject.markerScale = isMissed || isTarget ? 1.2 : isShownMissing ? 0.7 : 0.5;
       applyMarkerDisplayScale(countryObject);
@@ -546,6 +631,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     },
     destroy: () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId);
+      window.removeEventListener(LOCATO_THEME_EVENT, onThemeChange);
       resizeObserver.disconnect();
       renderer.dispose();
       globeTexture.dispose();

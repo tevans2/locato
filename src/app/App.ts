@@ -24,6 +24,7 @@ import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
 import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import { createThemeToggle } from "../ui/theme";
+import { createSoundToggle } from "../ui/dom/sfx";
 import type { AppRoute, Screen } from "./router";
 
 export interface AppOptions {
@@ -102,6 +103,7 @@ export function createApp(options: AppOptions): App {
     on: { click: () => navigate({ type: "landing" }) },
   });
   const themeToggle = createThemeToggle(options.storage);
+  const soundToggle = createSoundToggle();
 
   // Every navigation is mirrored into the browser history (the state carries the
   // route), so the browser back/forward buttons move through the app, and in-app
@@ -126,7 +128,7 @@ export function createApp(options: AppOptions): App {
   }
 
   function attachGlobalControls(): void {
-    options.root.append(landingButton, themeToggle, authControls.trigger, authControls.panel);
+    options.root.append(landingButton, themeToggle, soundToggle, authControls.trigger, authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
