@@ -7,6 +7,7 @@ export type AppRoute =
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
   | { readonly type: "streetview-country" }
   | { readonly type: "map-tap" }
+  | { readonly type: "worldsplit" }
   | { readonly type: "multiplayer"; readonly joinCode?: string }
   | { readonly type: "stats" }
   | { readonly type: "friends"; readonly username?: string }

@@ -382,11 +382,48 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const setupPanel = el("section", {
     className: "multiplayer-card multiplayer-setup",
     children: [
-      el("p", { className: "eyebrow", text: "MULTIPLAYER" }),
-      setupTitle,
-      setupDescription,
-      el("div", { className: "multiplayer-form-grid", children: [nameInput, modeDropdown.element, roundLimitSelect, roundDurationSelect, joinCodeInput] }),
-      el("div", { className: "actions", children: [createButton, joinButton] }),
+      el("div", {
+        className: "multiplayer-setup-intro",
+        children: [
+          el("p", { className: "eyebrow", text: "PLAY TOGETHER" }),
+          setupTitle,
+          setupDescription,
+          el("ul", {
+            className: "multiplayer-feature-list",
+            children: [
+              el("li", { children: [el("strong", { text: "Private rooms" }), el("span", { text: "Invite friends with one short code." })] }),
+              el("li", { children: [el("strong", { text: "Mix the modes" }), el("span", { text: "Build a rotation of flags, maps and places." })] }),
+              el("li", { children: [el("strong", { text: "Live race" }), el("span", { text: "Scores and standings update every round." })] }),
+            ],
+          }),
+        ],
+      }),
+      el("div", {
+        className: "multiplayer-setup-form",
+        children: [
+          el("div", {
+            className: "multiplayer-form-heading",
+            children: [el("p", { className: "eyebrow", text: "NEW ROOM" }), el("strong", { text: "Set up your game" })],
+          }),
+          el("div", {
+            className: "multiplayer-form-grid",
+            children: [
+              el("label", { className: "multiplayer-field multiplayer-name-field", children: [el("span", { text: "Player name" }), nameInput] }),
+              el("div", { className: "multiplayer-field multiplayer-mode-field", children: [el("span", { text: "Mode rotation" }), modeDropdown.element] }),
+              el("label", { className: "multiplayer-field", children: [el("span", { text: "Rounds" }), roundLimitSelect] }),
+              el("label", { className: "multiplayer-field", children: [el("span", { text: "Time per round" }), roundDurationSelect] }),
+            ],
+          }),
+          el("div", { className: "multiplayer-create-row", children: [createButton] }),
+          el("div", {
+            className: "multiplayer-join-block",
+            children: [
+              el("span", { className: "multiplayer-join-divider", text: "or join a room" }),
+              el("div", { className: "multiplayer-join-row", children: [joinCodeInput, joinButton] }),
+            ],
+          }),
+        ],
+      }),
     ],
   });
 

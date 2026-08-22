@@ -1,0 +1,328 @@
+.worldsplit-screen {
+  --worldsplit-a: #86ca3d;
+  --worldsplit-b: #4c9c9b;
+  --worldsplit-line: #f26f43;
+}
+
+.worldsplit-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 390px);
+  gap: clamp(16px, 2vw, 28px);
+}
+
+.worldsplit-map-shell {
+  position: relative;
+  min-width: 0;
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background:
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 82%, #fff), transparent 52%),
+    var(--sea);
+  isolation: isolate;
+}
+
+.worldsplit-map {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.worldsplit-map:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.worldsplit-map.is-drawing { cursor: grabbing; }
+.worldsplit-ocean { fill: transparent; }
+
+.worldsplit-graticule line {
+  stroke: color-mix(in srgb, var(--text) 13%, transparent);
+  stroke-width: .7;
+  stroke-dasharray: 2 7;
+  vector-effect: non-scaling-stroke;
+}
+
+.worldsplit-country {
+  fill: color-mix(in srgb, var(--land) 86%, var(--surface));
+  stroke: color-mix(in srgb, var(--text) 45%, transparent);
+  stroke-width: .7;
+  vector-effect: non-scaling-stroke;
+  transition: fill 150ms ease, opacity 150ms ease, filter 150ms ease;
+}
+
+.worldsplit-country.is-side-a { fill: var(--worldsplit-a); }
+.worldsplit-country.is-side-b { fill: var(--worldsplit-b); }
+.worldsplit-country.is-outside {
+  fill: color-mix(in srgb, var(--land) 60%, var(--sea));
+  opacity: .27;
+}
+
+.worldsplit-line-glow.is-hidden,
+.worldsplit-line.is-hidden,
+.worldsplit-line-handle.is-hidden { display: none; }
+
+.worldsplit-line-glow,
+.worldsplit-line {
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.worldsplit-line-glow {
+  stroke: color-mix(in srgb, var(--worldsplit-line) 46%, transparent);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.worldsplit-line {
+  stroke: var(--worldsplit-line);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 10 5;
+}
+
+.worldsplit-line-handle {
+  pointer-events: none;
+  fill: var(--surface);
+  stroke: var(--worldsplit-line);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.worldsplit-map.is-locked .worldsplit-line {
+  stroke-dasharray: none;
+}
+
+.worldsplit-map-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: min(290px, calc(100% - 32px));
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 91%, transparent);
+  box-shadow: var(--shadow-panel);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.worldsplit-map-hint strong { font-size: .86rem; }
+.worldsplit-map-hint span { color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.worldsplit-map-hint.is-hidden { opacity: 0; transform: translate(-50%, -45%); }
+
+.worldsplit-map-label {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 2;
+  padding: 6px 8px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  font-size: .62rem;
+  pointer-events: none;
+}
+
+.worldsplit-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+
+.worldsplit-panel-title {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.worldsplit-eyebrow {
+  color: #557932;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.worldsplit-panel-title h1 {
+  margin: 10px 0 13px;
+  font-size: clamp(2rem, 3.6vw, 3.2rem);
+  line-height: .98;
+  letter-spacing: -.045em;
+}
+
+.worldsplit-round-detail {
+  margin: 0;
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.55;
+}
+
+.worldsplit-progress {
+  display: grid;
+  gap: 11px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.worldsplit-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.worldsplit-progress-label {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.worldsplit-running-score { font-size: .82rem; }
+.worldsplit-progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.worldsplit-progress-dot { height: 4px; background: var(--surface-soft); }
+.worldsplit-progress-dot.is-active { background: var(--worldsplit-line); }
+.worldsplit-progress-dot.is-complete { background: var(--accent); }
+
+.worldsplit-status {
+  min-height: 44px;
+  margin: 18px 0 13px;
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 680;
+}
+
+.worldsplit-side-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.worldsplit-side-card {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.worldsplit-side-card.is-a { border-top: 4px solid var(--worldsplit-a); }
+.worldsplit-side-card.is-b { border-top: 4px solid var(--worldsplit-b); }
+.worldsplit-side-name { color: var(--muted); font-size: .65rem; font-weight: 760; text-transform: uppercase; }
+.worldsplit-side-value { font-size: clamp(1.45rem, 2.7vw, 2.15rem); line-height: 1; letter-spacing: -.045em; }
+.worldsplit-side-population { min-height: 28px; color: var(--muted); font-size: .63rem; line-height: 1.35; }
+
+.worldsplit-result-callout {
+  margin-top: 10px;
+  padding: 14px;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.worldsplit-result-callout strong,
+.worldsplit-result-callout span { display: block; }
+.worldsplit-result-callout strong { margin-bottom: 5px; font-size: .88rem; }
+.worldsplit-result-callout span { color: var(--muted); font-size: .68rem; line-height: 1.45; }
+
+.worldsplit-adjustments {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.worldsplit-adjust-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.worldsplit-adjust-button,
+.worldsplit-reset-line {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.worldsplit-reset-line {
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.worldsplit-panel-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.worldsplit-primary,
+.worldsplit-copy {
+  width: 100%;
+  min-height: 44px;
+}
+
+.worldsplit-data-note {
+  margin: 16px 0 0;
+  color: var(--subtle);
+  font-size: .6rem;
+  line-height: 1.45;
+}
+
+:root[data-theme="dark"] .worldsplit-map-shell {
+  background:
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 84%, #1e5a5c), transparent 55%),
+    var(--sea);
+}
+
+:root[data-theme="dark"] .worldsplit-country {
+  fill: #d8dacb;
+  stroke: rgba(12, 20, 17, .68);
+}
+
+:root[data-theme="dark"] .worldsplit-country.is-side-a { fill: #91cf4d; }
+:root[data-theme="dark"] .worldsplit-country.is-side-b { fill: #63b5ad; }
+:root[data-theme="dark"] .worldsplit-country.is-outside { fill: #7f9185; }
+
+@media (max-width: 980px) {
+  .worldsplit-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .worldsplit-map-shell { min-height: 420px; }
+  .worldsplit-map { min-height: 420px; }
+  .worldsplit-panel { overflow: visible; }
+}
+
+@media (max-width: 700px) {
+  .worldsplit-layout { gap: 10px; }
+  .worldsplit-map-shell,
+  .worldsplit-map { min-height: 290px; }
+  .worldsplit-panel { padding: 20px; }
+  .worldsplit-panel-title h1 { font-size: 2rem; }
+  .worldsplit-map-label { display: none; }
+  .worldsplit-map-hint { width: min(250px, calc(100% - 24px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .worldsplit-country,
+  .worldsplit-map-hint { transition: none; }
+}

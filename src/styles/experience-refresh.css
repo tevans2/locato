@@ -1,0 +1,1110 @@
+/* Structural redesign for the application beyond the landing page.
+   This file is intentionally last: it turns the shared game primitives into a
+   coherent product shell while leaving all game logic and accessibility intact. */
+
+body:not(:has(.landing-screen-shell)) .app-shell {
+  width: min(1680px, calc(100% - 48px));
+  padding-block: 16px;
+}
+
+body:not(:has(.landing-screen-shell)) .landing-return-action {
+  display: none;
+}
+
+body:not(:has(.landing-screen-shell)) .global-theme-switch {
+  position: fixed;
+  z-index: 111;
+  top: 21px;
+  right: 104px;
+  width: auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body:not(:has(.landing-screen-shell)) .auth-trigger {
+  top: 20px;
+  right: 24px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: .84rem;
+}
+
+body:not(:has(.landing-screen-shell)) .auth-trigger:hover {
+  border-color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+
+/* A compact editorial header replaces the toolbar of identical buttons. */
+body:not(:has(.landing-screen-shell)) .game-header {
+  min-height: 64px;
+  margin: 0 0 18px;
+  padding: 0 186px 14px 0;
+  align-items: center;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header-left {
+  align-items: center;
+  gap: 24px;
+}
+
+body:not(:has(.landing-screen-shell)) .game-header-actions {
+  gap: 4px;
+  padding-right: 0;
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action + .nav-action {
+  border-left: 1px solid var(--border);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action:hover:not(:disabled),
+body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button:hover:not(:disabled),
+body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action:hover:not(:disabled) {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+
+body:not(:has(.landing-screen-shell)) .brand-logo {
+  width: 26px;
+  height: 26px;
+}
+
+body:not(:has(.landing-screen-shell)) .brand-name {
+  font-size: 1.08rem;
+}
+
+/* Game library */
+.game-mode-dropdown {
+  width: min(332px, 100%);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
+.multiplayer-mode-dropdown .category-dropdown-summary {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 7px 12px 7px 15px;
+  border: 0;
+  border-left: 3px solid #75b52f;
+  border-radius: 0;
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.game-mode-dropdown .category-dropdown-summary::after {
+  display: none;
+}
+
+.game-mode-dropdown .category-row-label {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--muted);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.game-mode-dropdown .game-mode-selected-copy {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  text-align: left;
+}
+
+.game-mode-dropdown .category-dropdown-selected {
+  font-size: .95rem;
+  font-weight: 800;
+  letter-spacing: -.015em;
+}
+
+.game-mode-switch-action {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #568624;
+  font-size: .72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.game-mode-dropdown[open] .game-mode-switch-action {
+  color: var(--text);
+}
+
+.game-mode-dropdown .category-dropdown-menu,
+.game-mode-dropdown .category-dropdown-menu:has(.game-mode-group) {
+  width: var(--dropdown-width, min(900px, calc(100vw - 24px)));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 22px;
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(25, 35, 31, .18);
+}
+
+.game-mode-menu-heading {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: end;
+  margin: -2px 0 15px;
+  padding: 0 0 15px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.game-mode-menu-heading .eyebrow {
+  grid-column: 1 / -1;
+}
+
+.game-mode-menu-heading strong {
+  font-size: 1.35rem;
+  letter-spacing: -.035em;
+}
+
+.game-mode-menu-heading > span:last-child {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.game-mode-group {
+  align-content: start;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.game-mode-group-label {
+  margin-bottom: 5px;
+  padding: 0 0 9px;
+  border-bottom: 2px solid var(--text);
+  color: var(--text);
+  font-size: .7rem;
+  letter-spacing: .09em;
+}
+
+.game-mode-option {
+  min-height: 64px;
+  gap: 10px;
+  padding: 11px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.game-mode-option:hover,
+.game-mode-option:has(input:checked) {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+}
+
+.game-mode-option input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: #6ca82b;
+}
+
+.game-mode-option-label {
+  font-size: .86rem;
+}
+
+.game-mode-option-description {
+  color: var(--muted);
+  font-size: .73rem;
+  line-height: 1.35;
+}
+
+/* Gameplay is now a canvas and a deliberately structured control rail. */
+.play-layout,
+.country-guess-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: 28px;
+}
+
+.flag-card {
+  padding: 0;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.flag-card-top {
+  min-height: 36px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.round-status,
+.round-kicker {
+  font-size: .7rem;
+  letter-spacing: .1em;
+}
+
+.flag-slot,
+.world-map-panel,
+.world-globe-panel,
+.puzzle-board-shell,
+.streetview-stage,
+.maptap-map-panel {
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  box-shadow: 0 18px 46px rgba(25, 35, 31, .09);
+}
+
+.answer-panel,
+.country-guess-panel {
+  padding: 4px 0 8px 24px;
+  gap: 17px;
+  border: 0;
+  border-left: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.panel-title {
+  display: block;
+  padding: 0 0 14px;
+  border-bottom: 2px solid var(--text);
+}
+
+.panel-title h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  letter-spacing: -.045em;
+}
+
+.guess-form {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.guess-form label {
+  font-size: .68rem;
+  letter-spacing: .09em;
+}
+
+.input-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.input-row input {
+  min-height: 54px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface);
+  font-size: 1rem;
+}
+
+.input-row button,
+.guess-submit-action {
+  min-height: 48px;
+  width: 100%;
+  border: 0;
+  border-radius: 2px;
+  background: var(--text);
+  color: #fff;
+}
+
+.input-row button:hover:not(:disabled),
+.guess-submit-action:hover:not(:disabled) {
+  border: 0;
+  background: #30423b;
+  color: #fff;
+}
+
+.guess-submit-action::before {
+  color: rgba(255, 255, 255, .72);
+}
+
+.answer-panel .stats-panel,
+.country-guess-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.answer-panel .stat-card,
+.country-guess-panel .stat-card,
+.answer-panel .progress-card,
+.country-guess-panel .progress-card,
+.country-guess-mode-card {
+  min-height: 54px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.answer-panel .stat-card,
+.country-guess-panel .stat-card {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  align-items: start;
+}
+
+.answer-panel .stat-label,
+.country-guess-panel .stat-label {
+  font-size: .64rem;
+  letter-spacing: .08em;
+}
+
+.answer-panel .stat-value,
+.country-guess-panel .stat-value {
+  font-size: 1rem;
+}
+
+.answer-panel .progress-card,
+.country-guess-panel .progress-card {
+  gap: 8px;
+}
+
+.progress-track {
+  height: 3px;
+}
+
+.feedback {
+  min-height: 0;
+  padding: 9px 0 9px 12px;
+  border: 0;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  font-size: .82rem;
+}
+
+.feedback.good,
+.feedback.bad {
+  background: transparent;
+}
+
+.answer-panel .solo-action-grid,
+.country-guess-panel .actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.answer-panel .solo-action-grid button,
+.answer-panel .solo-action-grid .atlas-open,
+.country-guess-panel .actions button,
+.country-guess-panel .actions .atlas-open {
+  min-height: 44px;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  font-size: .82rem;
+}
+
+.answer-panel .solo-action-grid button:hover:not(:disabled),
+.answer-panel .solo-action-grid .atlas-open:hover,
+.country-guess-panel .actions button:hover:not(:disabled),
+.country-guess-panel .actions .atlas-open:hover {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.hint-popover,
+.achievement-panel,
+.map-review-panel,
+.country-click-prompt {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.world-map-country-label,
+.world-map-control-button,
+.maptap-info-card {
+  border-radius: 2px;
+}
+
+/* Multiplayer: an explanation on the left, one clean setup form on the right. */
+.multiplayer-layout {
+  overflow: auto;
+}
+
+.multiplayer-setup {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(480px, 1.1fr);
+  align-self: center;
+  justify-self: center;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow: 0 28px 72px rgba(25, 35, 31, .12);
+}
+
+.multiplayer-setup-intro {
+  min-width: 0;
+  padding: clamp(34px, 5vw, 64px);
+  background: var(--accent-soft);
+  border-right: 1px solid var(--border-strong);
+}
+
+.multiplayer-setup h1 {
+  max-width: 10ch;
+  margin: 13px 0 18px;
+  font-size: clamp(2.5rem, 4.2vw, 4.6rem);
+  line-height: .94;
+  letter-spacing: -.065em;
+}
+
+.multiplayer-setup-intro > .muted {
+  max-width: 42ch;
+  margin-bottom: 30px;
+  color: #4e5d56;
+}
+
+.multiplayer-feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(25, 35, 31, .28);
+}
+
+.multiplayer-feature-list li {
+  display: grid;
+  gap: 3px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(25, 35, 31, .18);
+}
+
+.multiplayer-feature-list strong {
+  font-size: .86rem;
+}
+
+.multiplayer-feature-list span {
+  color: #59675f;
+  font-size: .78rem;
+}
+
+.multiplayer-setup-form {
+  min-width: 0;
+  padding: clamp(28px, 4vw, 52px);
+}
+
+.multiplayer-form-heading {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--text);
+}
+
+.multiplayer-form-heading strong {
+  font-size: 1.3rem;
+  letter-spacing: -.03em;
+}
+
+.multiplayer-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin: 0 0 18px;
+}
+
+.multiplayer-form-grid > .multiplayer-field {
+  grid-column: auto;
+}
+
+.multiplayer-form-grid > .multiplayer-name-field,
+.multiplayer-form-grid > .multiplayer-mode-field {
+  grid-column: 1 / -1;
+}
+
+.multiplayer-field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.multiplayer-field > input,
+.multiplayer-field > select {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 2px;
+  background-color: var(--surface);
+  color: var(--text);
+  font-size: .9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.multiplayer-mode-dropdown {
+  width: 100%;
+}
+
+.multiplayer-mode-dropdown .category-dropdown-summary {
+  min-height: 56px;
+}
+
+.multiplayer-mode-dropdown .category-dropdown-selected-description {
+  display: none;
+}
+
+.multiplayer-mode-dropdown .category-dropdown-menu,
+.multiplayer-mode-dropdown .category-dropdown-menu:has(.game-mode-group) {
+  width: var(--dropdown-width, min(640px, calc(100vw - 24px)));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  padding: 16px 18px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.multiplayer-mode-dropdown .game-mode-group-label {
+  grid-column: 1 / -1;
+  margin: 8px 0 2px;
+  padding: 8px 0;
+}
+
+.multiplayer-mode-dropdown .game-mode-group-label:first-child {
+  margin-top: 0;
+}
+
+.multiplayer-mode-dropdown .game-mode-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  min-height: 58px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.multiplayer-mode-dropdown .game-mode-option input {
+  width: 16px;
+  height: 16px;
+}
+
+.multiplayer-create-row .primary-action {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--text);
+  color: #fff;
+}
+
+.multiplayer-join-block {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.multiplayer-join-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.multiplayer-join-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.multiplayer-join-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.multiplayer-join-row input,
+.multiplayer-join-row button {
+  min-height: 48px;
+  border-radius: 2px;
+}
+
+.lobby-panel {
+  width: min(900px, 100%);
+  border-radius: 2px;
+}
+
+.room-code-row {
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--text);
+}
+
+/* Supporting pages share the same wide, editorial rhythm. */
+.stats-header,
+.stats-content {
+  width: min(1120px, calc(100% - 40px));
+  max-width: none;
+}
+
+.stats-header {
+  padding-inline: 0;
+}
+
+.stats-content {
+  padding-inline: 0;
+}
+
+.stats-hero {
+  gap: 0;
+  border-top: 2px solid var(--text);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.stats-hero-card,
+.stats-hero-card.is-highlight {
+  padding: 18px 20px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stats-hero-card:last-child {
+  border-right: 0;
+}
+
+.stats-hero-card.is-highlight {
+  background: var(--accent-soft);
+}
+
+.stats-card {
+  border: 0;
+  border-top: 2px solid var(--text);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.friends-screen {
+  max-width: 960px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  padding-inline: 20px;
+}
+
+.friends-header,
+.friend-link-hint,
+.friend-profile-panel {
+  grid-column: 1 / -1;
+}
+
+.friend-section,
+.friend-profile-panel {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.leaderboard-screen .leaderboard-layout {
+  max-width: 900px;
+}
+
+.leaderboard-row {
+  border-radius: 0;
+}
+
+.daily-result-panel {
+  width: min(760px, 100%);
+}
+
+.auth-panel {
+  border-radius: 2px;
+}
+
+/* Dark theme — the structure stays identical while the cartographic palette
+   switches to deep ink, muted sea glass and warm pale land. */
+:root[data-theme="dark"] body {
+  background: var(--bg);
+}
+
+:root[data-theme="dark"] .landing-root,
+:root[data-theme="dark"] .landing-facts,
+:root[data-theme="dark"] .lp-btn,
+:root[data-theme="dark"] .category-dropdown-menu,
+:root[data-theme="dark"] .action-menu-panel,
+:root[data-theme="dark"] .multiplayer-setup,
+:root[data-theme="dark"] .multiplayer-card,
+:root[data-theme="dark"] .stats-card,
+:root[data-theme="dark"] .stats-hero-card,
+:root[data-theme="dark"] .friend-section,
+:root[data-theme="dark"] .friend-profile-panel,
+:root[data-theme="dark"] .auth-panel {
+  color: var(--text);
+  background: var(--surface);
+}
+
+:root[data-theme="dark"] .lp-btn:hover,
+:root[data-theme="dark"] .landing-mode:hover {
+  background: var(--surface-soft);
+}
+
+:root[data-theme="dark"] .lp-btn-primary,
+:root[data-theme="dark"] .lp-btn-primary:hover,
+:root[data-theme="dark"] .landing-daily {
+  color: #172116;
+  background: var(--accent);
+}
+
+:root[data-theme="dark"] .landing-together {
+  color: #fff;
+  background: #080d0a;
+}
+
+:root[data-theme="dark"] .landing-together .lp-btn {
+  color: var(--text);
+  background: var(--surface);
+}
+
+:root[data-theme="dark"] .landing-together .lp-btn-ghost {
+  color: var(--muted);
+  background: transparent;
+}
+
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) button,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) input,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) select,
+:root[data-theme="dark"] .guess-form input,
+:root[data-theme="dark"] .multiplayer-field > input,
+:root[data-theme="dark"] .multiplayer-field > select,
+:root[data-theme="dark"] .multiplayer-join-row input {
+  color: var(--text);
+  background-color: var(--surface);
+}
+
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .primary-action,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action {
+  border-color: var(--accent);
+  color: #172116;
+  background: var(--accent);
+}
+
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled),
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action:hover:not(:disabled) {
+  border-color: #b3e875;
+  color: #172116;
+  background: #a7e161;
+}
+
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .auth-trigger,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .global-theme-switch,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .game-header .nav-action,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
+:root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
+  color: var(--muted);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .flag-slot {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(rgba(232,240,231,.035) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(232,240,231,.028) 1px, transparent 1px) 0 0 / 44px 44px,
+    var(--bg-elevated);
+}
+
+:root[data-theme="dark"] .world-map-panel,
+:root[data-theme="dark"] .world-globe-panel,
+:root[data-theme="dark"] .puzzle-board-shell,
+:root[data-theme="dark"] .puzzle-piece-tray,
+:root[data-theme="dark"] .maptap-map-panel,
+:root[data-theme="dark"] .maptap-globe {
+  background:
+    linear-gradient(rgba(232,240,231,.04) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(232,240,231,.032) 1px, transparent 1px) 0 0 / 64px 64px,
+    var(--sea);
+}
+
+:root[data-theme="dark"] .world-map-country {
+  fill: var(--land);
+  stroke: #60736c;
+}
+
+:root[data-theme="dark"] .world-map-control-button,
+:root[data-theme="dark"] .puzzle-border-toggle,
+:root[data-theme="dark"] .maptap-attribution,
+:root[data-theme="dark"] .world-map-country-label,
+:root[data-theme="dark"] .maptap-info-card {
+  color: var(--text);
+  background: rgba(20, 29, 23, .94);
+}
+
+:root[data-theme="dark"] .multiplayer-setup-intro {
+  background: #25361f;
+}
+
+:root[data-theme="dark"] .multiplayer-setup-intro > .muted,
+:root[data-theme="dark"] .multiplayer-feature-list span {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .feedback.good,
+:root[data-theme="dark"] .achievement-panel {
+  color: var(--good);
+  background: rgba(139, 210, 63, .08);
+}
+
+:root[data-theme="dark"] .feedback.bad,
+:root[data-theme="dark"] .map-review-panel {
+  color: var(--bad);
+  background: rgba(239, 106, 69, .08);
+}
+
+@media (max-width: 1100px) {
+  .play-layout,
+  .country-guess-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+  }
+
+  .multiplayer-setup {
+    grid-template-columns: minmax(0, .82fr) minmax(420px, 1.18fr);
+  }
+}
+
+@media (max-width: 900px) {
+  body:not(:has(.landing-screen-shell)) .game-header {
+    padding-right: 0;
+  }
+
+  .play-layout,
+  .country-guess-layout {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .answer-panel,
+  .country-guess-panel {
+    padding: 20px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border-strong);
+  }
+
+  .multiplayer-setup {
+    width: min(720px, 100%);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .multiplayer-setup-intro {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  .multiplayer-feature-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .multiplayer-feature-list li {
+    padding-right: 14px;
+    border-right: 1px solid rgba(25, 35, 31, .18);
+  }
+
+  .friends-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .friends-screen > * {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  body:not(:has(.landing-screen-shell)) .app-shell {
+    width: min(100% - 24px, 1680px);
+    padding-block: 10px;
+  }
+
+  body:not(:has(.landing-screen-shell)) .auth-trigger {
+    top: 12px;
+    right: 12px;
+    border-left: 0;
+  }
+
+  body:not(:has(.landing-screen-shell)) .global-theme-switch {
+    top: 13px;
+    right: 74px;
+    min-height: 32px;
+    padding-inline: 7px;
+    border-right: 0;
+  }
+
+  body:not(:has(.landing-screen-shell)) .global-theme-switch .theme-switch-label {
+    display: none;
+  }
+
+  body:not(:has(.landing-screen-shell)) .game-header {
+    min-height: 48px;
+    margin-bottom: 10px;
+    padding: 0 54px 9px 0;
+  }
+
+  .multiplayer-header .game-header-actions {
+    right: 58px;
+    width: auto;
+  }
+
+  .multiplayer-header .game-header-actions > .screen-back-button {
+    width: auto;
+    display: inline-flex;
+    padding-inline: 10px;
+    border: 0;
+    background: transparent;
+  }
+
+  body:not(:has(.landing-screen-shell)) .game-header-left {
+    gap: 10px;
+  }
+
+  .game-mode-dropdown {
+    width: min(230px, calc(100vw - 118px));
+  }
+
+  body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary {
+    min-height: 42px;
+    padding: 5px 8px 5px 10px;
+  }
+
+  .game-mode-switch-action,
+  .game-mode-dropdown .category-row-label {
+    display: none;
+  }
+
+  .game-mode-dropdown .game-mode-selected-copy {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .game-mode-dropdown .category-dropdown-menu,
+  .game-mode-dropdown .category-dropdown-menu:has(.game-mode-group) {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .game-mode-menu-heading {
+    margin-bottom: 8px;
+  }
+
+  .play-layout,
+  .country-guess-layout {
+    gap: 14px;
+  }
+
+  .answer-panel,
+  .country-guess-panel {
+    padding-top: 14px;
+    gap: 12px;
+  }
+
+  .panel-title {
+    display: none;
+  }
+
+  .input-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .input-row button,
+  .guess-submit-action {
+    width: auto;
+  }
+
+  .multiplayer-setup-intro,
+  .multiplayer-setup-form {
+    padding: 24px 20px;
+  }
+
+  .multiplayer-setup h1 {
+    font-size: 2.6rem;
+  }
+
+  .multiplayer-feature-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .multiplayer-feature-list li {
+    border-right: 0;
+  }
+
+  .multiplayer-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .multiplayer-form-grid > .multiplayer-field {
+    grid-column: 1;
+  }
+
+  .multiplayer-join-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stats-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-hero-card:nth-child(2) {
+    border-right: 0;
+  }
+}
