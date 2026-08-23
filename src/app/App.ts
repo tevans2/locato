@@ -460,7 +460,7 @@ export function createApp(options: AppOptions): App {
     }
 
     if (isStreetViewGameModeId(gameMode)) {
-      navigate({ type: "streetview-country" });
+      navigate({ type: gameMode === "geoguessr" ? "geoguessr" : "streetview-country" });
       return;
     }
 
@@ -527,6 +527,24 @@ export function createApp(options: AppOptions): App {
   function startStreetViewCountry(): void {
     mount(
       createStreetViewCountryScreen({
+        countryIndex: options.countryIndex,
+        onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+        onHome: () => navigate({ type: "landing" }),
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+      }),
+    );
+  }
+
+  async function startGeoGuessr(): Promise<void> {
+    const run = navigationRun;
+    mount(createLoadingScreen("Preparing your first location..."));
+
+    const { createGeoGuessrScreen } = await import("../ui/screens/GeoGuessrScreen");
+    if (run !== navigationRun) return;
+
+    mount(
+      createGeoGuessrScreen({
         countryIndex: options.countryIndex,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
@@ -663,6 +681,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "streetview-country") {
       startStreetViewCountry();
+      return;
+    }
+    if (route.type === "geoguessr") {
+      void startGeoGuessr();
       return;
     }
     if (route.type === "map-tap") {
