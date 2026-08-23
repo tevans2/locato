@@ -454,6 +454,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
+    if (dailyMap) dailyMap.element.classList.toggle("is-click-country-mode", content?.kind === "map-click" && state.status === "playing");
     freePlayToggle.hidden = capitalRecallMap === null;
     guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
     input.placeholder = isCapitalRecallMode

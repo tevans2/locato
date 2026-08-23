@@ -251,6 +251,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       submitButton.disabled = !state.canSubmit;
       answerForm.hidden = isMapClickRound;
       mapView.element.classList.toggle("is-disabled", !state.canSubmit);
+      mapView.element.classList.toggle("is-click-country-mode", allowMapClickSubmit);
       // Focus the first time a round becomes submittable, not on round identity alone: the
       // ROUND_STARTED/GAME_STARTED frame arrives while status is still round-result/lobby
       // (canSubmit false), and the playing snapshot follows separately. Keying focus off

@@ -1441,7 +1441,7 @@
 }
 
 .world-map-panel.is-click-country-mode .world-map-country[data-country-id] {
-  cursor: pointer;
+  cursor: crosshair;
 }
 
 .world-map-panel.is-click-country-mode .world-map-country[data-country-id]:hover {

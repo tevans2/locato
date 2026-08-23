@@ -1,5 +1,6 @@
 import type { Continent, Country, CountryId, CountryIndex } from "../../core/countries";
 import { projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon, type WorldMapPosition } from "../../core/map";
+import { zoomViewBoxAroundPoint } from "./viewBoxZoom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOARD_WIDTH = 820;
@@ -140,18 +141,8 @@ function pointerToViewBoxPosition(svg: SVGSVGElement, viewBox: ViewBoxState, cli
 }
 
 function zoomBoardAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, clientX: number, clientY: number): ViewBoxState {
-  const [mapX, mapY] = pointerToViewBoxPosition(svg, viewBox, clientX, clientY);
-  const nextWidth = viewBox.width * factor;
-  const nextHeight = viewBox.height * factor;
-  const widthRatio = nextWidth / viewBox.width;
-  const heightRatio = nextHeight / viewBox.height;
-
-  return clampBoardViewBox({
-    x: mapX - (mapX - viewBox.x) * widthRatio,
-    y: mapY - (mapY - viewBox.y) * heightRatio,
-    width: nextWidth,
-    height: nextHeight,
-  });
+  const point = pointerToViewBoxPosition(svg, viewBox, clientX, clientY);
+  return clampBoardViewBox(zoomViewBoxAroundPoint(viewBox, point, factor, BOARD_WIDTH / MAX_ZOOM, BOARD_WIDTH));
 }
 
 function wheelDeltaYToPixels(event: WheelEvent): number {

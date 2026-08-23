@@ -9,6 +9,7 @@ import {
   type WorldMapPosition,
 } from "../../core/map";
 import { el } from "./createElement";
+import { zoomViewBoxAroundPoint } from "./viewBoxZoom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const RECENT_LABEL_COUNT = 8;
@@ -197,17 +198,8 @@ function pointerToMapPosition(svg: SVGSVGElement, viewBox: ViewBoxState, clientX
 }
 
 function zoomAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, clientX: number, clientY: number): ViewBoxState {
-  const [mapX, mapY] = pointerToMapPosition(svg, viewBox, clientX, clientY);
-  const nextWidth = viewBox.width * factor;
-  const nextHeight = viewBox.height * factor;
-  const widthRatio = nextWidth / viewBox.width;
-  const heightRatio = nextHeight / viewBox.height;
-  return clampViewBox({
-    x: mapX - (mapX - viewBox.x) * widthRatio,
-    y: mapY - (mapY - viewBox.y) * heightRatio,
-    width: nextWidth,
-    height: nextHeight,
-  });
+  const point = pointerToMapPosition(svg, viewBox, clientX, clientY);
+  return clampViewBox(zoomViewBoxAroundPoint(viewBox, point, factor, MAP_VIEWBOX_WIDTH / MAX_ZOOM, MAP_VIEWBOX_WIDTH));
 }
 
 function wheelDeltaYToPixels(event: WheelEvent): number {
