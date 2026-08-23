@@ -3,6 +3,7 @@ import { MAX_ANSWER_LENGTH, parseClientMessage, type ClientMessage, type Message
 import { parseRawClientMessage } from "../protocol/parseMessage";
 import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type RoomResult } from "./Room";
 import { MapTapRoom } from "./MapTapRoom";
+import { GeoGuessrRoom } from "./GeoGuessrRoom";
 import { getCategory, resolveCategoryIds } from "../../src/core/categories";
 
 export interface MultiplayerConnection {
@@ -71,12 +72,18 @@ function defaultCountryIndex(): CountryIndex {
 }
 
 function hasSupportedCategory(categoryIds: readonly string[]): boolean {
-  if (categoryIds.length === 1 && categoryIds[0] === "map-tap") return true;
+  if (categoryIds.length === 1 && (categoryIds[0] === "map-tap" || categoryIds[0] === "geoguessr")) return true;
   return categoryIds.some((id) => getCategory(id) !== undefined);
 }
 
-function isMapTapRoom(room: Room | MapTapRoom): room is MapTapRoom {
+type AnyRoom = Room | MapTapRoom | GeoGuessrRoom;
+
+function isMapTapRoom(room: AnyRoom): room is MapTapRoom {
   return room instanceof MapTapRoom;
+}
+
+function isGeoGuessrRoom(room: AnyRoom): room is GeoGuessrRoom {
+  return room instanceof GeoGuessrRoom;
 }
 
 export class RoomManager {
@@ -87,7 +94,7 @@ export class RoomManager {
   private readonly emptyRoomTtlMs: number;
   private readonly answerRateLimitPerSecond: number;
   private readonly resultDisplayMs: number;
-  private readonly rooms = new Map<RoomCode, Room | MapTapRoom>();
+  private readonly rooms = new Map<RoomCode, AnyRoom>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
   private readonly connectionByPlayerId = new Map<string, MultiplayerConnection>();
   // Survives disconnects so a reconnecting client can reclaim its player slot/score within the
@@ -182,7 +189,7 @@ export class RoomManager {
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (isMapTapRoom(room)) {
+          if (isMapTapRoom(room) || isGeoGuessrRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
           } else {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { categoryIds: resolveCategoryIds(message.categoryIds), ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
@@ -201,7 +208,7 @@ export class RoomManager {
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (isMapTapRoom(room)) { sendError(connection, "wrong-mode", "Use SUBMIT_MAPTAP_GUESS in a MapTap room."); return; }
+          if (isMapTapRoom(room) || isGeoGuessrRoom(room)) { sendError(connection, "wrong-mode", "Use a map guess in this room."); return; }
           const limited = this.rateLimitAnswer(connection, session, now);
           if (!limited.ok) { sendError(connection, limited.code, limited.message); return; }
           this.sendRoomResult(connection, room, room.submitAnswer(session.playerId, message.answer, now));
@@ -210,6 +217,12 @@ export class RoomManager {
       case "SUBMIT_MAPTAP_GUESS":
         this.withSessionRoom(connection, (room, session) => {
           if (!isMapTapRoom(room)) { sendError(connection, "wrong-mode", "This is not a MapTap room."); return; }
+          this.sendRoomResult(connection, room, room.submitGuess(session.playerId, message.lat, message.lng, now));
+        });
+        return;
+      case "SUBMIT_GEOGUESSR_GUESS":
+        this.withSessionRoom(connection, (room, session) => {
+          if (!isGeoGuessrRoom(room)) { sendError(connection, "wrong-mode", "This is not a GeoGuessr room."); return; }
           this.sendRoomResult(connection, room, room.submitGuess(session.playerId, message.lat, message.lng, now));
         });
         return;
@@ -240,7 +253,8 @@ export class RoomManager {
     const roomCode = createRoomCode(new Set(this.rooms.keys()));
     const playerId = createId("player");
     const isMapTap = categoryIds.length === 1 && categoryIds[0] === "map-tap";
-    const room = isMapTap
+    const isGeoGuessr = categoryIds.length === 1 && categoryIds[0] === "geoguessr";
+    const room: AnyRoom = isMapTap
       ? new MapTapRoom({
           code: roomCode,
           hostPlayerId: playerId,
@@ -251,6 +265,18 @@ export class RoomManager {
           ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
           ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
         })
+      : isGeoGuessr
+        ? new GeoGuessrRoom({
+            code: roomCode,
+            hostPlayerId: playerId,
+            hostName: connection.authenticatedName ?? playerName,
+            countryIndex: this.countryIndex,
+            seed: createId("seed"),
+            now,
+            maxPlayers: this.maxPlayersPerRoom,
+            ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
+            ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
+          })
       : new Room({
           code: roomCode,
           hostPlayerId: playerId,
@@ -343,7 +369,7 @@ export class RoomManager {
     return token;
   }
 
-  private withSessionRoom(connection: MultiplayerConnection, action: (room: Room | MapTapRoom, session: PlayerSession) => void): void {
+  private withSessionRoom(connection: MultiplayerConnection, action: (room: AnyRoom, session: PlayerSession) => void): void {
     const session = this.sessionByConnection.get(connection);
     if (!session) {
       sendError(connection, "not-in-room", "Join or create a room first.");
@@ -370,7 +396,7 @@ export class RoomManager {
     return { ok: true, message: nextSession };
   }
 
-  private sendRoomResult(connection: MultiplayerConnection, room: Room | MapTapRoom, result: RoomResult): void {
+  private sendRoomResult(connection: MultiplayerConnection, room: AnyRoom, result: RoomResult): void {
     if (!result.ok) {
       sendError(connection, result.code, result.message);
       return;
@@ -379,12 +405,12 @@ export class RoomManager {
     this.broadcastMessages(room, result.messages);
   }
 
-  private broadcastResult(room: Room | MapTapRoom, result: RoomResult): void {
+  private broadcastResult(room: AnyRoom, result: RoomResult): void {
     if (!result.ok) return;
     this.broadcastMessages(room, result.messages);
   }
 
-  private broadcastMessages(room: Room | MapTapRoom, messages: readonly ServerMessage[]): void {
+  private broadcastMessages(room: AnyRoom, messages: readonly ServerMessage[]): void {
     for (const message of messages) {
       for (const player of room.snapshot().players) {
         const connection = this.connectionByPlayerId.get(player.id);

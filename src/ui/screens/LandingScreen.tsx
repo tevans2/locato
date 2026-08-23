@@ -89,6 +89,7 @@ const MODE_GROUPS: readonly LandingGroup[] = [
     name: "Street View",
     tagline: "Dropped on a random street somewhere on earth.",
     modes: [
+      { id: "geoguessr", title: "GeoGuessr", icon: MapPin, desc: "Explore the street, then pin the exact spot.", badge: "New" },
       { id: "streetview-country", title: "Street View Country", icon: Binoculars, desc: "Look around and work out where you are." },
     ],
   },

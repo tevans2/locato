@@ -2,7 +2,7 @@ import { soloPromptCategories } from "./categories";
 
 export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "capital-recall";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
-export type StreetViewGameModeId = "streetview-country";
+export type StreetViewGameModeId = "streetview-country" | "geoguessr";
 export type MapTapGameModeId = "map-tap";
 export type WorldSplitGameModeId = "worldsplit";
 export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
@@ -17,7 +17,7 @@ export interface GameModeOption {
 
 const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
-const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
+const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country", "geoguessr"];
 const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
 const WORLD_SPLIT_GAME_MODE_IDS: readonly WorldSplitGameModeId[] = ["worldsplit"];
 
@@ -68,6 +68,12 @@ export const worldSplitGameModeOptions: readonly GameModeOption[] = [
 ];
 
 export const streetViewGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "geoguessr",
+    label: "GeoGuessr",
+    description: "Explore a mystery Street View, pin the exact location, and score up to 5,000 points per round.",
+    group: "Street View games",
+  },
   {
     id: "streetview-country",
     label: "Street View Country",

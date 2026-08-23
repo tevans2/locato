@@ -1,0 +1,434 @@
+.geoguessr-screen {
+  height: 100%;
+  min-height: 0;
+}
+
+.geoguessr-header {
+  position: relative;
+  z-index: 30;
+}
+
+.geoguessr-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #080c08;
+  box-shadow: var(--shadow-panel);
+}
+
+.geoguessr-streetview-frame {
+  position: absolute;
+  inset: -135px -330px;
+  width: calc(100% + 660px);
+  height: calc(100% + 270px);
+  border: 0;
+  background: #080c08;
+}
+
+.geoguessr-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  color: var(--text);
+  background: rgba(8, 12, 8, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.geoguessr-loading-pulse {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(184, 227, 109, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: streetview-loader-spin 0.8s linear infinite;
+}
+
+.geoguessr-missing-key {
+  position: absolute;
+  inset: 0;
+}
+
+.geoguessr-hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 8;
+  display: flex;
+  gap: 8px;
+}
+
+.geoguessr-hud > div {
+  display: grid;
+  gap: 1px;
+  min-width: 90px;
+  padding: 8px 12px;
+  border: 1px solid rgba(241, 234, 220, 0.2);
+  border-radius: 13px;
+  color: #f1eadc;
+  background: rgba(8, 12, 8, 0.74);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.geoguessr-hud span {
+  color: rgba(241, 234, 220, 0.7);
+  font-size: 0.68rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.geoguessr-map-dock {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10;
+  width: min(440px, calc(100% - 28px));
+  height: min(360px, calc(100% - 90px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(241, 234, 220, 0.2);
+  border-radius: 18px;
+  background: rgba(8, 12, 8, 0.9);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(14px);
+  transform: translateY(calc(100% - 58px));
+  transition: width 220ms ease, height 220ms ease, transform 220ms ease;
+}
+
+.geoguessr-map-dock.is-open {
+  transform: translateY(0);
+}
+
+.geoguessr-map-dock.is-result {
+  width: min(720px, calc(100% - 28px));
+  height: min(480px, calc(100% - 90px));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.geoguessr-map-header {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.geoguessr-map-header > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.geoguessr-pin-status {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geoguessr-map-toggle {
+  flex: 0 0 auto;
+  min-height: 34px !important;
+  padding-inline: 11px !important;
+  font-size: 0.78rem;
+}
+
+.geoguessr-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  cursor: crosshair;
+}
+
+.geoguessr-google-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.geoguessr-google-map-status {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: var(--muted);
+  background: var(--panel);
+  font-weight: 700;
+  text-align: center;
+}
+
+.geoguessr-google-map-status.is-error {
+  color: var(--bad);
+}
+
+body:not(:has(.landing-screen-shell)) .geoguessr-map button,
+body:not(:has(.landing-screen-shell)) .geoguessr-map button:hover:not(:disabled),
+body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled) {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.geoguessr-map-actions {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.geoguessr-submit {
+  width: 100%;
+}
+
+.geoguessr-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 74px;
+  padding: 10px 12px 10px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.geoguessr-result-copy,
+.geoguessr-final-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.geoguessr-result-score {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+.geoguessr-final-score {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  line-height: 0.95;
+}
+
+.geoguessr-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #f8f5ed;
+  border-radius: 50% 50% 50% 0;
+  background: var(--geoguessr-marker-color, var(--accent));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.42);
+  transform: rotate(-45deg);
+}
+
+.geoguessr-marker::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: rgba(8, 12, 8, 0.82);
+}
+
+.geoguessr-marker-target {
+  --geoguessr-marker-color: #ef6a45;
+  width: 28px;
+  height: 28px;
+}
+
+.geoguessr-marker-guess {
+  --geoguessr-marker-color: #a4df59;
+}
+
+@media (max-width: 700px) {
+  .geoguessr-header .game-mode-dropdown {
+    max-width: 190px;
+  }
+
+  .geoguessr-header .game-header-actions {
+    display: none;
+  }
+
+  .geoguessr-stage {
+    border-radius: 16px;
+  }
+
+  .geoguessr-streetview-frame {
+    inset: -125px -270px;
+    width: calc(100% + 540px);
+    height: calc(100% + 250px);
+  }
+
+  .geoguessr-map-dock,
+  .geoguessr-map-dock.is-result {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100% - 16px);
+    height: min(42dvh, 360px);
+  }
+
+  .geoguessr-map-dock.is-result {
+    height: min(52dvh, 430px);
+  }
+
+  .geoguessr-hud {
+    top: 8px;
+    left: 8px;
+  }
+
+  .geoguessr-result {
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Multiplayer shares the same Street View + pin surface, with live standings layered on top. */
+.multiplayer-geoguessr-layout {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.multiplayer-geoguessr-stage {
+  width: 100%;
+  height: 100%;
+}
+
+.geoguessr-mp-timer {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 12;
+  height: 6px;
+  margin: 0;
+}
+
+.geoguessr-mp-status {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 9;
+  max-width: min(520px, calc(100% - 320px));
+  padding: 8px 13px;
+  overflow: hidden;
+  border: 1px solid rgba(241, 234, 220, 0.2);
+  border-radius: 999px;
+  color: #f1eadc;
+  background: rgba(8, 12, 8, 0.74);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+
+.geoguessr-mp-scoreboard {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 9;
+  width: min(260px, 28%);
+  max-height: min(34dvh, 260px);
+  display: grid;
+  gap: 7px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(241, 234, 220, 0.2);
+  border-radius: 15px;
+  background: rgba(8, 12, 8, 0.78);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.geoguessr-mp-score-list {
+  gap: 5px;
+}
+
+.geoguessr-mp-score-list .score-row {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  padding: 6px 8px;
+  color: #f1eadc;
+  background: rgba(8, 12, 8, 0.66);
+  font-size: 0.76rem;
+}
+
+.geoguessr-mp-map-dock {
+  left: 16px;
+  right: auto;
+  width: min(440px, calc(100% - 32px));
+}
+
+.geoguessr-mp-map-dock.is-result {
+  width: min(720px, calc(100% - 32px));
+  height: min(500px, calc(100% - 32px));
+}
+
+.geoguessr-mp-map-dock .geoguessr-map-header > strong {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.geoguessr-mp-map-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.geoguessr-mp-map-dock.is-result .geoguessr-mp-map-actions {
+  display: none;
+}
+
+.geoguessr-mp-map-dock > .result-list {
+  max-height: 130px;
+  overflow: auto;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.geoguessr-mp-map-dock:not(.is-result) > .result-list:empty {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .multiplayer-geoguessr-layout {
+    min-height: 680px;
+  }
+
+  .geoguessr-mp-status {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+    transform: none;
+  }
+
+  .geoguessr-mp-scoreboard {
+    top: 56px;
+    right: 8px;
+    width: min(220px, calc(100% - 16px));
+    max-height: 150px;
+  }
+
+  .geoguessr-mp-map-dock,
+  .geoguessr-mp-map-dock.is-result {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+}

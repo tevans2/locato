@@ -66,6 +66,21 @@ describe("multiplayer public protocol", () => {
     expect(message.ok ? message.message : null).toEqual({ type: "VOTE_SKIP" });
   });
 
+  it("accepts GeoGuessr pin submissions and round reveals", () => {
+    const guess = parseClientMessage({ type: "SUBMIT_GEOGUESSR_GUESS", lat: -33.9, lng: 18.4, clientSentAt: 1000 });
+    expect(guess.ok).toBe(true);
+    expect(parseClientMessage({ type: "SUBMIT_GEOGUESSR_GUESS", lat: 91, lng: 18.4, clientSentAt: 1000 }).ok).toBe(false);
+
+    const reveal = parseServerMessage({
+      type: "GEOGUESSR_ROUND_ENDED",
+      countryName: "South Africa",
+      targetLat: -33.9,
+      targetLng: 18.4,
+      results: [{ playerId: "p1", name: "Ada", guess: { lat: -34, lng: 18.5 }, distanceKm: 14.4, score: 4964 }],
+    });
+    expect(reveal.ok).toBe(true);
+  });
+
   it("accepts normalized chat messages", () => {
     const message = parseClientMessage({ type: "SEND_CHAT_MESSAGE", text: "  hello   room  " });
     expect(message.ok).toBe(true);
