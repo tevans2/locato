@@ -1,6 +1,7 @@
 import { COUNTRY_FACTS } from "../countries/facts";
 import { normalizeAnswerVariants, type Country, type CountryId, type CountryIndex } from "../countries";
 import { buildPromptSlots, getCategory } from "../categories";
+import { createFameRampQueue } from "./fameRamp";
 import { createRoundQueue, takeNextCountry } from "./roundQueue";
 import type { CreateGameEngineInput, GameCommand, GameEngine, GameEvent, GameState, Hint } from "./types";
 
@@ -103,9 +104,13 @@ function createInitialState(
   categoryIds: readonly string[],
   seed: string,
   now: number,
+  countryIndex?: CountryIndex,
+  poolOrdering?: CreateGameEngineInput["poolOrdering"],
 ): GameState {
   const poolCountryIds = [...assignments.keys()];
-  const initialQueue = createRoundQueue(poolCountryIds, seed);
+  const initialQueue = poolOrdering === "fame-ramp" && countryIndex
+    ? createFameRampQueue(poolCountryIds, countryIndex, seed)
+    : createRoundQueue(poolCountryIds, seed);
   const next = takeNextCountry(initialQueue, new Set<CountryId>());
   const status = next.countryId === null ? "complete" : "playing";
   return {
@@ -155,7 +160,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
   const { countryIndex } = input;
   let categoryIds = input.initialState?.categoryIds ?? input.categoryIds;
   let assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, input.initialState?.seed ?? input.seed), input.poolCountryIds);
-  let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now());
+  let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now(), input.countryIndex, input.poolOrdering);
 
   function categoryFor(countryId: CountryId) {
     return getCategory(assignments.get(countryId) ?? "") ?? getCategory("flags");
@@ -182,7 +187,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
         if (command.type === "START_GAME") categoryIds = command.categoryIds;
         const seed = command.type === "START_GAME" ? command.seed : state.seed;
         assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, seed), input.poolCountryIds);
-        state = createInitialState(assignments, categoryIds, seed, command.now);
+        state = createInitialState(assignments, categoryIds, seed, command.now, input.countryIndex, input.poolOrdering);
         if (state.currentCountryId !== null) events.push({ type: "GAME_STARTED", currentCountryId: state.currentCountryId });
         if (command.type === "RESET_GAME") events.push({ type: "GAME_RESET" });
         return events;

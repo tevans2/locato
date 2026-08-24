@@ -2534,8 +2534,7 @@
   gap: 6px;
 }
 
-.maptap-filter-select,
-.maptap-decay-input {
+.maptap-filter-select {
   width: 100%;
   min-height: 44px;
   border-radius: var(--radius-sm);
@@ -2544,10 +2543,6 @@
   color: var(--text);
   padding: 0 13px;
   font: inherit;
-}
-
-.maptap-decay-input {
-  background-image: none;
 }
 
 .maptap-actions {
@@ -2670,6 +2665,12 @@
   font-size: 1.4rem;
 }
 
+.maptap-result-verdict {
+  margin: 0;
+  color: var(--fg);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
 .maptap-marker {
   width: 18px;
   height: 18px;
@@ -2682,8 +2683,63 @@
   background: #38bdf8;
 }
 
+/* The actual location is a rotated square pin so it never reads as another player's guess. */
 .maptap-marker-target {
   background: #fb7185;
+  border-radius: 4px;
+  transform: rotate(45deg) scale(1.15);
+}
+
+.maptap-marker-player {
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f172a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.maptap-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 34px;
+  z-index: 5;
+  display: flex;
+  gap: 14px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(232, 226, 211, 0.11);
+  background: rgba(20, 25, 20, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.maptap-legend[hidden] {
+  display: none;
+}
+
+.maptap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.maptap-legend-swatch {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+}
+
+.maptap-legend-swatch.maptap-marker-guess {
+  border-radius: 999px;
+}
+
+.maptap-legend-swatch.maptap-marker-target {
+  border-radius: 2px;
+  transform: rotate(45deg);
 }
 
 /* ── MapTap info overlay ─────────────────────────────────────────── */
@@ -3073,7 +3129,6 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
 
 .guess-form input,
 .maptap-filter-select,
-.maptap-decay-input,
 .puzzle-continent-select,
 .country-guess-timer-select {
   border-color: rgba(217, 217, 214, 0.14);

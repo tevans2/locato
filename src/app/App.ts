@@ -41,6 +41,7 @@ function createEngine(countryIndex: CountryIndex, categoryIds: readonly string[]
     countryIndex,
     categoryIds,
     seed: initialState?.seed ?? createRandomSeed(),
+    poolOrdering: "fame-ramp",
     ...(poolCountryIds ? { poolCountryIds } : {}),
     ...(initialState ? { initialState } : {}),
   });
@@ -408,6 +409,9 @@ export function createApp(options: AppOptions): App {
       categoryIds: challenge.categoryIds,
       seed: challenge.seed,
       poolCountryIds: challenge.countryIds,
+      // Same deterministic ramp as solo: famous countries first, widening out. Keeps the
+      // daily winnable for casual players while staying identical for everyone that day.
+      poolOrdering: "fame-ramp",
       now: dailyStartedAt,
     });
 
@@ -540,6 +544,7 @@ export function createApp(options: AppOptions): App {
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        storage: options.storage,
       }),
     );
   }

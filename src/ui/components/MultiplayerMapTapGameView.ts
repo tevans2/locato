@@ -5,8 +5,8 @@ import { el } from "../dom/createElement";
 import { createMapTapGlobe } from "./MapTapGlobe";
 import { createMapTapInfoOverlay } from "./MapTapInfoOverlay";
 
-// Colour palette for player markers — one per player slot
-const PLAYER_COLORS = ["#38bdf8", "#fb923c", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#60a5fa", "#f87171"];
+// Colours come from the shared palette so markers, scoreboard, and result rows always match.
+import { playerColor } from "../dom/palette";
 
 export interface MapTapMultiplayerReveal {
   readonly targetName: string;
@@ -123,10 +123,9 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
         });
       });
   }
-
-  function createResultRows(results: readonly MapTapRoundResult[], localPlayerId: PlayerId | null): readonly HTMLElement[] {
-    return results.map((result, index) => {
-      const color = PLAYER_COLORS[index % PLAYER_COLORS.length] ?? "#888";
+  function createResultRows(results: readonly MapTapRoundResult[], localPlayerId: PlayerId | null, colors: ReadonlyMap<PlayerId, string>): readonly HTMLElement[] {
+    return results.map((result) => {
+      const color = colors.get(result.playerId) ?? "#888";
       const isLocal = result.playerId === localPlayerId;
       const distText = result.guess ? formatDistance(result.distanceKm) : "didn't guess";
       return el("li", {
@@ -215,7 +214,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
       if (revealKey && revealKey !== renderedRevealKey) {
         renderedRevealKey = revealKey;
         const target = { lat: reveal!.targetLat, lng: reveal!.targetLng };
-        const playerColors = new Map(room.players.map((p, i) => [p.id, PLAYER_COLORS[i % PLAYER_COLORS.length] ?? "#888"]));
+        const playerColors = new Map(room.players.map((p, i) => [p.id, playerColor(i)]));
         const guesses = reveal!.results
           .filter((r) => r.guess !== null)
           .map((r) => ({
@@ -233,7 +232,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
           infoOverlay.show(reveal!.targetName, summary);
         });
 
-        resultList.replaceChildren(...createResultRows(reveal!.results, localPlayerId));
+        resultList.replaceChildren(...createResultRows(reveal!.results, localPlayerId, playerColors));
       }
 
       if (finalResults) {

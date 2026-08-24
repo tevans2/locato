@@ -40,6 +40,7 @@ function createMarkerElement(className: string, label: string): HTMLElement {
   marker.className = className;
   marker.setAttribute("aria-label", label);
   marker.setAttribute("role", "img");
+  marker.setAttribute("title", label);
   return marker;
 }
 
@@ -75,6 +76,17 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
   const attribution = document.createElement("div");
   attribution.className = "maptap-attribution";
   attribution.textContent = "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
+
+  const legend = document.createElement("div");
+  legend.className = "maptap-legend";
+  legend.hidden = true;
+  const legendYou = document.createElement("span");
+  legendYou.className = "maptap-legend-item";
+  legendYou.append(Object.assign(document.createElement("i"), { className: "maptap-legend-swatch maptap-marker-guess" }), document.createTextNode("Your guess"));
+  const legendTarget = document.createElement("span");
+  legendTarget.className = "maptap-legend-item";
+  legendTarget.append(Object.assign(document.createElement("i"), { className: "maptap-legend-swatch maptap-marker-target" }), document.createTextNode("Actual location"));
+  legend.append(legendYou, legendTarget);
 
   const map = new maplibregl.Map({
     container: element,
@@ -113,7 +125,7 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
     },
   });
 
-  element.append(attribution);
+  element.append(attribution, legend);
 
   function ensureLineLayer(): void {
     if (map.getSource(RESULT_LINE_SOURCE_ID) === undefined) {
@@ -174,15 +186,18 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
     reset: () => {
       acceptingGuesses = true;
       clearMarkers();
+      legend.hidden = true;
       if (map.loaded()) setLineData(EMPTY_LINE_DATA);
     },
     reveal: (result) => {
       acceptingGuesses = false;
       clearMarkers();
+      legend.hidden = false;
+      legendYou.hidden = false;
       guessMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-guess", "Your guess"), anchor: "center" })
         .setLngLat([result.guess.lng, result.guess.lat])
         .addTo(map);
-      targetMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-target", "Actual location"), anchor: "center" })
+      targetMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-target", `Actual location: ${result.target.name}`), anchor: "center" })
         .setLngLat([result.target.lng, result.target.lat])
         .addTo(map);
       setLineData(resultLineData(result));
@@ -192,13 +207,15 @@ export function createMapTapGlobe(options: MapTapGlobeOptions): MapTapGlobe {
     revealMultiplayer: (target, guesses) => {
       acceptingGuesses = false;
       clearMarkers();
+      legend.hidden = false;
+      legendYou.hidden = true;
       targetMarker = new maplibregl.Marker({ element: createMarkerElement("maptap-marker maptap-marker-target", "Actual location"), anchor: "center" })
         .setLngLat([target.lng, target.lat])
         .addTo(map);
       const bounds = new maplibregl.LngLatBounds([target.lng, target.lat], [target.lng, target.lat]);
       const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
       for (const guess of guesses) {
-        const markerEl = createMarkerElement("maptap-marker", guess.label);
+        const markerEl = createMarkerElement("maptap-marker maptap-marker-player", guess.label);
         markerEl.style.background = guess.color;
         const marker = new maplibregl.Marker({ element: markerEl, anchor: "center" })
           .setLngLat([guess.lng, guess.lat])
