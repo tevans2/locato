@@ -42,6 +42,7 @@ function buildGuessResult(location: MapTapLocation, guessLat: number, guessLng: 
     score: scored.score,
     maxScore: MAP_TAP_MAX_SCORE,
     decayKm: scored.decayKm,
+    toleranceKm: scored.toleranceKm,
   };
 }
 

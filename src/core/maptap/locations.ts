@@ -23,7 +23,7 @@ export const MAP_TAP_LOCATIONS: readonly MapTapLocation[] = [
 
   // Mountains and mountain ranges
   { id: "mount-kilimanjaro", name: "Mount Kilimanjaro", category: "mountain", lat: -3.0674, lng: 37.3556, difficulty: "easy", wikiSlug: "Mount_Kilimanjaro" },
-  { id: "andes-central", name: "The Andes", category: "mountain", lat: -32.6532, lng: -70.0112, difficulty: "medium", wikiSlug: "Andes" },
+  { id: "andes-central", name: "The Andes", category: "mountain", lat: -32.6532, lng: -70.0112, difficulty: "medium", wikiSlug: "Andes", toleranceKm: 900, anchors: [{ lat: 4.5, lng: -73.5 }, { lat: -13.0, lng: -72.0 }, { lat: -45.0, lng: -71.5 }] },
   { id: "mount-fuji", name: "Mount Fuji", category: "mountain", lat: 35.3606, lng: 138.7274, difficulty: "easy", wikiSlug: "Mount_Fuji" },
   { id: "mount-everest", name: "Mount Everest", category: "mountain", lat: 27.9881, lng: 86.9250, difficulty: "easy", wikiSlug: "Mount_Everest" },
   { id: "matterhorn", name: "Matterhorn", category: "mountain", lat: 45.9763, lng: 7.6586, difficulty: "medium", wikiSlug: "Matterhorn" },
@@ -31,9 +31,9 @@ export const MAP_TAP_LOCATIONS: readonly MapTapLocation[] = [
   { id: "mont-blanc", name: "Mont Blanc", category: "mountain", lat: 45.8326, lng: 6.8652, difficulty: "medium", wikiSlug: "Mont_Blanc" },
   { id: "table-mountain", name: "Table Mountain", category: "mountain", lat: -33.9628, lng: 18.4098, difficulty: "medium", wikiSlug: "Table_Mountain" },
   { id: "mount-etna", name: "Mount Etna", category: "mountain", lat: 37.7510, lng: 14.9934, difficulty: "medium", wikiSlug: "Mount_Etna" },
-  { id: "rocky-mountains", name: "The Rocky Mountains", category: "mountain", lat: 39.7392, lng: -105.9903, difficulty: "hard", wikiSlug: "Rocky_Mountains" },
-  { id: "atlas-mountains", name: "Atlas Mountains", category: "mountain", lat: 31.0594, lng: -7.9159, difficulty: "hard", wikiSlug: "Atlas_Mountains" },
-  { id: "drakensberg", name: "Drakensberg", category: "mountain", lat: -29.3833, lng: 29.4500, difficulty: "hard", wikiSlug: "Drakensberg" },
+  { id: "rocky-mountains", name: "The Rocky Mountains", category: "mountain", lat: 39.7392, lng: -105.9903, difficulty: "hard", wikiSlug: "Rocky_Mountains", toleranceKm: 800, anchors: [{ lat: 51.4, lng: -116.2 }, { lat: 43.6, lng: -110.7 }, { lat: 35.8, lng: -106.0 }] },
+  { id: "atlas-mountains", name: "Atlas Mountains", category: "mountain", lat: 31.0594, lng: -7.9159, difficulty: "hard", wikiSlug: "Atlas_Mountains", toleranceKm: 400, anchors: [{ lat: 36.0, lng: -4.0 }, { lat: 27.5, lng: -10.5 }] },
+  { id: "drakensberg", name: "Drakensberg", category: "mountain", lat: -29.3833, lng: 29.45, difficulty: "hard", wikiSlug: "Drakensberg", toleranceKm: 300 },
   { id: "mount-elbrus", name: "Mount Elbrus", category: "mountain", lat: 43.3499, lng: 42.4453, difficulty: "hard", wikiSlug: "Mount_Elbrus" },
   { id: "mauna-kea", name: "Mauna Kea", category: "mountain", lat: 19.8207, lng: -155.4681, difficulty: "hard", wikiSlug: "Mauna_Kea" },
 
@@ -43,30 +43,30 @@ export const MAP_TAP_LOCATIONS: readonly MapTapLocation[] = [
   { id: "grand-canyon", name: "Grand Canyon", category: "poi", lat: 36.1069, lng: -112.1129, difficulty: "easy", wikiSlug: "Grand_Canyon" },
   { id: "victoria-falls", name: "Victoria Falls", category: "poi", lat: -17.9243, lng: 25.8572, difficulty: "easy", wikiSlug: "Victoria_Falls" },
   { id: "niagara-falls", name: "Niagara Falls", category: "poi", lat: 43.0962, lng: -79.0377, difficulty: "easy", wikiSlug: "Niagara_Falls" },
-  { id: "great-barrier-reef", name: "Great Barrier Reef", category: "poi", lat: -18.2871, lng: 147.6992, difficulty: "medium", wikiSlug: "Great_Barrier_Reef" },
-  { id: "yellowstone", name: "Yellowstone", category: "poi", lat: 44.4280, lng: -110.5885, difficulty: "medium", wikiSlug: "Yellowstone_National_Park" },
-  { id: "serengeti", name: "Serengeti", category: "poi", lat: -2.3333, lng: 34.8333, difficulty: "medium", wikiSlug: "Serengeti" },
-  { id: "lake-baikal", name: "Lake Baikal", category: "poi", lat: 53.5587, lng: 108.1650, difficulty: "medium", wikiSlug: "Lake_Baikal" },
-  { id: "dead-sea", name: "Dead Sea", category: "poi", lat: 31.5590, lng: 35.4732, difficulty: "medium", wikiSlug: "Dead_Sea" },
-  { id: "galapagos-islands", name: "Galápagos Islands", category: "poi", lat: -0.9538, lng: -90.9656, difficulty: "hard", wikiSlug: "Galápagos_Islands" },
-  { id: "amazon-rainforest", name: "Amazon Rainforest", category: "poi", lat: -3.4653, lng: -62.2159, difficulty: "hard", wikiSlug: "Amazon_rainforest" },
-  { id: "salar-de-uyuni", name: "Salar de Uyuni", category: "poi", lat: -20.1338, lng: -67.4891, difficulty: "hard", wikiSlug: "Salar_de_Uyuni" },
-  { id: "suez-canal", name: "Suez Canal", category: "poi", lat: 30.5852, lng: 32.2654, difficulty: "hard", wikiSlug: "Suez_Canal" },
-  { id: "panama-canal", name: "Panama Canal", category: "poi", lat: 9.0801, lng: -79.6804, difficulty: "hard", wikiSlug: "Panama_Canal" },
+  { id: "great-barrier-reef", name: "Great Barrier Reef", category: "poi", lat: -18.2871, lng: 147.6992, difficulty: "medium", wikiSlug: "Great_Barrier_Reef", toleranceKm: 400, anchors: [{ lat: -10.7, lng: 144.5 }, { lat: -25.0, lng: 152.5 }] },
+  { id: "yellowstone", name: "Yellowstone", category: "poi", lat: 44.428, lng: -110.5885, difficulty: "medium", wikiSlug: "Yellowstone_National_Park", toleranceKm: 120 },
+  { id: "serengeti", name: "Serengeti", category: "poi", lat: -2.3333, lng: 34.8333, difficulty: "medium", wikiSlug: "Serengeti", toleranceKm: 250 },
+  { id: "lake-baikal", name: "Lake Baikal", category: "poi", lat: 53.5587, lng: 108.165, difficulty: "medium", wikiSlug: "Lake_Baikal", toleranceKm: 150, anchors: [{ lat: 55.8, lng: 109.5 }, { lat: 51.5, lng: 104.5 }] },
+  { id: "dead-sea", name: "Dead Sea", category: "poi", lat: 31.559, lng: 35.4732, difficulty: "medium", wikiSlug: "Dead_Sea", toleranceKm: 80, anchors: [{ lat: 29.5, lng: 35.0 }] },
+  { id: "galapagos-islands", name: "Galápagos Islands", category: "poi", lat: -0.9538, lng: -90.9656, difficulty: "hard", wikiSlug: "Galápagos_Islands", toleranceKm: 250 },
+  { id: "amazon-rainforest", name: "Amazon Rainforest", category: "poi", lat: -3.4653, lng: -62.2159, difficulty: "hard", wikiSlug: "Amazon_rainforest", toleranceKm: 900, anchors: [{ lat: -8.0, lng: -70.0 }, { lat: 0.0, lng: -55.0 }, { lat: -6.0, lng: -50.0 }] },
+  { id: "salar-de-uyuni", name: "Salar de Uyuni", category: "poi", lat: -20.1338, lng: -67.4891, difficulty: "hard", wikiSlug: "Salar_de_Uyuni", toleranceKm: 150 },
+  { id: "suez-canal", name: "Suez Canal", category: "poi", lat: 30.5852, lng: 32.2654, difficulty: "hard", wikiSlug: "Suez_Canal", toleranceKm: 100, anchors: [{ lat: 29.9, lng: 32.55 }] },
+  { id: "panama-canal", name: "Panama Canal", category: "poi", lat: 9.0801, lng: -79.6804, difficulty: "hard", wikiSlug: "Panama_Canal", toleranceKm: 100 },
 
   // Famous landmarks
   { id: "eiffel-tower", name: "Eiffel Tower", category: "landmark", lat: 48.8584, lng: 2.2945, difficulty: "easy", wikiSlug: "Eiffel_Tower" },
   { id: "taj-mahal", name: "Taj Mahal", category: "landmark", lat: 27.1751, lng: 78.0421, difficulty: "easy", wikiSlug: "Taj_Mahal" },
   { id: "machu-picchu", name: "Machu Picchu", category: "landmark", lat: -13.1631, lng: -72.5450, difficulty: "medium", wikiSlug: "Machu_Picchu" },
-  { id: "uluru", name: "Uluru", category: "landmark", lat: -25.3444, lng: 131.0369, difficulty: "hard", wikiSlug: "Uluru" },
+  { id: "uluru", name: "Uluru", category: "landmark", lat: -25.3444, lng: 131.0369, difficulty: "hard", wikiSlug: "Uluru", toleranceKm: 100 },
   { id: "statue-of-liberty", name: "Statue of Liberty", category: "landmark", lat: 40.6892, lng: -74.0445, difficulty: "easy", wikiSlug: "Statue_of_Liberty" },
   { id: "colosseum", name: "Colosseum", category: "landmark", lat: 41.8902, lng: 12.4922, difficulty: "easy", wikiSlug: "Colosseum" },
   { id: "great-wall-china", name: "Great Wall of China", category: "landmark", lat: 40.4319, lng: 116.5704, difficulty: "easy", wikiSlug: "Great_Wall_of_China" },
   { id: "christ-the-redeemer", name: "Christ the Redeemer", category: "landmark", lat: -22.9519, lng: -43.2105, difficulty: "easy", wikiSlug: "Christ_the_Redeemer_(statue)" },
   { id: "burj-khalifa", name: "Burj Khalifa", category: "landmark", lat: 25.1972, lng: 55.2744, difficulty: "easy", wikiSlug: "Burj_Khalifa" },
   { id: "sydney-opera-house", name: "Sydney Opera House", category: "landmark", lat: -33.8568, lng: 151.2153, difficulty: "easy", wikiSlug: "Sydney_Opera_House" },
-  { id: "angkor-wat", name: "Angkor Wat", category: "landmark", lat: 13.4125, lng: 103.8670, difficulty: "medium", wikiSlug: "Angkor_Wat" },
-  { id: "chichen-itza", name: "Chichén Itzá", category: "landmark", lat: 20.6843, lng: -88.5678, difficulty: "medium", wikiSlug: "Chichen_Itza" },
+  { id: "angkor-wat", name: "Angkor Wat", category: "landmark", lat: 13.4125, lng: 103.867, difficulty: "medium", wikiSlug: "Angkor_Wat", toleranceKm: 80 },
+  { id: "chichen-itza", name: "Chichén Itzá", category: "landmark", lat: 20.6843, lng: -88.5678, difficulty: "medium", wikiSlug: "Chichen_Itza", toleranceKm: 80 },
   { id: "stonehenge", name: "Stonehenge", category: "landmark", lat: 51.1789, lng: -1.8262, difficulty: "medium", wikiSlug: "Stonehenge" },
   { id: "sagrada-familia", name: "Sagrada Família", category: "landmark", lat: 41.4036, lng: 2.1744, difficulty: "medium", wikiSlug: "Sagrada_Família" },
   { id: "golden-gate-bridge", name: "Golden Gate Bridge", category: "landmark", lat: 37.8199, lng: -122.4783, difficulty: "medium", wikiSlug: "Golden_Gate_Bridge" },
@@ -78,8 +78,8 @@ export const MAP_TAP_LOCATIONS: readonly MapTapLocation[] = [
 ] as const;
 
 export function toMapTapRoundTarget(location: MapTapLocation): MapTapRoundTarget {
-  const { id, name, category, difficulty } = location;
-  return { id, name, category, difficulty };
+  const { id, name, category, difficulty, toleranceKm, anchors } = location;
+  return { id, name, category, difficulty, ...(toleranceKm !== undefined ? { toleranceKm } : {}), ...(anchors ? { anchors } : {}) };
 }
 
 export function findMapTapLocation(id: string): MapTapLocation | null {
