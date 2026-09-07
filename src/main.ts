@@ -4,7 +4,6 @@ import { initializeTheme } from "./ui/theme";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/layout.css";
-import "./styles/landing.css";
 import "./styles/game.css";
 import "./styles/geoguessr.css";
 import "./styles/worldsplit.css";
@@ -17,6 +16,8 @@ import "./styles/responsive.css";
 import "./styles/theme-refresh.css";
 import "./styles/experience-refresh.css";
 import "./styles/sfx.css";
+import "./styles/design-system.css";
+import "./styles/landing.css";
 
 const root = document.getElementById("app");
 

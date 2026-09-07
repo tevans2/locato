@@ -289,10 +289,6 @@
     overflow: hidden;
   }
 
-  .landing-screen-shell button {
-    width: auto;
-    min-height: 0;
-  }
 
   body:not(:has(.landing-screen-shell)) .landing-return-action {
     top: auto;

@@ -1,3 +1,4 @@
+import { createMobileGameNav } from "../dom/mobileGameNav";
 import type { Screen } from "../../app/router";
 import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
 import { describeMapTapSkill, difficultyForSkill, defaultMapTapSkill, readMapTapSkill, recordMapTapResult, saveMapTapSkill } from "../../core/maptap/skill";
@@ -54,6 +55,7 @@ function optionNodes<T extends string>(items: readonly { readonly value: T; read
 
 export function createMapTapScreen(options: MapTapScreenOptions): Screen {
   const controller = new AbortController();
+  const mobileNav = createMobileGameNav(options, controller.signal);
   const isDailyChallenge = options.dailyChallenge !== undefined;
   let activeTarget: MapTapRoundTarget | null = null;
   let activeResult: MapTapGuessResult | null = null;
@@ -175,8 +177,9 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     if (controller.signal.aborted) return;
 
     if (!target) {
-      statusText.textContent = "Could not load a MapTap target. Make sure the Bun server is running so /api/maptap/round is available.";
+      statusText.textContent = "We couldn’t find a target. Check your connection, then try again.";
       setControlsDisabled(false);
+      resetButton.disabled = false;
       return;
     }
 
@@ -259,7 +262,8 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     activeResult = null;
     resultPanel.hidden = true;
     resultPanel.replaceChildren();
-    statusText.textContent = activeTarget ? "Target restarted. Click once as close as you can." : "Loading a target...";
+    if (!activeTarget) { void loadRound(); return; }
+    statusText.textContent = "Target restarted. Click once as close as you can.";
     globe.reset();
     globe.setAcceptingGuesses(activeTarget !== null);
     setControlsDisabled(false);
@@ -283,7 +287,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileNav.button, mobileNav.sheet] }),
         ],
       }),
       el("section", {

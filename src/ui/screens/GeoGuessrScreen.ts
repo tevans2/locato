@@ -1,3 +1,4 @@
+import { createMobileGameNav } from "../dom/mobileGameNav";
 import type { Screen } from "../../app/router";
 import type { CountryIndex } from "../../core/countries";
 import { createGeoGuessrQueue, GEOGUESSR_MAX_GAME_SCORE, GEOGUESSR_MAX_ROUND_SCORE, GEOGUESSR_ROUND_LIMIT, scoreGeoGuessrGuess, type GeoGuessrGuessResult, type GeoGuessrLocation } from "../../core/geoguessr";
@@ -73,6 +74,7 @@ function formatDistance(distanceKm: number): string {
 
 export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
   const controller = new AbortController();
+  const mobileNav = createMobileGameNav(options, controller.signal);
   const apiKey = googleMapsEmbedApiKey();
   let locations: GeoGuessrLocation[] = [];
   let roundIndex = 0;
@@ -96,7 +98,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
   const streetViewLoading = el("div", { className: "geoguessr-loading", attrs: { role: "status" }, children: [el("span", { className: "geoguessr-loading-pulse" }), el("strong", { text: "Finding a road somewhere on Earth..." })] });
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key geoguessr-missing-key",
-    children: [el("strong", { text: "Google Maps Embed API key missing" }), el("p", { text: "Add VITE_GOOGLE_MAPS_EMBED_API_KEY to your local environment, then restart the site." })],
+    children: [el("strong", { text: "Street View is taking a detour." }), el("p", { text: "This adventure is temporarily unavailable. There’s still a whole world of other games to explore." }), el("button", { className: "primary-action", text: "Explore other games", attrs: { type: "button" }, on: { click: options.onHome } })],
   });
   const roundLabel = el("strong", { text: `1 / ${GEOGUESSR_ROUND_LIMIT}` });
   const scoreLabel = el("strong", { text: `0 / ${GEOGUESSR_MAX_GAME_SCORE.toLocaleString()}` });
@@ -141,7 +143,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
         className: "game-header geoguessr-header",
         children: [
           el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileNav.button, mobileNav.sheet] }),
         ],
       }),
       el("div", { className: "geoguessr-stage", children: [streetViewFrame, streetViewLoading, missingKeyPanel, roundHud, mapDock] }),
@@ -179,6 +181,8 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
       streetViewFrame.hidden = true;
       streetViewLoading.hidden = true;
       missingKeyPanel.hidden = Boolean(apiKey);
+      mapDock.hidden = !apiKey;
+      roundHud.hidden = !apiKey;
       return;
     }
     missingKeyPanel.hidden = true;

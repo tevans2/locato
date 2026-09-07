@@ -12,7 +12,7 @@ import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createAtlasView, setAtlasOpen, updateAtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
-import { createGlobeMapView } from "../dom/renderGlobeMap";
+import type { GlobeMapView } from "../dom/renderGlobeMap";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
@@ -545,7 +545,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   const map = createWorldMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
-  const globe = createGlobeMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
+  let globeView: GlobeMapView | null = null;
+  const globeHost = el("div", { className: "world-globe-panel globe-host" });
+  const globe: GlobeMapView = {
+    element: globeHost,
+    update: (state) => globeView?.update(state),
+    showCountryLabel: (id) => globeView?.showCountryLabel(id),
+    resetView: () => globeView?.resetView(),
+    destroy: () => globeView?.destroy(),
+  };
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
@@ -724,8 +732,26 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   );
   mapSurfaceButton.addEventListener(
     "click",
-    () => {
+    async () => {
       dismissKeyboardIfTouchInput(input);
+      if (!globeView && mapSurface === "flat") {
+        mapSurfaceButton.disabled = true;
+        mapSurfaceButton.textContent = "Preparing globe…";
+        try {
+          const { createGlobeMapView } = await import("../dom/renderGlobeMap");
+          if (controller.signal.aborted) return;
+          globeView = createGlobeMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
+          globeHost.append(globeView.element);
+        } catch {
+          if (!controller.signal.aborted) showFeedback(feedback, "The 3D globe is unavailable on this device. You can keep playing on the flat map.", "neutral");
+          return;
+        } finally {
+          if (!controller.signal.aborted) {
+            mapSurfaceButton.disabled = false;
+            mapSurfaceButton.textContent = "3D globe";
+          }
+        }
+      }
       mapSurface = mapSurface === "flat" ? "globe" : "flat";
       map.showCountryLabel(null);
       globe.showCountryLabel(null);

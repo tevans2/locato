@@ -25,7 +25,7 @@ export function createMobileMenu(title: string, sections: readonly MobileMenuSec
   const closeButton = el("button", { className: "mobile-nav-close", text: "×", attrs: { type: "button", "aria-label": "Close menu" } });
   const sheet = el("aside", {
     className: "mobile-nav-sheet",
-    attrs: { hidden: "true", role: "dialog", "aria-label": title },
+    attrs: { hidden: "true", role: "dialog", "aria-label": title, "aria-modal": "true" },
     children: [
       el("div", { className: "mobile-nav-sheet-header", children: [el("strong", { text: title }), closeButton] }),
       ...sections.map((section) => el("section", { className: "mobile-nav-section", children: [el("h2", { text: section.title }), ...section.items] })),
@@ -33,14 +33,17 @@ export function createMobileMenu(title: string, sections: readonly MobileMenuSec
   });
 
   const close = (): void => {
+    const restoreFocus = sheet.contains(document.activeElement);
     sheet.hidden = true;
     button.setAttribute("aria-expanded", "false");
+    if (restoreFocus && button.isConnected) button.focus();
   };
 
   const open = (): void => {
     closeOpenDropdowns();
     sheet.hidden = false;
     button.setAttribute("aria-expanded", "true");
+    closeButton.focus();
   };
 
   button.addEventListener("click", () => (sheet.hidden ? open() : close()), { signal });
@@ -53,7 +56,15 @@ export function createMobileMenu(title: string, sections: readonly MobileMenuSec
     { signal },
   );
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") close();
+    if (sheet.hidden) return;
+    if (event.key === "Escape") { event.preventDefault(); close(); }
+    if (event.key === "Tab") {
+      const items = [...sheet.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], input:not(:disabled)")].filter((item) => item.getClientRects().length > 0);
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
   }, { signal });
 
   return { button, sheet, close };

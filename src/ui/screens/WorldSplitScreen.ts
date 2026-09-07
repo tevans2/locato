@@ -1,3 +1,4 @@
+import { createMobileGameNav } from "../dom/mobileGameNav";
 import {
   DEFAULT_WORLD_SPLIT_LINE,
   WORLD_SPLIT_MAX_ROUND_SCORE,
@@ -88,6 +89,7 @@ function readBestScore(storage: Storage): number {
 
 export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen {
   const controller = new AbortController();
+  const mobileNav = createMobileGameNav(options, controller.signal);
   const countries = buildWorldSplitCountries(options.worldCountryFeatures);
   const countryByCode = new Map(countries.map((country) => [country.code, country]));
   const pathByCode = new Map<string, SVGPathElement>();
@@ -486,7 +488,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
         className: "game-header",
         children: [
           el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileNav.button, mobileNav.sheet] }),
         ],
       }),
       el("main", { className: "worldsplit-layout", children: [mapShell, panel] }),

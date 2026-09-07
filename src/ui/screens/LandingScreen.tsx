@@ -1,8 +1,9 @@
 import { createRoot, type Root } from "react-dom/client";
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  ArrowUpRight,
+  Sparkles,
   Binoculars,
   CalendarDays,
   Check,
@@ -26,11 +27,11 @@ import { readDailyResult } from "../../storage/dailySave";
 import { readSoloSave } from "../../storage/localSave";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
-import { LandingSatelliteGlobe } from "../components/LandingSatelliteGlobe";
 import { currentTheme, LOCATO_THEME_EVENT, toggleTheme, type LocatoTheme } from "../theme";
 
 export interface LandingScreenOptions {
   readonly onHome: () => void;
+  readonly accountControl: HTMLElement;
   readonly onPlay: () => void;
   readonly onDailyChallenge: () => void;
   readonly onGameMode: (mode: GameModeId) => void;
@@ -151,112 +152,184 @@ function LandingThemeSwitch({ storage }: { readonly storage: Storage | undefined
   );
 }
 
+function LandingAccount({ control }: { readonly control: HTMLElement }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.append(control);
+    return () => control.remove();
+  }, [control]);
+  return <div className="landing-account" ref={ref} />;
+}
+
+function GameArtwork({ mode }: { readonly mode: "flags" | "map-tap" | "worldsplit" }) {
+  return <div className={`discovery-art discovery-art-${mode}`} aria-hidden="true">
+    {mode === "flags" ? <div className="discovery-flags">
+      <img src="/assets/flags/br.svg" alt="" loading="lazy" width="100" height="68" />
+      <img src="/assets/flags/jp.svg" alt="" loading="lazy" width="100" height="68" />
+      <img src="/assets/flags/za.svg" alt="" loading="lazy" width="100" height="68" />
+      <span>ONE FLAG. ONE COUNTRY.</span>
+    </div> : mode === "map-tap" ? <>
+      <div className="discovery-map-grid" /><span className="discovery-map-road" />
+      <span className="discovery-pin"><MapPin size={34} strokeWidth={1.5} /></span>
+      <span className="discovery-map-label">Somewhere starts here.</span>
+    </> : <>
+      <span className="discovery-split-world"><img src="/assets/landing/atlas-globe.svg" alt="" loading="lazy" width="180" height="180" /></span>
+      <span className="discovery-split-line" /><span className="discovery-score is-first">49.8%</span><span className="discovery-score is-second">50.2%</span>
+    </>}
+  </div>;
+}
+
+const MODE_PREVIEW_PROMPTS: Record<GameModeId, string> = {
+  flags: "Which country flies this flag?",
+  "flag-colors": "Reveal a colour. Name the country.",
+  shapes: "Recognise the outline?",
+  codes: "Which country uses this code?",
+  capitals: "Name the country, given its capital.",
+  "capital-recall": "Name this country’s capital.",
+  "name-all": "How many countries can you name?",
+  "click-country": "Find the country on the map.",
+  "spot-country": "Name the highlighted country.",
+  puzzle: "Put the countries back in place.",
+  "map-tap": "Find the landmark. Place your pin.",
+  worldsplit: "Draw a line. Split the population 50/50.",
+  geoguessr: "Explore a street. Pin your location.",
+  "streetview-country": "Use the street clues to name the country.",
+};
+
+function ModePreviewArtwork({ mode }: { readonly mode: GameModeId }) {
+  if (mode === "flags" || mode === "flag-colors") return <div className={`picker-flag ${mode === "flag-colors" ? "is-partial" : ""}`}><img src="/assets/flags/it.svg" alt="" width="300" height="200" /></div>;
+  if (mode === "shapes" || mode === "puzzle" || mode === "spot-country") return <img className={`picker-outline is-${mode}`} src="/assets/country-shapes/it.svg" alt="" width="260" height="260" />;
+  if (mode === "codes" || mode === "capitals" || mode === "capital-recall") return <span className={`picker-clue ${mode === "codes" ? "is-code" : ""}`}>{mode === "codes" ? "ITA" : mode === "capitals" ? "Rome" : "Italy"}</span>;
+  return <div className={`picker-globe is-${mode}`}>
+    <img src="/assets/landing/atlas-globe.svg" alt="" width="320" height="320" />
+    {mode === "worldsplit" ? <span className="picker-split-line"><span>50</span><span>50</span></span> : null}
+    {mode === "map-tap" || mode === "geoguessr" || mode === "streetview-country" ? <span className="picker-map-pin"><MapPin size={32} strokeWidth={1.5} /></span> : null}
+  </div>;
+}
+
+function LandingGamePicker(options: LandingScreenOptions) {
+  const [group, setGroup] = useState(MODE_GROUPS[0]!);
+  const [mode, setMode] = useState(group.modes[0]!);
+  const resumable = hasResumableSolo(options.storage);
+  const allModes = MODE_GROUPS.flatMap((item) => item.modes);
+  const modeNumber = String(allModes.findIndex((item) => item.id === mode.id) + 1).padStart(2, "0");
+
+  return <section className="landing-hero game-picker" aria-labelledby="landing-title">
+    <div className="mode-picker-menu">
+      <header className="mode-picker-heading"><h1 id="landing-title">Choose a game.</h1><span>{allModes.length} modes</span></header>
+      <div className="mode-picker-tabs" role="group" aria-label="Game categories">
+        {MODE_GROUPS.map((item, index) => <button type="button" key={item.id} aria-pressed={group.id === item.id} onClick={() => { setGroup(item); setMode(item.modes[0]!); }}>
+          {["Clues", "Map", "Street View"][index]}<span>{item.modes.length}</span>
+        </button>)}
+      </div>
+      <div className="mode-picker-options" role="group" aria-label={`${group.name} modes`}>
+        {group.modes.map((item) => { const Icon = item.icon; return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} aria-controls="mode-preview" onClick={() => setMode(item)}>
+          <Icon size={19} strokeWidth={1.5} /><span>{item.title}</span><span className="mode-picker-indicator" aria-hidden="true">{mode.id === item.id ? <Check size={12} /> : null}</span>
+        </button>; })}
+      </div>
+      <div className="mode-picker-shortcuts">
+        <button type="button" onClick={options.onDailyChallenge}><CalendarDays size={16} /> Daily challenge <ArrowUpRight size={14} /></button>
+        {resumable ? <button type="button" onClick={options.onPlay}>Resume game <ArrowRight size={15} /></button> : <button type="button" onClick={options.onMultiplayer}><Users size={16} /> Multiplayer <ArrowUpRight size={14} /></button>}
+      </div>
+    </div>
+    <section className="mode-preview" id="mode-preview" aria-label="Selected game" aria-live="polite">
+      <div className="mode-preview-head"><span>{group.name}</span><span>{modeNumber} / {allModes.length}</span></div>
+      <div className={`mode-preview-art is-${mode.id}`} aria-hidden="true"><ModePreviewArtwork mode={mode.id} /><span className="mode-preview-caption">{isPromptGameModeId(mode.id) ? "Example clue" : "Mode preview"}</span></div>
+      <div className="mode-preview-info"><h2>{mode.title}</h2><p>{MODE_PREVIEW_PROMPTS[mode.id]}</p></div>
+      <button type="button" className="mode-picker-play" data-testid="button-play-selected" onClick={() => routeMode(options, mode.id)}>Play {mode.title}<ArrowRight size={19} /></button>
+    </section>
+  </section>;
+}
+
 function LandingHome(options: LandingScreenOptions) {
   const totalModes = MODE_GROUPS.reduce((total, group) => total + group.modes.length, 0);
   const daily = readDailyStatus(options.storage, options.getAuthUser);
-  const resumable = hasResumableSolo(options.storage);
+  const [filter, setFilter] = useState("all");
+  const groups = MODE_GROUPS.filter((group) => filter === "all" || group.id === filter);
+
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id === "games" || id === "landing-title") document.getElementById(id)?.scrollIntoView({ behavior: "instant", block: "start" });
+  }, []);
 
   return (
     <div className="landing-root">
-      <nav className="landing-topbar">
+      <a className="landing-skip-link" href="#games">Skip to games</a>
+      <nav className="landing-topbar" aria-label="Main navigation">
         <button type="button" onClick={options.onHome} className="brand-lockup compact brand-home-button" aria-label="Go to home page">
-          <img src="/logo.svg" alt="" className="brand-logo" />
-          <span className="brand-name">locato</span>
+          <img src="/logo.svg" alt="" className="brand-logo" width="30" height="30" />
+          <span className="brand-name">locato<span className="brand-period">.</span></span>
         </button>
-        <div className="landing-nav-links" aria-label="Landing page sections">
-          <a href="#games">Games</a>
+        <div className="landing-nav-links">
+          <a href="#games">Explore games</a>
           <button type="button" onClick={options.onDailyChallenge}>Daily challenge</button>
-          <button type="button" onClick={options.onMultiplayer}>Multiplayer</button>
+          <button type="button" onClick={options.onMultiplayer}>With friends <ArrowUpRight size={13} /></button>
         </div>
         <div className="landing-topbar-actions">
           <LandingThemeSwitch storage={options.storage} />
-          <button type="button" className="lp-btn lp-desktop-only" data-testid="button-leaderboard" onClick={options.onLeaderboard}>Leaderboards</button>
-          <button type="button" className="lp-btn lp-btn-primary" data-testid="button-play-now" onClick={options.onPlay}>Play now</button>
+          <LandingAccount control={options.accountControl} />
+          <button type="button" className="lp-btn lp-btn-primary landing-nav-play" data-testid="button-play-now" onClick={options.onPlay}>Let’s play <ArrowUpRight size={15} /></button>
         </div>
       </nav>
 
       <div className="landing-scroll">
-        <section className="landing-hero">
-          <motion.div className="landing-hero-copy" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <p className="landing-eyebrow">The map is the game</p>
-            <h1 className="landing-title">Play your way <span>around the world.</span></h1>
-            <p className="landing-sub">Race flags, rebuild continents, hunt landmarks and draw the line in Worldsplit. Quick geography games built on real maps.</p>
-            <div className="landing-hero-actions">
-              <button type="button" className="lp-btn lp-btn-primary" data-testid="button-play-worldsplit" onClick={() => routeMode(options, "worldsplit")}>
-                Play Worldsplit <ArrowRight size={16} />
-              </button>
-              <button type="button" className="lp-btn" data-testid="button-start-exploring" onClick={options.onPlay}>
-                {resumable ? "Continue last game" : "Start with flags"}
-              </button>
-            </div>
-            <a className="landing-browse-link" href="#games">Browse all {totalModes} games <ArrowRight size={14} /></a>
-            <p className="landing-free">Free to play · No account needed</p>
-          </motion.div>
+        <LandingGamePicker {...options} />
 
-          <motion.div className="landing-globe-stage" initial={{ opacity: 0, scale: .97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.55, delay: 0.08 }} aria-label="Slowly rotating globe previewing Worldsplit">
-            <span className="landing-globe-orbit" aria-hidden="true" />
-            <LandingSatelliteGlobe />
-            <span className="landing-hero-split-line" aria-hidden="true" />
-            <span className="landing-hero-split-score is-a" aria-hidden="true">49.8%</span>
-            <span className="landing-hero-split-score is-b" aria-hidden="true">50.2%</span>
-            <button type="button" className="landing-featured-game" onClick={() => routeMode(options, "worldsplit")}>
-              <span className="landing-featured-kicker"><Split size={14} /> New game</span>
-              <strong>Worldsplit</strong>
-              <span>One line. Two sides. How evenly can you divide the population?</span>
-              <span className="landing-featured-play">Play now <ArrowRight size={14} /></span>
-            </button>
-          </motion.div>
+        <section className="landing-facts" aria-label="Locato at a glance">
+          <span><Globe size={19} strokeWidth={1.4} /><strong>{COUNTRY_COUNT}</strong> countries to discover</span>
+          <span><Shapes size={19} strokeWidth={1.4} /><strong>{totalModes}</strong> ways to play</span>
+          <span><CalendarDays size={19} strokeWidth={1.4} />A fresh challenge <strong>every day</strong></span>
+          <span className="landing-facts-note">Made for curious minds <Sparkles size={16} /></span>
         </section>
 
-        <section className="landing-facts" aria-label="Locato facts">
-          <span><strong>{totalModes}</strong> different game modes</span>
-          <span><strong>{COUNTRY_COUNT}</strong> countries to learn</span>
-          <span><strong>1</strong> new daily challenge</span>
+        <section className="landing-discover" aria-labelledby="discovery-title">
+          <header className="landing-section-head"><div><p className="landing-eyebrow">A GOOD PLACE TO START</p><h2 id="discovery-title">Where to first?</h2></div><a className="landing-text-link" href="#games">Explore all {totalModes} games <ArrowRight size={16} /></a></header>
+          <div className="discovery-grid">
+            {([
+              { id: "flags", label: "THE CLASSIC", title: "A world of flags", desc: "Familiar colours. Surprising answers. How many can you name?", detail: "Quick thinking", number: "01" },
+              { id: "map-tap", label: "TRUST YOUR INSTINCTS", title: "Make your mark", desc: "From capital cities to hidden landmarks. Drop a pin and get closer.", detail: "Explore the globe", number: "02" },
+              { id: "worldsplit", label: "A NEW PERSPECTIVE", title: "Split the world", desc: "One line. Two halves. Can you balance the world’s population?", detail: "A different kind of puzzle", number: "03" },
+            ] as const).map((feature) => <button type="button" className="discovery-card" key={feature.id} data-testid={`featured-${feature.id}`} onClick={() => routeMode(options, feature.id)}>
+              <GameArtwork mode={feature.id} />
+              <div className="discovery-card-copy"><span className="discovery-kicker">{feature.label}<span>{feature.number}</span></span><h3>{feature.title}</h3><p>{feature.desc}</p><span className="discovery-card-foot">{feature.detail}<span className="discovery-arrow"><ArrowUpRight size={19} /></span></span></div>
+            </button>)}
+          </div>
         </section>
 
-        <section className="landing-catalog" id="games">
-          <header className="landing-section-head"><h2>Pick a game and start exploring.</h2><p>Start simple, or turn up the difficulty when you are ready.</p></header>
-          {MODE_GROUPS.map((group, groupIndex) => (
-            <motion.section className="landing-group" key={group.id} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.15 }} transition={{ duration: 0.3, delay: groupIndex * 0.04 }}>
-              <header className="landing-group-head"><h3>{group.name}</h3><p>{group.tagline}</p></header>
-              <div className="landing-mode-list">
-                {group.modes.map((mode, index) => {
-                  const Icon = mode.icon;
-                  return (
-                    <button type="button" className="landing-mode" key={mode.id} data-testid={`card-game-mode-${mode.id}`} onClick={() => routeMode(options, mode.id)}>
-                      <span className="landing-mode-number">{String(index + 1).padStart(2, "0")}</span>
-                      <span className="landing-mode-icon"><Icon size={18} /></span>
-                      <span className="landing-mode-name">{mode.title}{mode.badge ? <small>{mode.badge}</small> : null}</span>
-                      <span className="landing-mode-desc">{mode.desc}</span>
-                      <span className="landing-mode-play">Play <ArrowRight size={14} /></span>
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.section>
-          ))}
+        <section className="landing-catalog" id="games" aria-labelledby="catalog-title" tabIndex={-1}>
+          <header className="landing-section-head"><div><p className="landing-eyebrow">FOLLOW YOUR CURIOSITY</p><h2 id="catalog-title">Your world. Your kind of game.</h2></div><p>A quick brain break or a new personal best.<br />There’s a little adventure for everyone.</p></header>
+          <div className="landing-filters" role="group" aria-label="Filter games">
+            {[{ id: "all", name: "All games", count: totalModes }, ...MODE_GROUPS.map((group) => ({ id: group.id, name: group.name, count: group.modes.length }))].map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.name}<span>{item.count}</span></button>)}
+          </div>
+          <div className="landing-library" aria-live="polite">
+            {groups.map((group) => <section className="landing-group" key={group.id} aria-labelledby={`group-${group.id}`}>
+              <h3 className="landing-group-title" id={`group-${group.id}`}>{group.name}</h3>
+              <div className="landing-mode-list">{group.modes.map((mode) => { const Icon = mode.icon; return <button type="button" className="landing-mode" key={mode.id} data-testid={`card-game-mode-${mode.id}`} onClick={() => routeMode(options, mode.id)}>
+                <span className={`landing-mode-icon is-${group.id}`}><Icon size={21} strokeWidth={1.5} /></span>
+                <span className="landing-mode-copy"><span className="landing-mode-name">{mode.title}{mode.badge ? <small>{mode.badge}</small> : null}</span><span className="landing-mode-desc">{mode.desc}</span></span>
+                <ArrowUpRight className="landing-mode-arrow" size={17} />
+              </button>; })}</div>
+            </section>)}
+          </div>
         </section>
 
         <section className="landing-feature-row">
           <button type="button" className="landing-daily" data-testid="card-daily-challenge" onClick={options.onDailyChallenge}>
-            <span className="landing-daily-head"><CalendarDays size={16} /><strong>Today&apos;s daily challenge</strong><span>{daily.dateLabel}</span></span>
-            <span className="landing-daily-title">Ten questions. One trip around the world.</span>
-            <span className="landing-daily-desc">Everyone gets the same mix of maps, flags, capitals and Street View.</span>
-            <span className="landing-daily-state" data-played={daily.playedScore !== null}>
-              {daily.playedScore !== null ? <><Check size={14} /> Played · {daily.playedScore}/100</> : <>Play today&apos;s challenge <ArrowRight size={14} /></>}
-            </span>
+            <span className="landing-daily-head"><CalendarDays size={18} /><strong>THE DAILY DETOUR</strong><span>{daily.dateLabel}</span></span>
+            <span className="landing-daily-title">A little adventure.<br /><em>Every single day.</em></span>
+            <span className="landing-daily-desc">Ten questions. One shared challenge. A fresh way to see how much of the world you know.</span>
+            <span className="landing-daily-state" data-played={daily.playedScore !== null}>{daily.playedScore !== null ? <><Check size={16} /> View your result · {daily.playedScore}/100</> : <>Take today’s challenge <ArrowUpRight size={18} /></>}</span>
+            <span className="daily-stamp" aria-hidden="true"><Globe size={30} strokeWidth={1} /><span>ONE WORLD<br />ONE CHALLENGE</span></span>
           </button>
-
           <section className="landing-together">
-            <div><span className="landing-online">Play live</span><h2>Play against friends.</h2><p>Create a private room, answer the same questions and see who knows the world best.</p></div>
-            <div className="landing-together-actions">
-              <button type="button" className="lp-btn" data-testid="button-hero-multiplayer" onClick={options.onMultiplayer}><Users size={15} /> Create a room</button>
-              <button type="button" className="lp-btn lp-btn-ghost" data-testid="button-hero-leaderboard" onClick={options.onLeaderboard}><Trophy size={15} /> Leaderboards</button>
-            </div>
+            <div className="together-icon" aria-hidden="true"><Users size={25} strokeWidth={1.3} /></div>
+            <span className="landing-eyebrow">GOOD COMPANY. FRIENDLY COMPETITION.</span><h2>Better with<br /><em>a little rivalry.</em></h2>
+            <p>Same world. Same questions. Find out which of your friends really knows their way around.</p>
+            <div className="landing-together-actions"><button type="button" className="lp-btn lp-btn-primary" data-testid="button-hero-multiplayer" onClick={options.onMultiplayer}>Play with friends <ArrowUpRight size={17} /></button><button type="button" className="landing-text-link" data-testid="button-hero-leaderboard" onClick={options.onLeaderboard}>Leaderboards <Trophy size={16} /></button></div>
           </section>
         </section>
 
-        <footer className="landing-footer"><span className="brand-name">locato</span><span>{COUNTRY_COUNT} countries · {totalModes} games · one world</span></footer>
+        <footer className="landing-footer"><div><span className="brand-name">locato<span className="brand-period">.</span></span><span>A little closer to everywhere.</span></div><span>Made for the joy of knowing.</span><a href="#landing-title" className="landing-text-link">Back to the top ↑</a></footer>
       </div>
     </div>
   );

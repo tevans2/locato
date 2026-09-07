@@ -55,10 +55,11 @@ const OPACITY_COUNTRY_LINE = 0.34;
 const OPACITY_GUESSED_LINE = 0.9;
 const OPACITY_MISSED_LINE = 0.9;
 const OPACITY_TARGET_LINE = 0.96;
-const TEXTURE_WIDTH = 8192;
-const TEXTURE_HEIGHT = 4096;
+// Country outlines are vector geometry; a 4K fill texture avoids a 128 MB upload on each answer.
+const TEXTURE_WIDTH = 4096;
+const TEXTURE_HEIGHT = 2048;
 
-const GLOBE_DEFAULT_CAMERA_Z = 5.05;
+const GLOBE_DEFAULT_CAMERA_Z = 6.2;
 const GLOBE_MIN_CAMERA_Z = 2.34;
 const GLOBE_MAX_CAMERA_Z = 7.2;
 const WHEEL_ZOOM_SENSITIVITY = 0.0017;
@@ -293,13 +294,14 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   label.hidden = true;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.domElement.className = "world-globe-canvas";
   element.append(renderer.domElement, label);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(0, 0.12, GLOBE_DEFAULT_CAMERA_Z);
+  let fittedCameraZ = GLOBE_DEFAULT_CAMERA_Z;
 
   const root = new THREE.Group();
   root.rotation.y = -0.35;
@@ -356,6 +358,9 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   function applyGlobeShadingForTheme(): void {
     const material = globe.material as THREE.MeshStandardMaterial;
     const isDark = currentTheme() === "dark";
+    // Suppress diffuse light when the texture is emitted directly; otherwise the
+    // white base adds to the map colours and washes out the light-theme ocean.
+    material.color.set(isDark ? 0xffffff : 0x000000);
     material.map = isDark ? globeTexture : null;
     material.emissiveMap = isDark ? null : globeTexture;
     material.emissive.set(isDark ? 0x000000 : 0xffffff);
@@ -366,6 +371,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
 
   const countryObjects: GlobeCountryObject[] = [];
   const pickables: THREE.Object3D[] = [];
+  const outlineGeometries: THREE.BufferGeometry[] = [];
   const raycaster = new THREE.Raycaster();
   raycaster.params.Line = { threshold: 0.035 };
   const pointer = new THREE.Vector2();
@@ -400,6 +406,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
       const outerRing = polygon[0];
       if (!outerRing || outerRing.length < 2) continue;
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ringToPoints(outerRing)), lineMaterial);
+      outlineGeometries.push(line.geometry);
       line.userData.countryId = country.id;
       root.add(line);
       pickables.push(line);
@@ -414,20 +421,32 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     const height = Math.max(1, Math.floor(rect.height));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
+    const nextFit = GLOBE_DEFAULT_CAMERA_Z / Math.min(1, camera.aspect);
+    camera.position.z *= nextFit / fittedCameraZ;
+    fittedCameraZ = nextFit;
     camera.updateProjectionMatrix();
+    requestRender();
   }
 
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(element);
 
-  function render(): void {
-    frameId = window.requestAnimationFrame(render);
-    applyMarkerDisplayScales();
-    renderer.render(scene, camera);
+  // The globe has no idle animation. Coalesce input into a single frame and
+  // leave the GPU idle while the player thinks or uses the flat map.
+  function requestRender(): void {
+    if (frameId !== null) return;
+    frameId = window.requestAnimationFrame(() => {
+      frameId = null;
+      if (document.hidden || element.getBoundingClientRect().width === 0) return;
+      root.updateMatrixWorld(true);
+      applyMarkerDisplayScales();
+      renderer.render(scene, camera);
+    });
   }
+  document.addEventListener("visibilitychange", requestRender);
 
   function clampCameraZoom(cameraZ: number): number {
-    return THREE.MathUtils.clamp(cameraZ, GLOBE_MIN_CAMERA_Z, GLOBE_MAX_CAMERA_Z);
+    return THREE.MathUtils.clamp(cameraZ, GLOBE_MIN_CAMERA_Z, Math.max(GLOBE_MAX_CAMERA_Z, fittedCameraZ * 1.15));
   }
 
   function dragRotationScale(): number {
@@ -453,7 +472,10 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(pickables, false)[0]?.object;
+    const surface = raycaster.intersectObject(globe, false)[0];
+    if (!surface) return null;
+    // Do not select an outline on the far side of the globe through an ocean.
+    const hit = raycaster.intersectObjects(pickables, false).find((item) => item.distance <= surface.distance + 0.08)?.object;
     const countryId = Number(hit?.userData.countryId);
     if (Number.isInteger(countryId)) return countryId;
 
@@ -461,6 +483,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     let nearestDistance = 32;
     for (const countryObject of countryObjects) {
       countryObject.marker.getWorldPosition(projectedMarkerPosition);
+      if (projectedMarkerPosition.dot(camera.position) <= projectedMarkerPosition.lengthSq()) continue;
       projectedMarkerPosition.project(camera);
       if (projectedMarkerPosition.z < -1 || projectedMarkerPosition.z > 1) continue;
 
@@ -491,6 +514,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     if (pinchDistance === null) return;
     const currentDistance = Math.max(1, globeTouchDistance());
     camera.position.z = clampCameraZoom(pinchCameraZ * (pinchDistance / currentDistance));
+    requestRender();
   }
 
   renderer.domElement.addEventListener("wheel", (event) => {
@@ -498,6 +522,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     if (factor === null) return;
     event.preventDefault();
     camera.position.z = clampCameraZoom(camera.position.z * factor);
+    requestRender();
   }, { passive: false });
 
   renderer.domElement.addEventListener("pointerdown", (event) => {
@@ -543,6 +568,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     root.rotation.x = THREE.MathUtils.clamp(root.rotation.x + deltaY * DRAG_ROTATION_X * rotationScale, -0.95, 0.95);
     lastX = event.clientX;
     lastY = event.clientY;
+    requestRender();
   });
 
   function finishPointer(event: PointerEvent): void {
@@ -577,7 +603,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
   renderer.domElement.addEventListener("pointercancel", finishPointer);
 
   resize();
-  render();
+  requestRender();
 
   let currentState: GlobeMapState | null = null;
 
@@ -600,6 +626,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     applyLightingForTheme();
     applyGlobeShadingForTheme();
     applyThemePalette();
+    requestRender();
   }
 
   function update(state: GlobeMapState): void {
@@ -620,6 +647,7 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
       countryObject.markerScale = isMissed || isTarget ? 1.2 : isShownMissing ? 0.7 : 0.5;
       applyMarkerDisplayScale(countryObject);
     }
+    requestRender();
   }
 
   return {
@@ -627,12 +655,15 @@ export function createGlobeMapView(features: readonly WorldCountryFeature[], cou
     showCountryLabel,
     resetView: () => {
       root.rotation.set(0, -0.35, 0);
-      camera.position.z = GLOBE_DEFAULT_CAMERA_Z;
+      camera.position.z = fittedCameraZ;
+      requestRender();
     },
     destroy: () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId);
       window.removeEventListener(LOCATO_THEME_EVENT, onThemeChange);
       resizeObserver.disconnect();
+      document.removeEventListener("visibilitychange", requestRender);
+      for (const geometry of outlineGeometries) geometry.dispose();
       renderer.dispose();
       globeTexture.dispose();
       for (const object of countryObjects) {

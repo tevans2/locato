@@ -1,0 +1,139 @@
+@font-face { font-family: "Manrope Variable"; font-style: normal; font-weight: 200 800; font-display: swap; src: url('@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: "Fraunces Variable"; font-style: normal; font-weight: 100 900; font-display: swap; src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: "Fraunces Variable"; font-style: italic; font-weight: 100 900; font-display: swap; src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-italic.woff2') format('woff2'); }
+
+/* Shared application primitives. Mode-specific geometry remains in each mode's CSS. */
+body { background: var(--bg); }
+:root { accent-color: var(--brand); }
+button,input,select,textarea { font-family: var(--font-sans); }
+button,a,input,select,summary { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+::selection { color: var(--text); background: var(--accent-soft); }
+select { color-scheme: inherit; }
+button { touch-action: manipulation; }
+button:disabled { cursor: not-allowed; }
+:root[data-theme="dark"] .brand-logo { filter: invert(1); }
+:root body:not(:has(.landing-screen-shell)) .app-shell { width: min(1560px, calc(100% - 48px)); padding-block: 20px; }
+:root body:not(:has(.landing-screen-shell)) :is(button,input,select) { border-radius: var(--radius-sm); }
+:root body:not(:has(.landing-screen-shell)) .primary-action,
+:root body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action,
+.auth-panel .primary-action { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+:root body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled),
+:root body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action:hover:not(:disabled),
+.auth-panel .primary-action:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-hover); color: var(--on-brand); }
+:root body:not(:has(.landing-screen-shell)) .game-header { min-height: 65px; flex-wrap: wrap; row-gap: 10px; padding: 0 266px 16px 0; margin-bottom: 22px; border-color: var(--border); }
+:root body:not(:has(.landing-screen-shell)) .game-header-left { gap: 22px; }
+:root body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary { border: 1px solid var(--border); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--surface); }
+.game-mode-switch-action { color: var(--brand); }
+.global-controls { position: fixed; z-index: 111; top: 22px; right: max(24px, calc((100vw - 1560px) / 2)); display: flex; align-items: center; gap: 4px; padding: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; }
+:root body:not(:has(.landing-screen-shell)) .global-controls > button { position: static; inset: auto; width: auto; min-height: 38px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; box-shadow: none; font-size: .69rem; backdrop-filter: none; }
+:root body:not(:has(.landing-screen-shell)) .global-controls > button:hover { color: var(--text); background: var(--surface-soft); }
+:root body:not(:has(.landing-screen-shell)) .global-controls > .auth-trigger { border-left: 1px solid var(--border); padding-inline: 13px; }
+:root body:not(:has(.landing-screen-shell)) .global-controls .auth-trigger-label { font-size: .73rem; }
+:root body:not(:has(.landing-screen-shell)) .game-header .nav-action { color: var(--muted); border-radius: 6px; font-size: .73rem; }
+:root body:not(:has(.landing-screen-shell)) .game-header .nav-action + .nav-action { border-left: 0; }
+:root body:not(:has(.landing-screen-shell)) .game-header .nav-action:hover { background: var(--surface-soft); color: var(--text); }
+.flag-slot,.world-map-panel,.world-globe-panel,.puzzle-board-shell,.streetview-stage,.maptap-map-panel,.maptap-globe,.geoguessr-map,.worldsplit-map-shell { border-radius: 14px; border-color: var(--border); box-shadow: 0 10px 25px #1d362c09; }
+.flag-slot { background: radial-gradient(ellipse at 50% 38%,var(--surface),var(--surface-soft)); }
+:root[data-theme="dark"] .flag-slot { background: radial-gradient(ellipse at 50% 38%,var(--surface-soft),var(--surface)); }
+.answer-panel,.country-guess-panel { border-left: 0; padding: 20px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.panel-title { padding-bottom: 13px; border-bottom: 1px solid var(--border); }
+.panel-title h2 { font-family: var(--font-editorial); font-weight: 480; font-size: 1.75rem; }
+.input-row input { border-radius: 8px; min-height: 52px; }
+.guess-form label,.stat-label { color: var(--muted); }
+.progress-track { height: 5px; background: var(--surface-soft); border-radius: 99px; }
+.progress-fill { background: var(--brand); border-radius: inherit; }
+.category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu:has(.game-mode-group),.action-menu-panel { border-radius: 12px; border-color: var(--border); box-shadow: var(--shadow); }
+:root :is(.world-map-country-label,.world-map-control-button,.maptap-info-card,.hint-popover,.achievement-panel,.map-review-panel,.country-click-prompt) { border-radius: 9px; }
+:root[data-theme="dark"] .world-map-country-label { color: var(--text); }
+.multiplayer-setup { border-radius: 16px; border-color: var(--border); box-shadow: var(--shadow-panel); }
+.multiplayer-setup h1 { font-family: var(--font-editorial); font-weight: 450; letter-spacing: -.045em; line-height: 1.05; }
+.multiplayer-form-heading { border-bottom: 1px solid var(--border); }
+.multiplayer-form-heading strong { font-family: var(--font-editorial); font-size: 1.7rem; font-weight: 500; }
+.multiplayer-card,.lobby-panel,.stats-card,.stats-hero-card,.friend-section,.friend-profile-panel { border-color: var(--border); border-radius: 12px; }
+.stats-header h1,.friends-header h1 { font-family: var(--font-editorial); font-weight: 460; letter-spacing: -.04em; }
+.stats-header,.friends-header { min-height: 65px; padding-right: 250px; flex-wrap: wrap; gap: 16px; }
+.screen-header-actions { flex-wrap: wrap; }
+.stats-hero-card.is-highlight .stats-hero-value,.room-code { color: var(--brand); }
+:root .auth-panel { top: 76px; right: max(20px, calc((100vw - 1320px) / 2)); z-index: 200; padding: 25px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); backdrop-filter: none; }
+.auth-title { font-family: var(--font-editorial); font-size: 1.8rem; font-weight: 450; }
+.auth-panel :is(input,button) { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--bg-elevated); }
+.auth-panel button { font-weight: 650; cursor: pointer; }
+.auth-panel button:hover { background: var(--surface-soft); }
+.auth-panel .auth-mode-tab.is-active { background: var(--accent-soft); }
+.auth-panel .auth-close { width: 35px; min-height: 35px; padding: 0; }
+.loading-screen { align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 70px 24px; }
+.loading-screen h1 { font-family: var(--font-editorial); font-weight: 450; font-size: clamp(2rem,5vw,3rem); }
+.loading-screen p { max-width: 450px; margin: 0; color: var(--muted); }
+.loading-screen .loading-mark { width: 48px; height: 48px; border: 1px solid var(--border); border-top: 2px solid var(--brand); border-radius: 50%; animation: loading-turn 1s linear infinite; }
+.loading-screen.is-error .loading-mark { display: none; }
+:root body:not(:has(.landing-screen-shell)) .loading-screen button { width: auto; min-height: 44px; }
+@keyframes loading-turn { to { transform: rotate(360deg); } }
+@media(max-width: 1100px) { :root body:not(:has(.landing-screen-shell)) .game-header { padding-right: 254px; }.answer-panel,.country-guess-panel { padding: 17px; } }
+@media(max-width: 900px) { .answer-panel,.country-guess-panel { border-top: 1px solid var(--border); }.play-layout,.country-guess-layout { overscroll-behavior: contain; } }
+@media(max-width: 700px) {
+  :root body:not(:has(.landing-screen-shell)) .app-shell { width: calc(100% - 24px); padding-block: 12px; }
+  .global-controls { top: 10px; right: 12px; gap: 1px; padding: 1px; }
+  :root body:not(:has(.landing-screen-shell)) .global-controls > button { min-height: 34px; padding-inline: 7px; font-size: .6rem; }
+  :root body:not(:has(.landing-screen-shell)) .global-controls > .auth-trigger { padding-inline: 9px; }
+  :root body:not(:has(.landing-screen-shell)) .game-header { padding: 44px 0 10px; min-height: 96px; margin-bottom: 12px; }
+  :root body:not(:has(.landing-screen-shell)) .game-header-left { width: 100%; gap: 10px; }
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown { width: min(280px,calc(100vw - 110px)); }
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary { min-height: 42px; }
+  :root body:not(:has(.landing-screen-shell)) .game-header .mobile-menu { align-self: center; }
+  .stats-header,.friends-header { padding-top: 44px; padding-right: 0; }
+  .screen-header-actions { width: 100%; justify-content: flex-start; gap: 4px; }
+  :root body:not(:has(.landing-screen-shell)) .screen-header-actions > button { width: auto; min-height: 38px; padding-inline: 10px; font-size: .72rem; }
+  .answer-panel,.country-guess-panel { padding: 15px; }
+  .flag-slot,.world-map-panel,.world-globe-panel,.puzzle-board-shell,.streetview-stage,.maptap-map-panel { border-radius: 10px; }
+  :root .auth-panel { top: 60px; right: 12px; width: calc(100vw - 24px); padding: 20px; max-height: calc(100dvh - 76px); }
+  .multiplayer-header .game-header-actions { top: 52px; right: 0; }
+}
+@media(prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+.globe-host > .world-globe-panel { width: 100%; height: 100%; min-height: 0; border: 0; box-shadow: none; }
+/* Keep the answer, hints and progress visible together at laptop heights. */
+.answer-panel .solo-timer-stats { grid-template-columns: repeat(3,minmax(0,1fr)); margin-bottom: 0; gap: 0 10px; }
+.answer-panel .solo-timer-stats .country-guess-mode-card { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 6px 0; }
+.answer-panel .solo-timer-stats .stat-card { min-height: 43px; padding: 7px 0; }
+.answer-panel .solo-timer-stats .country-guess-mode-card select { width: 118px; min-height: 32px; }
+@media(min-width: 901px) and (max-height: 800px) {
+  .answer-panel { gap: 11px; padding: 16px 19px; }
+  .answer-panel .panel-title { padding-bottom: 10px; }
+  .answer-panel .panel-title h2 { font-size: 1.6rem; }
+  .answer-panel .stats-panel .stat-card { min-height: 43px; padding-block: 7px; }
+  .answer-panel .stat-label { font-size: .58rem; }
+  .answer-panel .solo-action-grid button,.answer-panel .solo-action-grid .atlas-open { min-height: 36px; font-size: .74rem; }
+}
+@media(max-width: 700px) {
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-header-left { padding-right: 72px; }
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown { flex: 1 1 auto; min-width: 0; width: auto; max-width: none; }
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-header-actions { top: 44px; right: 0; width: 62px; padding: 0; }
+  :root body:not(:has(.landing-screen-shell)) .game-header .mobile-nav-trigger { width: 62px; min-height: 42px; border: 1px solid var(--border); background: var(--surface); }
+  :root body:not(:has(.landing-screen-shell)) .global-controls > .auth-trigger { display: inline-flex; }
+  :root .mobile-nav-sheet:not([hidden]) { top: 58px; border-radius: 13px; color: var(--text); background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); backdrop-filter: none; }
+  :root body:not(:has(.landing-screen-shell)) .multiplayer-header .game-header-left { padding-right: 82px; }
+}
+.worldsplit-panel { border-radius: 14px; border-color: var(--border); padding: 24px; }
+.worldsplit-panel-title h1 { font-family: var(--font-editorial); font-weight: 450; font-size: 2.2rem; line-height: 1.08; }
+.worldsplit-eyebrow { color: var(--brand); font-size: .62rem; }
+.worldsplit-panel-title { padding-bottom: 15px; }
+.worldsplit-status { min-height: 0; margin: 15px 0; }
+.worldsplit-side-card { border-radius: 8px; padding: 11px; }
+.worldsplit-map-hint { border-radius: 10px; }
+.worldsplit-side-population { min-height: 0; }
+.worldsplit-data-note { color: var(--muted); }
+.maptap-sidebar .panel-title strong { font-family: var(--font-editorial); font-weight: 470; letter-spacing: -.025em; line-height: 1.1; }
+.maptap-sidebar .panel-title .eyebrow { color: var(--brand); }
+.geoguessr-loading,.geoguessr-map-dock,.geoguessr-google-map-status { color: var(--text); background: var(--surface); }
+.geoguessr-map-dock { border-color: var(--border); box-shadow: var(--shadow); backdrop-filter: none; }
+.geoguessr-result-score,.geoguessr-final-score { color: var(--brand); }
+.streetview-missing-key { color: var(--text); background: var(--surface); align-content: center; justify-items: center; gap: 15px; padding: 28px; text-align: center; }
+.streetview-missing-key strong { font-family: var(--font-editorial); font-weight: 450; font-size: clamp(1.7rem,4vw,2.7rem); }
+.streetview-missing-key p { max-width: 400px; margin: 0; color: var(--muted); line-height: 1.7; }
+:root body:not(:has(.landing-screen-shell)) .streetview-missing-key button { width: auto; min-height: 45px; }
+@media(max-width: 700px) {
+  :root body:not(:has(.landing-screen-shell)) .game-header .game-header-actions { display: block; }
+  :root body:not(:has(.landing-screen-shell)) .mobile-nav-close { flex: 0 0 40px; width: 40px; min-width: 40px; min-height: 40px; padding: 0; }
+}
+.round-kicker,.prompt-text { color: var(--brand); }
