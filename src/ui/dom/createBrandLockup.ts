@@ -3,7 +3,7 @@ import { el } from "./createElement";
 export function createBrandLockup(onHome?: () => void): HTMLElement {
   const children = [
     el("img", { className: "brand-logo", attrs: { src: "/logo.svg", alt: "" } }),
-    el("span", { className: "brand-name", text: "locato" }),
+    el("span", { className: "brand-name", children: [document.createTextNode("locato"), el("span", { className: "brand-period", text: "." })] }),
   ];
 
   if (!onHome) {

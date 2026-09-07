@@ -8,13 +8,11 @@ import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResu
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
-import { createCountryGuessingScreen, type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
-import { createStreetViewCountryScreen } from "../ui/screens/StreetViewCountryScreen";
+import { type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { findMapTapLocation } from "../core/maptap/locations";
 import { streetViewCountryRounds } from "../core/streetview";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
-import { createSoloGameScreen } from "../ui/screens/SoloGameScreen";
 import { createStatsScreen } from "../ui/screens/StatsScreen";
 import { createFriendsScreen } from "../ui/screens/FriendsScreen";
 import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClient";
@@ -22,10 +20,9 @@ import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
-import { createMultiplayerLobbyScreen } from "../ui/screens/MultiplayerLobbyScreen";
 import { createThemeToggle } from "../ui/theme";
 import { createSoundToggle } from "../ui/dom/sfx";
-import type { AppRoute, Screen } from "./router";
+import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
 
 export interface AppOptions {
   readonly root: HTMLElement;
@@ -53,15 +50,6 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
   return createWebSocketMultiplayerTransport(resolveDefaultWebSocketUrl(window.location));
 }
 
-function routeFromLocation(location: Pick<Location, "search">): AppRoute | null {
-  const params = new URLSearchParams(location.search);
-  const room = params.get("room")?.trim();
-  if (room) return { type: "multiplayer", joinCode: room };
-  const friend = params.get("friend")?.trim();
-  if (friend) return { type: "friends", username: friend };
-  return null;
-}
-
 interface NavigateOptions {
   /** Push a browser history entry (default). Pass false when rendering an existing entry (popstate/start). */
   readonly push?: boolean;
@@ -70,12 +58,6 @@ interface NavigateOptions {
 interface HistoryState {
   readonly route: AppRoute;
   readonly idx: number;
-}
-
-function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathname">): string {
-  if (route.type === "multiplayer" && route.joinCode) return `${location.pathname}?room=${encodeURIComponent(route.joinCode)}`;
-  if (route.type === "friends" && route.username) return `${location.pathname}?friend=${encodeURIComponent(route.username)}`;
-  return location.pathname;
 }
 
 export function createApp(options: AppOptions): App {
@@ -106,6 +88,8 @@ export function createApp(options: AppOptions): App {
   const themeToggle = createThemeToggle(options.storage);
   const soundToggle = createSoundToggle();
 
+  const globalControls = el("div", { className: "global-controls", attrs: { "aria-label": "Account and preferences" }, children: [soundToggle, themeToggle, authControls.trigger] });
+
   // Every navigation is mirrored into the browser history (the state carries the
   // route), so the browser back/forward buttons move through the app, and in-app
   // "Back" buttons can simply pop the real history.
@@ -129,7 +113,8 @@ export function createApp(options: AppOptions): App {
   }
 
   function attachGlobalControls(): void {
-    options.root.append(landingButton, themeToggle, soundToggle, authControls.trigger, authControls.panel);
+    globalControls.append(soundToggle, themeToggle, authControls.trigger);
+    options.root.append(landingButton, globalControls, authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
@@ -178,7 +163,8 @@ export function createApp(options: AppOptions): App {
   function mount(screen: Screen, showGlobalControls = true): void {
     activeScreen?.destroy();
     activeScreen = screen;
-    options.root.replaceChildren(screen.element);
+    options.root.replaceChildren(screen.element, authControls.panel);
+    options.root.scrollTop = 0;
     if (showGlobalControls) attachGlobalControls();
   }
 
@@ -199,7 +185,7 @@ export function createApp(options: AppOptions): App {
         onHome: () => navigate({ type: "landing" }),
         onBackToSolo: () => {
           const save = readSoloSave(options.storage);
-          startSolo(save?.categoryIds ?? DEFAULT_CATEGORY_IDS, save !== null);
+          navigate({ type: "solo-game", categoryIds: save?.categoryIds ?? DEFAULT_CATEGORY_IDS, continueSaved: save !== null });
         },
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -207,12 +193,22 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startSolo(categoryIds: readonly string[], continueSaved = false): Promise<void> {
+  async function startSolo(categoryIds: readonly string[] | undefined, continueSaved = false): Promise<void> {
     const run = navigationRun;
-    const resolved = resolveCategoryIds(categoryIds);
-    const save = continueSaved ? readSoloSave(options.storage) : null;
+    mount(createLoadingScreen("Preparing your game…"));
+    const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
+    if (run !== navigationRun) return;
+    const resolved = resolveCategoryIds(categoryIds ?? DEFAULT_CATEGORY_IDS);
+    const candidate = continueSaved ? readSoloSave(options.storage) : null;
+    const matchesMode = !categoryIds || (candidate?.categoryIds.length === resolved.length && resolved.every((id) => candidate.categoryIds.includes(id)));
+    const save = candidate && matchesMode && (candidate.status ?? (candidate.currentCountryCode === null ? "complete" : "playing")) !== "complete" ? candidate : null;
     const initialState = save ? hydrateGameState(options.countryIndex, save) : null;
     const activeCategories = initialState ? initialState.categoryIds : resolved;
+    if (initialState) {
+      const current = historyState();
+      const resumedRoute: AppRoute = { type: "solo-game", categoryIds: activeCategories, continueSaved: true };
+      window.history.replaceState({ route: resumedRoute, idx: current?.idx ?? 0 } satisfies HistoryState, "", buildRouteUrl(resumedRoute, window.location));
+    }
     let worldCountryFeatures: readonly WorldCountryFeature[] | undefined;
 
     if (activeCategories.includes("capital-recall")) {
@@ -223,7 +219,7 @@ export function createApp(options: AppOptions): App {
         worldCountryFeatures = await loadWorldCountryFeatures();
       } catch (error) {
         if (run !== navigationRun) return;
-        loading.element.textContent = error instanceof Error ? error.message : "Unable to load capital map data.";
+        showLoadError(error);
         return;
       }
 
@@ -268,6 +264,9 @@ export function createApp(options: AppOptions): App {
 
   async function startDailyChallenge(): Promise<void> {
     const run = navigationRun;
+    mount(createLoadingScreen("Preparing the daily challenge…"));
+    const [{ createSoloGameScreen }, { createStreetViewCountryScreen }] = await Promise.all([import("../ui/screens/SoloGameScreen"), import("../ui/screens/StreetViewCountryScreen")]);
+    if (run !== navigationRun) return;
     const challenge = createDailyChallenge(options.countryIndex);
     const activeUser = authControls.getUser();
     const activeUserId = activeUser?.id ?? null;
@@ -306,7 +305,7 @@ export function createApp(options: AppOptions): App {
       worldCountryFeatures = await loadWorldCountryFeatures();
     } catch (error) {
       if (run !== navigationRun) return;
-      activeScreen!.element.textContent = error instanceof Error ? error.message : "Unable to load daily map data.";
+      showLoadError(error);
       return;
     }
     if (run !== navigationRun) return;
@@ -442,7 +441,7 @@ export function createApp(options: AppOptions): App {
             dailyScore += dailyResult.score;
             dailyHintsUsed += dailyResult.hintsUsed;
             for (const mark of dailyResult.marks) addDailyMark(mark);
-            void startDailyMapTapRound();
+            runNavigation(startDailyMapTapRound());
           },
         },
       }),
@@ -481,12 +480,33 @@ export function createApp(options: AppOptions): App {
   function createLoadingScreen(message: string): Screen {
     const element = document.createElement("section");
     element.className = "game-screen loading-screen";
-    element.textContent = message;
+    element.append(
+      el("span", { className: "loading-mark", attrs: { "aria-hidden": "true" } }),
+      el("h1", { text: "A little adventure awaits." }),
+      el("p", { text: message, attrs: { role: "status" } }),
+      el("button", { className: "ghost-action", text: "Back to home", attrs: { type: "button" }, on: { click: () => navigate({ type: "landing" }) } }),
+    );
 
     return {
       element,
       destroy: () => undefined,
     };
+  }
+
+  function showLoadError(error: unknown): void {
+    const route = historyState()?.route ?? { type: "landing" };
+    console.error("Unable to open game screen", error);
+    const screen = createLoadingScreen("Please check your connection and try again.");
+    screen.element.classList.add("is-error");
+    screen.element.querySelector("h1")!.textContent = "We couldn’t open that adventure.";
+    screen.element.querySelector("p")!.setAttribute("role", "alert");
+    screen.element.append(el("button", { className: "primary-action", text: "Try again", attrs: { type: "button" }, on: { click: () => navigate(route, { push: false }) } }));
+    mount(screen);
+  }
+
+  function runNavigation(task: Promise<unknown>): void {
+    const run = navigationRun;
+    void task.catch((error: unknown) => { if (run === navigationRun) showLoadError(error); });
   }
 
   async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all"): Promise<void> {
@@ -495,7 +515,7 @@ export function createApp(options: AppOptions): App {
     mount(loading);
 
     try {
-      const worldCountryFeatures = await loadWorldCountryFeatures();
+      const [worldCountryFeatures, { createCountryGuessingScreen }] = await Promise.all([loadWorldCountryFeatures(), import("../ui/screens/CountryGuessingScreen")]);
 
       if (run !== navigationRun) {
         return;
@@ -524,11 +544,15 @@ export function createApp(options: AppOptions): App {
         return;
       }
 
-      loading.element.textContent = error instanceof Error ? error.message : "Unable to load world map data.";
+      showLoadError(error);
     }
   }
 
-  function startStreetViewCountry(): void {
+  async function startStreetViewCountry(): Promise<void> {
+    const run = navigationRun;
+    mount(createLoadingScreen("Finding a street to explore…"));
+    const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
+    if (run !== navigationRun) return;
     mount(
       createStreetViewCountryScreen({
         countryIndex: options.countryIndex,
@@ -600,7 +624,7 @@ export function createApp(options: AppOptions): App {
       );
     } catch (error) {
       if (run !== navigationRun) return;
-      loading.element.textContent = error instanceof Error ? error.message : "Unable to load Worldsplit.";
+      showLoadError(error);
     }
   }
 
@@ -614,12 +638,14 @@ export function createApp(options: AppOptions): App {
       worldCountryFeatures = await loadWorldCountryFeatures();
     } catch (error) {
       if (run !== navigationRun) return;
-      loading.element.textContent = error instanceof Error ? error.message : "Unable to load multiplayer map data.";
+      showLoadError(error);
       return;
     }
 
     if (run !== navigationRun) return;
 
+    const { createMultiplayerLobbyScreen } = await import("../ui/screens/MultiplayerLobbyScreen");
+    if (run !== navigationRun) return;
     mount(
       createMultiplayerLobbyScreen({
         countryIndex: options.countryIndex,
@@ -651,10 +677,10 @@ export function createApp(options: AppOptions): App {
   function navigate(route: AppRoute, navigateOptions?: NavigateOptions): void {
     navigationRun += 1;
     if (navigateOptions?.push !== false) pushRoute(route);
-
     if (route.type === "landing") {
       mount(
         createLandingScreen({
+          accountControl: authControls.trigger,
           onHome: () => navigate({ type: "landing" }),
           onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
@@ -669,44 +695,47 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "solo-game") {
-      startSolo(route.categoryIds ?? DEFAULT_CATEGORY_IDS, route.continueSaved ?? false);
+      runNavigation(startSolo(route.categoryIds, route.continueSaved ?? false));
       return;
     }
-    // Leaving solo for any other screen ends the current run — record it first.
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
     if (route.type === "daily-challenge") {
-      void startDailyChallenge();
+      runNavigation(startDailyChallenge());
       return;
     }
 
     if (route.type === "country-guessing") {
-      void startCountryGuessing(route.mode ?? "name-all");
+      runNavigation(startCountryGuessing(route.mode ?? "name-all"));
       return;
     }
     if (route.type === "streetview-country") {
-      startStreetViewCountry();
+      runNavigation(startStreetViewCountry());
       return;
     }
     if (route.type === "geoguessr") {
-      void startGeoGuessr();
+      runNavigation(startGeoGuessr());
       return;
     }
     if (route.type === "map-tap") {
-      void startMapTap();
+      runNavigation(startMapTap());
       return;
     }
     if (route.type === "worldsplit") {
-      void startWorldSplit();
+      runNavigation(startWorldSplit());
       return;
     }
     if (route.type === "multiplayer") {
-      void startMultiplayer(route.joinCode);
+      runNavigation(startMultiplayer(route.joinCode));
       return;
     }
     if (route.type === "stats") {
       // Await the record so the just-finished run appears in the freshly fetched stats.
-      void leavingSolo.then(() => mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) })));
+      const run = navigationRun;
+      mount(createLoadingScreen("Gathering your discoveries…"));
+      runNavigation(leavingSolo.then(() => {
+        if (run === navigationRun) mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) }));
+      }));
       return;
     }
 
@@ -753,10 +782,13 @@ export function createApp(options: AppOptions): App {
   return {
     start: () => {
       const initialRoute = routeFromLocation(window.location) ?? { type: "landing" };
-      window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", buildRouteUrl(initialRoute, window.location));
+      const initialHash = initialRoute.type === "landing" && ["#games", "#landing-title"].includes(window.location.hash) ? window.location.hash : "";
+      window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", `${buildRouteUrl(initialRoute, window.location)}${initialHash}`);
       window.addEventListener("popstate", (event) => {
         const state = event.state as Partial<HistoryState> | null;
-        navigate(state?.route ?? { type: "landing" }, { push: false });
+        // Native in-page anchors keep the landing page mounted and preserve scrolling.
+        if (!state?.route && !window.location.search && activeScreen?.element.classList.contains("landing-screen-shell")) return;
+        navigate(state?.route ?? routeFromLocation(window.location) ?? { type: "landing" }, { push: false });
       });
       navigate(initialRoute, { push: false });
     },

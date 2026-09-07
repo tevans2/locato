@@ -182,8 +182,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key",
     children: [
-      el("strong", { text: "Google Maps Embed API key missing" }),
-      el("p", { text: "Add VITE_GOOGLE_MAPS_EMBED_API_KEY to your local .env file, then restart Vite." }),
+      el("strong", { text: "Street View is taking a detour." }),
+      el("p", { text: "This adventure is temporarily unavailable. There’s still a whole world of other games to explore." }),
+      el("button", { className: "primary-action", text: "Explore other games", attrs: { type: "button" }, on: { click: options.onHome } }),
     ],
   });
   const frameNumber = el("strong", { className: "stat-value", text: "1 / 3" });
@@ -682,7 +683,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   bindKeyboardAwareInput(element, input, controller.signal);
 
   render();
-  if (!apiKey) showFeedback(feedback, "Add your Google Maps Embed API key to enable Street View frames.", "neutral");
+  if (!apiKey) showFeedback(feedback, "Street View is unavailable right now. Try another game or use Reveal to continue.", "neutral");
   warmRoundCache();
   queueMicrotask(() => input.focus());
 

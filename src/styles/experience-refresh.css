@@ -832,9 +832,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   background: var(--bg);
 }
 
-:root[data-theme="dark"] .landing-root,
-:root[data-theme="dark"] .landing-facts,
-:root[data-theme="dark"] .lp-btn,
 :root[data-theme="dark"] .category-dropdown-menu,
 :root[data-theme="dark"] .action-menu-panel,
 :root[data-theme="dark"] .multiplayer-setup,
@@ -846,33 +843,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] .auth-panel {
   color: var(--text);
   background: var(--surface);
-}
-
-:root[data-theme="dark"] .lp-btn:hover,
-:root[data-theme="dark"] .landing-mode:hover {
-  background: var(--surface-soft);
-}
-
-:root[data-theme="dark"] .lp-btn-primary,
-:root[data-theme="dark"] .lp-btn-primary:hover,
-:root[data-theme="dark"] .landing-daily {
-  color: #172116;
-  background: var(--accent);
-}
-
-:root[data-theme="dark"] .landing-together {
-  color: #fff;
-  background: #080d0a;
-}
-
-:root[data-theme="dark"] .landing-together .lp-btn {
-  color: var(--text);
-  background: var(--surface);
-}
-
-:root[data-theme="dark"] .landing-together .lp-btn-ghost {
-  color: var(--muted);
-  background: transparent;
 }
 
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) button,

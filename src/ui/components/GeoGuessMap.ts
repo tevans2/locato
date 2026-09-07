@@ -158,7 +158,7 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
   const status = document.createElement("div");
   status.className = "geoguessr-google-map-status";
   status.setAttribute("role", "status");
-  status.textContent = apiKey ? "Loading Google Maps..." : "Google Maps key missing";
+  status.textContent = apiKey ? "Loading Google Maps..." : "The guess map is unavailable.";
   const element = document.createElement("div");
   element.className = "geoguessr-map";
   element.setAttribute("aria-label", "Google world map for placing your location guess");
@@ -252,7 +252,7 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
     });
   } else {
     status.classList.add("is-error");
-    status.textContent = "Add a Google Maps JavaScript API key to use the guess map.";
+    status.textContent = "The guess map is unavailable right now. Please try again later.";
   }
 
   function removeMap(): void {

@@ -1,31 +1,31 @@
 :root {
   color-scheme: light;
-  --bg: #f3f4ed;
-  --bg-elevated: #f8f8f3;
-  --surface: #ffffff;
-  --surface-soft: #edf1e9;
+  --bg: #f8f7f0;
+  --bg-elevated: #fcfbf5;
+  --surface: #fffef9;
+  --surface-soft: #eeefe5;
   --border: rgba(25, 35, 31, 0.14);
   --border-strong: rgba(25, 35, 31, 0.3);
-  --text: #19231f;
-  --muted: #65706a;
+  --text: #253e30;
+  --muted: #687264;
   --subtle: #8a948e;
-  --accent: #8bd23f;
-  --accent-soft: #dff2c9;
-  --earth: #5fa99d;
-  --route: #ef6a45;
+  --accent: #bbcf91;
+  --accent-soft: #e7edda;
+  --earth: #3b7567;
+  --route: #b9734d;
   --good: #5f9728;
   --bad: #c94f35;
   --sea: #c9e0df;
   --land: #f7f5eb;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --shadow: 0 24px 64px rgba(25, 35, 31, 0.14);
   --shadow-panel: 0 12px 34px rgba(25, 35, 31, 0.08);
   --panel-border: rgba(25, 35, 31, 0.2);
   --panel-border-strong: rgba(25, 35, 31, 0.38);
-  --panel-bg: #ffffff;
-  --panel-bg-strong: #ffffff;
+  --panel-bg: var(--surface);
+  --panel-bg-strong: var(--surface);
   --panel-grid:
     linear-gradient(rgba(25, 35, 31, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
     linear-gradient(90deg, rgba(25, 35, 31, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
@@ -35,7 +35,13 @@
   --floating-auth-clearance: 244px;
   /* Width of the fixed top-right strip (auth + theme + sound) that in-flow headers must clear. */
   --floating-controls-clearance: 292px;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Manrope Variable", sans-serif;
+  --font-editorial: "Fraunces Variable", Georgia, serif;
+  --brand: #31583f;
+  --brand-hover: #254731;
+  --on-brand: #fffef2;
+  --focus: #668a3f;
+  --route-soft: #f2e4d7;
   --font-display: var(--font-sans);
   font-family: var(--font-sans);
 
@@ -57,17 +63,22 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1511;
-  --bg-elevated: #141c17;
-  --surface: #19221c;
-  --surface-soft: #222d25;
+  --brand: #c0d49e;
+  --brand-hover: #d0e2b1;
+  --on-brand: #1b3023;
+  --focus: #c0d49e;
+  --route-soft: #3e3226;
+  --bg: #151e18;
+  --bg-elevated: #1c2820;
+  --surface: #1c2820;
+  --surface-soft: #26352a;
   --border: rgba(226, 234, 225, 0.13);
   --border-strong: rgba(226, 234, 225, 0.28);
-  --text: #eef2e9;
-  --muted: #9ca8a0;
+  --text: #efefdd;
+  --muted: #adb9a6;
   --subtle: #748078;
-  --accent: #98d94f;
-  --accent-soft: #273a1e;
+  --accent: #b9d18f;
+  --accent-soft: #2c3e2b;
   /* Dark map palette: preserves the previous always-dark renderer values. */
   --map-ocean-top: #121a10;
   --map-ocean-mid: #0b100b;
@@ -91,8 +102,8 @@
   --shadow-panel: 0 14px 38px rgba(0, 0, 0, 0.24);
   --panel-border: rgba(226, 234, 225, 0.2);
   --panel-border-strong: rgba(226, 234, 225, 0.34);
-  --panel-bg: #19221c;
-  --panel-bg-strong: #202b23;
+  --panel-bg: var(--surface);
+  --panel-bg-strong: var(--surface-soft);
   --panel-grid:
     linear-gradient(rgba(232, 240, 231, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
     linear-gradient(90deg, rgba(232, 240, 231, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
