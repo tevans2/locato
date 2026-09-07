@@ -94,8 +94,7 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
   });
   const missingKey = el("div", { className: "streetview-missing-key geoguessr-missing-key", children: [el("strong", { text: "Google Maps Embed API key missing" }), el("p", { text: "Set VITE_GOOGLE_MAPS_EMBED_API_KEY to play this room." })] });
   const statusText = el("span", { className: "geoguessr-mp-status", text: "Waiting for the round..." });
-  const pinStatus = el("span", { className: "geoguessr-pin-status", text: "Place a pin on the map" });
-  const submitButton = el("button", { className: "primary-action geoguessr-submit", text: "Make guess", attrs: { type: "button" } });
+  const submitButton = el("button", { className: "primary-action geoguessr-submit", text: "Place your pin on the map", attrs: { type: "button" } });
   const skipButton = el("button", { className: "ghost-action multiplayer-skip-btn", text: "Skip", attrs: { type: "button" } });
   const resultList = el("ul", { className: "result-list maptap-mp-result-list" });
   const scoreList = el("ol", { className: "score-list geoguessr-mp-score-list" });
@@ -108,14 +107,13 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
     onGuessChange: (point) => {
       if (hasGuessed) return;
       pendingGuess = point;
-      pinStatus.textContent = `${Math.abs(point.lat).toFixed(2)}° ${point.lat >= 0 ? "N" : "S"}, ${Math.abs(point.lng).toFixed(2)}° ${point.lng >= 0 ? "E" : "W"}`;
+      submitButton.textContent = "Make guess";
       submitButton.disabled = false;
     },
   });
   const mapPanel = el("aside", {
-    className: "geoguessr-map-dock geoguessr-mp-map-dock is-open",
+    className: "geoguessr-map-dock geoguessr-mp-map-dock",
     children: [
-      el("div", { className: "geoguessr-map-header", children: [el("div", { children: [el("span", { className: "eyebrow", text: "YOUR GUESS" }), pinStatus] }), roundLabel] }),
       map.element,
       el("div", { className: "geoguessr-map-actions geoguessr-mp-map-actions", children: [submitButton, skipButton] }),
       resultList,
@@ -123,7 +121,10 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
   });
   const scoreboard = el("aside", {
     className: "geoguessr-mp-scoreboard",
-    children: [el("span", { className: "eyebrow", text: "LIVE STANDINGS" }), scoreList],
+    children: [
+      el("div", { className: "geoguessr-mp-scoreboard-heading", children: [el("span", { className: "eyebrow", text: "LIVE STANDINGS" }), roundLabel] }),
+      scoreList,
+    ],
   });
   const element = el("div", {
     className: "multiplayer-geoguessr-layout",
@@ -209,7 +210,7 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
         renderedRevealKey = null;
         pendingGuess = null;
         hasGuessed = false;
-        pinStatus.textContent = "Place a pin on the map";
+        submitButton.textContent = "Place your pin on the map";
         resultList.replaceChildren();
         mapPanel.classList.remove("is-result");
         map.reset();

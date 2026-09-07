@@ -100,30 +100,21 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
   });
   const roundLabel = el("strong", { text: `1 / ${GEOGUESSR_ROUND_LIMIT}` });
   const scoreLabel = el("strong", { text: `0 / ${GEOGUESSR_MAX_GAME_SCORE.toLocaleString()}` });
-  const pinStatus = el("span", { className: "geoguessr-pin-status", text: "Click the map to place your pin" });
-  const submitButton = el("button", { className: "primary-action geoguessr-submit", text: "Make guess", attrs: { type: "button" } });
+  const submitButton = el("button", { className: "primary-action geoguessr-submit", text: "Place your pin on the map", attrs: { type: "button" } });
   const nextButton = el("button", { className: "primary-action", text: "Next round", attrs: { type: "button" } });
-  const mapToggle = el("button", { className: "ghost-action geoguessr-map-toggle", text: "Hide map", attrs: { type: "button", "aria-expanded": "true" } });
   const resultPanel = el("section", { className: "geoguessr-result", attrs: { hidden: "true", "aria-live": "polite" } });
-  const mapDock = el("aside", { className: "geoguessr-map-dock is-open" });
+  const mapDock = el("aside", { className: "geoguessr-map-dock" });
   const map = createGeoGuessMap({
     signal: controller.signal,
     onGuessChange: (point) => {
       if (status !== "playing") return;
       guess = point;
-      pinStatus.textContent = `${Math.abs(point.lat).toFixed(2)}° ${point.lat >= 0 ? "N" : "S"}, ${Math.abs(point.lng).toFixed(2)}° ${point.lng >= 0 ? "E" : "W"}`;
+      submitButton.textContent = "Make guess";
       submitButton.disabled = false;
     },
   });
-  const mapHeader = el("div", {
-    className: "geoguessr-map-header",
-    children: [
-      el("div", { children: [el("span", { className: "eyebrow", text: "YOUR GUESS" }), pinStatus] }),
-      mapToggle,
-    ],
-  });
   const mapActions = el("div", { className: "geoguessr-map-actions", children: [submitButton] });
-  mapDock.append(mapHeader, map.element, mapActions, resultPanel);
+  mapDock.append(map.element, mapActions, resultPanel);
 
   const roundHud = el("div", {
     className: "geoguessr-hud",
@@ -167,7 +158,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
     guess = null;
     resultPanel.hidden = true;
     mapActions.hidden = false;
-    pinStatus.textContent = "Click the map to place your pin";
+    submitButton.textContent = "Place your pin on the map";
     submitButton.disabled = true;
     status = location ? "playing" : "complete";
     map.reset();
@@ -217,9 +208,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
     mapActions.hidden = true;
     map.setAcceptingGuesses(false);
     map.reveal(location, [{ ...guess, label: "Your guess" }]);
-    mapDock.classList.add("is-result", "is-open");
-    mapToggle.textContent = "Hide map";
-    mapToggle.setAttribute("aria-expanded", "true");
+    mapDock.classList.add("is-result");
     updateHud();
     showRoundResult();
     requestAnimationFrame(map.resize);
@@ -229,7 +218,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
     status = "complete";
     streetViewFrame.hidden = true;
     streetViewLoading.hidden = true;
-    mapDock.classList.add("is-result", "is-open");
+    mapDock.classList.add("is-result");
     mapActions.hidden = true;
     resultPanel.hidden = false;
     resultPanel.replaceChildren(
@@ -268,13 +257,6 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions): Screen {
     }
     roundIndex += 1;
     startRound();
-  }, { signal: controller.signal });
-  mapToggle.addEventListener("click", () => {
-    const opening = !mapDock.classList.contains("is-open");
-    mapDock.classList.toggle("is-open", opening);
-    mapToggle.textContent = opening ? "Hide map" : "Open map";
-    mapToggle.setAttribute("aria-expanded", String(opening));
-    if (opening) requestAnimationFrame(map.resize);
   }, { signal: controller.signal });
   dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
   multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });

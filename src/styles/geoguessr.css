@@ -3,9 +3,17 @@
   min-height: 0;
 }
 
-.geoguessr-header {
+body:not(:has(.landing-screen-shell)) .app-shell:has(.geoguessr-screen) {
+  width: calc(100% - 24px);
+  padding-block: 8px;
+}
+
+body:not(:has(.landing-screen-shell)) .geoguessr-screen .geoguessr-header {
   position: relative;
   z-index: 30;
+  min-height: 56px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
 }
 
 .geoguessr-stage {
@@ -13,8 +21,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: 16px;
   background: #080c08;
   box-shadow: var(--shadow-panel);
 }
@@ -86,63 +94,26 @@
 
 .geoguessr-map-dock {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  right: 18px;
+  bottom: 18px;
   z-index: 10;
-  width: min(440px, calc(100% - 28px));
-  height: min(360px, calc(100% - 90px));
+  width: min(500px, calc(100% - 36px));
+  height: min(360px, calc(100% - 36px));
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: hidden;
-  border: 1px solid rgba(241, 234, 220, 0.2);
-  border-radius: 18px;
-  background: rgba(8, 12, 8, 0.9);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(14px);
-  transform: translateY(calc(100% - 58px));
-  transition: width 220ms ease, height 220ms ease, transform 220ms ease;
-}
-
-.geoguessr-map-dock.is-open {
-  transform: translateY(0);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform-origin: bottom right;
+  transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), height 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .geoguessr-map-dock.is-result {
-  width: min(720px, calc(100% - 28px));
-  height: min(480px, calc(100% - 90px));
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.geoguessr-map-header {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.geoguessr-map-header > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.geoguessr-pin-status {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.geoguessr-map-toggle {
-  flex: 0 0 auto;
-  min-height: 34px !important;
-  padding-inline: 11px !important;
-  font-size: 0.78rem;
+  width: min(820px, calc(100% - 36px));
+  height: min(620px, calc(100% - 36px));
 }
 
 .geoguessr-map {
@@ -150,7 +121,10 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
   cursor: crosshair;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.32);
 }
 
 .geoguessr-google-map-canvas {
@@ -190,12 +164,33 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
 }
 
 .geoguessr-map-actions {
-  padding: 10px;
-  border-top: 1px solid var(--border);
+  padding: 0;
+  border: 0;
 }
 
-.geoguessr-submit {
+body:not(:has(.landing-screen-shell)) .geoguessr-screen .geoguessr-map-dock .geoguessr-submit,
+body:not(:has(.landing-screen-shell)) .multiplayer-geoguessr-layout .geoguessr-map-dock .geoguessr-submit {
   width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20, 20, 18, 0.68);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+body:not(:has(.landing-screen-shell)) .geoguessr-screen .geoguessr-map-dock .geoguessr-submit:hover:not(:disabled),
+body:not(:has(.landing-screen-shell)) .multiplayer-geoguessr-layout .geoguessr-map-dock .geoguessr-submit:hover:not(:disabled) {
+  border: 0;
+  color: #172116;
+  background: var(--accent);
 }
 
 .geoguessr-result {
@@ -205,7 +200,12 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
   gap: 16px;
   min-height: 74px;
   padding: 10px 12px 10px 16px;
-  border-top: 1px solid var(--border);
+  border: 0;
+  border-radius: 16px;
+  color: #f1eadc;
+  background: rgba(8, 12, 8, 0.82);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
 }
 
 .geoguessr-result-copy,
@@ -256,6 +256,14 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
   --geoguessr-marker-color: #a4df59;
 }
 
+@media (hover: hover) and (min-width: 701px) {
+  .geoguessr-map-dock:not(.is-result):hover,
+  .geoguessr-map-dock:not(.is-result):has(:focus-visible) {
+    width: min(820px, calc(100% - 36px));
+    height: min(620px, calc(100% - 36px));
+  }
+}
+
 @media (max-width: 700px) {
   .geoguessr-header .game-mode-dropdown {
     max-width: 190px;
@@ -280,11 +288,11 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
     right: 8px;
     bottom: 8px;
     width: calc(100% - 16px);
-    height: min(42dvh, 360px);
+    height: min(46dvh, 390px);
   }
 
   .geoguessr-map-dock.is-result {
-    height: min(52dvh, 430px);
+    height: min(58dvh, 470px);
   }
 
   .geoguessr-hud {
@@ -357,6 +365,19 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
   backdrop-filter: blur(12px);
 }
 
+.geoguessr-mp-scoreboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.geoguessr-mp-scoreboard-heading > strong {
+  color: var(--accent);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 .geoguessr-mp-score-list {
   gap: 5px;
 }
@@ -370,19 +391,14 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
 }
 
 .geoguessr-mp-map-dock {
-  left: 16px;
-  right: auto;
-  width: min(440px, calc(100% - 32px));
+  right: 18px;
+  left: auto;
+  width: min(500px, calc(100% - 36px));
 }
 
 .geoguessr-mp-map-dock.is-result {
-  width: min(720px, calc(100% - 32px));
-  height: min(500px, calc(100% - 32px));
-}
-
-.geoguessr-mp-map-dock .geoguessr-map-header > strong {
-  color: var(--accent);
-  white-space: nowrap;
+  width: min(820px, calc(100% - 36px));
+  height: min(620px, calc(100% - 36px));
 }
 
 .geoguessr-mp-map-actions {
@@ -399,7 +415,11 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
   max-height: 130px;
   overflow: auto;
   padding: 8px;
-  border-top: 1px solid var(--border);
+  border: 0;
+  border-radius: 14px;
+  background: rgba(8, 12, 8, 0.82);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
 }
 
 .geoguessr-mp-map-dock:not(.is-result) > .result-list:empty {
@@ -427,8 +447,8 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
 
   .geoguessr-mp-map-dock,
   .geoguessr-mp-map-dock.is-result {
-    left: 8px;
     right: 8px;
+    left: 8px;
     width: auto;
   }
 }

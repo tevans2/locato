@@ -152,6 +152,7 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
   let resultMarkers: GoogleAdvancedMarker[] = [];
   let resultLines: GooglePolyline[] = [];
   let pendingReveal: { readonly target: LngLatPoint; readonly guesses: readonly GeoGuessMapMarker[] } | null = null;
+  let resizeObserver: ResizeObserver | null = null;
 
   const canvas = document.createElement("div");
   canvas.className = "geoguessr-google-map-canvas";
@@ -243,6 +244,12 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
         selectedMarker = addMarker(point, "geoguessr-marker geoguessr-marker-guess", "Your guess");
         options.onGuessChange(point);
       });
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          if (map && maps) maps.event.trigger(map, "resize");
+        });
+        resizeObserver.observe(element);
+      }
       status.hidden = true;
       if (pendingReveal) applyReveal(pendingReveal.target, pendingReveal.guesses);
     }).catch((error: unknown) => {
@@ -260,6 +267,8 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
     destroyed = true;
     clickListener?.remove();
     clickListener = null;
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     clearMarkersAndLines();
     canvas.replaceChildren();
   }
