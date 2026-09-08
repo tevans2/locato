@@ -113,8 +113,11 @@ export function createApp(options: AppOptions): App {
   }
 
   function attachGlobalControls(): void {
-    globalControls.append(soundToggle, themeToggle, authControls.trigger);
-    options.root.append(landingButton, globalControls, authControls.panel);
+    const gamePreferences = activeScreen?.element.querySelector("[data-game-preferences]");
+    // The immersive game has fixed contrast; the site theme remains available on other screens.
+    globalControls.replaceChildren(soundToggle, ...(gamePreferences ? [] : [themeToggle]), authControls.trigger);
+    (gamePreferences ?? options.root).append(globalControls);
+    options.root.append(landingButton, authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush

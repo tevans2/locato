@@ -18,6 +18,7 @@ import "./styles/experience-refresh.css";
 import "./styles/sfx.css";
 import "./styles/design-system.css";
 import "./styles/landing.css";
+import "./styles/geoguessr-play.css";
 
 const root = document.getElementById("app");
 

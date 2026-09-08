@@ -40,8 +40,8 @@ interface GoogleMapsNamespace {
   readonly Map: new (element: HTMLElement, options: Record<string, unknown>) => GoogleMapInstance;
   readonly LatLngBounds: new () => GoogleLatLngBounds;
   readonly Polyline: new (options: Record<string, unknown>) => GooglePolyline;
-  readonly event: { trigger(instance: GoogleMapInstance, eventName: "resize"): void };
-  readonly importLibrary: (libraryName: "maps" | "marker") => Promise<unknown>;
+  readonly event: { trigger(instance: object, eventName: "resize"): void };
+  readonly importLibrary: (libraryName: "maps" | "marker" | "streetView") => Promise<unknown>;
 }
 
 interface GoogleMarkerLibrary {
@@ -60,9 +60,10 @@ interface GoogleWindow extends Window {
 
 let googleMapsPromise: Promise<GoogleMapsBundle> | null = null;
 
-function googleMapsJavaScriptApiKey(): string {
-  const env = (import.meta as ImportMeta & { readonly env?: { readonly VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY?: string; readonly VITE_GOOGLE_MAPS_EMBED_API_KEY?: string } }).env;
-  return env?.VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY?.trim() || env?.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() || "";
+export function googleMapsJavaScriptApiKey(): string {
+  return import.meta.env.VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY?.trim()
+    || import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim()
+    || "";
 }
 
 async function resolveGoogleMapsBundle(googleWindow: GoogleWindow): Promise<GoogleMapsBundle> {
@@ -73,11 +74,14 @@ async function resolveGoogleMapsBundle(googleWindow: GoogleWindow): Promise<Goog
   return { maps, AdvancedMarkerElement: markerLibrary.AdvancedMarkerElement };
 }
 
-function loadGoogleMaps(apiKey: string): Promise<GoogleMapsBundle> {
+export function loadGoogleMaps(apiKey: string): Promise<GoogleMapsBundle> {
   if (googleMapsPromise) return googleMapsPromise;
   const googleWindow = window as GoogleWindow;
   if (googleWindow.google?.maps?.importLibrary) {
-    googleMapsPromise = resolveGoogleMapsBundle(googleWindow);
+    googleMapsPromise = resolveGoogleMapsBundle(googleWindow).catch((error: unknown) => {
+      googleMapsPromise = null;
+      throw error;
+    });
     return googleMapsPromise;
   }
 
@@ -107,7 +111,11 @@ function loadGoogleMaps(apiKey: string): Promise<GoogleMapsBundle> {
       reject(new Error("Google Maps could not be loaded."));
     }, { once: true });
     document.head.append(script);
-  }).then(() => resolveGoogleMapsBundle(googleWindow));
+  }).then(() => resolveGoogleMapsBundle(googleWindow)).catch((error: unknown) => {
+    googleMapsPromise = null;
+    document.getElementById(GOOGLE_MAPS_SCRIPT_ID)?.remove();
+    throw error;
+  });
 
   return googleMapsPromise;
 }
@@ -152,6 +160,8 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
   let resultMarkers: GoogleAdvancedMarker[] = [];
   let resultLines: GooglePolyline[] = [];
   let pendingReveal: { readonly target: LngLatPoint; readonly guesses: readonly GeoGuessMapMarker[] } | null = null;
+  let observer: ResizeObserver | null = null;
+  let loading = false;
 
   const canvas = document.createElement("div");
   canvas.className = "geoguessr-google-map-canvas";
@@ -194,7 +204,7 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
         map,
         path: [guess, target],
         geodesic: true,
-        strokeColor: guess.color ?? "#33453c",
+        strokeColor: guess.color ?? "#d8ec99",
         strokeOpacity: 0.88,
         strokeWeight: 3,
       }));
@@ -218,7 +228,12 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
     map.fitBounds(bounds, 64);
   }
 
-  if (apiKey) {
+  function loadMap(): void {
+    if (!apiKey || loading || map || destroyed) return;
+    loading = true;
+    status.hidden = false;
+    status.classList.remove("is-error");
+    status.textContent = "Loading Google Maps…";
     void loadGoogleMaps(apiKey).then((bundle) => {
       if (destroyed) return;
       maps = bundle.maps;
@@ -229,12 +244,13 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
         minZoom: 2,
         maxZoom: 18,
         mapId: GOOGLE_DEMO_MAP_ID,
+        colorScheme: "DARK",
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
         clickableIcons: false,
         gestureHandling: "greedy",
-        backgroundColor: "#dce7df",
+        backgroundColor: "#172323",
       });
       clickListener = map.addListener("click", (event) => {
         if (!acceptingGuesses || destroyed || !event.latLng) return;
@@ -245,12 +261,20 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
       });
       status.hidden = true;
       if (pendingReveal) applyReveal(pendingReveal.target, pendingReveal.guesses);
-    }).catch((error: unknown) => {
+    }).catch(() => {
       if (destroyed) return;
       status.classList.add("is-error");
-      status.textContent = error instanceof Error ? error.message : "Google Maps could not be loaded.";
-    });
-  } else {
+      status.textContent = "The map couldn’t load. ";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "geo-button geoguessr-map-retry";
+      retry.textContent = "Retry map";
+      retry.addEventListener("click", loadMap, { signal: options.signal });
+      status.append(retry);
+    }).finally(() => { loading = false; });
+  }
+  if (apiKey) loadMap();
+  else {
     status.classList.add("is-error");
     status.textContent = "The guess map is unavailable right now. Please try again later.";
   }
@@ -258,6 +282,7 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
   function removeMap(): void {
     if (destroyed) return;
     destroyed = true;
+    observer?.disconnect();
     clickListener?.remove();
     clickListener = null;
     clearMarkersAndLines();
@@ -265,10 +290,13 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
   }
 
   options.signal.addEventListener("abort", removeMap);
+  observer = new ResizeObserver(() => { if (map && maps) maps.event.trigger(map, "resize"); });
+  observer.observe(element);
 
   return {
     element,
     reset: () => {
+      loadMap();
       acceptingGuesses = true;
       pendingReveal = null;
       clearMarkersAndLines();

@@ -49,6 +49,14 @@ Non-secret config (`NODE_ENV`, room limits, `DATABASE_PATH`) lives in each `[env
 
 OAuth callback URLs to register with each provider: `${BASE_URL}/auth/github/callback` and `${BASE_URL}/auth/google/callback`.
 
+### GeoGuessr browser configuration
+
+`VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY` is a **build-time** browser key. Solo GeoGuessr uses Maps JavaScript API for both the guess map and native Street View; the latter replaces the cropped Maps Embed iframe. Enable Maps JavaScript API and billing, and restrict the key to the deployed HTTP referrers. If this variable is empty, the client falls back to `VITE_GOOGLE_MAPS_EMBED_API_KEY`, which must also permit Maps JavaScript API. Street View Country continues to use Maps Embed API.
+
+Native panoramas use Google's [Dynamic Street View billing SKU](https://developers.google.com/maps/billing-and-pricing/sku-details), so the new solo view has different usage costs from an Embed panorama. Review the project's quotas and budget before deploying. The Fly workflows already pass both browser keys as Docker build arguments; changing a runtime secret alone does not update an existing frontend bundle.
+
+Without a browser key, GeoGuessr displays a recoverable unavailable screen. For local layout checks without Google requests, `/tests/fixtures/geoguessr.html` mounts the real game UI with labeled sample surfaces; this fixture is excluded from the production build.
+
 ## Sizing & scaling
 
 Each app is `shared-cpu-1x` / 512 MB — ample for Bun, room state, and WebSocket connections at this scale. Scaling vertically (`fly scale vm shared-cpu-2x --memory 1024`) is the next step if CPU/memory gets tight. Horizontal scaling (multiple machines) is **not** supported as-is: in-memory rooms and the in-process `RoomManager` assume a single machine; multi-machine would require shared room state (Redis) and sticky routing. Postgres would only be needed if SQLite-on-volume becomes a bottleneck.
