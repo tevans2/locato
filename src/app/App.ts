@@ -485,7 +485,7 @@ export function createApp(options: AppOptions): App {
     element.className = "game-screen loading-screen";
     element.append(
       el("span", { className: "loading-mark", attrs: { "aria-hidden": "true" } }),
-      el("h1", { text: "A little adventure awaits." }),
+      el("h1", { text: "Loading…" }),
       el("p", { text: message, attrs: { role: "status" } }),
       el("button", { className: "ghost-action", text: "Back to home", attrs: { type: "button" }, on: { click: () => navigate({ type: "landing" }) } }),
     );
@@ -501,7 +501,7 @@ export function createApp(options: AppOptions): App {
     console.error("Unable to open game screen", error);
     const screen = createLoadingScreen("Please check your connection and try again.");
     screen.element.classList.add("is-error");
-    screen.element.querySelector("h1")!.textContent = "We couldn’t open that adventure.";
+    screen.element.querySelector("h1")!.textContent = "Couldn’t load this page.";
     screen.element.querySelector("p")!.setAttribute("role", "alert");
     screen.element.append(el("button", { className: "primary-action", text: "Try again", attrs: { type: "button" }, on: { click: () => navigate(route, { push: false }) } }));
     mount(screen);
@@ -691,7 +691,6 @@ export function createApp(options: AppOptions): App {
           onLeaderboard: () => navigate({ type: "leaderboard" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           storage: options.storage,
-          getAuthUser: () => authControls.getUser(),
         }),
         false,
       );

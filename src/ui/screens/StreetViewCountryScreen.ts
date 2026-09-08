@@ -182,9 +182,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key",
     children: [
-      el("strong", { text: "Street View is taking a detour." }),
-      el("p", { text: "This adventure is temporarily unavailable. There’s still a whole world of other games to explore." }),
-      el("button", { className: "primary-action", text: "Explore other games", attrs: { type: "button" }, on: { click: options.onHome } }),
+      el("strong", { text: "Street View unavailable" }),
+      el("p", { text: "Please try again later." }),
+      el("button", { className: "primary-action", text: "All games", attrs: { type: "button" }, on: { click: options.onHome } }),
     ],
   });
   const frameNumber = el("strong", { className: "stat-value", text: "1 / 3" });
