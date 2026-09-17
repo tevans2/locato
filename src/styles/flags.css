@@ -11,6 +11,15 @@
 .flags-count span { margin-top: 8px; color: var(--muted); font-size: .68rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
 .flags-nav-current { display: inline-flex; align-items: center; min-height: 44px; color: var(--brand); font-size: .79rem; font-weight: 750; }
 
+.flags-collection { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 22px 0; border-bottom: 1px solid var(--border); }
+.flags-collection-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 10px; background: var(--bg-elevated); }
+.flags-collection-toggle button { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.flags-collection-toggle button:hover { color: var(--text); }
+.flags-collection-toggle button.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-soft); }
+.flags-collection-toggle button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.flags-collection-toggle small { display: inline-grid; place-items: center; min-width: 25px; height: 21px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: inherit; font-size: .6rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.flags-collection-note { max-width: 560px; margin: 0; color: var(--muted); font-size: .68rem; line-height: 1.55; text-align: right; }
+
 .flags-letter-nav { position: sticky; top: 0; z-index: 12; display: flex; flex-wrap: wrap; gap: 5px; padding: 14px 0; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(12px); }
 .flags-letter-nav button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: .68rem; font-weight: 750; cursor: pointer; }
 .flags-letter-nav button:hover,.flags-letter-nav button:focus-visible { border-color: var(--border); background: var(--surface); color: var(--brand); outline: none; }
@@ -25,7 +34,9 @@
 .flags-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-panel); }
 .flags-card-art { display: grid; place-items: center; aspect-ratio: 3 / 2; padding: 18px; overflow: hidden; background: var(--bg-elevated); }
 .flags-card-art img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(25,35,31,.12)); }
-.flags-card-name { min-height: 54px; display: flex; align-items: center; padding: 12px 14px; color: var(--text); font-size: .74rem; font-weight: 680; line-height: 1.35; }
+.flags-card-name { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; color: var(--text); font-size: .74rem; font-weight: 680; line-height: 1.35; }
+.flags-card-name span { min-width: 0; }
+.flags-card-name small { flex: 0 0 auto; color: var(--muted); font-size: .56rem; font-weight: 700; letter-spacing: .035em; }
 
 .flags-play-cta { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-top: 60px; padding: 34px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .flags-play-cta h2 { margin: 9px 0 8px; font-family: var(--font-editorial); font-size: clamp(1.65rem, 3.5vw, 2.6rem); font-weight: 470; letter-spacing: -.045em; line-height: 1.05; }
@@ -52,6 +63,11 @@
   .flags-hero p { font-size: .78rem; }
   .flags-count { justify-items: start; margin-top: 25px; }
   .flags-count strong { font-size: 2.35rem; }
+  .flags-collection { display: block; padding: 16px 0; }
+  .flags-collection-toggle { width: 100%; }
+  .flags-collection-toggle button { flex: 1 1 0; justify-content: center; padding: 0 9px; font-size: .65rem; }
+  .flags-collection-toggle button:last-child { flex: 1.55 1 0; }
+  .flags-collection-note { margin-top: 11px; font-size: .62rem; text-align: left; }
   .flags-letter-nav { gap: 3px; padding: 10px 0; }
   .flags-letter-nav button { width: 30px; height: 30px; font-size: .62rem; }
   .flags-group { padding-top: 30px; scroll-margin-top: 58px; }
@@ -72,5 +88,5 @@
 }
 
 @media(prefers-reduced-motion: reduce) {
-  .flags-letter-nav button,.flags-card { transition: none; }
+  .flags-letter-nav button,.flags-card,.flags-collection-toggle button { transition: none; }
 }

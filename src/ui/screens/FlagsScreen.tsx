@@ -1,7 +1,9 @@
 import { createRoot, type Root } from "react-dom/client";
+import { useMemo, useState } from "react";
 import { ArrowRight, ArrowUpRight, Flag } from "lucide-react";
 import type { Screen } from "../../app/router";
-import type { Country, CountryIndex } from "../../core/countries";
+import type { CountryIndex } from "../../core/countries";
+import { territoryFlags } from "../../core/territoryFlags";
 import { LandingAccount, LandingThemeSwitch } from "./LandingScreen";
 
 export interface FlagsScreenOptions {
@@ -14,31 +16,55 @@ export interface FlagsScreenOptions {
   readonly onMultiplayer: () => void;
 }
 
-interface FlagGroup {
-  readonly letter: string;
-  readonly countries: readonly Country[];
+type FlagCollection = "countries" | "territories";
+
+export interface FlagReference {
+  readonly name: string;
+  readonly code: string;
+  readonly flagSrc: string;
 }
 
-export function buildAlphabeticalFlagGroups(countryIndex: CountryIndex): readonly FlagGroup[] {
-  const countries = [...countryIndex.countries].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
-  const grouped = new Map<string, Country[]>();
+interface FlagGroup {
+  readonly letter: string;
+  readonly flags: readonly FlagReference[];
+}
 
-  for (const country of countries) {
-    const letter = country.name.charAt(0).toLocaleUpperCase("en");
+function flagInitial(name: string): string {
+  return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").charAt(0).toLocaleUpperCase("en");
+}
+
+export function buildAlphabeticalFlagGroups(flags: readonly FlagReference[]): readonly FlagGroup[] {
+  const sorted = [...flags].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  const grouped = new Map<string, FlagReference[]>();
+
+  for (const flag of sorted) {
+    const letter = flagInitial(flag.name);
     const group = grouped.get(letter);
-    if (group) group.push(country);
-    else grouped.set(letter, [country]);
+    if (group) group.push(flag);
+    else grouped.set(letter, [flag]);
   }
 
-  return [...grouped.entries()].map(([letter, groupedCountries]) => ({ letter, countries: groupedCountries }));
+  return [...grouped.entries()].map(([letter, groupedFlags]) => ({ letter, flags: groupedFlags }));
 }
 
 function FlagsHome(options: FlagsScreenOptions) {
-  const groups = buildAlphabeticalFlagGroups(options.countryIndex);
-  const totalFlags = groups.reduce((total, group) => total + group.countries.length, 0);
+  const [collection, setCollection] = useState<FlagCollection>("countries");
+  const countryFlags = useMemo<readonly FlagReference[]>(
+    () => options.countryIndex.countries.map(({ name, code, flagSrc }) => ({ name, code, flagSrc })),
+    [options.countryIndex],
+  );
+  const activeFlags = collection === "countries" ? countryFlags : territoryFlags;
+  const groups = useMemo(() => buildAlphabeticalFlagGroups(activeFlags), [activeFlags]);
+  const isCountries = collection === "countries";
 
   const jumpToLetter = (letter: string) => {
     document.getElementById(`flags-${letter}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const chooseCollection = (nextCollection: FlagCollection) => {
+    if (nextCollection === collection) return;
+    setCollection(nextCollection);
+    document.querySelector(".flags-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -67,17 +93,54 @@ function FlagsHome(options: FlagsScreenOptions) {
             <div className="flags-hero-copy">
               <span className="flags-eyebrow"><Flag size={15} strokeWidth={1.7} /> World flag reference</span>
               <h1>Flags of the world.</h1>
-              <p>Browse every flag in Locato’s country set in one clear, alphabetical view.</p>
+              <p>
+                {isCountries
+                  ? "Browse every official country flag in Locato’s country set in one clear, alphabetical view."
+                  : "Browse territory, dependency and special-area flags in the same clear, alphabetical format."}
+              </p>
             </div>
-            <div className="flags-count" aria-label={`${totalFlags} flags`}>
-              <strong>{totalFlags}</strong>
-              <span>flags · A–Z</span>
+            <div className="flags-count" aria-label={`${activeFlags.length} flags`}>
+              <strong>{activeFlags.length}</strong>
+              <span>{isCountries ? "country flags" : "territory flags"} · A–Z</span>
             </div>
           </header>
 
-          <nav className="flags-letter-nav" aria-label="Jump to country initial">
+          <section className="flags-collection" aria-label="Flag collection">
+            <div className="flags-collection-toggle" role="group" aria-label="Choose which flags to show">
+              <button
+                type="button"
+                className={isCountries ? "is-active" : undefined}
+                aria-pressed={isCountries}
+                onClick={() => chooseCollection("countries")}
+              >
+                <span>Countries</span>
+                <small>{countryFlags.length}</small>
+              </button>
+              <button
+                type="button"
+                className={!isCountries ? "is-active" : undefined}
+                aria-pressed={!isCountries}
+                onClick={() => chooseCollection("territories")}
+              >
+                <span>Territories &amp; dependencies</span>
+                <small>{territoryFlags.length}</small>
+              </button>
+            </div>
+            <p className="flags-collection-note">
+              {isCountries
+                ? "The country list stays exactly as it appears elsewhere in Locato."
+                : "Includes ISO territory and special-area entries, with separately flagged Caribbean Netherlands and Saint Helena group territories shown individually."}
+            </p>
+          </section>
+
+          <nav className="flags-letter-nav" aria-label={`Jump to ${isCountries ? "country" : "territory"} initial`}>
             {groups.map((group) => (
-              <button key={group.letter} type="button" onClick={() => jumpToLetter(group.letter)} aria-label={`Jump to countries beginning with ${group.letter}`}>
+              <button
+                key={group.letter}
+                type="button"
+                onClick={() => jumpToLetter(group.letter)}
+                aria-label={`Jump to ${isCountries ? "countries" : "territories"} beginning with ${group.letter}`}
+              >
                 {group.letter}
               </button>
             ))}
@@ -88,15 +151,22 @@ function FlagsHome(options: FlagsScreenOptions) {
               <section className="flags-group" id={`flags-${group.letter}`} key={group.letter} aria-labelledby={`flags-heading-${group.letter}`}>
                 <header className="flags-group-head">
                   <h2 id={`flags-heading-${group.letter}`}>{group.letter}</h2>
-                  <span>{group.countries.length} {group.countries.length === 1 ? "country" : "countries"}</span>
+                  <span>
+                    {group.flags.length} {group.flags.length === 1
+                      ? (isCountries ? "country" : "territory")
+                      : (isCountries ? "countries" : "territories")}
+                  </span>
                 </header>
                 <ul className="flags-grid">
-                  {group.countries.map((country) => (
-                    <li className="flags-card" key={country.code}>
+                  {group.flags.map((flag) => (
+                    <li className="flags-card" key={flag.code}>
                       <div className="flags-card-art">
-                        <img src={`/${country.flagSrc}`} alt={`${country.name} flag`} loading="lazy" decoding="async" />
+                        <img src={`/${flag.flagSrc}`} alt={`${flag.name} flag`} loading="lazy" decoding="async" />
                       </div>
-                      <div className="flags-card-name">{country.name}</div>
+                      <div className="flags-card-name">
+                        <span>{flag.name}</span>
+                        {!isCountries && <small>{flag.code}</small>}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -108,7 +178,7 @@ function FlagsHome(options: FlagsScreenOptions) {
             <div>
               <span className="flags-eyebrow">Ready to practise?</span>
               <h2>Know the flags. Test the flags.</h2>
-              <p>Jump straight into the flag guessing mode when you’re ready.</p>
+              <p>The flag game currently uses Locato’s country set.</p>
             </div>
             <button type="button" className="lp-btn lp-btn-primary" onClick={options.onPlay}>Play flags <ArrowRight size={17} /></button>
           </section>
