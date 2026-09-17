@@ -31,6 +31,7 @@ export interface LandingScreenOptions {
   readonly onPlay: () => void;
   readonly onDailyChallenge: () => void;
   readonly onGameMode: (mode: GameModeId) => void;
+  readonly onFlags: () => void;
   readonly onLeaderboard: () => void;
   readonly onMultiplayer: () => void;
   readonly storage?: Storage;
@@ -107,7 +108,7 @@ function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
   }
 }
 
-function LandingThemeSwitch({ storage }: { readonly storage: Storage | undefined }) {
+export function LandingThemeSwitch({ storage }: { readonly storage: Storage | undefined }) {
   const [theme, setThemeState] = useState<LocatoTheme>(() => currentTheme());
 
   useEffect(() => {
@@ -132,7 +133,7 @@ function LandingThemeSwitch({ storage }: { readonly storage: Storage | undefined
   );
 }
 
-function LandingAccount({ control }: { readonly control: HTMLElement }) {
+export function LandingAccount({ control }: { readonly control: HTMLElement }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.append(control);
@@ -223,6 +224,7 @@ function LandingHome(options: LandingScreenOptions) {
         </button>
         <div className="landing-nav-links">
           <a href="#games">Explore games</a>
+          <button type="button" onClick={options.onFlags}>Flags</button>
           <button type="button" onClick={options.onDailyChallenge}>Daily challenge</button>
           <button type="button" onClick={options.onMultiplayer}>With friends <ArrowUpRight size={13} /></button>
         </div>
@@ -262,6 +264,7 @@ function LandingHome(options: LandingScreenOptions) {
         <footer className="landing-footer">
           <span className="brand-name">locato<span className="brand-period">.</span></span>
           <nav className="landing-footer-links" aria-label="More links">
+            <button type="button" className="landing-text-link" onClick={options.onFlags}>Flags</button>
             <button type="button" className="landing-text-link" onClick={options.onDailyChallenge}>Daily challenge</button>
             <button type="button" className="landing-text-link" onClick={options.onMultiplayer}>Multiplayer</button>
             <button type="button" className="landing-text-link" onClick={options.onLeaderboard}>Leaderboards</button>

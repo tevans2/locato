@@ -28,6 +28,7 @@ describe("shareable game routes", () => {
     { type: "friends", username: "curious_explorer" },
     { type: "daily-challenge" },
     { type: "stats" },
+    { type: "flag-gallery" },
     { type: "friends" },
     { type: "multiplayer" },
     { type: "leaderboard", mode: "flags", variant: "timer" },

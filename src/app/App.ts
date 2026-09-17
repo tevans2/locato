@@ -19,6 +19,7 @@ import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClien
 import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
+import { createFlagsScreen } from "../ui/screens/FlagsScreen";
 import { el } from "../ui/dom/createElement";
 import { createThemeToggle } from "../ui/theme";
 import { createSoundToggle } from "../ui/dom/sfx";
@@ -688,9 +689,25 @@ export function createApp(options: AppOptions): App {
           onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onGameMode: (gameMode) => handleGameModeChange(gameMode),
+          onFlags: () => navigate({ type: "flag-gallery" }),
           onLeaderboard: () => navigate({ type: "leaderboard" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           storage: options.storage,
+        }),
+        false,
+      );
+      return;
+    }
+    if (route.type === "flag-gallery") {
+      mount(
+        createFlagsScreen({
+          countryIndex: options.countryIndex,
+          accountControl: authControls.trigger,
+          storage: options.storage,
+          onHome: () => navigate({ type: "landing" }),
+          onPlay: () => navigate({ type: "solo-game", categoryIds: ["flags"], continueSaved: false }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onMultiplayer: () => navigate({ type: "multiplayer" }),
         }),
         false,
       );

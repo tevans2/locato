@@ -11,6 +11,7 @@ export type AppRoute =
   | { readonly type: "worldsplit" }
   | { readonly type: "multiplayer"; readonly joinCode?: string }
   | { readonly type: "stats" }
+  | { readonly type: "flag-gallery" }
   | { readonly type: "friends"; readonly username?: string }
   | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string };
 
@@ -34,6 +35,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   if (game && isWorldMapGameModeId(game)) return { type: "country-guessing", mode: game };
   if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
+  if (view === "flags") return { type: "flag-gallery" };
   if (view === "daily-challenge" || view === "stats" || view === "friends" || view === "multiplayer") return { type: view };
   if (view === "leaderboard") {
     const mode = params.get("mode");
@@ -55,7 +57,7 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
   else if (route.type === "friends" && route.username) params.set("friend", route.username);
   else if (route.type !== "landing") {
-    params.set("view", route.type);
+    params.set("view", route.type === "flag-gallery" ? "flags" : route.type);
     if (route.type === "leaderboard") {
       if (route.mode) params.set("mode", route.mode);
       if (route.variant) params.set("variant", route.variant);
