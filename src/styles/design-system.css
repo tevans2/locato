@@ -47,6 +47,28 @@ button:disabled { cursor: not-allowed; }
 :root :is(.world-map-country-label,.world-map-control-button,.maptap-info-card,.hint-popover,.achievement-panel,.map-review-panel,.country-click-prompt) { border-radius: 9px; }
 :root[data-theme="dark"] .world-map-country-label { color: var(--text); }
 .multiplayer-setup { border-radius: 16px; border-color: var(--border); box-shadow: var(--shadow-panel); }
+/* Multiplayer surfaces follow the same theme tokens as solo play. Keep floating status/chat/modal
+   UI out of the old always-dark palette so switching theme never leaves a mismatched overlay. */
+.multiplayer-status { border-color: var(--border); color: var(--muted); background: var(--surface-soft); }
+.multiplayer-feedback { border-color: var(--border); color: var(--text); background: var(--bg-elevated); }
+.player-row.is-local,.score-row.is-local,.maptap-mp-result-row.is-local { border-color: var(--brand); background: var(--accent-soft); }
+.maptap-mp-result-dot { border-color: var(--surface); }
+.multiplayer-chat-panel { border-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: var(--shadow); backdrop-filter: none; }
+.multiplayer-chat-message,.multiplayer-chat-empty { border-color: var(--border); color: var(--text); background: var(--bg-elevated); }
+.multiplayer-chat-message.is-local { border-color: var(--brand); background: var(--accent-soft); }
+.multiplayer-chat-author { color: var(--brand); }
+.multiplayer-chat-toggle { border-color: var(--border-strong); color: var(--brand); background: var(--surface); box-shadow: var(--shadow-panel); }
+.multiplayer-chat-toggle:hover,.multiplayer-chat-toggle:focus-visible { border-color: var(--text); color: var(--text); background: var(--surface-soft); }
+.multiplayer-chat-badge { border-color: var(--surface); color: var(--on-brand); background: var(--brand); }
+.multiplayer-modal-backdrop { z-index: 160; background: var(--multiplayer-scrim); }
+.multiplayer-modal { border-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
+.multiplayer-modal .modal-headline,.leaderboard-score,.leaderboard-row.is-local .leaderboard-name { color: var(--brand); }
+.multiplayer-modal .eyebrow,.multiplayer-modal .modal-hint { color: var(--muted); }
+.leaderboard-row.is-winner { border-color: var(--brand); background: var(--accent-soft); }
+.flag-color-reveal-canvas { background: var(--surface-soft); box-shadow: var(--shadow-panel); }
+/* Country-outline SVG assets are white-filled. Solo uses the same luminance flip via its
+   background-image renderer; multiplayer renders an <img>, so apply it here as well. */
+:root:not([data-theme="dark"]) .multiplayer-flag-slot .country-shape-image { filter: invert(1) hue-rotate(180deg); }
 .multiplayer-setup h1 { font-family: var(--font-editorial); font-weight: 450; letter-spacing: -.045em; line-height: 1.05; }
 .multiplayer-form-heading { border-bottom: 1px solid var(--border); }
 .multiplayer-form-heading strong { font-family: var(--font-editorial); font-size: 1.7rem; font-weight: 500; }

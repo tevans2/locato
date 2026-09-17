@@ -108,6 +108,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     className: "multiplayer-map-target",
     children: [el("span", { text: "Pick this country" }), mapTargetName],
   });
+  mapTarget.hidden = true;
   let allowMapClickSubmit = false;
   const mapView = createWorldMapView(options.worldCountryFeatures, options.countryIndex, {
     onCountryClick: (countryId) => {
@@ -118,7 +119,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     },
   });
   mapView.element.classList.add("multiplayer-map-panel");
-  const mapPrompt = el("div", { className: "multiplayer-map-prompt", children: [mapTarget] });
+  const mapPrompt = el("div", { className: "multiplayer-map-prompt" });
   const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt" });
   const flagColorReveal = createFlagColorRevealView();
   let activeFlagColorRoundKey: string | null = null;
@@ -196,7 +197,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
         children: [
           el("section", {
             className: "flag-card multiplayer-flag-card",
-            children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot, timerBar],
+            children: [el("div", { className: "flag-card-top multiplayer-round-header", children: [roundKicker, mapTarget] }), flagSlot, timerBar],
           }),
           el("section", {
             className: "answer-panel multiplayer-round-panel multiplayer-answer-panel",
@@ -240,6 +241,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
             ? `Round ${visibleRound.roundNumber}`
             : "Waiting for the next round";
       roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : isFlagColorRound ? "Find the target flag" : "Your answer";
+      mapTarget.hidden = !isMapClickRound || intermission || state.room.status === "complete";
       feedback.textContent = state.feedback;
       const localSkipVoted = state.localPlayerId !== null && state.room.skipVotes.includes(state.localPlayerId);
       const skipRequired = Math.max(0, state.room.skipRequired);

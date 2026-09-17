@@ -59,6 +59,7 @@
   --map-fill-guessed: rgba(139, 210, 63, 0.8);
   --map-fill-target: rgba(239, 106, 69, 0.85);
   --map-fill-missed: rgba(239, 106, 69, 0.72);
+  --multiplayer-scrim: rgba(25, 35, 31, 0.38);
 }
 
 :root[data-theme="dark"] {
@@ -92,6 +93,7 @@
   --map-fill-guessed: rgba(184, 227, 109, 0.74);
   --map-fill-target: rgba(237, 74, 67, 0.9);
   --map-fill-missed: rgba(237, 74, 67, 0.72);
+  --multiplayer-scrim: rgba(4, 7, 5, 0.74);
   --earth: #66b6a8;
   --route: #f07a58;
   --good: #9bd45b;

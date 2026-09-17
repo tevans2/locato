@@ -558,7 +558,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 .multiplayer-setup-intro > .muted {
   max-width: 42ch;
   margin-bottom: 30px;
-  color: #4e5d56;
+  color: var(--muted);
 }
 
 .multiplayer-feature-list {
@@ -567,14 +567,14 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   padding: 0;
   display: grid;
   gap: 0;
-  border-top: 1px solid rgba(25, 35, 31, .28);
+  border-top: 1px solid var(--border-strong);
 }
 
 .multiplayer-feature-list li {
   display: grid;
   gap: 3px;
   padding: 13px 0;
-  border-bottom: 1px solid rgba(25, 35, 31, .18);
+  border-bottom: 1px solid var(--border);
 }
 
 .multiplayer-feature-list strong {
@@ -582,7 +582,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 }
 
 .multiplayer-feature-list span {
-  color: #59675f;
+  color: var(--muted);
   font-size: .78rem;
 }
 
