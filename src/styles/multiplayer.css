@@ -816,3 +816,17 @@
 .multiplayer-mode-dropdown.is-disabled .category-dropdown-summary::after {
   display: none;
 }
+
+/* Flag-source selector sits full-width in room setup and mirrors the host's choice in the lobby. */
+.multiplayer-flag-pool-field {
+  grid-column: 1 / -1;
+}
+
+.multiplayer-flag-pool-field .flag-pool-control {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.lobby-panel > .flag-pool-control {
+  margin: 10px 0 14px;
+}

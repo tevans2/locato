@@ -23,6 +23,13 @@ describe("shareable game routes", () => {
     expect(parse("/?game=flags&categories=invalid,capitals")).toMatchObject({ categoryIds: ["capitals"] });
   });
 
+  it("round-trips the selected flag source and ignores invalid values", () => {
+    const route: AppRoute = { type: "solo-game", categoryIds: ["flags"], continueSaved: true, flagPool: "both" };
+    expect(parse(buildRouteUrl(route, { pathname: "/" }))).toEqual(route);
+    expect(parse("/?game=flags&flagPool=territories")).toMatchObject({ flagPool: "territories" });
+    expect(parse("/?game=flags&flagPool=invalid")).toEqual({ type: "solo-game", categoryIds: ["flags"], continueSaved: false });
+  });
+
   it.each<AppRoute>([
     { type: "multiplayer", joinCode: "ABC 123" },
     { type: "friends", username: "curious_explorer" },

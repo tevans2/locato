@@ -1,3 +1,4 @@
+import type { FlagPool } from "../flagPools";
 import type { PromptGameModeId, TimerGameModeId, WorldMapGameModeId } from "../gameModes";
 import type { TimerStorageKeys } from "./playTimer";
 
@@ -47,9 +48,15 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
   },
 };
 
-export function timerKeysForMode(mode: TimerGameModeId): TimerStorageKeys {
+export function timerKeysForMode(mode: TimerGameModeId, flagPool: FlagPool = "countries"): TimerStorageKeys {
   if (mode in MAP_TIMER_KEYS) {
     return MAP_TIMER_KEYS[mode as WorldMapGameModeId];
+  }
+  if (mode === "flags" && flagPool !== "countries") {
+    return {
+      last: `locato:solo:flags:${flagPool}:timer-last-ms:v1`,
+      best: `locato:solo:flags:${flagPool}:timer-best-ms:v1`,
+    };
   }
   return PROMPT_TIMER_KEYS[mode as PromptGameModeId];
 }

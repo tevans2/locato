@@ -1,6 +1,7 @@
 import { buildPromptSlots } from "../core/categories";
 import type { CountryId, CountryIndex } from "../core/countries";
 import type { GameState } from "../core/game";
+import { DEFAULT_FLAG_POOL, type FlagPool } from "../core/flagPools";
 
 export const SOLO_SAVE_KEY = "locato:solo:v2";
 
@@ -8,6 +9,7 @@ export interface SoloSave {
   readonly version: 2;
   readonly status?: GameState["status"];
   readonly categoryIds: readonly string[];
+  readonly flagPool?: FlagPool;
   readonly seed: string;
   readonly currentCountryCode: string | null;
   readonly queueCountryCodes: readonly string[];
@@ -43,13 +45,14 @@ function idsFromCodes(index: CountryIndex, countryCodes: readonly string[]): Cou
   return ids;
 }
 
-export function createSoloSave(index: CountryIndex, state: GameState, updatedAt: number): SoloSave {
+export function createSoloSave(index: CountryIndex, state: GameState, updatedAt: number, flagPool: FlagPool = DEFAULT_FLAG_POOL): SoloSave {
   const currentCountry = state.currentCountryId === null ? null : index.byId[state.currentCountryId] ?? null;
 
   return {
     status: state.status,
     version: 2,
     categoryIds: [...state.categoryIds],
+    flagPool,
     seed: state.seed,
     currentCountryCode: currentCountry?.code ?? null,
     queueCountryCodes: codesFromIds(index, state.queue.remainingCountryIds),
@@ -68,8 +71,8 @@ export function createSoloSave(index: CountryIndex, state: GameState, updatedAt:
   };
 }
 
-export function saveSoloGame(storage: Storage, index: CountryIndex, state: GameState, updatedAt = Date.now()): void {
-  storage.setItem(SOLO_SAVE_KEY, JSON.stringify(createSoloSave(index, state, updatedAt)));
+export function saveSoloGame(storage: Storage, index: CountryIndex, state: GameState, updatedAt = Date.now(), flagPool: FlagPool = DEFAULT_FLAG_POOL): void {
+  storage.setItem(SOLO_SAVE_KEY, JSON.stringify(createSoloSave(index, state, updatedAt, flagPool)));
 }
 
 export function clearSoloSave(storage: Storage): void {

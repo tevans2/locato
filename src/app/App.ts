@@ -2,6 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
+import { createPromptCountryIndex, DEFAULT_FLAG_POOL, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, hydrateGameState, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { createDailyResultSave, readDailyResult, saveDailyResult, type DailyResultSave } from "../storage/dailySave";
@@ -197,7 +198,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startSolo(categoryIds: readonly string[] | undefined, continueSaved = false): Promise<void> {
+  async function startSolo(categoryIds: readonly string[] | undefined, continueSaved = false, requestedFlagPool?: FlagPool): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your game…"));
     const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
@@ -205,12 +206,18 @@ export function createApp(options: AppOptions): App {
     const resolved = resolveCategoryIds(categoryIds ?? DEFAULT_CATEGORY_IDS);
     const candidate = continueSaved ? readSoloSave(options.storage) : null;
     const matchesMode = !categoryIds || (candidate?.categoryIds.length === resolved.length && resolved.every((id) => candidate.categoryIds.includes(id)));
-    const save = candidate && matchesMode && (candidate.status ?? (candidate.currentCountryCode === null ? "complete" : "playing")) !== "complete" ? candidate : null;
-    const initialState = save ? hydrateGameState(options.countryIndex, save) : null;
-    const activeCategories = initialState ? initialState.categoryIds : resolved;
+    const requestedPool = requestedFlagPool === undefined ? null : normalizeFlagPool(requestedFlagPool);
+    const matchesFlagPool = requestedPool === null || !candidate || normalizeFlagPool(candidate.flagPool) === requestedPool;
+    const save = candidate && matchesMode && matchesFlagPool && (candidate.status ?? (candidate.currentCountryCode === null ? "complete" : "playing")) !== "complete" ? candidate : null;
+    const activeCategories = save ? save.categoryIds : resolved;
+    const activeFlagPool = activeCategories.includes("flags")
+      ? normalizeFlagPool(requestedFlagPool ?? save?.flagPool ?? candidate?.flagPool)
+      : DEFAULT_FLAG_POOL;
+    const promptCountryIndex = createPromptCountryIndex(options.countryIndex, activeCategories, activeFlagPool);
+    const initialState = save ? hydrateGameState(promptCountryIndex, save) : null;
     if (initialState) {
       const current = historyState();
-      const resumedRoute: AppRoute = { type: "solo-game", categoryIds: activeCategories, continueSaved: true };
+      const resumedRoute: AppRoute = { type: "solo-game", categoryIds: activeCategories, continueSaved: true, ...(activeCategories.includes("flags") ? { flagPool: activeFlagPool } : {}) };
       window.history.replaceState({ route: resumedRoute, idx: current?.idx ?? 0 } satisfies HistoryState, "", buildRouteUrl(resumedRoute, window.location));
     }
     let worldCountryFeatures: readonly WorldCountryFeature[] | undefined;
@@ -230,13 +237,20 @@ export function createApp(options: AppOptions): App {
       if (run !== navigationRun) return;
     }
 
-    const engine = createEngine(options.countryIndex, activeCategories, initialState);
+    const engine = createEngine(promptCountryIndex, activeCategories, initialState);
 
     mount(
       createSoloGameScreen({
-        countryIndex: options.countryIndex,
+        countryIndex: promptCountryIndex,
         engine,
         selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
+        flagPool: activeFlagPool,
+        onFlagPoolChange: (nextFlagPool) => {
+          void recordSoloSession(lastSoloState);
+          lastSoloState = null;
+          clearSoloSave(options.storage);
+          navigate({ type: "solo-game", categoryIds: activeCategories, continueSaved: false, flagPool: nextFlagPool });
+        },
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onReset: () => {
@@ -246,7 +260,7 @@ export function createApp(options: AppOptions): App {
           clearSoloSave(options.storage);
         },
         onStateChange: (state) => {
-          saveSoloGame(options.storage, options.countryIndex, state);
+          saveSoloGame(options.storage, promptCountryIndex, state, Date.now(), activeFlagPool);
           // A new seed means the previous session ended (reset / new game) — record it.
           if (lastSoloState && lastSoloState.seed !== state.seed) void recordSoloSession(lastSoloState);
           lastSoloState = state;
@@ -257,7 +271,12 @@ export function createApp(options: AppOptions): App {
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onViewStats: () => navigate({ type: "stats" }),
         onViewFriends: () => navigate({ type: "friends" }),
-        onLeaderboard: () => navigate({ type: "leaderboard", mode: promptGameModeFromCategoryIds(activeCategories) }),
+        onLeaderboard: () =>
+          navigate({
+            type: "leaderboard",
+            mode: promptGameModeFromCategoryIds(activeCategories),
+            ...(activeCategories.length === 1 && activeCategories[0] === "flags" && activeFlagPool !== "countries" ? { variant: activeFlagPool } : {}),
+          }),
         getAuthUser: () => authControls.getUser(),
         authControls,
         storage: options.storage,
@@ -714,7 +733,7 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "solo-game") {
-      runNavigation(startSolo(route.categoryIds, route.continueSaved ?? false));
+      runNavigation(startSolo(route.categoryIds, route.continueSaved ?? false, route.flagPool));
       return;
     }
     const leavingSolo = recordSoloSession(lastSoloState);

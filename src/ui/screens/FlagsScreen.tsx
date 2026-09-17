@@ -178,7 +178,7 @@ function FlagsHome(options: FlagsScreenOptions) {
             <div>
               <span className="flags-eyebrow">Ready to practise?</span>
               <h2>Know the flags. Test the flags.</h2>
-              <p>The flag game currently uses Locato’s country set.</p>
+              <p>Choose countries, territories & dependencies, or combine both when you play.</p>
             </div>
             <button type="button" className="lp-btn lp-btn-primary" onClick={options.onPlay}>Play flags <ArrowRight size={17} /></button>
           </section>

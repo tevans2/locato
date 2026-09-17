@@ -1,5 +1,6 @@
 import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
 import { CONTINENTS } from "../../core/countries";
+import { normalizeFlagPool, type FlagPool } from "../../core/flagPools";
 import { isTimerGameModeId, timerGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
@@ -41,7 +42,8 @@ function renderRows(entries: readonly LeaderboardEntry[], currentUserId: string 
 export function createLeaderboardScreen(options: LeaderboardScreenOptions): Screen {
   const controller = new AbortController();
   let selectedMode: TimerGameModeId = options.initialMode && isTimerGameModeId(options.initialMode) ? options.initialMode : "name-all";
-  let selectedVariant = options.initialVariant ?? (selectedMode === "puzzle" ? "Africa" : "");
+  let selectedPuzzleVariant = selectedMode === "puzzle" && CONTINENTS.includes(options.initialVariant as (typeof CONTINENTS)[number]) ? options.initialVariant! : "Africa";
+  let selectedFlagVariant = selectedMode === "flags" && (options.initialVariant === "territories" || options.initialVariant === "both") ? options.initialVariant : "";
   let currentUser: AuthUser | null = null;
 
   const modeSelect = el("select", {
@@ -56,7 +58,18 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     attrs: { id: "leaderboard-variant", name: "leaderboardVariant", "aria-label": "Puzzle continent" },
     children: CONTINENTS.map((continent) => el("option", { text: continent, attrs: { value: continent } })),
   });
-  variantSelect.value = selectedVariant || "Africa";
+  variantSelect.value = selectedPuzzleVariant;
+
+  const flagVariantSelect = el("select", {
+    className: "leaderboard-variant-select",
+    attrs: { id: "leaderboard-flag-variant", name: "leaderboardFlagVariant", "aria-label": "Flag set" },
+    children: [
+      el("option", { text: "Countries", attrs: { value: "" } }),
+      el("option", { text: "Territories & dependencies", attrs: { value: "territories" } }),
+      el("option", { text: "Both", attrs: { value: "both" } }),
+    ],
+  });
+  flagVariantSelect.value = selectedFlagVariant;
 
   const statusText = el("p", { className: "leaderboard-status", attrs: { role: "status" } });
   const userRankText = el("p", { className: "leaderboard-user-rank" });
@@ -70,12 +83,24 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     className: "leaderboard-filter leaderboard-filter-variant",
     children: [el("span", { className: "stat-label", text: "Continent", attrs: { for: "leaderboard-variant" } }), variantSelect],
   });
+  const flagVariantFilter = el("label", {
+    className: "leaderboard-filter leaderboard-filter-variant",
+    children: [el("span", { className: "stat-label", text: "Flag set", attrs: { for: "leaderboard-flag-variant" } }), flagVariantSelect],
+  });
+
+  function activeVariant(): string {
+    if (selectedMode === "puzzle") return selectedPuzzleVariant;
+    if (selectedMode === "flags") return selectedFlagVariant;
+    return "";
+  }
+
+  function activeFlagPool(): FlagPool {
+    return selectedMode === "flags" ? normalizeFlagPool(selectedFlagVariant || "countries") : "countries";
+  }
 
   function syncVariantVisibility(): void {
-    const showVariant = selectedMode === "puzzle";
-    variantFilter.hidden = !showVariant;
-    if (!showVariant) selectedVariant = "";
-    else if (!selectedVariant) selectedVariant = variantSelect.value;
+    variantFilter.hidden = selectedMode !== "puzzle";
+    flagVariantFilter.hidden = selectedMode !== "flags";
   }
 
   async function loadBoard(): Promise<void> {
@@ -83,7 +108,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     userRankText.textContent = "";
     list.replaceChildren();
 
-    const variant = selectedMode === "puzzle" ? selectedVariant : "";
+    const variant = activeVariant();
     const response = await fetchLeaderboard(selectedMode, variant);
 
     if (!response) {
@@ -104,8 +129,8 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     if (currentUser && response.currentUser) {
       userRankText.textContent = `Your best: ${formatElapsedTime(response.currentUser.timeMs)} — rank #${response.currentUser.rank}`;
     } else if (currentUser) {
-      const variant = selectedMode === "puzzle" ? selectedVariant : "";
-      const localBest = readStoredTime(options.storage, timerKeysForMode(selectedMode).best);
+      const variant = activeVariant();
+      const localBest = readStoredTime(options.storage, timerKeysForMode(selectedMode, activeFlagPool()).best);
       if (localBest) {
         userRankText.textContent = `You have a saved best of ${formatElapsedTime(localBest)} on this device that is not on the board yet.`;
         postLocalBestButton.hidden = false;
@@ -126,7 +151,6 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
     "change",
     () => {
       selectedMode = modeSelect.value as TimerGameModeId;
-      if (selectedMode === "puzzle" && !selectedVariant) selectedVariant = variantSelect.value;
       syncVariantVisibility();
       void loadBoard();
     },
@@ -136,7 +160,16 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
   variantSelect.addEventListener(
     "change",
     () => {
-      selectedVariant = variantSelect.value;
+      selectedPuzzleVariant = variantSelect.value;
+      void loadBoard();
+    },
+    { signal: controller.signal },
+  );
+
+  flagVariantSelect.addEventListener(
+    "change",
+    () => {
+      selectedFlagVariant = flagVariantSelect.value;
       void loadBoard();
     },
     { signal: controller.signal },
@@ -194,6 +227,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
                 children: [el("span", { className: "stat-label", text: "Game mode", attrs: { for: "leaderboard-mode" } }), modeSelect],
               }),
               variantFilter,
+              flagVariantFilter,
             ],
           }),
           statusText,

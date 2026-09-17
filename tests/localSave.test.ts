@@ -20,10 +20,18 @@ describe("local save", () => {
 
     expect(save.version).toBe(2);
     expect(save.categoryIds).toEqual(["flags", "codes"]);
+    expect(save.flagPool).toBe("countries");
     expect(save.guessedCountryCodes).toContain(current!.code);
     expect(hydrated?.guessedCountryIds.has(current!.id)).toBe(true);
     expect(hydrated?.seed).toBe("save-seed");
     // Category assignment is recomputed deterministically, so the hydrated current prompt keeps its category.
     expect(hydrated?.categoryIds).toEqual(["flags", "codes"]);
   });
+  it("persists the selected flag source with a solo save", () => {
+    const index = indexCountries(countries);
+    const engine = createGameEngine({ countryIndex: index, categoryIds: ["flags"], seed: "territory-save", now: 1000 });
+    const save = createSoloSave(index, engine.getState(), 1100, "territories");
+    expect(save.flagPool).toBe("territories");
+  });
+
 });

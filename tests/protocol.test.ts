@@ -60,6 +60,17 @@ describe("multiplayer public protocol", () => {
     expect(parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["flags", "codes", "capitals", "shapes", "flag-colors", "pick-country", "spot-country", "extra", "too-many"] }).ok).toBe(false);
   });
 
+  it("accepts the three flag pool choices and rejects unknown ones", () => {
+    const create = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], flagPool: "both" });
+    expect(create.ok).toBe(true);
+    expect(create.ok ? create.message : null).toMatchObject({ flagPool: "both" });
+
+    const update = parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["flags"], flagPool: "territories" });
+    expect(update.ok).toBe(true);
+    expect(update.ok ? update.message : null).toMatchObject({ flagPool: "territories" });
+    expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], flagPool: "sketches" }).ok).toBe(false);
+  });
+
   it("accepts skip votes as a client message", () => {
     const message = parseClientMessage({ type: "VOTE_SKIP" });
     expect(message.ok).toBe(true);

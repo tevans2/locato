@@ -1,3 +1,4 @@
+import { isFlagPool } from "../flagPools";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import type { FinalResult, GeoGuessrRoundResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
@@ -87,6 +88,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
+      if (value.flagPool !== undefined && !isFlagPool(value.flagPool)) return reject("invalid-room-settings", "Flag set is invalid.");
       return {
         ok: true,
         message: {
@@ -95,6 +97,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
           categoryIds: value.categoryIds.map((id) => id.trim()),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
+          ...(isFlagPool(value.flagPool) ? { flagPool: value.flagPool } : {}),
         },
       };
     }
@@ -120,6 +123,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
+      if (value.flagPool !== undefined && !isFlagPool(value.flagPool)) return reject("invalid-room-settings", "Flag set is invalid.");
       return {
         ok: true,
         message: {
@@ -127,6 +131,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
           categoryIds: value.categoryIds.map((id) => id.trim()),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
+          ...(isFlagPool(value.flagPool) ? { flagPool: value.flagPool } : {}),
         },
       };
     }
@@ -205,6 +210,7 @@ function isRoom(value: unknown): value is PublicRoomState {
     isRecord(value.settings) &&
     isFiniteNumber(value.settings.roundLimit) &&
     isFiniteNumber(value.settings.roundDurationMs) &&
+    (value.settings.flagPool === undefined || isFlagPool(value.settings.flagPool)) &&
     (value.status === "lobby" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&

@@ -43,7 +43,9 @@ export function buildPromptSlots(index: CountryIndex, categoryIds: readonly stri
   const slots: PromptSlot[] = [];
 
   for (const country of index.countries) {
-    const eligible = categories.filter((category) => category.eligible(country));
+    const eligible = categories.filter(
+      (category) => (!country.allowedCategoryIds || country.allowedCategoryIds.includes(category.id)) && category.eligible(country),
+    );
     if (eligible.length === 0) continue;
     const chosen = eligible[Math.floor(random() * eligible.length)] ?? eligible[0];
     if (chosen) slots.push({ countryId: country.id, categoryId: chosen.id });

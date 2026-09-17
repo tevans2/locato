@@ -1,5 +1,6 @@
 import { MAX_CHAT_MESSAGE_LENGTH, type MultiplayerTransport, type PublicChatMessage, type PublicRoomState, type PublicRoundState, type RoundResult, type FinalResult, type ServerMessage, type TransportStatus } from "../../core/multiplayer";
 import { gameModeOptions, type GameModeOption } from "../../core/gameModes";
+import { DEFAULT_FLAG_POOL, flagPoolLabel, normalizeFlagPool } from "../../core/flagPools";
 import { createMultiplayerMapTapGameView, type MapTapMultiplayerReveal } from "../components/MultiplayerMapTapGameView";
 import { createMultiplayerGeoGuessrGameView, type GeoGuessrMultiplayerReveal } from "../components/MultiplayerGeoGuessrGameView";
 import type { CountryIndex } from "../../core/countries";
@@ -10,6 +11,7 @@ import { getPlayerEmoji } from "../../core/auth/avatars";
 import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
 import { enhanceDropdown } from "../dom/dropdown";
+import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createBrandLockup } from "../dom/createBrandLockup";
 import { createMultiplayerGameView } from "./MultiplayerGameScreen";
 import { createEndGameModal } from "./MultiplayerEndGameModal";
@@ -332,6 +334,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     className: "muted",
     text: initialSetupCopy.description,
   });
+  const setupFlagPoolSelector = createFlagPoolSelector({
+    value: DEFAULT_FLAG_POOL,
+    signal: controller.signal,
+    label: "Flags include",
+    onChange: () => {},
+  });
   const modeDropdown = createMultiplayerModeSelector({
     selectedModes: playModes,
     signal: controller.signal,
@@ -341,6 +349,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       const setupCopy = setupCopyForModes(modes);
       setupTitle.textContent = setupCopy.title;
       setupDescription.textContent = setupCopy.description;
+      setupFlagPoolSelector.element.hidden = !modes.includes("flags");
     },
   });
   const lobbyModeDropdown = createMultiplayerModeSelector({
@@ -353,6 +362,16 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       transport?.send({ type: "SET_ROOM_OPTIONS", categoryIds: categoryIdsForModes(modes) });
     },
   });
+  const lobbyFlagPoolSelector = createFlagPoolSelector({
+    value: DEFAULT_FLAG_POOL,
+    signal: controller.signal,
+    label: "Flags include",
+    onChange: (flagPool) => {
+      if (!room || room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !room.categoryIds.includes("flags")) return;
+      transport?.send({ type: "SET_ROOM_OPTIONS", categoryIds: room.categoryIds, flagPool });
+    },
+  });
+  setupFlagPoolSelector.element.hidden = !playModes.includes("flags");
   const statusText = el("p", { className: "multiplayer-status", text: feedback });
   const roomCode = el("strong", { className: "room-code", text: "----" });
   const roomSettings = el("p", { className: "room-settings", text: "" });
@@ -426,6 +445,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
             children: [
               el("label", { className: "multiplayer-field multiplayer-name-field", children: [el("span", { text: "Player name" }), nameInput] }),
               el("div", { className: "multiplayer-field multiplayer-mode-field", children: [el("span", { text: "Mode rotation" }), modeDropdown.element] }),
+              el("div", { className: "multiplayer-field multiplayer-flag-pool-field", children: [setupFlagPoolSelector.element] }),
               el("label", { className: "multiplayer-field", children: [el("span", { text: "Rounds" }), roundLimitSelect] }),
               el("label", { className: "multiplayer-field", children: [el("span", { text: "Time per round" }), roundDurationSelect] }),
             ],
@@ -450,6 +470,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("div", { className: "room-code-row", children: [el("span", { text: "Code" }), roomCode, copyButton] }),
       roomSettings,
       lobbyModeDropdown.element,
+      lobbyFlagPoolSelector.element,
       playerList,
       inviteSection,
       el("div", { className: "actions", children: [readyButton, startButton, leaveButton] }),
@@ -624,7 +645,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     const localIsHost = localPlayerId === room.hostPlayerId;
     lobbyModeDropdown.setSelectedModes(roomModes);
     lobbyModeDropdown.setDisabled(room.status !== "lobby" || !localIsHost || isMapTap || isGeoGuessr);
-    roomSettings.textContent = `${modeSelectionDescription(roomModes)} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
+    const roomFlagPool = normalizeFlagPool(room.settings.flagPool);
+    const hasFlagRounds = roomModes.includes("flags");
+    lobbyFlagPoolSelector.element.hidden = !hasFlagRounds;
+    lobbyFlagPoolSelector.setValue(roomFlagPool);
+    lobbyFlagPoolSelector.setDisabled(room.status !== "lobby" || !localIsHost);
+    roomSettings.textContent = `${modeSelectionDescription(roomModes)}${hasFlagRounds ? ` · ${flagPoolLabel(roomFlagPool)}` : ""} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
     playerList.replaceChildren(...createPlayerRows(room, localPlayerId));
     // Show "invite friends" only to signed-in users while waiting in the lobby. Friends are fetched
     // once per room, then re-filtered every render so anyone in the lobby is excluded live.
@@ -811,6 +837,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
           type: "CREATE_ROOM",
           playerName,
           categoryIds: categoryIdsForModes(modeDropdown.selectedModes()),
+          flagPool: setupFlagPoolSelector.value(),
           roundLimit: Number(roundLimitSelect.value),
           roundDurationMs: Number(roundDurationSelect.value),
         }),

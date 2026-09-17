@@ -3,6 +3,7 @@ import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from
 import { getCategory } from "../../core/categories";
 import { matchesCapitalName } from "../../core/categories/matching";
 import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
 import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
@@ -12,6 +13,7 @@ import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, t
 import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
+import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
@@ -29,6 +31,8 @@ export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly selectedGameMode: PromptGameModeId;
+  readonly flagPool?: FlagPool;
+  readonly onFlagPoolChange?: (flagPool: FlagPool) => void;
   readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
@@ -73,6 +77,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
   const isDailyChallenge = options.dailyChallenge !== undefined;
+  const activeFlagPool = options.flagPool ?? DEFAULT_FLAG_POOL;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
   const dailyMarks: DailyRoundMark[] = [];
@@ -177,6 +182,14 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
     ],
   });
+  const flagPoolSelector = !isDailyChallenge && options.selectedGameMode === "flags" && options.onFlagPoolChange
+    ? createFlagPoolSelector({
+        value: activeFlagPool,
+        signal: controller.signal,
+        label: "Flag set",
+        onChange: options.onFlagPoolChange,
+      })
+    : null;
 
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
@@ -254,7 +267,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
     const serverAccepted = await submitTimerToLeaderboard({
       gameMode: options.selectedGameMode,
-      variant: "",
+      variant: options.selectedGameMode === "flags" && activeFlagPool !== "countries" ? activeFlagPool : "",
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
@@ -610,7 +623,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   playTimer = createPlayTimer({
     storage: options.storage,
-    keys: timerKeysForMode(options.selectedGameMode),
+    keys: timerKeysForMode(options.selectedGameMode, activeFlagPool),
     isComplete: () => engine.getState().status === "complete",
     onTick: renderTimer,
   });
@@ -787,6 +800,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             children: [
               el("div", { className: "panel-title has-freeplay-toggle", children: [el("h2", { text: "Name the place" }), freePlayToggle] }),
               form,
+              ...(flagPoolSelector ? [flagPoolSelector.element] : []),
               hintPopover,
               mobileExtrasToggle,
               mobileExtrasPanel,

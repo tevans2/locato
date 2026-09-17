@@ -3388,3 +3388,78 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
     linear-gradient(180deg, rgba(8, 12, 8, 0.38), rgba(8, 12, 8, 0.74)),
     var(--panel-grid);
 }
+
+/* Flag prompt source switch shared by solo play and multiplayer room setup. */
+.flag-pool-control {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 0 10px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+}
+
+.flag-pool-label {
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 760;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.flag-pool-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-soft, rgba(0, 0, 0, .025));
+}
+
+.flag-pool-option {
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 720;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.flag-pool-option:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.flag-pool-option.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(25, 35, 31, .12);
+}
+
+.flag-pool-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.flag-pool-control.is-disabled .flag-pool-option:not(.is-active) {
+  opacity: .55;
+}
+
+.flag-pool-control.is-disabled .flag-pool-option {
+  cursor: default;
+}
+
+@media (max-width: 420px) {
+  .flag-pool-option {
+    min-height: 32px;
+    padding-inline: 4px;
+    font-size: .66rem;
+  }
+}

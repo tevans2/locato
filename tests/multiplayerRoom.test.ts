@@ -3,6 +3,7 @@ import { indexCountries, type RawCountry } from "../src/core/countries";
 import type { PublicRoundState, ServerMessage } from "../src/core/multiplayer";
 import { Room } from "../server/rooms/Room";
 import { RoomManager, type MultiplayerConnection } from "../server/rooms/RoomManager";
+import { territoryFlags } from "../src/core/territoryFlags";
 
 const fixtureCountries = [
   { name: "Japan", code: "JP", aliases: ["Nippon"], continent: "Asia", flagSrc: "assets/flags/jp.svg", capital: "Tokyo", capitalAliases: [] },
@@ -312,6 +313,35 @@ describe("multiplayer room", () => {
     expect(room.removePlayer("guest", 3000).ok).toBe(true);
     expect(completed.results.find((result) => result.playerId === "guest")?.name).toBe("Guest");
   });
+
+  it("uses the territory flag pool for multiplayer flag rounds", () => {
+    const room = new Room({
+      code: "TERR1",
+      hostPlayerId: "host",
+      hostName: "Host",
+      countryIndex,
+      categoryIds: ["flags"],
+      flagPool: "territories",
+      seed: "territory-multiplayer",
+      now: 1000,
+      roundLimit: 1,
+    });
+
+    expect(room.snapshot().settings.flagPool).toBe("territories");
+    expect(room.startGame("host", 1010).ok).toBe(true);
+    const round = room.publicRound;
+    if (!round || round.prompt.kind !== "image") throw new Error("Expected territory flag round.");
+    expect(round.prompt.value).toMatch(/^assets\/flags\/territories\/.+\.svg$/);
+
+    const territory = territoryFlags.find((flag) => flag.flagSrc === round.prompt.value);
+    if (!territory) throw new Error(`No territory for ${round.prompt.value}`);
+    const answer = room.submitAnswer("host", territory.name, 1020);
+    expect(answer.ok).toBe(true);
+    const reveal = answer.ok ? answer.messages.find((message) => message.type === "ROUND_ENDED") : null;
+    expect(reveal?.type).toBe("ROUND_ENDED");
+    if (reveal?.type !== "ROUND_ENDED") throw new Error("Expected territory reveal.");
+    expect(reveal.answer).toBe(territory.name);
+  });
 });
 
 describe("room manager", () => {
@@ -357,7 +387,7 @@ describe("room manager", () => {
 
     expect(snapshot?.type).toBe("ROOM_SNAPSHOT");
     if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
-    expect(snapshot.room.settings).toEqual({ roundLimit: 3, roundDurationMs: 45_000 });
+    expect(snapshot.room.settings).toEqual({ roundLimit: 3, roundDurationMs: 45_000, flagPool: "countries" });
   });
 
   it("rate limits answer bursts per connection", () => {
@@ -462,11 +492,12 @@ describe("room manager", () => {
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
     expect(room.setReady("guest", true, 1020).ok).toBe(true);
 
-    const update = room.updateOptions("host", { categoryIds: ["codes", "spot-country"], roundLimit: 2 }, 1030);
+    const update = room.updateOptions("host", { categoryIds: ["flags", "spot-country"], flagPool: "both", roundLimit: 2 }, 1030);
     expect(update.ok).toBe(true);
     const snapshot = room.snapshot();
-    expect(snapshot.categoryIds).toEqual(["codes", "spot-country"]);
+    expect(snapshot.categoryIds).toEqual(["flags", "spot-country"]);
     expect(snapshot.settings.roundLimit).toBe(2);
+    expect(snapshot.settings.flagPool).toBe("both");
     expect(snapshot.players.find((player) => player.id === "guest")?.ready).toBe(false);
   });
 

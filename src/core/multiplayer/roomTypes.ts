@@ -1,3 +1,5 @@
+import type { FlagPool } from "../flagPools";
+
 export type PlayerId = string;
 export type RoomCode = string;
 
@@ -27,6 +29,7 @@ export interface PublicRoundState {
 export interface PublicRoomSettings {
   readonly roundLimit: number;
   readonly roundDurationMs: number;
+  readonly flagPool?: FlagPool;
 }
 
 export interface PublicChatMessage {

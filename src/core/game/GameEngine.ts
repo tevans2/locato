@@ -59,7 +59,7 @@ function createHint(country: Country, level: number, categoryId: string): Hint {
   if (hintLevel === 0) {
     return {
       title: "Country note",
-      message: COUNTRY_FACTS[country.code] ?? `It has a distinct geographic profile in ${country.continent}.`,
+      message: COUNTRY_FACTS[country.code] ?? `It has a distinct geographic profile in ${country.geographyLabel ?? country.continent}.`,
       level: hintLevel,
     };
   }
@@ -69,7 +69,7 @@ function createHint(country: Country, level: number, categoryId: string): Hint {
     const wordCount = countNameWords(country.name);
     return {
       title: "Name shape",
-      message: `${country.continent}. Starts with “${country.name.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
+      message: `${country.geographyLabel ?? country.continent}. Starts with “${country.name.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
       level: hintLevel,
     };
   }

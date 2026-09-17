@@ -53,6 +53,8 @@ export function indexCountries(
     acceptedAnswers: buildAcceptedAnswers(country, options),
     capital: country.capital,
     capitalAliases: [...country.capitalAliases],
+    ...(country.allowedCategoryIds ? { allowedCategoryIds: [...country.allowedCategoryIds] } : {}),
+    ...(country.geographyLabel ? { geographyLabel: country.geographyLabel } : {}),
   }));
 
   const byCode = new Map<string, Country>();

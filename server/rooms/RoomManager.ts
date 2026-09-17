@@ -5,6 +5,7 @@ import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type Roo
 import { MapTapRoom } from "./MapTapRoom";
 import { GeoGuessrRoom } from "./GeoGuessrRoom";
 import { getCategory, resolveCategoryIds } from "../../src/core/categories";
+import type { FlagPool } from "../../src/core/flagPools";
 
 export interface MultiplayerConnection {
   readonly send: (message: string) => unknown;
@@ -169,6 +170,7 @@ export class RoomManager {
         this.createRoom(connection, message.playerName, message.categoryIds, now, {
           ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}),
           ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}),
+          ...(message.flagPool !== undefined ? { flagPool: message.flagPool } : {}),
         });
         return;
       case "JOIN_ROOM":
@@ -192,7 +194,20 @@ export class RoomManager {
           if (isMapTapRoom(room) || isGeoGuessrRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
           } else {
-            this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { categoryIds: resolveCategoryIds(message.categoryIds), ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
+            this.sendRoomResult(
+              connection,
+              room,
+              room.updateOptions(
+                session.playerId,
+                {
+                  categoryIds: resolveCategoryIds(message.categoryIds),
+                  ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}),
+                  ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}),
+                  ...(message.flagPool !== undefined ? { flagPool: message.flagPool } : {}),
+                },
+                now,
+              ),
+            );
           }
         });
         return;
@@ -238,7 +253,13 @@ export class RoomManager {
     }
   }
 
-  private createRoom(connection: MultiplayerConnection, playerName: string, categoryIds: readonly string[], now: number, settings: { readonly roundLimit?: number; readonly roundDurationMs?: number }): void {
+  private createRoom(
+    connection: MultiplayerConnection,
+    playerName: string,
+    categoryIds: readonly string[],
+    now: number,
+    settings: { readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool },
+  ): void {
     if (this.rooms.size >= this.maxRooms) {
       sendError(connection, "too-many-rooms", "The server is at room capacity.");
       return;
@@ -288,6 +309,7 @@ export class RoomManager {
           maxPlayers: this.maxPlayersPerRoom,
           ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
           ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
+          ...(settings.flagPool !== undefined ? { flagPool: settings.flagPool } : {}),
           resultDisplayMs: this.resultDisplayMs,
         });
     this.rooms.set(roomCode, room);

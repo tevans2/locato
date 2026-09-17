@@ -1,8 +1,9 @@
+import { isFlagPool, type FlagPool } from "../core/flagPools";
 import { isPromptGameModeId, isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 
 export type AppRoute =
   | { readonly type: "landing" }
-  | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean }
+  | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool }
   | { readonly type: "daily-challenge" }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
   | { readonly type: "streetview-country" }
@@ -30,7 +31,13 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   const game = params.get("game");
   if (game && isPromptGameModeId(game)) {
     const categories = params.get("categories")?.split(",").filter(isPromptGameModeId);
-    return { type: "solo-game", categoryIds: categories?.length ? categories : [game], continueSaved: params.get("resume") === "1" };
+    const flagPool = params.get("flagPool");
+    return {
+      type: "solo-game",
+      categoryIds: categories?.length ? categories : [game],
+      continueSaved: params.get("resume") === "1",
+      ...(isFlagPool(flagPool) ? { flagPool } : {}),
+    };
   }
   if (game && isWorldMapGameModeId(game)) return { type: "country-guessing", mode: game };
   if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
@@ -51,6 +58,7 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
   if (route.type === "solo-game") {
     params.set("game", route.categoryIds?.find(isPromptGameModeId) ?? "flags");
     if (route.categoryIds && route.categoryIds.length > 1) params.set("categories", route.categoryIds.join(","));
+    if (route.flagPool) params.set("flagPool", route.flagPool);
     params.set("resume", "1");
   } else if (route.type === "country-guessing") params.set("game", route.mode ?? "name-all");
   else if (["map-tap", "worldsplit", "geoguessr", "streetview-country"].includes(route.type)) params.set("game", route.type);
