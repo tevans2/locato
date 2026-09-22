@@ -1,7 +1,9 @@
 import type { AuthUser } from "../../core/auth";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
+import { matchesCapitalName } from "../../core/categories/matching";
 import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
 import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
@@ -11,25 +13,31 @@ import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, t
 import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
+import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, hideFeedback, showFeedback, type FeedbackView } from "../dom/renderFeedback";
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
-import { createStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
+import { createStatsView, updateFreePlayStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
+import { createCapitalRecallMapView, type CapitalRecallMapView } from "../dom/renderCapitalRecallMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly selectedGameMode: PromptGameModeId;
+  readonly flagPool?: FlagPool;
+  readonly onFlagPoolChange?: (flagPool: FlagPool) => void;
   readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   readonly onExitDailyChallenge?: () => void;
@@ -69,6 +77,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
   const isDailyChallenge = options.dailyChallenge !== undefined;
+  const activeFlagPool = options.flagPool ?? DEFAULT_FLAG_POOL;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
   const dailyMarks: DailyRoundMark[] = [];
@@ -77,6 +86,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   let dailyRoundWrongGuesses = 0;
   let dailyScore = 0;
   let dailyCompleted = false;
+  let soloHintsUsed = 0;
   const stats = createStatsView();
   const prompt = createPromptView();
   const flagColorReveal = createFlagColorRevealView();
@@ -87,10 +97,16 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const input = el("input", {
     attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
   });
+  const guessLabel = el("label", { text: "Your guess", attrs: { for: "guess-input" } });
   const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
   const hintButton = el("button", { className: "secondary-action hint-action", text: "Hint", attrs: { type: "button", "aria-label": "Get a hint" } });
   const skipButton = el("button", { className: "secondary-action", text: "Pass", attrs: { type: "button", "aria-label": "Reveal this answer" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
+  const freePlayToggle = el("button", {
+    className: "freeplay-toggle",
+    text: "Free play",
+    attrs: { type: "button", "aria-pressed": "false", title: "Pick any country on the map and name its capital — no prompts" },
+  });
   const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
   const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge", ...(isDailyChallenge ? { disabled: "" } : {}) } });
   const exitDailyButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
@@ -166,12 +182,33 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
     ],
   });
+  const flagPoolSelector = !isDailyChallenge && options.selectedGameMode === "flags" && options.onFlagPoolChange
+    ? createFlagPoolSelector({
+        value: activeFlagPool,
+        signal: controller.signal,
+        label: "Flag set",
+        onChange: options.onFlagPoolChange,
+      })
+    : null;
 
   let playTimer: PlayTimer;
   let activeFlagColorTarget: string | null = null;
   let activeMapPromptKey: string | null = null;
+  let latestCapitalRecallCountryId: CountryId | null = null;
   let revealAnswerArmed = false;
+  // Free play: type as many capitals as you can, any order — no prompts, no picking.
+  // Progress lives here, separate from the engine's guided run, so toggling never mixes them.
+  let freePlayEnabled = false;
+  let freePlayLatestCountryId: CountryId | null = null;
+  let freePlayAttempts = 0;
+  let freePlayCorrect = 0;
+  let freePlayStreak = 0;
+  const freePlayGuessedCountryIds = new Set<CountryId>();
   const cleanDailyMapCountryIds: ReadonlySet<CountryId> = new Set();
+  const capitalRecallMap: CapitalRecallMapView | null =
+    !isDailyChallenge && options.selectedGameMode === "capital-recall" && options.worldCountryFeatures && options.worldCountryFeatures.length > 0
+      ? createCapitalRecallMapView(options.worldCountryFeatures, countryIndex, { signal: controller.signal })
+      : null;
   const dailyMap =
     options.worldCountryFeatures && options.worldCountryFeatures.length > 0
       ? createWorldMapView(options.worldCountryFeatures, countryIndex, {
@@ -222,11 +259,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
+  function answerLabelFor(country: Country): string {
+    return options.selectedGameMode === "capital-recall" ? country.capital : country.name;
+  }
+
   async function finishTimerRun(finalTimeMs: number): Promise<{ readonly isNewLocalBest: boolean; readonly serverAccepted: boolean | null }> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
     const serverAccepted = await submitTimerToLeaderboard({
       gameMode: options.selectedGameMode,
-      variant: "",
+      variant: options.selectedGameMode === "flags" && activeFlagPool !== "countries" ? activeFlagPool : "",
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
@@ -240,7 +281,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         playTimer.startIfNeeded();
         hideHintPopover();
         const country = countryIndex.byId[event.countryId];
-        if (country) showFeedback(views.feedback, `Correct: ${country.name}. +${event.points} points.`, "good");
+        if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
+        if (country) showFeedback(views.feedback, `Correct: ${answerLabelFor(country)}. +${event.points} points.`, "good");
         continue;
       }
 
@@ -259,6 +301,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
       if (event.type === "HINT_REVEALED") {
         revealAnswerArmed = false;
+        if (!isDailyChallenge) soloHintsUsed += 1;
         showHintPopover(event.hint.title, event.hint.message);
         showFeedback(views.feedback, "Hint ready.", "neutral");
         continue;
@@ -268,8 +311,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         revealAnswerArmed = false;
         const country = countryIndex.byId[event.countryId];
         if (country) {
-          showHintPopover("Answer", country.name);
-          showFeedback(views.feedback, `Answer: ${country.name}.`, "bad");
+          if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
+          showHintPopover("Answer", answerLabelFor(country));
+          showFeedback(views.feedback, `Answer: ${answerLabelFor(country)}.`, "bad");
         }
         continue;
       }
@@ -277,7 +321,18 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (event.type === "GAME_COMPLETED") {
         revealAnswerArmed = false;
         hideHintPopover();
-        if (!isDailyChallenge) showAchievements(recordSoloAchievements(options.storage, { completed: true, wrongAnswers: engine.getState().wrongAnswers, bestStreak: engine.getState().bestStreak, gameMode: options.selectedGameMode }));
+        if (!isDailyChallenge) {
+          const state = engine.getState();
+          showAchievements(recordSoloAchievements(options.storage, {
+            completed: true,
+            wrongAnswers: state.wrongAnswers,
+            bestStreak: state.bestStreak,
+            gameMode: options.selectedGameMode,
+            hintsUsed: soloHintsUsed,
+            countryIndex,
+            guessedCountryIds: state.guessedCountryIds,
+          }));
+        }
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           void finishTimerRun(finalTimeMs).then((result) => {
@@ -311,18 +366,97 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const form = el("form", {
     className: "guess-form",
     children: [
-      el("label", { text: "Your guess", attrs: { for: "guess-input" } }),
+      guessLabel,
       el("div", { className: "input-row", children: [input, submitButton, mobileHintButton] }),
       el("div", { className: "mobile-daily-actions", children: [mobileSkipButton] }),
     ],
   });
 
+  function playableCapitalTotal(): number {
+    return countryIndex.countries.filter((country) => country.capital.length > 0).length;
+  }
+
+  function resetFreePlayProgress(): void {
+    freePlayLatestCountryId = null;
+    freePlayAttempts = 0;
+    freePlayCorrect = 0;
+    freePlayStreak = 0;
+    freePlayGuessedCountryIds.clear();
+  }
+
+  // `solved` selects which pool to scan: unsolved for scoring, solved for the
+  // "already named" hint. Auto-submit accepts exact answers only; Enter also
+  // accepts the same close misspellings as guided Capital Recall.
+  function findCapitalMatch(value: string, solved: boolean, auto: boolean): Country | null {
+    return (
+      countryIndex.countries.find(
+        (country) =>
+          country.capital.length > 0 &&
+          freePlayGuessedCountryIds.has(country.id) === solved &&
+          matchesCapitalName(country, value, auto),
+      ) ?? null
+    );
+  }
+
+  function handleFreePlayGuess(auto: boolean): void {
+    const value = input.value;
+    if (value.trim().length === 0) return;
+
+    const match = findCapitalMatch(value, false, auto);
+
+    if (match === null) {
+      if (auto) return; // keep typing — no penalty until Enter
+      const solved = findCapitalMatch(value, true, auto);
+      freePlayAttempts += 1;
+      freePlayStreak = 0;
+      render(false);
+      showFeedback(views.feedback, solved ? `${solved.capital} is already named.` : "No new capital recognized yet.", "neutral");
+      if (shouldAutoFocusTextInput()) input.select();
+      return;
+    }
+
+    playTimer.startIfNeeded();
+    freePlayGuessedCountryIds.add(match.id);
+    freePlayAttempts += 1;
+    freePlayCorrect += 1;
+    freePlayStreak += 1;
+    freePlayLatestCountryId = match.id;
+    input.value = "";
+
+    const total = playableCapitalTotal();
+    if (freePlayGuessedCountryIds.size >= total) {
+      // Casual ruleset: no leaderboard submission, unlike timed guided runs.
+      const timeSuffix = playTimer.mode === "count-up" ? ` in ${formatElapsedTime(playTimer.stop())}` : "";
+      showFeedback(views.feedback, `All ${total} capitals named${timeSuffix}. Free play complete.`, "good");
+    } else {
+      showFeedback(views.feedback, `Correct: ${match.capital}. ${freePlayGuessedCountryIds.size} of ${total}.`, "good");
+    }
+    render(false);
+    if (shouldAutoFocusTextInput()) input.focus();
+  }
+
+  function setFreePlayEnabled(enabled: boolean): void {
+    if (freePlayEnabled === enabled) return;
+    freePlayEnabled = enabled;
+    resetFreePlayProgress();
+    freePlayToggle.classList.toggle("is-active", enabled);
+    freePlayToggle.setAttribute("aria-pressed", String(enabled));
+    hideHintPopover();
+    hideFeedback(feedback);
+    input.value = "";
+    render(false);
+    showFeedback(feedback, enabled ? "Free play: type as many capitals as you can — any order." : "Back to guided prompts.", "neutral");
+  }
+
   function resetRun(message: string): void {
     activeMapPromptKey = null;
+    latestCapitalRecallCountryId = null;
+    resetFreePlayProgress();
     setAtlasOpen(atlas, false);
     updateAtlasView(atlas, countries, new Set());
     options.onReset();
     playTimer.reset();
+    soloHintsUsed = 0;
     dispatchAndRender(engine.dispatch({ type: "RESET_GAME", now: Date.now() }));
     showFeedback(feedback, message, "neutral");
   }
@@ -332,8 +466,40 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const current = getCurrentCountry(countryIndex, state);
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
-    updateStatsView(stats, countryIndex, state);
-    if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
+    const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
+    if (dailyMap) dailyMap.element.classList.toggle("is-click-country-mode", content?.kind === "map-click" && state.status === "playing");
+    freePlayToggle.hidden = capitalRecallMap === null;
+    guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
+    input.placeholder = isCapitalRecallMode
+      ? "e.g. Tokyo, Abuja, Brasília..."
+      : "e.g. Brazil, Japan, ZA...";
+    if (freePlayEnabled) {
+      updateFreePlayStatsView(stats, {
+        found: freePlayGuessedCountryIds.size,
+        total: playableCapitalTotal(),
+        attempts: freePlayAttempts,
+        correct: freePlayCorrect,
+        streak: freePlayStreak,
+      });
+    } else {
+      updateStatsView(stats, countryIndex, state);
+    }
+    if (isCapitalRecallMode && capitalRecallMap) {
+      activeFlagColorTarget = null;
+      activeMapPromptKey = null;
+      if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
+      prompt.status.textContent = freePlayEnabled ? "Free play" : state.status === "complete" ? "Complete" : `Round ${state.roundNumber}`;
+      prompt.kicker.textContent = "Capital recall";
+      capitalRecallMap.element.classList.toggle("is-freeplay", freePlayEnabled);
+      if (prompt.imageSlot.firstElementChild !== capitalRecallMap.element) {
+        prompt.imageSlot.replaceChildren(capitalRecallMap.element);
+      }
+      capitalRecallMap.update(
+        freePlayEnabled ? freePlayGuessedCountryIds : state.guessedCountryIds,
+        freePlayEnabled ? freePlayLatestCountryId : current?.id ?? null,
+        freePlayEnabled ? freePlayLatestCountryId : latestCapitalRecallCountryId,
+      );
+    } else if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
       activeFlagColorTarget = null;
       prompt.status.textContent = `Round ${state.roundNumber}`;
       prompt.kicker.textContent = category?.label ?? "Map";
@@ -374,13 +540,16 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
       updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
     }
-    updateAtlasView(atlas, countries, state.guessedCountryIds);
+    updateAtlasView(atlas, countries, freePlayEnabled ? freePlayGuessedCountryIds : state.guessedCountryIds);
     const playing = state.status === "playing";
+    const acceptingInput = freePlayEnabled || playing;
     if (!playing || state.hintLevel < TOTAL_HINTS) revealAnswerArmed = false;
     const revealAnswerReady = state.hintLevel >= TOTAL_HINTS;
     const hintLabel = revealAnswerReady ? (revealAnswerArmed ? "Reveal answer" : "Reveal answer?") : "Hint";
-    input.disabled = !playing;
-    submitButton.disabled = !playing;
+    input.disabled = !acceptingInput;
+    submitButton.disabled = !acceptingInput;
+    hintButton.hidden = freePlayEnabled;
+    mobileHintButton.hidden = freePlayEnabled;
     hintButton.disabled = !playing;
     mobileHintButton.disabled = !playing;
     hintButton.textContent = hintLabel;
@@ -389,6 +558,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     mobileHintButton.classList.toggle("is-reveal-armed", revealAnswerReady);
     hintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
     mobileHintButton.setAttribute("aria-label", revealAnswerReady ? hintLabel : "Get a hint");
+    skipButton.hidden = freePlayEnabled;
+    mobileSkipButton.hidden = freePlayEnabled;
     skipButton.disabled = !playing;
     mobileSkipButton.disabled = !playing;
     renderTimer();
@@ -452,7 +623,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   playTimer = createPlayTimer({
     storage: options.storage,
-    keys: timerKeysForMode(options.selectedGameMode),
+    keys: timerKeysForMode(options.selectedGameMode, activeFlagPool),
     isComplete: () => engine.getState().status === "complete",
     onTick: renderTimer,
   });
@@ -461,6 +632,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "submit",
     (event) => {
       event.preventDefault();
+      if (freePlayEnabled) {
+        handleFreePlayGuess(false);
+        return;
+      }
       if (engine.getState().currentCategoryId === "flag-colors") {
         const guessedCountry = countryForGuess(countryIndex, input.value);
         if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
@@ -475,6 +650,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "input",
     () => {
       if (isDailyChallenge) return;
+      if (freePlayEnabled) {
+        handleFreePlayGuess(true);
+        return;
+      }
       const events = engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now(), auto: true });
       if (events.length > 0) dispatchAndRender(events);
     },
@@ -533,6 +712,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     },
     { signal: controller.signal },
   );
+  freePlayToggle.addEventListener("click", () => setFreePlayEnabled(!freePlayEnabled), { signal: controller.signal });
   timerModeSelect.addEventListener(
     "change",
     () => {
@@ -584,10 +764,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   );
 
   updateAtlasView(atlas, countries, initialState.guessedCountryIds);
-  const logo = el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
+  const logo = createBrandLockup(options.onHome);
 
   atlas.openButton.addEventListener("click", () => setAtlasOpen(atlas, true), { signal: controller.signal });
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
@@ -621,8 +798,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           el("aside", {
             className: "answer-panel",
             children: [
-              el("div", { className: "panel-title", children: [el("h2", { text: "Name the place" })] }),
+              el("div", { className: "panel-title has-freeplay-toggle", children: [el("h2", { text: "Name the place" }), freePlayToggle] }),
               form,
+              ...(flagPoolSelector ? [flagPoolSelector.element] : []),
               hintPopover,
               mobileExtrasToggle,
               mobileExtrasPanel,

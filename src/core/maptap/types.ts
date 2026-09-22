@@ -9,6 +9,10 @@ export interface MapTapLocation {
   readonly lng: number;
   readonly difficulty: MapTapDifficulty;
   readonly wikiSlug: string;
+  // Distance from the target that still scores full marks. Large natural features use a wide
+  // zone (and optional extra anchors) so guessing "somewhere in the Andes" isn't pure luck.
+  readonly toleranceKm?: number;
+  readonly anchors?: readonly { readonly lat: number; readonly lng: number }[];
 }
 
 // Public round payload. Do not include lat/lng here when a backend is available.
@@ -17,6 +21,8 @@ export interface MapTapRoundTarget {
   readonly name: string;
   readonly category: MapTapCategory;
   readonly difficulty: MapTapDifficulty;
+  readonly toleranceKm?: number;
+  readonly anchors?: readonly { readonly lat: number; readonly lng: number }[];
 }
 
 export interface MapTapGuessInput {
@@ -36,4 +42,5 @@ export interface MapTapGuessResult {
   readonly score: number;
   readonly maxScore: number;
   readonly decayKm: number;
+  readonly toleranceKm: number;
 }

@@ -1,3 +1,4 @@
+import { flashScreen, playCorrect, playWrong } from "./sfx";
 import { el } from "./createElement";
 
 export interface FeedbackView {
@@ -17,4 +18,12 @@ export function showFeedback(view: FeedbackView, message: string, tone: "neutral
   view.element.hidden = false;
   view.element.className = `feedback ${tone}`;
   view.element.textContent = message;
+  // Central cue point for every solo mode: successes chime green, misses buzz red.
+  if (tone === "good") {
+    playCorrect();
+    flashScreen("good");
+  } else if (tone === "bad") {
+    playWrong();
+    flashScreen("bad");
+  }
 }

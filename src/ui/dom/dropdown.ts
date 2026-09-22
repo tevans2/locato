@@ -59,14 +59,15 @@ export function enhanceDropdown(
     const usableWidth = Math.max(0, viewportWidth - DROPDOWN_MARGIN_PX * 2);
     const isGameModeMenu = dropdown.classList.contains("game-mode-dropdown");
     const isActionMenu = dropdown.classList.contains("action-menu");
-    const minWidth = isGameModeMenu ? 560 : isActionMenu ? 220 : 280;
-    const maxWidth = isGameModeMenu ? 640 : isActionMenu ? 280 : DROPDOWN_MAX_WIDTH_PX;
+    const minWidth = isGameModeMenu ? 720 : isActionMenu ? 220 : 280;
+    const maxWidth = isGameModeMenu ? 900 : isActionMenu ? 280 : DROPDOWN_MAX_WIDTH_PX;
     const width = Math.min(Math.max(summaryRect.width, minWidth), maxWidth, usableWidth);
     const left = clamp(summaryRect.right - width, DROPDOWN_MARGIN_PX, viewportWidth - width - DROPDOWN_MARGIN_PX);
     const spaceBelow = viewportHeight - summaryRect.bottom - DROPDOWN_GAP_PX - DROPDOWN_MARGIN_PX;
     const spaceAbove = summaryRect.top - DROPDOWN_GAP_PX - DROPDOWN_MARGIN_PX;
     const openAbove = spaceBelow < 180 && spaceAbove > spaceBelow;
-    const availableHeight = Math.max(DROPDOWN_MIN_HEIGHT_PX, Math.min(openAbove ? spaceAbove : spaceBelow, DROPDOWN_MAX_HEIGHT_PX));
+    const dropdownMaxHeight = isGameModeMenu ? 620 : DROPDOWN_MAX_HEIGHT_PX;
+    const availableHeight = Math.max(DROPDOWN_MIN_HEIGHT_PX, Math.min(openAbove ? spaceAbove : spaceBelow, dropdownMaxHeight));
     const contentHeight = Math.min(menu.scrollHeight, availableHeight);
     const top = openAbove
       ? Math.max(DROPDOWN_MARGIN_PX, summaryRect.top - DROPDOWN_GAP_PX - contentHeight)

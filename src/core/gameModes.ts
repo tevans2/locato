@@ -1,11 +1,12 @@
 import { soloPromptCategories } from "./categories";
 
-export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals";
+export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "capital-recall";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
-export type StreetViewGameModeId = "streetview-country";
+export type StreetViewGameModeId = "streetview-country" | "geoguessr";
 export type MapTapGameModeId = "map-tap";
+export type WorldSplitGameModeId = "worldsplit";
 export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
-export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId;
+export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId | WorldSplitGameModeId;
 
 export interface GameModeOption {
   readonly id: GameModeId;
@@ -14,10 +15,11 @@ export interface GameModeOption {
   readonly group: "Prompt games" | "World map games" | "Street View games";
 }
 
-const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals"];
+const PROMPT_GAME_MODE_IDS: readonly PromptGameModeId[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"];
 const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "click-country", "spot-country", "puzzle"];
-const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country"];
+const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country", "geoguessr"];
 const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
+const WORLD_SPLIT_GAME_MODE_IDS: readonly WorldSplitGameModeId[] = ["worldsplit"];
 
 export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
   const category = soloPromptCategories.find((item) => item.id === id);
@@ -56,7 +58,22 @@ export const worldMapGameModeOptions: readonly GameModeOption[] = [
   },
 ];
 
+export const worldSplitGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "worldsplit",
+    label: "Worldsplit",
+    description: "Draw one straight line that divides a population as evenly as possible.",
+    group: "World map games",
+  },
+];
+
 export const streetViewGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "geoguessr",
+    label: "GeoGuessr",
+    description: "Explore a mystery Street View, pin the exact location, and score up to 5,000 points per round.",
+    group: "Street View games",
+  },
   {
     id: "streetview-country",
     label: "Street View Country",
@@ -75,7 +92,7 @@ export const mapTapGameModeOptions: readonly GameModeOption[] = [
 ];
 
 export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
-export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
+export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...worldSplitGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
 
 export function isPromptGameModeId(id: string): id is PromptGameModeId {
   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
@@ -91,6 +108,10 @@ export function isStreetViewGameModeId(id: string): id is StreetViewGameModeId {
 
 export function isMapTapGameModeId(id: string): id is MapTapGameModeId {
   return MAP_TAP_GAME_MODE_IDS.includes(id as MapTapGameModeId);
+}
+
+export function isWorldSplitGameModeId(id: string): id is WorldSplitGameModeId {
+  return WORLD_SPLIT_GAME_MODE_IDS.includes(id as WorldSplitGameModeId);
 }
 
 export function isTimerGameModeId(id: string): id is TimerGameModeId {

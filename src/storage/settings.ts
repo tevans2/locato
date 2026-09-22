@@ -8,7 +8,7 @@ export interface Settings {
 
 export const defaultSettings: Settings = {
   reducedMotion: false,
-  soundEnabled: false,
+  soundEnabled: true,
   showAutocomplete: false,
 };
 

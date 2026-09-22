@@ -8,6 +8,7 @@ import {
   type WorldMapPolygon,
   type WorldMapPosition,
 } from "../../core/map";
+import { zoomViewBoxAroundPoint } from "./viewBoxZoom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const VIEWBOX_WIDTH = MAP_VIEWBOX_WIDTH;
@@ -225,18 +226,8 @@ function pointerToMapPosition(svg: SVGSVGElement, viewBox: ViewBoxState, clientX
 }
 
 function zoomAround(svg: SVGSVGElement, viewBox: ViewBoxState, factor: number, clientX: number, clientY: number): ViewBoxState {
-  const [mapX, mapY] = pointerToMapPosition(svg, viewBox, clientX, clientY);
-  const nextWidth = viewBox.width * factor;
-  const nextHeight = viewBox.height * factor;
-  const widthRatio = nextWidth / viewBox.width;
-  const heightRatio = nextHeight / viewBox.height;
-
-  return clampViewBox({
-    x: mapX - (mapX - viewBox.x) * widthRatio,
-    y: mapY - (mapY - viewBox.y) * heightRatio,
-    width: nextWidth,
-    height: nextHeight,
-  });
+  const point = pointerToMapPosition(svg, viewBox, clientX, clientY);
+  return clampViewBox(zoomViewBoxAroundPoint(viewBox, point, factor, VIEWBOX_WIDTH / MAX_ZOOM, VIEWBOX_WIDTH));
 }
 
 function clampNumber(value: number, min: number, max: number): number {

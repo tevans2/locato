@@ -1,26 +1,112 @@
 :root {
-  color-scheme: dark;
-  --bg: #080b08;
-  --bg-elevated: #0d110d;
-  --surface: #111710;
-  --surface-soft: #151c14;
-  --border: rgba(232, 226, 211, 0.14);
-  --border-strong: rgba(232, 226, 211, 0.28);
-  --text: #f1eadc;
-  --muted: #a49d8d;
-  --subtle: #747d6d;
-  --accent: #b8e36d;
-  --accent-soft: rgba(184, 227, 109, 0.14);
-  --earth: #bb8256;
-  --good: #98df74;
-  --bad: #ee7d6b;
-  --radius-sm: 3px;
-  --radius-md: 5px;
-  --radius-lg: 7px;
-  --shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+  color-scheme: light;
+  --bg: #f8f7f0;
+  --bg-elevated: #fcfbf5;
+  --surface: #fffef9;
+  --surface-soft: #eeefe5;
+  --border: rgba(25, 35, 31, 0.14);
+  --border-strong: rgba(25, 35, 31, 0.3);
+  --text: #253e30;
+  --muted: #687264;
+  --subtle: #8a948e;
+  --accent: #bbcf91;
+  --accent-soft: #e7edda;
+  --earth: #3b7567;
+  --route: #b9734d;
+  --good: #5f9728;
+  --bad: #c94f35;
+  --sea: #c9e0df;
+  --land: #f7f5eb;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow: 0 24px 64px rgba(25, 35, 31, 0.14);
+  --shadow-panel: 0 12px 34px rgba(25, 35, 31, 0.08);
+  --panel-border: rgba(25, 35, 31, 0.2);
+  --panel-border-strong: rgba(25, 35, 31, 0.38);
+  --panel-bg: var(--surface);
+  --panel-bg-strong: var(--surface);
+  --panel-grid:
+    linear-gradient(rgba(25, 35, 31, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(25, 35, 31, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
   --app-shell-max-width: 1480px;
   --app-shell-gutter: clamp(24px, 5vw, 56px);
   --header-control-height: 46px;
-  --floating-auth-clearance: 132px;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  --floating-auth-clearance: 244px;
+  /* Width of the fixed top-right strip (auth + theme + sound) that in-flow headers must clear. */
+  --floating-controls-clearance: 292px;
+  --font-sans: "Manrope Variable", sans-serif;
+  --font-editorial: "Fraunces Variable", Georgia, serif;
+  --brand: #31583f;
+  --brand-hover: #254731;
+  --on-brand: #fffef2;
+  --focus: #668a3f;
+  --route-soft: #f2e4d7;
+  --font-display: var(--font-sans);
+  font-family: var(--font-sans);
+
+  /* Shared map palette. Consumed by CSS map classes and by canvas/WebGL/MapLibre renderers
+     (which read these at paint time) so every game mode draws the same world per theme. */
+  --map-ocean-top: #d8eae7;
+  --map-ocean-mid: #c9e0df;
+  --map-ocean-bottom: #bcd6d3;
+  --map-land-fill: rgba(247, 245, 235, 0.94);
+  --map-land-fill-unplayable: rgba(247, 245, 235, 0.5);
+  --map-line-country: #668078;
+  --map-line-guessed: #4b6d2a;
+  --map-line-hit: #923d28;
+  --map-line-target: #923d28;
+  --map-fill-guessed: rgba(139, 210, 63, 0.8);
+  --map-fill-target: rgba(239, 106, 69, 0.85);
+  --map-fill-missed: rgba(239, 106, 69, 0.72);
+  --multiplayer-scrim: rgba(25, 35, 31, 0.38);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand: #c0d49e;
+  --brand-hover: #d0e2b1;
+  --on-brand: #1b3023;
+  --focus: #c0d49e;
+  --route-soft: #3e3226;
+  --bg: #151e18;
+  --bg-elevated: #1c2820;
+  --surface: #1c2820;
+  --surface-soft: #26352a;
+  --border: rgba(226, 234, 225, 0.13);
+  --border-strong: rgba(226, 234, 225, 0.28);
+  --text: #efefdd;
+  --muted: #adb9a6;
+  --subtle: #748078;
+  --accent: #b9d18f;
+  --accent-soft: #2c3e2b;
+  /* Dark map palette: preserves the previous always-dark renderer values. */
+  --map-ocean-top: #121a10;
+  --map-ocean-mid: #0b100b;
+  --map-ocean-bottom: #11180f;
+  --map-land-fill: rgba(232, 226, 211, 0.09);
+  --map-land-fill-unplayable: rgba(232, 226, 211, 0.04);
+  --map-line-country: #e8e2d3;
+  --map-line-guessed: #f5f4ce;
+  --map-line-hit: #ffdcd1;
+  --map-line-target: #ffebdb;
+  --map-fill-guessed: rgba(184, 227, 109, 0.74);
+  --map-fill-target: rgba(237, 74, 67, 0.9);
+  --map-fill-missed: rgba(237, 74, 67, 0.72);
+  --multiplayer-scrim: rgba(4, 7, 5, 0.74);
+  --earth: #66b6a8;
+  --route: #f07a58;
+  --good: #9bd45b;
+  --bad: #ef8069;
+  --sea: #173638;
+  --land: #d7d9c9;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  --shadow-panel: 0 14px 38px rgba(0, 0, 0, 0.24);
+  --panel-border: rgba(226, 234, 225, 0.2);
+  --panel-border-strong: rgba(226, 234, 225, 0.34);
+  --panel-bg: var(--surface);
+  --panel-bg-strong: var(--surface-soft);
+  --panel-grid:
+    linear-gradient(rgba(232, 240, 231, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(232, 240, 231, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
 }

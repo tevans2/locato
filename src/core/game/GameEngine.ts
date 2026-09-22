@@ -1,6 +1,7 @@
 import { COUNTRY_FACTS } from "../countries/facts";
 import { normalizeAnswerVariants, type Country, type CountryId, type CountryIndex } from "../countries";
 import { buildPromptSlots, getCategory } from "../categories";
+import { createFameRampQueue } from "./fameRamp";
 import { createRoundQueue, takeNextCountry } from "./roundQueue";
 import type { CreateGameEngineInput, GameCommand, GameEngine, GameEvent, GameState, Hint } from "./types";
 
@@ -24,12 +25,41 @@ function countNameWords(name: string): number {
   return name.split(/\s+/).filter(Boolean).length;
 }
 
-function createHint(country: Country, level: number): Hint {
+function createCapitalHint(country: Country, level: number): Hint {
+  const hintLevel = Math.min(level, TOTAL_HINTS - 1);
+  if (hintLevel === 0) {
+    return {
+      title: "Capital clue",
+      message: `${country.continent}. ${country.capitalAliases.length > 0 ? "Alternate capital spellings are accepted." : "The official capital name is expected."}`,
+      level: hintLevel,
+    };
+  }
+
+  if (hintLevel === 1) {
+    const letterCount = countNameLetters(country.capital);
+    const wordCount = countNameWords(country.capital);
+    return {
+      title: "Capital shape",
+      message: `Starts with “${country.capital.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
+      level: hintLevel,
+    };
+  }
+
+  return {
+    title: "Capital trace",
+    message: country.capitalAliases.length > 0 ? `Also accepted: ${country.capitalAliases[0]}.` : `One letter inside it is “${country.capital.charAt(Math.max(0, Math.floor(country.capital.length / 2))).toUpperCase()}”.`,
+    level: hintLevel,
+  };
+}
+
+function createHint(country: Country, level: number, categoryId: string): Hint {
+  if (categoryId === "capital-recall") return createCapitalHint(country, level);
+
   const hintLevel = Math.min(level, TOTAL_HINTS - 1);
   if (hintLevel === 0) {
     return {
       title: "Country note",
-      message: COUNTRY_FACTS[country.code] ?? `It has a distinct geographic profile in ${country.continent}.`,
+      message: COUNTRY_FACTS[country.code] ?? `It has a distinct geographic profile in ${country.geographyLabel ?? country.continent}.`,
       level: hintLevel,
     };
   }
@@ -39,7 +69,7 @@ function createHint(country: Country, level: number): Hint {
     const wordCount = countNameWords(country.name);
     return {
       title: "Name shape",
-      message: `${country.continent}. Starts with “${country.name.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
+      message: `${country.geographyLabel ?? country.continent}. Starts with “${country.name.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
       level: hintLevel,
     };
   }
@@ -74,9 +104,13 @@ function createInitialState(
   categoryIds: readonly string[],
   seed: string,
   now: number,
+  countryIndex?: CountryIndex,
+  poolOrdering?: CreateGameEngineInput["poolOrdering"],
 ): GameState {
   const poolCountryIds = [...assignments.keys()];
-  const initialQueue = createRoundQueue(poolCountryIds, seed);
+  const initialQueue = poolOrdering === "fame-ramp" && countryIndex
+    ? createFameRampQueue(poolCountryIds, countryIndex, seed)
+    : createRoundQueue(poolCountryIds, seed);
   const next = takeNextCountry(initialQueue, new Set<CountryId>());
   const status = next.countryId === null ? "complete" : "playing";
   return {
@@ -126,7 +160,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
   const { countryIndex } = input;
   let categoryIds = input.initialState?.categoryIds ?? input.categoryIds;
   let assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, input.initialState?.seed ?? input.seed), input.poolCountryIds);
-  let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now());
+  let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now(), input.countryIndex, input.poolOrdering);
 
   function categoryFor(countryId: CountryId) {
     return getCategory(assignments.get(countryId) ?? "") ?? getCategory("flags");
@@ -153,7 +187,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
         if (command.type === "START_GAME") categoryIds = command.categoryIds;
         const seed = command.type === "START_GAME" ? command.seed : state.seed;
         assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, seed), input.poolCountryIds);
-        state = createInitialState(assignments, categoryIds, seed, command.now);
+        state = createInitialState(assignments, categoryIds, seed, command.now, input.countryIndex, input.poolOrdering);
         if (state.currentCountryId !== null) events.push({ type: "GAME_STARTED", currentCountryId: state.currentCountryId });
         if (command.type === "RESET_GAME") events.push({ type: "GAME_RESET" });
         return events;
@@ -171,7 +205,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
       if (!currentCountry || !category) return events;
 
       if (command.type === "REQUEST_HINT") {
-        const hint = createHint(currentCountry, state.hintLevel);
+        const hint = createHint(currentCountry, state.hintLevel, category.id);
         state = {
           ...state,
           hintLevel: state.hintLevel + 1,

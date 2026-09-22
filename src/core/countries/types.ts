@@ -20,6 +20,10 @@ export interface RawCountry {
   readonly flagSrc: string;
   readonly capital: string;
   readonly capitalAliases: readonly string[];
+  /** Optional prompt-mode restriction used by non-sovereign flag entries. */
+  readonly allowedCategoryIds?: readonly string[];
+  /** Human-readable geography label for hints when the continent enum is too coarse. */
+  readonly geographyLabel?: string;
 }
 
 export interface Country {
@@ -33,6 +37,8 @@ export interface Country {
   readonly acceptedAnswers: readonly string[];
   readonly capital: string;
   readonly capitalAliases: readonly string[];
+  readonly allowedCategoryIds?: readonly string[];
+  readonly geographyLabel?: string;
 }
 
 

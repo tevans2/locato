@@ -45,6 +45,9 @@ export interface CreateGameEngineInput {
   readonly seed: string;
   readonly now?: number;
   readonly poolCountryIds?: readonly CountryId[];
+  // "fame-ramp" front-loads famous countries for solo play; daily/multiplayer keep the
+  // default seeded shuffle.
+  readonly poolOrdering?: "shuffle" | "fame-ramp";
   readonly initialState?: GameState;
 }
 

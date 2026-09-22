@@ -1,0 +1,347 @@
+/* Shared light cartographic theme. Imported last so every route inherits the
+   same visual language without changing the game and navigation logic. */
+
+body {
+  color: var(--text);
+  background: var(--bg);
+}
+
+body::before { display: none; }
+
+body:not(:has(.landing-screen-shell)) button,
+body:not(:has(.landing-screen-shell)) select,
+body:not(:has(.landing-screen-shell)) input {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+body:not(:has(.landing-screen-shell)) button:hover:not(:disabled) {
+  border-color: var(--text);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+select { color-scheme: light; background-color: var(--surface); }
+select option { color: var(--text); background: var(--surface); }
+
+.primary-action,
+body:not(:has(.landing-screen-shell)) .primary-action {
+  border-color: var(--accent);
+  border-radius: var(--radius-sm);
+  color: #172116;
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.primary-action:hover:not(:disabled),
+body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled) {
+  border-color: var(--text);
+  color: #172116;
+  background: var(--accent);
+}
+
+.secondary-action,
+.ghost-action {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.app-shell { padding-block: clamp(12px, 2dvh, 20px); }
+
+.brand-logo { filter: none; opacity: 1; }
+.brand-name { color: var(--text); font-family: var(--font-sans); letter-spacing: -.03em; }
+
+.landing-return-action,
+.auth-trigger {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 8px 24px rgba(25,35,31,.08);
+  backdrop-filter: blur(12px);
+}
+
+.landing-return-action:hover,
+.auth-trigger:hover {
+  border-color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(25,35,31,.1);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header,
+.stats-header,
+.friends-header {
+  border-bottom-color: var(--border);
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action,
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
+body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
+body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action,
+.category-dropdown-summary,
+.action-menu-trigger {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+body:not(:has(.landing-screen-shell)) .game-header .nav-action,
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
+body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
+.answer-panel > .actions button,
+.country-guess-panel > .actions button,
+.answer-panel .mobile-extras-panel > .actions button,
+.country-guess-panel .mobile-extras-panel > .actions button,
+.atlas-open {
+  border-radius: var(--radius-sm);
+}
+
+.category-dropdown-summary:hover,
+.category-dropdown[open] .category-dropdown-summary {
+  border-color: var(--text);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.category-dropdown-menu,
+.action-menu-panel,
+.mobile-nav-sheet:not([hidden]) {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: none;
+}
+
+.category-option {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.category-option:hover,
+.category-option:has(input:checked) {
+  border-color: #7bad37;
+  background: var(--accent-soft);
+}
+
+.flag-card,
+.answer-panel,
+.country-guess-panel,
+.multiplayer-card,
+.stats-card,
+.stats-hero-card,
+.friend-section,
+.friend-profile-panel,
+.daily-result-stats article,
+.achievement-panel,
+.hint-popover,
+.country-click-prompt,
+.map-review-panel,
+.maptap-sidebar {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.flag-card::before,
+.answer-panel::before { display: none; }
+
+.flag-card-top { border-bottom-color: var(--border); }
+
+.flag-slot {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(rgba(25,35,31,.038) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(25,35,31,.03) 1px, transparent 1px) 0 0 / 44px 44px,
+    var(--bg-elevated);
+}
+
+.flag-slot::after { border-color: rgba(25,35,31,.08); }
+.flag-image { box-shadow: 0 16px 36px rgba(25,35,31,.16); }
+
+.stat-card,
+.progress-card,
+.daily-badge,
+.daily-share-text,
+.daily-history-row,
+.achievement-chip,
+.feedback,
+.map-review-country,
+.maptap-result-score,
+.maptap-result-stat,
+.maptap-mp-result-row,
+.player-row,
+.score-row,
+.result-row,
+.leaderboard-row,
+.friend-row,
+.puzzle-piece-card {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--bg-elevated);
+  box-shadow: none;
+}
+
+.progress-track,
+.atlas-progress-track,
+.cat-bar-track,
+.multiplayer-timer { background: #dfe4df; }
+
+.progress-fill,
+.atlas-progress-fill,
+.cat-bar-fill,
+.multiplayer-timer-fill { background: var(--accent); }
+
+.guess-form { border-color: var(--border); background: var(--bg-elevated); }
+.guess-form input,
+.maptap-filter-select,
+.maptap-decay-input,
+.puzzle-continent-select,
+.country-guess-timer-select { border-color: var(--border-strong); background-color: var(--surface); }
+
+.feedback.good,
+.achievement-panel { border-color: #9fca67; color: #49771f; background: #eef7e3; }
+.feedback.bad,
+.map-review-panel { border-color: #df9b8c; color: #a13b28; background: #fff0eb; }
+
+.world-map-panel,
+.world-globe-panel,
+.puzzle-board-shell,
+.puzzle-piece-tray,
+.maptap-map-panel,
+.maptap-globe {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(rgba(25,35,31,.055) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(25,35,31,.045) 1px, transparent 1px) 0 0 / 64px 64px,
+    var(--sea);
+  box-shadow: var(--shadow-panel);
+}
+
+.streetview-stage {
+  border-color: var(--border-strong);
+  background: #dde5df;
+  box-shadow: var(--shadow-panel);
+}
+
+.world-map-panel::before,
+.world-globe-panel::before,
+.puzzle-board-shell::before,
+.streetview-stage::before,
+.maptap-map-panel::before { border-color: rgba(25,35,31,.08); }
+
+.world-map-country {
+  fill: var(--land);
+  stroke: #668078;
+  stroke-width: .65;
+}
+
+.world-map-country-unplayable { fill: rgba(247,245,235,.5); stroke: rgba(80,106,99,.3); }
+.world-map-country.is-guessed,
+.puzzle-country-piece.is-placed,
+.puzzle-country-piece.is-accuracy-close { fill: var(--accent); stroke: #4b6d2a; filter: none; }
+.world-map-country.is-target,
+.world-map-country.is-review-missed,
+.world-map-country.is-review-active,
+.puzzle-country-piece.is-accuracy-far { fill: var(--route); stroke: #923d28; filter: none; }
+.world-map-panel.is-click-country-mode .world-map-country[data-country-id]:hover { fill: var(--accent-soft); stroke: #5d7f39; }
+
+.world-map-control-button,
+.puzzle-border-toggle,
+.maptap-attribution {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 8px 24px rgba(25,35,31,.08);
+}
+
+.world-map-country-label,
+.maptap-info-card,
+.country-guess-screen.is-map-fullscreen .country-guess-panel,
+.streetview-country-screen.is-streetview-fullscreen .game-header,
+.streetview-country-screen.is-streetview-fullscreen .streetview-panel {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: rgba(255,255,255,.96);
+  box-shadow: var(--shadow);
+}
+
+.puzzle-piece-card:hover,
+.puzzle-piece-card:focus-visible,
+.puzzle-piece-card.is-in-play,
+.map-review-country.is-active,
+.leaderboard-row.is-winner,
+.player-row.is-local,
+.score-row.is-local {
+  border-color: #8fbb52;
+  background: var(--accent-soft);
+}
+
+.puzzle-piece-card-path { fill: #70a632; }
+
+.maptap-sidebar .panel-title {
+  border-color: var(--border);
+  background: var(--accent-soft);
+}
+
+.streetview-loader { background: rgba(243,244,237,.86); }
+.streetview-loader-status { color: var(--text); }
+
+.multiplayer-status {
+  border-color: var(--border-strong);
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.multiplayer-card,
+.lobby-panel { background: var(--surface); }
+.room-code { color: #5f9328; text-shadow: none; }
+
+.auth-panel {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: none;
+}
+
+.auth-mode-tabs { border-color: var(--border); background: var(--bg); }
+.auth-mode-tab { color: var(--muted); background: transparent; }
+.auth-mode-tab.is-active { color: var(--text); background: var(--accent-soft); }
+.auth-initial { color: var(--text); background: var(--accent); }
+
+.stats-hero-card,
+.stats-card { background: var(--surface); }
+.stats-hero-card.is-highlight { border-color: #93bd5c; background: var(--accent-soft); }
+.stats-hero-card.is-highlight .stats-hero-value { color: #4f7f22; }
+.cat-bar-track { background: #e1e6e1; }
+.recent-game-row:hover { border-color: var(--border); background: var(--bg-elevated); }
+.recent-game-row.is-win { border-color: #9ac667; background: var(--accent-soft); }
+
+.friend-section,
+.friend-profile-panel { background: var(--surface); }
+.friend-add-input { border-color: var(--border-strong); color: var(--text); background: var(--surface); }
+.friend-row { background: var(--bg-elevated); }
+.friend-avatar { background: var(--accent-soft); }
+.game-invite-toast { border-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
+
+.atlas-overlay { background: rgba(25,35,31,.36); }
+.atlas-drawer { border-left-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: -24px 0 60px rgba(25,35,31,.18); }
+.atlas-header,.atlas-section { border-bottom-color: var(--border); }
+.atlas-chip { border-color: #a2ca70; color: var(--text); background: var(--accent-soft); }
+
+@media (max-width: 700px) {
+  .landing-return-action,
+  .auth-trigger { border-radius: var(--radius-sm); }
+}

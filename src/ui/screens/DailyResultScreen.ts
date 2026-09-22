@@ -4,10 +4,12 @@ import { recordDailyAchievement, type Achievement } from "../../storage/achievem
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface DailyResultScreenOptions {
   readonly result: DailyResultSave;
   readonly storage: Storage;
+  readonly onHome: () => void;
   readonly onBackToSolo: () => void;
   readonly onDailyChallenge: () => void;
   readonly onMultiplayer: () => void;
@@ -152,10 +154,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       el("header", {
         className: "game-header",
         children: [
-          el("div", {
-            className: "brand-lockup compact",
-            children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-          }),
+          createBrandLockup(options.onHome),
           el("div", { className: "game-header-actions", children: [dailyButton, topBackButton, multiplayerButton] }),
         ],
       }),

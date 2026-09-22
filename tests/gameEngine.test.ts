@@ -161,6 +161,19 @@ describe("game engine", () => {
     expect(events[0]?.type).toBe("GUESS_CORRECT");
   });
 
+  it("plays a capital-recall category answered by capital city", () => {
+    const countryIndex = indexCountries([
+      { name: "Brazil", code: "BR", aliases: ["Brasil"], continent: "South America", flagSrc: "assets/flags/br.svg", capital: "Brasília", capitalAliases: ["Brasilia"] },
+    ] as const satisfies readonly RawCountry[]);
+    const engine = createGameEngine({ countryIndex, categoryIds: ["capital-recall"], seed: "capital-recall", now: 1000 });
+
+    expect(engine.getState().currentCategoryId).toBe("capital-recall");
+    const current = getCurrentCountry(countryIndex, engine.getState());
+    const category = getCategory("capital-recall");
+    expect(category?.prompt(current!).value).toBe("Brazil");
+    expect(engine.dispatch({ type: "SUBMIT_GUESS", value: "Brasilia", now: 1100, auto: true })[0]?.type).toBe("GUESS_CORRECT");
+  });
+
   it("plays a country-outline category answered by country name", () => {
     const countryIndex = indexCountries(fixtureCountries);
     const engine = createGameEngine({ countryIndex, categoryIds: ["shapes"], seed: "shapes", now: 1000 });

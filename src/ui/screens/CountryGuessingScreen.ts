@@ -12,11 +12,12 @@ import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createAtlasView, setAtlasOpen, updateAtlasView } from "../dom/renderAtlas";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
-import { createGlobeMapView } from "../dom/renderGlobeMap";
+import type { GlobeMapView } from "../dom/renderGlobeMap";
 import { createPuzzleMapView, type PuzzleMapProgress } from "../dom/renderPuzzleMap";
 import { createWorldMapView, setWorldMapMissingMarkersVisible, setWorldMapReviewCountries, setWorldMapTargetCountry, updateWorldMapView } from "../dom/renderWorldMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface WorldMapRunResult {
   readonly playMode: WorldMapGameModeId;
@@ -33,6 +34,7 @@ export interface CountryGuessingScreenOptions {
   readonly storage: Storage;
   readonly initialMode: WorldMapGameModeId;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   // Called once per world-map run when it ends (completion, restart, mode change, or leaving).
@@ -47,13 +49,6 @@ export interface CountryGuessingScreenOptions {
 type CountryGuessPlayMode = WorldMapGameModeId;
 type MapSurface = "flat" | "globe";
 
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
-}
 
 export function createCountryGuessingScreen(options: CountryGuessingScreenOptions): Screen {
   const controller = new AbortController();
@@ -159,6 +154,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         ),
       }),
     );
+  }
+
+  function recordWorldProgress(completed: boolean): void {
+    showAchievements(recordWorldAchievements(options.storage, {
+      playMode,
+      completed,
+      countryIndex,
+      guessedCountryIds,
+    }));
   }
 
   function renderMapReviewState(): void {
@@ -295,6 +299,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     playTimer.startIfNeeded();
     guessedCountryIds.add(country.id);
     lastCountryName.textContent = country.name;
+    recordWorldProgress(false);
 
     if (playMode === "spot-country") {
       targetCountryId = null;
@@ -307,7 +312,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         if (playTimer.mode === "count-up") {
           const finalTimeMs = playTimer.stop();
           recordCurrentRun(true);
-          showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+          recordWorldProgress(true);
           void finishTimerRun(finalTimeMs).then((result) => {
             showFeedback(
               feedback,
@@ -319,7 +324,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         }
 
         recordCurrentRun(true);
-        showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+        recordWorldProgress(true);
         showFeedback(
           feedback,
           `World complete. All ${countryIndex.countries.length} countries found. Switch to Timer mode to post a time to the leaderboard.`,
@@ -346,7 +351,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       if (playTimer.mode === "count-up") {
         const finalTimeMs = playTimer.stop();
         recordCurrentRun(true);
-        showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+        recordWorldProgress(true);
         void finishTimerRun(finalTimeMs).then((result) => {
           showFeedback(
             feedback,
@@ -358,7 +363,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       }
 
       recordCurrentRun(true);
-      showAchievements(recordWorldAchievements(options.storage, { playMode, completed: true }));
+      recordWorldProgress(true);
       showFeedback(
         feedback,
         `World complete. All ${countryIndex.countries.length} countries found. Switch to Timer mode to post a time to the leaderboard.`,
@@ -540,7 +545,15 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   const map = createWorldMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
-  const globe = createGlobeMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
+  let globeView: GlobeMapView | null = null;
+  const globeHost = el("div", { className: "world-globe-panel globe-host" });
+  const globe: GlobeMapView = {
+    element: globeHost,
+    update: (state) => globeView?.update(state),
+    showCountryLabel: (id) => globeView?.showCountryLabel(id),
+    resetView: () => globeView?.resetView(),
+    destroy: () => globeView?.destroy(),
+  };
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
@@ -719,8 +732,26 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   );
   mapSurfaceButton.addEventListener(
     "click",
-    () => {
+    async () => {
       dismissKeyboardIfTouchInput(input);
+      if (!globeView && mapSurface === "flat") {
+        mapSurfaceButton.disabled = true;
+        mapSurfaceButton.textContent = "Preparing globe…";
+        try {
+          const { createGlobeMapView } = await import("../dom/renderGlobeMap");
+          if (controller.signal.aborted) return;
+          globeView = createGlobeMapView(options.worldCountryFeatures, countryIndex, { onCountryClick: handleCountryClick });
+          globeHost.append(globeView.element);
+        } catch {
+          if (!controller.signal.aborted) showFeedback(feedback, "The 3D globe is unavailable on this device. You can keep playing on the flat map.", "neutral");
+          return;
+        } finally {
+          if (!controller.signal.aborted) {
+            mapSurfaceButton.disabled = false;
+            mapSurfaceButton.textContent = "3D globe";
+          }
+        }
+      }
       mapSurface = mapSurface === "flat" ? "globe" : "flat";
       map.showCountryLabel(null);
       globe.showCountryLabel(null);
@@ -834,7 +865,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
           el("div", { className: "game-header-actions", children: [dailyButton, leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),

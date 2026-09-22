@@ -80,11 +80,26 @@ export function createGameModeDropdown(options: GameModeDropdownOptions): GameMo
       el("summary", {
         className: "category-dropdown-summary",
         children: [
-          el("span", { className: "category-row-label", text: "Game mode" }),
+          el("span", { className: "category-row-label", text: "Now playing" }),
           el("span", { className: "game-mode-selected-copy", children: [selectedText] }),
+          el("span", { className: "game-mode-switch-action", text: "All games" }),
         ],
       }),
-      el("div", { className: "category-dropdown-menu", attrs: { role: "radiogroup", "aria-label": "Game modes" }, children: menuChildren }),
+      el("div", {
+        className: "category-dropdown-menu",
+        attrs: { role: "radiogroup", "aria-label": "Game modes" },
+        children: [
+          el("div", {
+            className: "game-mode-menu-heading",
+            children: [
+              el("span", { className: "eyebrow", text: "GAME LIBRARY" }),
+              el("strong", { text: "Choose what to play next" }),
+              el("span", { text: `${modeControls.length} games` }),
+            ],
+          }),
+          ...menuChildren,
+        ],
+      }),
     ],
   });
 

@@ -1,17 +1,21 @@
-import type { FinalResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FlagPool } from "../flagPools";
 import type { MapTapCategory } from "../maptap/types";
+import type { FinalResult, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
-  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly mapTapCategories?: readonly MapTapCategory[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
+  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
+
   | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string }
   | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
   | { readonly type: "LEAVE_ROOM" }
   | { readonly type: "SET_READY"; readonly ready: boolean }
-  | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly mapTapCategories?: readonly MapTapCategory[]; readonly roundLimit?: number; readonly roundDurationMs?: number }
+  | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
+
   | { readonly type: "START_GAME" }
   | { readonly type: "PLAY_AGAIN" }
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_MAPTAP_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
+  | { readonly type: "SUBMIT_GEOGUESSR_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "VOTE_SKIP" }
   | { readonly type: "SEND_CHAT_MESSAGE"; readonly text: string }
   | { readonly type: "REQUEST_HINT" };
@@ -27,6 +31,7 @@ export type ServerMessage =
   | { readonly type: "ANSWER_REJECTED"; readonly reason: string }
   | { readonly type: "ROUND_ENDED"; readonly answer: string; readonly results: readonly RoundResult[] }
   | { readonly type: "MAPTAP_ROUND_ENDED"; readonly targetName: string; readonly targetLat: number; readonly targetLng: number; readonly wikiSlug: string; readonly results: readonly MapTapRoundResult[] }
+  | { readonly type: "GEOGUESSR_ROUND_ENDED"; readonly countryName: string; readonly targetLat: number; readonly targetLng: number; readonly results: readonly GeoGuessrRoundResult[] }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
 

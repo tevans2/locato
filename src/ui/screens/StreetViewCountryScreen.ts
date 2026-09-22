@@ -1,5 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
-import { isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, type GameModeId } from "../../core/gameModes";
+import type { GameModeId } from "../../core/gameModes";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
 import { submitCountryGuess } from "../../core/map";
 import type { Screen } from "../../app/router";
@@ -8,10 +8,12 @@ import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { createMobileMenu } from "../dom/mobileMenu";
 import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   readonly dailyChallenge?: {
@@ -24,9 +26,10 @@ export interface StreetViewCountryScreenOptions {
 type RoundStatus = "playing" | "won" | "lost";
 type DailyStreetViewResult = { readonly missed: boolean; readonly wrongGuesses: number };
 
-const ROUND_CACHE_TARGET_SIZE = 8;
-const STREETVIEW_PRELOAD_SLOT_COUNT = ROUND_CACHE_TARGET_SIZE + 4;
-const STREETVIEW_VISUAL_WARMUP_MS = 2000;
+const ROUND_CACHE_TARGET_SIZE = 1;
+const STREETVIEW_PRELOAD_SLOT_COUNT = 1;
+const STREETVIEW_VISUAL_WARMUP_MS = 150;
+const STREETVIEW_LOAD_TIMEOUT_MS = 1800;
 
 interface StreetViewPreloadSlot {
   iframe: HTMLIFrameElement;
@@ -34,13 +37,7 @@ interface StreetViewPreloadSlot {
   ready: boolean;
   loadSequence: number;
   warmupTimer: number | null;
-}
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
+  loadTimeout: number | null;
 }
 
 function googleMapsEmbedApiKey(): string {
@@ -181,14 +178,15 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const streetViewPreloadSlots: StreetViewPreloadSlot[] = Array.from({ length: STREETVIEW_PRELOAD_SLOT_COUNT }, (_, index) => {
     const iframe = createStreetViewIframe(`Preloaded Street View frame ${index + 1}`, "streetview-frame is-buffer", true);
     streetViewIframes.push(iframe);
-    return { iframe, url: "", ready: false, loadSequence: 0, warmupTimer: null };
+    return { iframe, url: "", ready: false, loadSequence: 0, warmupTimer: null, loadTimeout: null };
   });
   let activeIframe = initialStreetViewFrame;
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key",
     children: [
-      el("strong", { text: "Google Maps Embed API key missing" }),
-      el("p", { text: "Add VITE_GOOGLE_MAPS_EMBED_API_KEY to your local .env file, then restart Vite." }),
+      el("strong", { text: "Street View unavailable" }),
+      el("p", { text: "Please try again later." }),
+      el("button", { className: "primary-action", text: "All games", attrs: { type: "button" }, on: { click: options.onHome } }),
     ],
   });
   const frameNumber = el("strong", { className: "stat-value", text: "1 / 3" });
@@ -246,8 +244,8 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     selectedMode: "streetview-country",
     signal: controller.signal,
     onChange: (gameMode) => {
-      if (isStreetViewGameModeId(gameMode)) return;
-      if (isPromptGameModeId(gameMode) || isWorldMapGameModeId(gameMode)) options.onGameModeChange(gameMode);
+      if (gameMode === "streetview-country") return;
+      options.onGameModeChange(gameMode);
     },
   });
 
@@ -276,7 +274,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
           el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet] }),
         ],
       }),
@@ -342,6 +340,10 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     if (slot.warmupTimer) {
       window.clearTimeout(slot.warmupTimer);
       slot.warmupTimer = null;
+    }
+    if (slot.loadTimeout) {
+      window.clearTimeout(slot.loadTimeout);
+      slot.loadTimeout = null;
     }
 
     slot.loadSequence += 1;
@@ -463,18 +465,40 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     slot.loadSequence = loadSequence;
     slot.url = url;
     slot.ready = false;
-    slot.iframe.onload = () => {
+    const finishLoading = (waitForVisualWarmup: boolean): void => {
       if (controller.signal.aborted || slot.loadSequence !== loadSequence || slot.url !== url) return;
+      if (slot.loadTimeout) {
+        window.clearTimeout(slot.loadTimeout);
+        slot.loadTimeout = null;
+      }
 
-      // The Google iframe fires load before the panorama tiles have necessarily painted.
-      // Keep it hidden for a short warm-up period so the promoted iframe is not a black screen.
-      slot.warmupTimer = window.setTimeout(() => {
-        slot.warmupTimer = null;
+      const markReady = (): void => {
         if (controller.signal.aborted || slot.loadSequence !== loadSequence || slot.url !== url) return;
         slot.ready = true;
         if (desiredStreetViewUrl === url) promoteStreetViewPreloadSlot(slot);
-      }, STREETVIEW_VISUAL_WARMUP_MS);
+      };
+
+      // The Google iframe fires load before the panorama tiles have necessarily painted.
+      // Keep it hidden for a short warm-up period so the promoted iframe is not a black screen.
+      if (waitForVisualWarmup) {
+        slot.warmupTimer = window.setTimeout(() => {
+          slot.warmupTimer = null;
+          markReady();
+        }, STREETVIEW_VISUAL_WARMUP_MS);
+      } else {
+        markReady();
+      }
     };
+
+    slot.iframe.onload = () => {
+      finishLoading(true);
+    };
+    slot.loadTimeout = window.setTimeout(() => {
+      // Some embed failures never dispatch iframe load/error events. Show the iframe anyway so
+      // the player is not trapped behind the loading overlay while Google retries or reports its
+      // own API message.
+      finishLoading(false);
+    }, STREETVIEW_LOAD_TIMEOUT_MS);
     slot.iframe.setAttribute("src", url);
   }
 
@@ -680,7 +704,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   bindKeyboardAwareInput(element, input, controller.signal);
 
   render();
-  if (!apiKey) showFeedback(feedback, "Add your Google Maps Embed API key to enable Street View frames.", "neutral");
+  if (!apiKey) showFeedback(feedback, "Street View is unavailable right now. Try another game or use Reveal to continue.", "neutral");
   warmRoundCache();
   queueMicrotask(() => input.focus());
 

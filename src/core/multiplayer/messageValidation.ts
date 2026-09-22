@@ -1,7 +1,9 @@
+import { isFlagPool } from "../flagPools";
 import type { ClientMessage, ServerMessage } from "./protocol";
-import type { FinalResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, GeoGuessrRoundResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 import { isMapTapCategory } from "../maptap/locations";
 import type { MapTapCategory } from "../maptap/types";
+
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
 export const MAX_PLAYER_NAME_LENGTH = 32;
@@ -79,7 +81,7 @@ function isMapTapCategoryList(value: unknown): value is readonly MapTapCategory[
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe" || value.kind === "geoguessr-streetview") && typeof value.value === "string";
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
@@ -94,6 +96,8 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
       if (value.mapTapCategories !== undefined && !isMapTapCategoryList(value.mapTapCategories)) return reject("invalid-maptap-categories", "MapTap categories are invalid.");
+      if (value.flagPool !== undefined && !isFlagPool(value.flagPool)) return reject("invalid-room-settings", "Flag set is invalid.");
+
       return {
         ok: true,
         message: {
@@ -103,6 +107,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
           ...(value.mapTapCategories !== undefined ? { mapTapCategories: [...value.mapTapCategories] } : {}),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
+          ...(isFlagPool(value.flagPool) ? { flagPool: value.flagPool } : {}),
         },
       };
     }
@@ -129,6 +134,8 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (value.roundLimit !== undefined && roundLimit === null) return reject("invalid-room-settings", "Round count is invalid.");
       if (value.roundDurationMs !== undefined && roundDurationMs === null) return reject("invalid-room-settings", "Round timer is invalid.");
       if (value.mapTapCategories !== undefined && !isMapTapCategoryList(value.mapTapCategories)) return reject("invalid-maptap-categories", "MapTap categories are invalid.");
+      if (value.flagPool !== undefined && !isFlagPool(value.flagPool)) return reject("invalid-room-settings", "Flag set is invalid.");
+
       return {
         ok: true,
         message: {
@@ -137,6 +144,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
           ...(value.mapTapCategories !== undefined ? { mapTapCategories: [...value.mapTapCategories] } : {}),
           ...(roundLimit !== null ? { roundLimit } : {}),
           ...(roundDurationMs !== null ? { roundDurationMs } : {}),
+          ...(isFlagPool(value.flagPool) ? { flagPool: value.flagPool } : {}),
         },
       };
     }
@@ -153,6 +161,11 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isFiniteNumber(value.lng)) return reject("invalid-guess", "Longitude is required.");
       if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
       return { ok: true, message: { type: "SUBMIT_MAPTAP_GUESS", lat: value.lat as number, lng: value.lng as number, clientSentAt: value.clientSentAt as number } };
+    case "SUBMIT_GEOGUESSR_GUESS":
+      if (!isFiniteNumber(value.lat) || (value.lat as number) < -90 || (value.lat as number) > 90) return reject("invalid-guess", "Latitude is out of range.");
+      if (!isFiniteNumber(value.lng)) return reject("invalid-guess", "Longitude is required.");
+      if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
+      return { ok: true, message: { type: "SUBMIT_GEOGUESSR_GUESS", lat: value.lat as number, lng: value.lng as number, clientSentAt: value.clientSentAt as number } };
     case "VOTE_SKIP":
       return { ok: true, message: { type: "VOTE_SKIP" } };
     case "SEND_CHAT_MESSAGE":
@@ -211,6 +224,8 @@ function isRoom(value: unknown): value is PublicRoomState {
     isFiniteNumber(value.settings.roundLimit) &&
     isFiniteNumber(value.settings.roundDurationMs) &&
     (value.settings.mapTapCategories === undefined || isMapTapCategoryList(value.settings.mapTapCategories)) &&
+    (value.settings.flagPool === undefined || isFlagPool(value.settings.flagPool)) &&
+
     (value.status === "lobby" || value.status === "playing" || value.status === "round-result" || value.status === "complete") &&
     Array.isArray(value.players) &&
     value.players.every(isPlayer) &&
@@ -244,6 +259,10 @@ function isMapTapRoundResult(value: unknown): value is MapTapRoundResult {
   if (value.guess !== null && !(isRecord(value.guess) && isFiniteNumber(value.guess.lat) && isFiniteNumber(value.guess.lng))) return false;
   if (value.distanceKm !== null && !isFiniteNumber(value.distanceKm)) return false;
   return true;
+}
+
+function isGeoGuessrRoundResult(value: unknown): value is GeoGuessrRoundResult {
+  return isMapTapRoundResult(value);
 }
 
 function isFinalResult(value: unknown): value is FinalResult {
@@ -289,6 +308,15 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
         return reject("invalid-maptap-result", "MapTap round results are invalid.");
       }
       return { ok: true, message: { type: "MAPTAP_ROUND_ENDED", targetName: value.targetName as string, targetLat: value.targetLat as number, targetLng: value.targetLng as number, wikiSlug: value.wikiSlug as string, results: value.results as MapTapRoundResult[] } };
+    }
+    case "GEOGUESSR_ROUND_ENDED": {
+      if (typeof value.countryName !== "string" || !isFiniteNumber(value.targetLat) || !isFiniteNumber(value.targetLng)) {
+        return reject("invalid-geoguessr-result", "GeoGuessr round result target is invalid.");
+      }
+      if (!Array.isArray(value.results) || !value.results.every(isGeoGuessrRoundResult)) {
+        return reject("invalid-geoguessr-result", "GeoGuessr round results are invalid.");
+      }
+      return { ok: true, message: { type: "GEOGUESSR_ROUND_ENDED", countryName: value.countryName, targetLat: value.targetLat, targetLng: value.targetLng, results: value.results } };
     }
     case "GAME_COMPLETED":
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");

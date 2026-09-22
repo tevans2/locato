@@ -1,4 +1,6 @@
 import type { MapTapCategory } from "../maptap/types";
+import type { FlagPool } from "../flagPools";
+
 
 export type PlayerId = string;
 export type RoomCode = string;
@@ -15,7 +17,7 @@ export interface PublicPlayerState {
 }
 
 export interface PublicPromptContent {
-  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe" | "geoguessr-streetview";
   readonly value: string;
 }
 
@@ -30,6 +32,8 @@ export interface PublicRoomSettings {
   readonly roundLimit: number;
   readonly roundDurationMs: number;
   readonly mapTapCategories?: readonly MapTapCategory[];
+  readonly flagPool?: FlagPool;
+
 }
 
 export interface PublicChatMessage {
@@ -70,6 +74,14 @@ export interface RoundResult {
 }
 
 export interface MapTapRoundResult {
+  readonly playerId: PlayerId;
+  readonly name: string;
+  readonly guess: { readonly lat: number; readonly lng: number } | null;
+  readonly distanceKm: number | null;
+  readonly score: number;
+}
+
+export interface GeoGuessrRoundResult {
   readonly playerId: PlayerId;
   readonly name: string;
   readonly guess: { readonly lat: number; readonly lng: number } | null;

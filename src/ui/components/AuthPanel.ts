@@ -282,10 +282,12 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
   }
 
   function closePanel(): void {
+    const restoreFocus = panel.contains(document.activeElement);
     isOpen = false;
     panel.hidden = true;
     avatarPicker.hidden = true;
     trigger.setAttribute("aria-expanded", "false");
+    if (restoreFocus && trigger.isConnected) trigger.focus();
   }
 
   trigger.addEventListener("click", () => (isOpen ? closePanel() : openPanel()), { signal: controller.signal });

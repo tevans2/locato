@@ -1,15 +1,23 @@
+import { createMobileGameNav } from "../dom/mobileGameNav";
 import type { Screen } from "../../app/router";
 import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_CATEGORY_OPTIONS, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_LOCATIONS, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
+import { describeMapTapSkill, difficultyForSkill, defaultMapTapSkill, readMapTapSkill, recordMapTapResult, saveMapTapSkill } from "../../core/maptap/skill";
+
 import type { GameModeId } from "../../core/gameModes";
 import { el } from "../dom/createElement";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { createMapTapGlobe, type MapTapClick } from "../components/MapTapGlobe";
 import { createMapTapInfoOverlay } from "../components/MapTapInfoOverlay";
+import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface MapTapScreenOptions {
   readonly onGameModeChange: (gameMode: GameModeId) => void;
+  readonly onHome: () => void;
   readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
+  // When provided, casual rounds pick targets from an adaptive difficulty ramp persisted
+  // across visits. Daily challenge rounds are unaffected.
+  readonly storage?: Storage;
   readonly dailyChallenge?: {
     readonly date: string;
     readonly target: MapTapLocation;
@@ -25,13 +33,6 @@ const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly l
   { value: "medium", label: "Medium" },
   { value: "hard", label: "Hard" },
 ];
-
-function createLogo(): HTMLElement {
-  return el("div", {
-    className: "brand-lockup compact",
-    children: [el("img", { className: "brand-logo", attrs: { src: "logo.svg", alt: "" } }), el("span", { className: "brand-name", text: "locato" })],
-  });
-}
 
 function formatDistance(distanceKm: number): string {
   if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
@@ -57,6 +58,7 @@ function optionNodes<T extends string>(items: readonly { readonly value: T; read
 
 export function createMapTapScreen(options: MapTapScreenOptions): Screen {
   const controller = new AbortController();
+  const mobileNav = createMobileGameNav(options, controller.signal);
   const isDailyChallenge = options.dailyChallenge !== undefined;
   let activeTarget: MapTapRoundTarget | null = null;
   let activeResult: MapTapGuessResult | null = null;
@@ -64,6 +66,9 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
   let dailyCompleted = false;
   let hasStarted = isDailyChallenge;
   const selectedCategoryIds = new Set<MapTapCategory>(CATEGORIES.map((category) => category.value));
+  let skill = options.storage ? readMapTapSkill(options.storage) : defaultMapTapSkill;
+  let adaptiveRoundIndex = 0;
+
   const gameModeDropdown = createGameModeDropdown({
     selectedMode: "map-tap",
     signal: controller.signal,
@@ -84,9 +89,16 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     attrs: { id: "maptap-difficulty", name: "maptapDifficulty", "aria-label": "MapTap difficulty" },
     children: optionNodes(DIFFICULTIES),
   });
-  const decayInput = el("input", {
-    className: "maptap-decay-input",
-    attrs: { id: "maptap-decay", name: "maptapDecay", type: "number", min: "100", max: "10000", step: "100", value: String(MAP_TAP_DEFAULT_DECAY_KM), "aria-label": "MapTap score decay in kilometres" },
+  // Friendly presets instead of a raw kilometre input — "Standard" matches the old default.
+  const DECAY_PRESETS: readonly { readonly value: string; readonly label: string }[] = [
+    { value: "2000", label: "Relaxed (2,000 km)" },
+    { value: String(MAP_TAP_DEFAULT_DECAY_KM), label: "Standard (1,000 km)" },
+    { value: "500", label: "Precise (500 km)" },
+  ];
+  const decayInput = el("select", {
+    className: "maptap-filter-select",
+    attrs: { id: "maptap-decay", name: "maptapDecay", "aria-label": "MapTap scoring leniency" },
+    children: optionNodes(DECAY_PRESETS),
   });
   const startButton = el("button", { className: "primary-action maptap-start-action", text: "Start MapTap", attrs: { type: "button" } });
   const toggleAllButton = el("button", { className: "ghost-action maptap-toggle-all", text: "Clear all", attrs: { type: "button" } });
@@ -109,6 +121,8 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
       ],
     });
   });
+  decayInput.value = String(MAP_TAP_DEFAULT_DECAY_KM);
+
 
   const globe = createMapTapGlobe({
     signal: controller.signal,
@@ -166,11 +180,15 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
   function renderResult(result: MapTapGuessResult): void {
     resultPanel.hidden = false;
     newRoundButton.textContent = isDailyChallenge ? "Continue daily challenge" : "Next target";
+    const insideZone = result.distanceKm <= result.toleranceKm;
+    const zoneNote = insideZone ? ` — right in the ${Math.round(result.toleranceKm).toLocaleString()} km target zone` : "";
+    const verdict = result.score / result.maxScore >= 0.6 ? "Great pin!" : insideZone ? "Nailed the area!" : "Not quite — trace the line on the globe, then try the next one.";
     resultPanel.replaceChildren(
       newRoundButton,
+      el("p", { className: "maptap-result-verdict", text: `${verdict} ${result.target.name} is highlighted on the globe.` }),
       el("div", { className: "maptap-result-score", children: [el("span", { text: "Score" }), el("strong", { text: `${result.score.toLocaleString()}/${result.maxScore.toLocaleString()}` })] }),
-      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Distance" }), el("strong", { text: formatDistance(result.distanceKm) })] }),
-      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Actual" }), el("strong", { text: `${result.target.name} (${result.target.lat.toFixed(4)}, ${result.target.lng.toFixed(4)})` })] }),
+      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Distance" }), el("strong", { text: `${formatDistance(result.distanceKm)}${zoneNote}` })] }),
+      el("div", { className: "maptap-result-stat", children: [el("span", { text: "Actual" }), el("strong", { text: `${result.target.name} (${formatCategory(result.target.category)})` })] }),
     );
   }
 
@@ -188,20 +206,31 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     renderTarget(null);
     statusText.textContent = "Loading a target...";
 
+    // Explicit difficulty filter wins; otherwise casual rounds ride the adaptive ramp.
+    const adaptiveDifficulty = !isDailyChallenge && selectedDifficulty() === "" && options.storage
+      ? difficultyForSkill(skill.level, adaptiveRoundIndex)
+      : selectedDifficulty();
     const categories = selectedCategories();
     const category = categories[Math.floor(Math.random() * categories.length)];
-    const target = options.dailyChallenge?.target ?? (category ? await fetchMapTapRound({ category, difficulty: selectedDifficulty() }) : null);
+    const target = options.dailyChallenge?.target ?? (category ? await fetchMapTapRound({ category, difficulty: adaptiveDifficulty }) : null);
+
     if (controller.signal.aborted) return;
 
     if (!target) {
-      statusText.textContent = "Could not load a MapTap target. Make sure the Bun server is running so /api/maptap/round is available.";
+      statusText.textContent = "We couldn’t find a target. Check your connection, then try again.";
       setControlsDisabled(false);
+      resetButton.disabled = false;
       return;
     }
 
     activeTarget = target;
     renderTarget(target);
-    statusText.textContent = isDailyChallenge ? "Daily MapTap: click once as close as you can." : "Rotate or zoom the globe, then click once as close as you can.";
+    if (!isDailyChallenge) {
+      adaptiveRoundIndex += 1;
+      statusText.textContent = `Rotate or zoom the globe, then click once as close as you can. ${describeMapTapSkill(skill.level)}`;
+    } else {
+      statusText.textContent = "Daily MapTap: click once as close as you can.";
+    }
     globe.reset();
     globe.setAcceptingGuesses(true);
     setControlsDisabled(false);
@@ -220,6 +249,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
       score: scored.score,
       maxScore: MAP_TAP_MAX_SCORE,
       decayKm: scored.decayKm,
+      toleranceKm: scored.toleranceKm,
     };
   }
 
@@ -251,7 +281,13 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
 
     activeResult = result;
     setControlsDisabled(false);
-    statusText.textContent = isDailyChallenge ? "Result revealed. Continue to the next daily round." : "Result revealed.";
+    if (!isDailyChallenge && options.storage) {
+      skill = recordMapTapResult(skill, result.score / result.maxScore);
+      saveMapTapSkill(options.storage, skill);
+    }
+    statusText.textContent = isDailyChallenge
+      ? "Result revealed. Continue to the next daily round."
+      : describeMapTapSkill(skill.level);
     globe.reveal(result);
     renderResult(result);
     void fetchWikipediaSummary(result.target.wikiSlug, controller.signal).then((summary) => {
@@ -300,7 +336,8 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
     activeResult = null;
     resultPanel.hidden = true;
     resultPanel.replaceChildren();
-    statusText.textContent = activeTarget ? "Target restarted. Click once as close as you can." : "Loading a target...";
+    if (!activeTarget) { void loadRound(); return; }
+    statusText.textContent = "Target restarted. Click once as close as you can.";
     globe.reset();
     globe.setAcceptingGuesses(activeTarget !== null);
     setControlsDisabled(false);
@@ -352,8 +389,8 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
       el("header", {
         className: "game-header",
         children: [
-          el("div", { className: "game-header-left", children: [createLogo(), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton] }),
+          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
+          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileNav.button, mobileNav.sheet] }),
         ],
       }),
       el("section", {
@@ -363,6 +400,7 @@ export function createMapTapScreen(options: MapTapScreenOptions): Screen {
           el("aside", {
             className: "maptap-sidebar",
             children: [setupPanel, playPanel],
+
           }),
         ],
       }),

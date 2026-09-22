@@ -6,6 +6,7 @@ import { el } from "../dom/createElement";
 import { promptImageClass } from "../dom/renderPrompt";
 import { createWorldMapView, setWorldMapTargetCountry } from "../dom/renderWorldMap";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
+import { playTick } from "../dom/sfx";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -45,6 +46,7 @@ function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null):
     const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
     return el("li", {
       className: player.id === localPlayerId ? "score-row is-local" : "score-row",
+      attrs: { "data-player-id": player.id },
       children: [
         el("span", { className: "score-rank", text: `#${index + 1}` }),
         el("span", { className: "player-emoji score-emoji", text: emoji, attrs: { "aria-hidden": "true" } }),
@@ -61,7 +63,7 @@ function createResultRows(results: readonly RoundResult[]): readonly HTMLElement
     const guess = result.guess ? ` guessed ${result.guess}` : " did not answer";
     const outcome = result.correct ? `+${result.points}` : "missed";
     return el("li", {
-      className: result.correct ? "result-row good" : "result-row",
+      className: result.correct ? "result-row good" : "result-row miss",
       text: `${result.name}${guess} · ${outcome}`,
     });
   });
@@ -106,6 +108,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     className: "multiplayer-map-target",
     children: [el("span", { text: "Pick this country" }), mapTargetName],
   });
+  mapTarget.hidden = true;
   let allowMapClickSubmit = false;
   const mapView = createWorldMapView(options.worldCountryFeatures, options.countryIndex, {
     onCountryClick: (countryId) => {
@@ -116,7 +119,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     },
   });
   mapView.element.classList.add("multiplayer-map-panel");
-  const mapPrompt = el("div", { className: "multiplayer-map-prompt", children: [mapTarget] });
+  const mapPrompt = el("div", { className: "multiplayer-map-prompt" });
   const mapHighlightPrompt = el("div", { className: "multiplayer-map-prompt multiplayer-map-highlight-prompt" });
   const flagColorReveal = createFlagColorRevealView();
   let activeFlagColorRoundKey: string | null = null;
@@ -133,6 +136,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   let phaseStartedAt: number | null = null;
   let phaseEndsAt: number | null = null;
   let rafId: number | null = null;
+  let lastTickSecond: number | null = null;
+  let phaseIsIntermission = false;
 
   // The bar is driven by its own animation frame, not by server messages, so it drains smoothly
   // between snapshots. The server stays authoritative; the bar only clamps to [0,1] to stay sane
@@ -146,6 +151,12 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
     const total = phaseEndsAt - phaseStartedAt;
     const remaining = phaseEndsAt - Date.now();
     const fraction = Math.max(0, Math.min(1, remaining / total));
+    // One quiet click per second across the final three seconds of live play only.
+    const remainingSeconds = Math.ceil(remaining / 1000);
+    if (!phaseIsIntermission && fraction > 0 && remainingSeconds >= 1 && remainingSeconds <= 3 && lastTickSecond !== remainingSeconds) {
+      lastTickSecond = remainingSeconds;
+      playTick();
+    }
     timerFill.style.transform = `scaleX(${fraction})`;
   }
 
@@ -186,7 +197,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
         children: [
           el("section", {
             className: "flag-card multiplayer-flag-card",
-            children: [el("div", { className: "flag-card-top", children: [roundKicker] }), flagSlot, timerBar],
+            children: [el("div", { className: "flag-card-top multiplayer-round-header", children: [roundKicker, mapTarget] }), flagSlot, timerBar],
           }),
           el("section", {
             className: "answer-panel multiplayer-round-panel multiplayer-answer-panel",
@@ -214,7 +225,10 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       const isMapHighlightRound = visibleRound?.prompt.kind === "map-highlight";
       const isFlagColorRound = visibleRound?.prompt.kind === "flag-colors";
       const isNewRound = roundKey !== null && roundKey !== renderedRoundKey;
-      if (isNewRound) answerInput.value = "";
+      if (isNewRound) {
+        answerInput.value = "";
+        lastTickSecond = null;
+      }
       renderedRoundKey = roundKey;
       allowMapClickSubmit = isMapClickRound && state.canSubmit;
 
@@ -227,6 +241,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
             ? `Round ${visibleRound.roundNumber}`
             : "Waiting for the next round";
       roundTitle.textContent = state.room.status === "complete" ? "Game complete" : isMapHighlightRound ? "Type the highlighted country" : isFlagColorRound ? "Find the target flag" : "Your answer";
+      mapTarget.hidden = !isMapClickRound || intermission || state.room.status === "complete";
       feedback.textContent = state.feedback;
       const localSkipVoted = state.localPlayerId !== null && state.room.skipVotes.includes(state.localPlayerId);
       const skipRequired = Math.max(0, state.room.skipRequired);
@@ -238,6 +253,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       submitButton.disabled = !state.canSubmit;
       answerForm.hidden = isMapClickRound;
       mapView.element.classList.toggle("is-disabled", !state.canSubmit);
+      mapView.element.classList.toggle("is-click-country-mode", allowMapClickSubmit);
       // Focus the first time a round becomes submittable, not on round identity alone: the
       // ROUND_STARTED/GAME_STARTED frame arrives while status is still round-result/lobby
       // (canSubmit false), and the playing snapshot follows separately. Keying focus off
@@ -306,6 +322,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       phaseStartedAt = state.room.phaseStartedAt;
       phaseEndsAt = state.room.phaseEndsAt;
       timerBar.classList.toggle("is-intermission", intermission);
+      phaseIsIntermission = intermission;
       if ((state.room.status === "playing" || intermission) && phaseEndsAt !== null) {
         renderTimer();
         ensureTimerLoop();
@@ -322,6 +339,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       } else resultList.replaceChildren(el("li", { className: "result-row", text: "No result yet." }));
 
       scoreList.replaceChildren(...createScoreRows(state.room, state.localPlayerId));
+      const bumpWinner = state.roundResult?.results.find((result) => result.correct);
+      if (bumpWinner) scoreList.querySelector(`[data-player-id="${bumpWinner.playerId}"]`)?.classList.add("score-bump");
     },
     destroy: stopTimerLoop,
   };

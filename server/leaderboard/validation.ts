@@ -1,8 +1,11 @@
+import { isFlagPool } from "../../src/core/flagPools";
+
 export const GAME_MODE_IDS = [
   "flags",
   "shapes",
   "codes",
   "capitals",
+  "capital-recall",
   "name-all",
   "click-country",
   "spot-country",
@@ -38,6 +41,10 @@ export function isLeaderboardContinent(value: string): value is LeaderboardConti
 export function normalizeLeaderboardVariant(gameMode: LeaderboardGameMode, variant: string): string | null {
   if (gameMode === "puzzle") {
     return isLeaderboardContinent(variant) ? variant : null;
+  }
+  if (gameMode === "flags") {
+    if (variant === "") return "";
+    return isFlagPool(variant) && variant !== "countries" ? variant : null;
   }
   return variant === "" ? "" : null;
 }

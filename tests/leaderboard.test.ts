@@ -84,6 +84,30 @@ describe("leaderboard", () => {
     });
   });
 
+  it("keeps country, territory, and combined flag timer boards separate", async () => {
+    const { service } = createService();
+    const registered = await service.register({ email: "flags@b.com", password: "supersecret", displayName: "flagster" });
+    if (!registered.ok) throw new Error("registration failed");
+
+    expect(service.submitBestTime(registered.user.id, { gameMode: "flags", variant: "territories", timeMs: 55_000 })).toEqual({
+      accepted: true,
+      isPersonalBest: true,
+    });
+    expect(service.submitBestTime(registered.user.id, { gameMode: "flags", variant: "both", timeMs: 75_000 })).toEqual({
+      accepted: true,
+      isPersonalBest: true,
+    });
+    expect(service.submitBestTime(registered.user.id, { gameMode: "flags", variant: "countries", timeMs: 50_000 })).toEqual({
+      error: "Invalid leaderboard variant.",
+    });
+
+    const territories = service.getLeaderboard({ gameMode: "flags", variant: "territories" });
+    const combined = service.getLeaderboard({ gameMode: "flags", variant: "both" });
+    if ("error" in territories || "error" in combined) throw new Error("flag leaderboard failed");
+    expect(territories.entries[0]?.timeMs).toBe(55_000);
+    expect(combined.entries[0]?.timeMs).toBe(75_000);
+  });
+
   it("serves leaderboard data over HTTP", async () => {
     const { service } = createService();
     const register = await route(service, jsonRequest("/auth/register", "POST", { email: "a@b.com", password: "supersecret", displayName: "ace" }));

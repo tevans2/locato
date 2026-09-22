@@ -71,10 +71,37 @@ describe("multiplayer public protocol", () => {
     expect(parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"], mapTapCategories: ["not-a-place-type"] }).ok).toBe(false);
   });
 
+  it("accepts the three flag pool choices and rejects unknown ones", () => {
+    const create = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], flagPool: "both" });
+    expect(create.ok).toBe(true);
+    expect(create.ok ? create.message : null).toMatchObject({ flagPool: "both" });
+
+    const update = parseClientMessage({ type: "SET_ROOM_OPTIONS", categoryIds: ["flags"], flagPool: "territories" });
+    expect(update.ok).toBe(true);
+    expect(update.ok ? update.message : null).toMatchObject({ flagPool: "territories" });
+    expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], flagPool: "sketches" }).ok).toBe(false);
+
+  });
+
   it("accepts skip votes as a client message", () => {
     const message = parseClientMessage({ type: "VOTE_SKIP" });
     expect(message.ok).toBe(true);
     expect(message.ok ? message.message : null).toEqual({ type: "VOTE_SKIP" });
+  });
+
+  it("accepts GeoGuessr pin submissions and round reveals", () => {
+    const guess = parseClientMessage({ type: "SUBMIT_GEOGUESSR_GUESS", lat: -33.9, lng: 18.4, clientSentAt: 1000 });
+    expect(guess.ok).toBe(true);
+    expect(parseClientMessage({ type: "SUBMIT_GEOGUESSR_GUESS", lat: 91, lng: 18.4, clientSentAt: 1000 }).ok).toBe(false);
+
+    const reveal = parseServerMessage({
+      type: "GEOGUESSR_ROUND_ENDED",
+      countryName: "South Africa",
+      targetLat: -33.9,
+      targetLng: 18.4,
+      results: [{ playerId: "p1", name: "Ada", guess: { lat: -34, lng: 18.5 }, distanceKm: 14.4, score: 4964 }],
+    });
+    expect(reveal.ok).toBe(true);
   });
 
   it("accepts normalized chat messages", () => {
