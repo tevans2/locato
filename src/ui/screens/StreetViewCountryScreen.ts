@@ -41,8 +41,7 @@ interface StreetViewPreloadSlot {
 }
 
 function googleMapsEmbedApiKey(): string {
-  const env = (import.meta as ImportMeta & { readonly env?: { readonly VITE_GOOGLE_MAPS_EMBED_API_KEY?: string } }).env;
-  return env?.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
+  return import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
 }
 
 function eligibleRounds(countryIndex: CountryIndex): readonly StreetViewCountryRound[] {
@@ -419,7 +418,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     return urls;
   }
 
-  function chooseStreetViewPreloadSlot(url: string): StreetViewPreloadSlot {
+  function chooseStreetViewPreloadSlot(url: string): StreetViewPreloadSlot | null {
     const existing = findStreetViewPreloadSlot(url);
     if (existing) return existing;
 
@@ -427,7 +426,11 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     if (emptySlot) return emptySlot;
 
     const protectedUrls = protectedStreetViewUrls(url);
-    const reusableSlot = streetViewPreloadSlots.find((slot) => !protectedUrls.has(slot.url)) ?? streetViewPreloadSlots.find((slot) => !slot.ready) ?? streetViewPreloadSlots[streetViewPreloadSlots.length - 1]!;
+    // The visible round takes priority over future frames. Background preloads must wait
+    // rather than evicting the only slot while the visible round is still loading.
+    const reusableSlot = streetViewPreloadSlots.find((slot) => !protectedUrls.has(slot.url))
+      ?? (url === desiredStreetViewUrl ? streetViewPreloadSlots.find((slot) => slot.url !== desiredStreetViewUrl) : null);
+    if (!reusableSlot) return null;
     clearStreetViewPreloadSlot(reusableSlot, true);
     return reusableSlot;
   }
@@ -455,6 +458,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     if (!apiKey || !url || url === activeStreetViewUrl) return;
 
     const slot = chooseStreetViewPreloadSlot(url);
+    if (!slot) return;
     if (slot.url === url) {
       if (slot.ready && desiredStreetViewUrl === url) promoteStreetViewPreloadSlot(slot);
       return;
