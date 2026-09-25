@@ -3458,10 +3458,11 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
   pointer-events: none;
 }
 
+/* Street View is excluded: its frames and loader must stay absolutely
+   positioned so both reusable frames overlap inside the clipped stage. */
 .world-map-panel > *,
 .world-globe-panel > *,
 .puzzle-board-shell > *,
-.streetview-stage > *,
 .maptap-map-panel > * {
   position: relative;
   z-index: 1;
