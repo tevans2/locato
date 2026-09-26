@@ -267,7 +267,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "In 1957 it became the first sub-Saharan African colony to win independence.",
       "Lake Volta is one of the largest artificial reservoirs in the world by surface area.",
-      "The equator and the Greenwich meridian cross in the sea just off its coast.",
+      "The Greenwich meridian (0° longitude) runs through Ghana, passing the port city of Tema.",
     ],
     landmarks: ["Cape Coast Castle", "Kakum National Park", "Lake Volta"],
     drivingSide: "right",
@@ -300,7 +300,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "Over a million wildebeest take part in the Great Migration through the Maasai Mara.",
       "M-Pesa, its mobile-money service launched in 2007, pioneered paying by phone.",
-      "Kenyan Eliud Kipchoge ran the first sub-two-hour marathon in 2019.",
+      "Kenyan Eliud Kipchoge ran the first sub-two-hour marathon, in a special unofficial race in 2019.",
     ],
     landmarks: ["Maasai Mara", "Mount Kenya", "Lamu Old Town"],
     drivingSide: "left",
@@ -328,7 +328,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     ],
     landmarks: ["Sapo National Park", "Providence Island", "Mount Nimba"],
     drivingSide: "right",
-    highestPoint: { name: "Mount Wuteve", metres: 1440 },
+    highestPoint: { name: "Mount Wuteve", metres: 1447 },
   },
   LY: {
     hook: "A huge desert block on the Mediterranean between Egypt and Tunisia.",
@@ -346,7 +346,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     hook: "The giant island off Mozambique — the fourth-largest island in the world.",
     flagNote: "A white vertical band at the hoist, with red over green horizontal bands.",
     funFacts: [
-      "Most of its wildlife is found nowhere else, including every species of lemur.",
+      "Most of its wildlife is found nowhere else — wild lemurs live only here and on the nearby Comoros.",
       "It split from the Indian subcontinent roughly 88 million years ago.",
     ],
     landmarks: ["Avenue of the Baobabs", "Tsingy de Bemaraha", "Andasibe-Mantadia National Park"],
@@ -1060,7 +1060,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
   },
   SY: {
     hook: "The eastern Mediterranean's northern corner, between Turkey and Iraq.",
-    flagNote: "The independence-era flag — green, white and black bands with three red stars — replaced the red-white-black two-star flag after 2024.",
+    flagNote: "The independence-era flag — green, white and black bands with three red stars — replaced the red-white-black two-star flag after the fall of Assad in December 2024.",
     funFacts: [
       "Damascus is one of the oldest continuously inhabited cities in the world.",
       "Aleppo's ancient citadel rises on a mound above the old city.",
@@ -1120,7 +1120,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "The Darvaza gas crater, the 'Door to Hell', has burned since the early 1970s.",
       "Ashgabat holds a world record for the most white-marble buildings.",
-      "It is one of very few flags featuring carpet patterns.",
+      "It is the only national flag to feature carpet designs.",
     ],
     landmarks: ["Darvaza gas crater", "Ancient Merv", "Ashgabat"],
     drivingSide: "right",
@@ -1135,7 +1135,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     ],
     landmarks: ["Burj Khalifa", "Sheikh Zayed Grand Mosque", "Louvre Abu Dhabi"],
     drivingSide: "right",
-    highestPoint: { name: "Jebel Jais", metres: 1934 },
+    highestPoint: { name: "Jebel Jais (UAE side)", metres: 1892 },
   },
   UZ: {
     hook: "The Silk Road heartland — doubly landlocked in Central Asia.",
@@ -1248,7 +1248,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "It has three official languages: Dutch, French and German.",
       "Brussels hosts the headquarters of both the EU and NATO.",
-      "In 2010–11 it went a record 541 days without a government.",
+      "In 2010–11 it went 541 days without an elected government — a world record at the time.",
     ],
     landmarks: ["Grand-Place, Brussels", "Atomium", "Bruges"],
     drivingSide: "right",
@@ -1319,7 +1319,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     flagNote: "Blue, black and white horizontal stripes.",
     funFacts: [
       "Skype was built by Estonian developers.",
-      "In 2005 it became the first country to allow online voting in a national election.",
+      "In 2005 it became the first country to offer online voting in nationwide elections.",
       "Its e-Residency programme lets foreigners set up an Estonian company online.",
     ],
     landmarks: ["Tallinn Old Town", "Lahemaa National Park", "Saaremaa"],
@@ -1356,7 +1356,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "It shares land borders with nine countries.",
       "Many stretches of the autobahn have no general speed limit.",
-      "Gutenberg's printing press was developed in Mainz around 1440.",
+      "Johannes Gutenberg printed his famous Bible in Mainz in the 1450s.",
     ],
     landmarks: ["Brandenburg Gate", "Neuschwanstein Castle", "Cologne Cathedral"],
     drivingSide: "right",
@@ -1525,7 +1525,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     ],
     landmarks: ["Amsterdam canals", "Kinderdijk windmills", "Keukenhof"],
     drivingSide: "right",
-    highestPoint: { name: "Vaalserberg", metres: 322 },
+    highestPoint: { name: "Vaalserberg (European Netherlands)", metres: 322 },
   },
   MK: {
     hook: "A landlocked Balkan country north of Greece, with Lake Ohrid in its southwest.",
@@ -1567,7 +1567,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     hook: "A rectangle on Iberia's Atlantic edge, plus the Azores and Madeira.",
     flagNote: "Green and red with an armillary sphere and shield on the dividing line.",
     funFacts: [
-      "Its 1386 alliance with England is the oldest alliance still in force.",
+      "Its 1373 alliance with England is the oldest alliance still in force.",
       "Cabo da Roca is the westernmost point of mainland Europe.",
       "It produces around half of the world's cork.",
     ],
@@ -1636,7 +1636,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     flagNote: "White, blue and red bands with a shield of Mount Triglav under three gold stars.",
     funFacts: [
       "Its coastline is only about 47 km long.",
-      "Mount Triglav, on its flag, is also on its coat of arms and euro coins.",
+      "Mount Triglav, shown on its flag, also appears on its 50-cent euro coin.",
       "Postojna Cave has its own underground railway.",
     ],
     landmarks: ["Lake Bled", "Postojna Cave", "Triglav National Park"],
@@ -1684,7 +1684,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     funFacts: [
       "It is the largest country lying entirely in Europe.",
       "The 1986 Chernobyl disaster happened north of Kyiv.",
-      "The Antonov An-225, the world's largest aircraft, was built here.",
+      "The Antonov An-225, the heaviest aircraft ever built, was made here.",
     ],
     landmarks: ["Saint Sophia Cathedral, Kyiv", "Lviv Old Town", "Kyiv Pechersk Lavra"],
     drivingSide: "right",
@@ -1827,7 +1827,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     flagNote: "Blue, white, blue horizontal bands with the coat of arms in the centre.",
     funFacts: [
       "It is the most densely populated country in Central America.",
-      "In 2021 it became the first country to make Bitcoin legal tender.",
+      "In 2021 it became the first country to make Bitcoin legal tender, though it scaled this back in 2025.",
       "It has used the US dollar since 2001.",
     ],
     landmarks: ["Joya de Cerén", "Santa Ana Volcano", "Ruta de las Flores"],
@@ -1862,7 +1862,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     flagNote: "Blue over red with a white panel holding the coat of arms.",
     funFacts: [
       "In 1804 it became the first independent nation born from a successful slave revolt.",
-      "The Citadelle Laferrière is the largest fortress in the Americas.",
+      "The Citadelle Laferrière is one of the largest fortresses in the Americas.",
     ],
     landmarks: ["Citadelle Laferrière", "Sans-Souci Palace", "Labadee"],
     drivingSide: "right",
@@ -1897,7 +1897,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     flagNote: "Green, white and red with an eagle devouring a snake atop a cactus.",
     funFacts: [
       "It has the largest Spanish-speaking population in the world.",
-      "Chocolate, chillies and maize were all first domesticated in Mesoamerica.",
+      "Maize and chillies were first domesticated here, and Mesoamericans pioneered drinking chocolate.",
       "Mexico City is built on the site of the Aztec capital Tenochtitlan.",
     ],
     landmarks: ["Chichén Itzá", "Teotihuacan", "Zócalo, Mexico City"],
@@ -2068,7 +2068,7 @@ export const CURATED_COUNTRY_PROFILES: Readonly<Record<string, CuratedCountryPro
     ],
     landmarks: ["Kaieteur Falls", "Iwokrama Forest", "St George's Cathedral, Georgetown"],
     drivingSide: "left",
-    highestPoint: { name: "Mount Roraima", metres: 2810 },
+    highestPoint: { name: "Mount Roraima", metres: 2772 },
   },
   PY: {
     hook: "Landlocked in the middle of South America, split in two by the Paraguay River.",
