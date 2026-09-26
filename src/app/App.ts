@@ -246,6 +246,7 @@ export function createApp(options: AppOptions): App {
     mount(
       createSoloGameScreen({
         countryIndex: promptCountryIndex,
+        onOpenCountry: (code) => navigate({ type: "country-profile", code }),
         engine,
         selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
         flagPool: activeFlagPool,

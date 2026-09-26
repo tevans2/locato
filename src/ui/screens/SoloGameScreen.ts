@@ -17,7 +17,8 @@ import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
-import { createFeedbackView, hideFeedback, showFeedback, type FeedbackView } from "../dom/renderFeedback";
+import { appendFeedbackAction, createFeedbackView, hideFeedback, showFeedback, type FeedbackView } from "../dom/renderFeedback";
+import { ACADEMY_COUNTRY_CODES } from "../../core/academy/groups";
 import { createPromptView, updatePromptView, type PromptView } from "../dom/renderPrompt";
 import { createStatsView, updateFreePlayStatsView, updateStatsView, type StatsView } from "../dom/renderStats";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
@@ -44,6 +45,8 @@ export interface SoloGameScreenOptions {
   readonly onViewStats?: () => void;
   readonly onViewFriends?: () => void;
   readonly onLeaderboard: () => void;
+  /** Open a country's Academy profile; offered after a skip or reveal so misses become lessons. */
+  readonly onOpenCountry?: (code: string) => void;
   readonly getAuthUser: () => AuthUser | null;
   readonly authControls?: AuthControls;
   readonly worldCountryFeatures?: readonly WorldCountryFeature[];
@@ -259,6 +262,12 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
+  function offerCountryProfile(country: Country): void {
+    if (isDailyChallenge || !options.onOpenCountry || !ACADEMY_COUNTRY_CODES.includes(country.code)) return;
+    const openCountry = options.onOpenCountry;
+    appendFeedbackAction(views.feedback, `Learn about ${country.name} →`, () => openCountry(country.code));
+  }
+
   function answerLabelFor(country: Country): string {
     return options.selectedGameMode === "capital-recall" ? country.capital : country.name;
   }
@@ -295,7 +304,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (event.type === "ROUND_SKIPPED") {
         revealAnswerArmed = false;
         hideHintPopover();
-        showFeedback(views.feedback, "Skipped. Streak reset — this prompt can return later.", "neutral");
+        const skipped = countryIndex.byId[event.previousCountryId];
+        // Daily passes reveal the answer separately; elsewhere, name what was skipped so the miss teaches something.
+        showFeedback(views.feedback, skipped && !isDailyChallenge ? `Skipped — that was ${answerLabelFor(skipped)}. It can return later.` : "Skipped. Streak reset — this prompt can return later.", "neutral");
+        if (skipped) offerCountryProfile(skipped);
         continue;
       }
 
@@ -314,6 +326,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
           showHintPopover("Answer", answerLabelFor(country));
           showFeedback(views.feedback, `Answer: ${answerLabelFor(country)}.`, "bad");
+          offerCountryProfile(country);
         }
         continue;
       }

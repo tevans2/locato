@@ -27,3 +27,8 @@ export function showFeedback(view: FeedbackView, message: string, tone: "neutral
     flashScreen("bad");
   }
 }
+
+/** Adds a small inline action (e.g. "Learn about Chad") after the current feedback message. */
+export function appendFeedbackAction(view: FeedbackView, label: string, onClick: () => void): void {
+  view.element.append(" ", el("button", { className: "feedback-action", text: label, attrs: { type: "button" }, on: { click: onClick } }));
+}

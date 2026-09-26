@@ -475,6 +475,20 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   background: transparent;
 }
 
+.feedback .feedback-action {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--brand);
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .answer-panel .solo-action-grid,
 .country-guess-panel .actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
