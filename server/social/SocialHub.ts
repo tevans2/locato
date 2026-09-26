@@ -17,6 +17,10 @@ export class SocialHub implements SocialBridge {
     return this.connections.has(userId);
   }
 
+  onlineUserIds(): readonly string[] {
+    return [...this.connections.keys()];
+  }
+
   attach(connection: SocialConnection): void {
     const wasOnline = this.connections.has(connection.userId);
     const set = this.connections.get(connection.userId) ?? new Set<SocialConnection>();

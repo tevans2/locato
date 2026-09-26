@@ -3,6 +3,14 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type {
+  AdminActivityRows,
+  AdminBestTime,
+  AdminEvent,
+  AdminEventInput,
+  AdminEventLevel,
+  AdminEventQuery,
+  AdminSessionInfo,
+  AdminTotals,
   AdminUserList,
   AdminUserListQuery,
   CategoryStats,
@@ -154,6 +162,18 @@ function migrate(db: Database): void {
       CHECK (user_low < user_high)
     );
     CREATE INDEX IF NOT EXISTS friendships_user_high ON friendships(user_high);
+
+    CREATE TABLE IF NOT EXISTS admin_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      time INTEGER NOT NULL,
+      level TEXT NOT NULL,
+      action TEXT NOT NULL,
+      ip TEXT,
+      user_id TEXT,
+      details TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS admin_events_time ON admin_events(time);
+    CREATE INDEX IF NOT EXISTS admin_events_action ON admin_events(action);
   `);
 
   // Additive migrations: columns added after initial schema deployment.
@@ -485,17 +505,24 @@ export class SqliteUserStore implements UserStore {
       .query<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${filter}`)
       .get(query.query ? { $like: like } : {})!.n;
     const rows = this.db
-      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; createdAt: number; games: number }>(
+      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; providers: string | null; createdAt: number; games: number; dailies: number; lastActiveAt: number | null }>(
         `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
                 (u.password_hash IS NOT NULL) AS hasPassword, u.created_at AS createdAt,
-                COALESCE(s.total_games, 0) AS games
+                COALESCE(s.total_games, 0) AS games,
+                (SELECT group_concat(provider) FROM oauth_accounts o WHERE o.user_id = u.id) AS providers,
+                (SELECT COUNT(*) FROM daily_challenge_results d WHERE d.user_id = u.id) AS dailies,
+                NULLIF(MAX(
+                  COALESCE((SELECT MAX(played_at) FROM game_records g WHERE g.user_id = u.id), 0),
+                  COALESCE((SELECT MAX(completed_at) FROM daily_challenge_results d WHERE d.user_id = u.id), 0),
+                  COALESCE((SELECT MAX(created_at) FROM sessions se WHERE se.user_id = u.id), 0)
+                ), 0) AS lastActiveAt
          FROM users u LEFT JOIN user_stats s ON s.user_id = u.id
          ${filter}
          ORDER BY u.created_at DESC
          LIMIT $limit OFFSET $offset`,
       )
       .all(query.query ? { $like: like, $limit: query.limit, $offset: query.offset } : { $limit: query.limit, $offset: query.offset });
-    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, createdAt: row.createdAt, games: row.games })) };
+    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, providers: row.providers ? row.providers.split(",").sort() : [], createdAt: row.createdAt, games: row.games, dailies: row.dailies, lastActiveAt: row.lastActiveAt })) };
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
@@ -510,6 +537,91 @@ export class SqliteUserStore implements UserStore {
     const count = this.db.query<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?").get(userId)?.n ?? 0;
     this.db.query("DELETE FROM sessions WHERE user_id = ?").run(userId);
     return count;
+  }
+
+  updateDisplayName(userId: string, displayName: string): void {
+    this.db.query("UPDATE users SET display_name = ? WHERE id = ?").run(displayName, userId);
+  }
+
+  listUserSessions(userId: string, now: number): readonly AdminSessionInfo[] {
+    return this.db
+      .query<AdminSessionInfo>("SELECT created_at AS createdAt, expires_at AS expiresAt FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC")
+      .all(userId, now);
+  }
+
+  listUserProviders(userId: string): readonly string[] {
+    return this.db.query<{ provider: string }>("SELECT provider FROM oauth_accounts WHERE user_id = ? ORDER BY provider").all(userId).map((row) => row.provider);
+  }
+
+  listUserBestTimes(userId: string): readonly AdminBestTime[] {
+    return this.db
+      .query<AdminBestTime>("SELECT game_mode AS gameMode, variant, best_time_ms AS timeMs, achieved_at AS achievedAt FROM mode_best_times WHERE user_id = ? ORDER BY game_mode, variant")
+      .all(userId);
+  }
+
+  deleteBestTime(userId: string, gameMode: string, variant: string): boolean {
+    return this.db.query("DELETE FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?").run(userId, gameMode, variant).changes > 0;
+  }
+
+  deleteDailyResult(userId: string, date: string): boolean {
+    return this.db.query("DELETE FROM daily_challenge_results WHERE user_id = ? AND date = ?").run(userId, date).changes > 0;
+  }
+
+  resetUserStats(userId: string): void {
+    this.db.transaction(() => {
+      this.db.query("DELETE FROM game_records WHERE user_id = ?").run(userId);
+      this.db.query("DELETE FROM category_stats WHERE user_id = ?").run(userId);
+      this.db.query("DELETE FROM user_stats WHERE user_id = ?").run(userId);
+    })();
+  }
+
+  getAdminTotals(now: number): AdminTotals {
+    const count = (sql: string, ...params: number[]) => this.db.query<{ n: number }>(sql).get(...params)?.n ?? 0;
+    return {
+      users: count("SELECT COUNT(*) AS n FROM users"),
+      games: count("SELECT COUNT(*) AS n FROM game_records"),
+      dailies: count("SELECT COUNT(*) AS n FROM daily_challenge_results"),
+      bestTimes: count("SELECT COUNT(*) AS n FROM mode_best_times"),
+      activeSessions: count("SELECT COUNT(*) AS n FROM sessions WHERE expires_at > ?", now),
+      friendships: count("SELECT COUNT(*) AS n FROM friendships WHERE status = 'accepted'"),
+    };
+  }
+
+  listActivitySince(since: number): AdminActivityRows {
+    return {
+      signups: this.db.query<{ userId: string; at: number }>("SELECT id AS userId, created_at AS at FROM users WHERE created_at >= ?").all(since),
+      games: this.db.query<{ userId: string; mode: string; playMode: string | null; at: number }>("SELECT user_id AS userId, mode, play_mode AS playMode, played_at AS at FROM game_records WHERE played_at >= ?").all(since),
+      dailies: this.db.query<{ userId: string; at: number }>("SELECT user_id AS userId, completed_at AS at FROM daily_challenge_results WHERE completed_at >= ?").all(since),
+      logins: this.db.query<{ userId: string; at: number }>("SELECT user_id AS userId, created_at AS at FROM sessions WHERE created_at >= ?").all(since),
+    };
+  }
+
+  recordEvent(event: AdminEventInput): void {
+    this.db
+      .query("INSERT INTO admin_events (time, level, action, ip, user_id, details) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(event.time, event.level, event.action, event.ip, event.userId, JSON.stringify(event.details));
+  }
+
+  listEvents(query: AdminEventQuery): readonly AdminEvent[] {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+    if (query.level !== null) { where.push("level = ?"); params.push(query.level); }
+    if (query.action !== null) { where.push("action LIKE ? ESCAPE '\\'"); params.push(`${query.action.replace(/[\\%_]/g, "\\$&")}%`); }
+    if (query.ip !== null) { where.push("ip = ?"); params.push(query.ip); }
+    if (query.userId !== null) { where.push("user_id = ?"); params.push(query.userId); }
+    if (query.before !== null) { where.push("id < ?"); params.push(query.before); }
+    const rows = this.db
+      .query<{ id: number; time: number; level: AdminEventLevel; action: string; ip: string | null; userId: string | null; details: string }>(
+        `SELECT id, time, level, action, ip, user_id AS userId, details FROM admin_events
+         ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+         ORDER BY id DESC LIMIT ?`,
+      )
+      .all(...params, query.limit);
+    return rows.map((row) => ({ ...row, details: JSON.parse(row.details) as Record<string, unknown> }));
+  }
+
+  pruneEvents(before: number): number {
+    return this.db.query("DELETE FROM admin_events WHERE time < ?").run(before).changes;
   }
 
   sendFriendRequest(requesterId: string, addresseeId: string, now: number): SendFriendRequestResult {

@@ -1,4 +1,11 @@
 import type {
+  AdminActivityRows,
+  AdminBestTime,
+  AdminEvent,
+  AdminEventInput,
+  AdminEventQuery,
+  AdminSessionInfo,
+  AdminTotals,
   AdminUserList,
   AdminUserListQuery,
   CategoryStats,
@@ -37,6 +44,8 @@ export function createMemoryUserStore(): UserStore {
 
   // Friendships keyed by canonical "low|high" pair (low < high by id string).
   const friendships = new Map<string, { low: string; high: string; status: "pending" | "accepted"; requestedBy: string; createdAt: number }>();
+  const events: AdminEvent[] = [];
+  let nextEventId = 1;
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -48,6 +57,19 @@ export function createMemoryUserStore(): UserStore {
 
   function pairKey(a: string, b: string): string {
     return a < b ? `${a}|${b}` : `${b}|${a}`;
+  }
+
+  function providersFor(userId: string): string[] {
+    return [...usersByOAuth.entries()].filter(([, u]) => u.id === userId).map(([key]) => key.split(":")[0]!).sort();
+  }
+
+  function lastActiveAt(userId: string): number | null {
+    const times = [
+      ...(gameRecords.get(userId) ?? []).map((r) => r.playedAt),
+      ...[...dailyResults.entries()].filter(([key]) => key.startsWith(`${userId}:`)).map(([, r]) => r.completedAt),
+      ...[...sessions.values()].filter((s) => s.userId === userId).map((s) => s.createdAt),
+    ];
+    return times.length > 0 ? Math.max(...times) : null;
   }
 
   function publicUser(id: string): PublicUser | null {
@@ -229,8 +251,11 @@ export function createMemoryUserStore(): UserStore {
           displayName: user.displayName,
           avatarEmoji: user.avatarEmoji,
           hasPassword: user.passwordHash !== null,
+          providers: providersFor(user.id),
           createdAt: user.createdAt,
           games: (stats.get(user.id) ?? EMPTY_STATS).totalGames,
+          dailies: [...dailyResults.keys()].filter((key) => key.startsWith(`${user.id}:`)).length,
+          lastActiveAt: lastActiveAt(user.id),
         })),
       };
     },
@@ -257,6 +282,74 @@ export function createMemoryUserStore(): UserStore {
           removed += 1;
         }
       }
+      return removed;
+    },
+    updateDisplayName(userId: string, displayName: string): void {
+      const user = usersById.get(userId);
+      if (!user) return;
+      const updated = { ...user, displayName };
+      usersById.set(userId, updated);
+      usersByEmail.set(user.email, updated);
+    },
+    listUserSessions(userId: string, now: number): readonly AdminSessionInfo[] {
+      return [...sessions.values()]
+        .filter((s) => s.userId === userId && s.expiresAt > now)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map((s) => ({ createdAt: s.createdAt, expiresAt: s.expiresAt }));
+    },
+    listUserProviders: (userId) => providersFor(userId),
+    listUserBestTimes(userId: string): readonly AdminBestTime[] {
+      return [...bestTimes.values()]
+        .filter((row) => row.userId === userId)
+        .sort((a, b) => a.gameMode.localeCompare(b.gameMode) || a.variant.localeCompare(b.variant))
+        .map((row) => ({ gameMode: row.gameMode, variant: row.variant, timeMs: row.timeMs, achievedAt: row.achievedAt }));
+    },
+    deleteBestTime: (userId, gameMode, variant) => bestTimes.delete(bestTimeKey(userId, gameMode, variant)),
+    deleteDailyResult: (userId, date) => dailyResults.delete(dailyKey(userId, date)),
+    resetUserStats(userId: string): void {
+      stats.delete(userId);
+      categoryStats.delete(userId);
+      gameRecords.delete(userId);
+    },
+    getAdminTotals(now: number): AdminTotals {
+      return {
+        users: usersById.size,
+        games: [...gameRecords.values()].reduce((sum, records) => sum + records.length, 0),
+        dailies: dailyResults.size,
+        bestTimes: bestTimes.size,
+        activeSessions: [...sessions.values()].filter((s) => s.expiresAt > now).length,
+        friendships: [...friendships.values()].filter((f) => f.status === "accepted").length,
+      };
+    },
+    listActivitySince(since: number): AdminActivityRows {
+      return {
+        signups: [...usersById.values()].filter((u) => u.createdAt >= since).map((u) => ({ userId: u.id, at: u.createdAt })),
+        games: [...gameRecords.entries()].flatMap(([userId, records]) =>
+          records.filter((r) => r.playedAt >= since).map((r) => ({ userId, mode: r.mode, playMode: r.playMode, at: r.playedAt }))),
+        dailies: [...dailyResults.entries()]
+          .filter(([, r]) => r.completedAt >= since)
+          .map(([key, r]) => ({ userId: key.slice(0, -r.date.length - 1), at: r.completedAt })),
+        logins: [...sessions.values()].filter((s) => s.createdAt >= since).map((s) => ({ userId: s.userId, at: s.createdAt })),
+      };
+    },
+    recordEvent(event: AdminEventInput): void {
+      events.push({ ...event, id: nextEventId++ });
+    },
+    listEvents(query: AdminEventQuery): readonly AdminEvent[] {
+      return events
+        .filter((e) =>
+          (query.level === null || e.level === query.level) &&
+          (query.action === null || e.action.startsWith(query.action)) &&
+          (query.ip === null || e.ip === query.ip) &&
+          (query.userId === null || e.userId === query.userId) &&
+          (query.before === null || e.id < query.before))
+        .sort((a, b) => b.id - a.id)
+        .slice(0, query.limit);
+    },
+    pruneEvents(before: number): number {
+      const kept = events.filter((e) => e.time >= before);
+      const removed = events.length - kept.length;
+      events.splice(0, events.length, ...kept);
       return removed;
     },
     sendFriendRequest(requesterId: string, addresseeId: string, now: number): SendFriendRequestResult {
