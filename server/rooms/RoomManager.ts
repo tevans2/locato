@@ -41,6 +41,20 @@ export interface RoomManagerStats {
   readonly connections: number;
 }
 
+// Admin-facing room view: no session tokens, chat, or prompt answers.
+export interface AdminRoomSummary {
+  readonly code: RoomCode;
+  readonly kind: "quiz" | "map-tap" | "geoguessr";
+  readonly status: string;
+  readonly categoryIds: readonly string[];
+  readonly roundNumber: number | null;
+  readonly roundLimit: number;
+  readonly players: readonly { readonly name: string; readonly connected: boolean; readonly score: number; readonly isHost: boolean }[];
+  readonly updatedAt: number;
+}
+
+export const ADMIN_ROOM_CLOSED_MESSAGE = "This room was closed by an admin.";
+
 const DEFAULT_MAX_ROOMS = 500;
 const DEFAULT_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 const DEFAULT_EMPTY_ROOM_TTL_MS = 30_000;
@@ -116,6 +130,37 @@ export class RoomManager {
 
   stats(): RoomManagerStats {
     return { rooms: this.rooms.size, connections: this.connectionByPlayerId.size };
+  }
+
+  listRooms(): readonly AdminRoomSummary[] {
+    return [...this.rooms.values()]
+      .map((room) => {
+        const snapshot = room.snapshot();
+        return {
+          code: room.code,
+          kind: isMapTapRoom(room) ? "map-tap" : isGeoGuessrRoom(room) ? "geoguessr" : "quiz",
+          status: snapshot.status,
+          categoryIds: snapshot.categoryIds,
+          roundNumber: snapshot.round?.roundNumber ?? null,
+          roundLimit: snapshot.settings.roundLimit,
+          players: snapshot.players.map((player) => ({ name: player.name, connected: player.connected, score: player.score, isHost: player.id === snapshot.hostPlayerId })),
+          updatedAt: room.updatedAt,
+        } satisfies AdminRoomSummary;
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  // Tells every connected player the room is gone (clients treat room-not-found as "back to
+  // setup") and then drops it along with its reconnect tokens.
+  closeRoom(roomCode: RoomCode): boolean {
+    const room = this.rooms.get(roomCode);
+    if (!room) return false;
+    for (const player of room.snapshot().players) {
+      const connection = this.connectionByPlayerId.get(player.id);
+      if (connection) sendError(connection, "room-not-found", ADMIN_ROOM_CLOSED_MESSAGE);
+    }
+    this.deleteRoom(roomCode);
+    return true;
   }
 
   attach(_connection: MultiplayerConnection): void {}

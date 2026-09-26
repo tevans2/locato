@@ -36,7 +36,7 @@ declare module "bun:sqlite" {
   export interface Statement<Row = unknown> {
     get(...params: readonly unknown[]): Row | null;
     all(...params: readonly unknown[]): Row[];
-    run(...params: readonly unknown[]): void;
+    run(...params: readonly unknown[]): { readonly changes: number; readonly lastInsertRowid: number | bigint };
   }
 
   export class Database {
@@ -44,6 +44,7 @@ declare module "bun:sqlite" {
     query<Row = unknown>(sql: string): Statement<Row>;
     run(sql: string, ...params: readonly unknown[]): void;
     exec(sql: string): void;
+    transaction<Args extends unknown[]>(fn: (...args: Args) => void): (...args: Args) => void;
     close(): void;
   }
 }

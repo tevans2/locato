@@ -8,7 +8,6 @@ import {
   normalizeLeaderboardVariant,
 } from "../leaderboard/validation";
 import type {
-  AdminUserList,
   AuthUser,
   DailyChallengeResult,
   DailyLeaderboardEntry,
@@ -36,8 +35,6 @@ const USERNAME_MAX_LENGTH = 20;
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_ADMIN_PAGE = 50;
-const MAX_ADMIN_PAGE = 200;
 const DEFAULT_DAILY_HISTORY_LIMIT = 14;
 
 export interface AuthServiceOptions {
@@ -57,7 +54,7 @@ function normalizeEmail(value: unknown): string | null {
 
 // The display name doubles as a unique handle (used to add friends), so it must match the
 // username charset and length. Returns the trimmed name (case preserved) or null if invalid.
-function normalizeUsername(value: unknown): string | null {
+export function normalizeUsername(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const name = value.trim();
   return name.length >= USERNAME_MIN_LENGTH && name.length <= USERNAME_MAX_LENGTH && USERNAME_PATTERN.test(name) ? name : null;
@@ -280,28 +277,6 @@ export class AuthService {
 
   getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
     return this.store.getUserRank(userId, gameMode, variant);
-  }
-
-  // --- Admin account controls ---
-
-  listUsers(query: { q?: unknown; limit?: unknown; offset?: unknown }): AdminUserList {
-    const search = typeof query.q === "string" && query.q.trim().length > 0 ? query.q.trim() : null;
-    const limit = typeof query.limit === "number" && Number.isInteger(query.limit) ? Math.min(Math.max(query.limit, 1), MAX_ADMIN_PAGE) : DEFAULT_ADMIN_PAGE;
-    const offset = typeof query.offset === "number" && Number.isInteger(query.offset) && query.offset > 0 ? query.offset : 0;
-    return this.store.listUsers({ query: search, limit, offset });
-  }
-
-  getUserDetail(id: string): { user: AuthUser; stats: UserStats } | null {
-    const user = this.store.findUserById(id);
-    return user ? { user: this.toAuthUser(user), stats: this.store.getStats(id) } : null;
-  }
-
-  deleteUser(id: string): boolean {
-    return this.store.deleteUser(id);
-  }
-
-  revokeUserSessions(id: string): number {
-    return this.store.deleteUserSessions(id);
   }
 
   // --- Friends ---

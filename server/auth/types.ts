@@ -178,8 +178,73 @@ export interface AdminUserSummary {
   readonly displayName: string;
   readonly avatarEmoji: string | null;
   readonly hasPassword: boolean;
+  readonly providers: readonly string[];
   readonly createdAt: number;
   readonly games: number;
+  readonly dailies: number;
+  // Latest game, daily, or login; null when the account has never been used since signup.
+  readonly lastActiveAt: number | null;
+}
+
+// Session tokens are credentials, so admin views only ever see their timestamps.
+export interface AdminSessionInfo {
+  readonly createdAt: number;
+  readonly expiresAt: number;
+}
+
+export interface AdminBestTime {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timeMs: number;
+  readonly achievedAt: number;
+}
+
+// Raw activity rows since a cutoff; the service aggregates them into the overview.
+export interface AdminActivityRows {
+  readonly signups: readonly { readonly userId: string; readonly at: number }[];
+  readonly games: readonly { readonly userId: string; readonly mode: string; readonly playMode: string | null; readonly at: number }[];
+  readonly dailies: readonly { readonly userId: string; readonly at: number }[];
+  readonly logins: readonly { readonly userId: string; readonly at: number }[];
+}
+
+export interface AdminTotals {
+  readonly users: number;
+  readonly games: number;
+  readonly dailies: number;
+  readonly bestTimes: number;
+  readonly activeSessions: number;
+  readonly friendships: number;
+}
+
+export type AdminEventLevel = "info" | "warn";
+
+export interface AdminEvent {
+  readonly id: number;
+  readonly time: number;
+  readonly level: AdminEventLevel;
+  readonly action: string;
+  readonly ip: string | null;
+  readonly userId: string | null;
+  readonly details: Record<string, unknown>;
+}
+
+export interface AdminEventInput {
+  readonly time: number;
+  readonly level: AdminEventLevel;
+  readonly action: string;
+  readonly ip: string | null;
+  readonly userId: string | null;
+  readonly details: Record<string, unknown>;
+}
+
+export interface AdminEventQuery {
+  readonly level: AdminEventLevel | null;
+  // Prefix match, so "admin." or "oauth" narrows to a family of actions.
+  readonly action: string | null;
+  readonly ip: string | null;
+  readonly userId: string | null;
+  readonly before: number | null;
+  readonly limit: number;
 }
 
 export interface AdminUserListQuery {
@@ -236,6 +301,20 @@ export interface UserStore {
   listUsers(query: AdminUserListQuery): AdminUserList;
   deleteUser(id: string): boolean;
   deleteUserSessions(userId: string): number;
+  updateDisplayName(userId: string, displayName: string): void;
+  listUserSessions(userId: string, now: number): readonly AdminSessionInfo[];
+  listUserProviders(userId: string): readonly string[];
+  listUserBestTimes(userId: string): readonly AdminBestTime[];
+  deleteBestTime(userId: string, gameMode: string, variant: string): boolean;
+  deleteDailyResult(userId: string, date: string): boolean;
+  // Clears game history, per-category stats, and aggregates; leaderboards and dailies are untouched.
+  resetUserStats(userId: string): void;
+  getAdminTotals(now: number): AdminTotals;
+  listActivitySince(since: number): AdminActivityRows;
+  // Admin event log (durable audit trail of the structured server log).
+  recordEvent(event: AdminEventInput): void;
+  listEvents(query: AdminEventQuery): readonly AdminEvent[];
+  pruneEvents(before: number): number;
   // Friends.
   sendFriendRequest(requesterId: string, addresseeId: string, now: number): SendFriendRequestResult;
   acceptFriendRequest(userId: string, requesterId: string, now: number): boolean;

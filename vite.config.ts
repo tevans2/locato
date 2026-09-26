@@ -13,6 +13,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  build: {
+    rollupOptions: {
+      // The admin console is its own page so none of it ships in the game bundle.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        admin: path.resolve(__dirname, "admin.html"),
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,

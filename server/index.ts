@@ -8,6 +8,8 @@ import { openDatabase, SqliteUserStore } from "./db/database";
 import { SocialHub, type SocialConnection } from "./social/SocialHub";
 import { StreetViewLocationPool } from "./streetview";
 import { createMapTapRoundResponse, validateMapTapGuessResponse } from "./maptap";
+import { AdminService } from "./admin/AdminService";
+import { logEvent, setEventSink } from "./admin/events";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -112,8 +114,68 @@ const streetViewPool = new StreetViewLocationPool({
 });
 streetViewPool.warm();
 
-// Hourly cleanup of expired session rows; cheap and keeps the table from growing unbounded.
-setInterval(() => authService.pruneExpiredSessions(), 60 * 60 * 1000).unref?.();
+// Structured log lines also land in the admin event log, since Fly keeps only a short stdout tail.
+setEventSink((event) => userStore.recordEvent(event));
+const EVENT_RETENTION_DAYS = readIntegerEnv("ADMIN_EVENT_RETENTION_DAYS", 90);
+const serverStartedAt = Date.now();
+const adminService = new AdminService(userStore, { rooms: roomManager, presence: socialHub });
+
+function fileSize(path: string): number {
+  try {
+    return existsSync(path) ? statSync(path).size : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function systemSnapshot(): Promise<Record<string, unknown>> {
+  const memory = process.memoryUsage();
+  return {
+    startedAt: serverStartedAt,
+    uptimeSeconds: Math.round((Date.now() - serverStartedAt) / 1000),
+    runtime: { bun: process.versions.bun ?? null, nodeEnv: process.env.NODE_ENV ?? "development", platform: process.platform },
+    host: { app: process.env.FLY_APP_NAME ?? null, region: process.env.FLY_REGION ?? null, machineId: process.env.FLY_MACHINE_ID ?? null, image: process.env.FLY_IMAGE_REF ?? null },
+    memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed, heapTotalBytes: memory.heapTotal },
+    database: { path: databasePath, sizeBytes: fileSize(databasePath), walBytes: fileSize(`${databasePath}-wal`) },
+    rooms: roomManager.stats(),
+    limits: {
+      maxRooms: readIntegerEnv("MAX_ROOMS", 500),
+      maxPlayersPerRoom: readIntegerEnv("MAX_PLAYERS_PER_ROOM", 8),
+      roomTtlSeconds: readIntegerEnv("ROOM_TTL_SECONDS", 7200),
+      sessionTtlDays: readIntegerEnv("SESSION_TTL_DAYS", 30),
+      eventRetentionDays: EVENT_RETENTION_DAYS,
+    },
+    features: {
+      githubOAuth: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+      googleOAuth: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+      allowedOrigins: origins ? [...origins] : null,
+    },
+    streetview: await streetViewPool.stats(),
+  };
+}
+
+// Hourly cleanup of expired session rows and aged-out admin events; cheap and keeps both tables bounded.
+setInterval(() => {
+  authService.pruneExpiredSessions();
+  userStore.pruneEvents(Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}, 60 * 60 * 1000).unref?.();
+
+// The admin console page. Like the API, it only exists when ADMIN_TOKEN is configured; the page
+// itself holds no data and signs in with the token against /api/admin/*.
+function serveAdminPage(): Response {
+  const path = safeStaticPath("/admin.html");
+  if (!adminToken || !path) return new Response("Not found", { status: 404 });
+  return new Response(Bun.file(path), {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "x-frame-options": "DENY",
+      "referrer-policy": "no-referrer",
+      "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    },
+  });
+}
 
 // Map each Bun socket to a stable connection object so RoomManager can use it as a Map key
 // across open/message/close callbacks. The socket itself changes identity on each callback
@@ -129,6 +191,9 @@ const server = Bun.serve<WebSocketData>({
     const { method } = request;
 
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    // Assets are referenced relatively (vite base "./"), so the page must live at /admin, not /admin/.
+    if (url.pathname === "/admin/" || url.pathname === "/admin.html") return new Response(null, { status: 301, headers: { Location: "/admin" } });
+    if (url.pathname === "/admin") return serveAdminPage();
 
     if (url.pathname === "/ws") {
       if (!isAllowedOrigin(request, origins)) return new Response("Forbidden", { status: 403 });
@@ -159,7 +224,7 @@ const server = Bun.serve<WebSocketData>({
       try {
         return json(await streetViewPool.createRound());
       } catch (error) {
-        console.warn(JSON.stringify({ time: new Date().toISOString(), level: "warn", action: "streetview.round.failed", error: error instanceof Error ? error.message : String(error) }));
+        logEvent("warn", "streetview.round.failed", { error: error instanceof Error ? error.message : String(error) });
         return json({ error: "Street View round unavailable." }, 503);
       }
     }
@@ -171,7 +236,7 @@ const server = Bun.serve<WebSocketData>({
         const count = Number.isFinite(parsedCount) ? parsedCount : fallbackCount;
         return json(await streetViewPool.createRounds(count));
       } catch (error) {
-        console.warn(JSON.stringify({ time: new Date().toISOString(), level: "warn", action: "streetview.rounds.failed", error: error instanceof Error ? error.message : String(error) }));
+        logEvent("warn", "streetview.rounds.failed", { error: error instanceof Error ? error.message : String(error) });
         return json({ error: "Street View rounds unavailable." }, 503);
       }
     }
@@ -180,7 +245,7 @@ const server = Bun.serve<WebSocketData>({
       return json(await streetViewPool.stats());
     }
 
-    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, adminToken, socialHub);
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, adminToken, socialHub, { service: adminService, system: systemSnapshot });
     if (authResponse) return authResponse;
 
     return serveStatic(url.pathname);

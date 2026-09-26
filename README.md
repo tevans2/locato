@@ -107,16 +107,34 @@ JSON over HTTP; session is an `HttpOnly` cookie set on register/login.
 - **Multiplayer:** WebSocket at `GET /ws`, authenticated from the session cookie at upgrade time.
 - **Health:** `GET /health`.
 
-### Admin account controls
+### Admin console
 
-Gated by `ADMIN_TOKEN` (`Authorization: Bearer <token>` or `x-admin-token: <token>`). While the variable is unset the entire surface is hidden — requests fall through to `404`; with it set, missing/wrong credentials get `403`. Password hashes are never returned.
+Gated by `ADMIN_TOKEN` (`Authorization: Bearer <token>` or `x-admin-token: <token>`). While the variable is unset the entire surface is hidden: `/admin` and `/api/admin/*` fall through to `404`. With it set, missing/wrong credentials get `403`, and an IP that gets it wrong 10 times in 15 minutes is locked out with `429`. Password hashes and session tokens are never returned, and admin responses are `Cache-Control: no-store`.
+
+**Panel:** open `/admin` and sign in with the token (kept in `sessionStorage` for that tab only). Sections: Overview (30-day activity, deltas, top players, modes), Users (search, full dossier, rename, clear avatar, reset stats, sign out everywhere, delete), Leaderboards (daily results and best times with too-fast/backdated flags, remove entries), Live (open rooms, close a room, who's online), Event log, and System. In dev, run `npm run serve` with `ADMIN_TOKEN` set plus `npm run dev`, then open `/admin.html` on the Vite port.
+
+**Event log:** every structured server log line (`logEvent` in `server/admin/events.ts`) is also written to the `admin_events` table and pruned after `ADMIN_EVENT_RETENTION_DAYS` (default 90), so history survives Fly's short stdout retention. It only records signed-in activity and server events; guest play isn't tracked.
 
 | Method | Path | Effect |
 | --- | --- | --- |
-| `GET` | `/api/admin/users?q=&limit=&offset=` | List/search users (`{ total, users[] }`). |
-| `GET` | `/api/admin/users/:id` | User detail + stats. |
-| `DELETE` | `/api/admin/users/:id` | Delete a user; cascades sessions, OAuth links, stats, and leaderboard times. |
-| `DELETE` | `/api/admin/users/:id/sessions` | Revoke all sessions (force-logout) without deleting the account. |
+| `GET` | `/api/admin/overview` | Totals, 24h/7d/30d windows (+ prior 30d), 30-day daily series, modes, top players, live counts. |
+| `GET` | `/api/admin/users?q=&limit=&offset=` | List/search users with sign-in methods, game/daily counts, last active. |
+| `GET` | `/api/admin/users/:id` | Dossier: stats, recent games, dailies, best times, session timestamps, friends, events. |
+| `PATCH` | `/api/admin/users/:id` | `{ displayName?, clearAvatar? }`: rename (username rules + uniqueness) / clear avatar. |
+| `DELETE` | `/api/admin/users/:id` | Delete a user; cascades sessions, OAuth links, stats, games, dailies, times, friendships. |
+| `DELETE` | `/api/admin/users/:id/sessions` | Revoke all sessions (force sign-out) without deleting the account. |
+| `DELETE` | `/api/admin/users/:id/stats` | Clear game history and aggregates (leaderboards/dailies untouched). |
+| `GET` | `/api/admin/leaderboards/meta` | Game modes and their variants. |
+| `GET` | `/api/admin/leaderboards?mode=&variant=` | Best-time board with `suspicious` flags. |
+| `DELETE` | `/api/admin/leaderboards/:userId?mode=&variant=` | Remove one best time. |
+| `GET` | `/api/admin/daily?date=YYYY-MM-DD` | Daily results with `too-fast` / `backdated` flags. |
+| `DELETE` | `/api/admin/daily/:userId/:date` | Remove one daily result. |
+| `GET` | `/api/admin/rooms` | Open multiplayer rooms and signed-in users online. |
+| `DELETE` | `/api/admin/rooms/:code` | Close a room (players get `room-not-found`). |
+| `GET` | `/api/admin/events?level=&action=&ip=&userId=&before=&limit=` | Event log, newest first; `action` is a prefix, `before` is an id cursor. |
+| `GET` | `/api/admin/system` | Uptime, memory, database size, limits, OAuth config, Street View pool. |
+
+Every admin write is itself logged as an `admin.*` event with the caller's IP.
 
 ## Architecture rules
 
