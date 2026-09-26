@@ -3,6 +3,8 @@ import { readSessionToken, serializeClearCookie, serializeSessionCookie, type Co
 import { buildAuthUrl, consumeOAuthState, exchangeOAuthCode, saveOAuthState } from "./oauth";
 import { createOAuthState } from "./tokens";
 import { NOOP_SOCIAL, type SocialBridge } from "../../src/core/social/socialProtocol";
+import { logEvent } from "../admin/events";
+import { handleAdminRoutes, type AdminRouteContext } from "../admin/routes";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 
 const MAX_STAT_VALUE = 1_000_000;
@@ -34,6 +36,32 @@ function isAuthorizedAdmin(request: Request, adminToken: string): boolean {
   return provided !== null && safeEqual(provided, adminToken);
 }
 
+// Per-IP lockout for wrong admin tokens: brute-forcing the token gets 429s after a handful of
+// misses. In-memory and single-machine, like the other rate limits here.
+const ADMIN_MAX_FAILURES = 10;
+const ADMIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const adminFailures = new Map<string, number[]>();
+
+function recentAdminFailures(callerIp: string, now: number): number[] {
+  const recent = (adminFailures.get(callerIp) ?? []).filter((at) => now - at < ADMIN_FAILURE_WINDOW_MS);
+  if (recent.length === 0) adminFailures.delete(callerIp);
+  else adminFailures.set(callerIp, recent);
+  return recent;
+}
+
+function isAdminLockedOut(callerIp: string, now: number): boolean {
+  return recentAdminFailures(callerIp, now).length >= ADMIN_MAX_FAILURES;
+}
+
+function recordAdminFailure(callerIp: string, now: number): void {
+  adminFailures.set(callerIp, [...recentAdminFailures(callerIp, now), now]);
+}
+
+// Test hook: the lockout map is module state shared across route calls.
+export function resetAdminLockouts(): void {
+  adminFailures.clear();
+}
+
 function intParam(url: URL, name: string): number | undefined {
   const raw = url.searchParams.get(name);
   if (raw === null) return undefined;
@@ -41,11 +69,7 @@ function intParam(url: URL, name: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function log(level: "info" | "warn", action: string, details: Record<string, unknown>): void {
-  const entry = { time: new Date().toISOString(), level, action, ...details };
-  // eslint-disable-next-line no-console
-  console[level](JSON.stringify(entry));
-}
+const log = logEvent;
 
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
@@ -137,7 +161,7 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
 
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
-export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, adminToken: string | null = null, social: SocialBridge = NOOP_SOCIAL): Promise<Response | null> {
+export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, adminToken: string | null = null, social: SocialBridge = NOOP_SOCIAL, admin: AdminRouteContext | null = null): Promise<Response | null> {
   const { pathname } = url;
   const { method } = request;
 
@@ -268,45 +292,26 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!body) return json({ error: "Invalid request body." }, 400);
     const result = service.submitBestTime(user.id, body);
     if ("error" in result) return json({ error: result.error }, 400);
+    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, timeMs: body.timeMs, accepted: result.accepted });
     return json(result);
   }
 
-  // --- Admin account controls (gated by ADMIN_TOKEN; the surface stays hidden when unset) ---
+  // --- Admin console (gated by ADMIN_TOKEN; the surface stays hidden when unset) ---
   if (pathname.startsWith("/api/admin/")) {
     if (!adminToken) return null; // not configured → fall through to static (404), surface hidden
+    const callerIp = ip(request);
+    if (isAdminLockedOut(callerIp, Date.now())) {
+      log("warn", "admin.locked_out", { ip: callerIp, path: pathname });
+      return json({ error: "Too many failed admin attempts. Try again later." }, 429);
+    }
     if (!isAuthorizedAdmin(request, adminToken)) {
-      log("warn", "admin.unauthorized", { ip: ip(request), path: pathname });
+      recordAdminFailure(callerIp, Date.now());
+      log("warn", "admin.unauthorized", { ip: callerIp, path: pathname });
       return json({ error: "Forbidden." }, 403);
     }
-
-    if (pathname === "/api/admin/users" && method === "GET") {
-      const result = service.listUsers({ q: url.searchParams.get("q") ?? undefined, limit: intParam(url, "limit"), offset: intParam(url, "offset") });
-      return json(result);
-    }
-
-    const userMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
-    if (userMatch) {
-      const id = decodeURIComponent(userMatch[1]!);
-      if (method === "GET") {
-        const detail = service.getUserDetail(id);
-        return detail ? json(detail) : json({ error: "User not found." }, 404);
-      }
-      if (method === "DELETE") {
-        const deleted = service.deleteUser(id);
-        log("info", "admin.user.delete", { ip: ip(request), targetUserId: id, deleted });
-        return deleted ? json({ ok: true, deleted: id }) : json({ error: "User not found." }, 404);
-      }
-    }
-
-    const sessionsMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/sessions$/);
-    if (sessionsMatch && method === "DELETE") {
-      const id = decodeURIComponent(sessionsMatch[1]!);
-      const revoked = service.revokeUserSessions(id);
-      log("info", "admin.user.logout", { ip: ip(request), targetUserId: id, revoked });
-      return json({ ok: true, revoked });
-    }
-
-    return json({ error: "Unknown admin route." }, 404);
+    // Only an authorized request reaches the admin routes.
+    if (!admin) return json({ error: "Admin console is not configured." }, 503);
+    return handleAdminRoutes(request, url, admin);
   }
 
   // --- Friends ---
