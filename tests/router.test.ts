@@ -39,6 +39,12 @@ describe("shareable game routes", () => {
     { type: "friends" },
     { type: "multiplayer" },
     { type: "leaderboard", mode: "flags", variant: "timer" },
+    { type: "academy" },
+    { type: "academy", groupId: "western-europe" },
+    { type: "academy-lesson", lessonId: "review" },
+    { type: "academy-lesson", lessonId: "lookalikes:FR" },
+    { type: "academy-placement" },
+    { type: "country-profile", code: "FR" },
   ])("preserves $type links", (route) => {
     expect(parse(buildRouteUrl(route, { pathname: "/" }))).toEqual(route);
   });
@@ -48,6 +54,8 @@ describe("shareable game routes", () => {
     expect(parse("/?view=unknown")).toBeNull();
     expect(parse("/?room=%20")).toBeNull();
     expect(parse("/?view=leaderboard&mode=unknown")).toEqual({ type: "leaderboard" });
+    expect(parse("/?country=france")).toBeNull();
+    expect(parse("/?view=academy&group=Bad%20Id")).toEqual({ type: "academy" });
     expect(buildRouteUrl({ type: "landing" }, { pathname: "/" })).toBe("/");
   });
 });
