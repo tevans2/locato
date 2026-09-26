@@ -18,11 +18,12 @@
     "@types/three": "^0.184.1",
     "@vitest/ui": "^3.2.4",
     "happy-dom": "^20.14.0",
+    "region-flags": "^1.1.0",
+    "svg-country-flags": "^1.2.10",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vitest": "^3.2.4",
-    "region-flags": "^1.1.0",
-    "svg-country-flags": "^1.2.10"
+    "world-countries": "^5.1.0"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
