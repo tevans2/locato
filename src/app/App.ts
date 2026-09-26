@@ -770,6 +770,7 @@ export function createApp(options: AppOptions): App {
           onFlags: () => navigate({ type: "flag-gallery" }),
           onLeaderboard: () => navigate({ type: "leaderboard" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
+          onAcademy: () => navigate({ type: "academy" }),
           storage: options.storage,
         }),
         false,
