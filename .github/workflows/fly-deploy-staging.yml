@@ -48,4 +48,20 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_STAGING }}
           VITE_GOOGLE_MAPS_EMBED_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_EMBED_API_KEY_STAGING }}
           VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY_STAGING }}
-      
+
+      # This job's check ("Test, build, and deploy staging") is required on main via the
+      # main-protect ruleset, so it must only pass once staging is actually serving traffic.
+      # Fly has no health checks configured, so verify the app boots (staging scales to zero,
+      # so allow for a cold start).
+      - name: Smoke test staging
+        run: |
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --max-time 20 https://locato-staging.fly.dev/health; then
+              echo " - staging healthy after attempt $attempt"
+              exit 0
+            fi
+            echo "staging not healthy yet (attempt $attempt/12); retrying in 10s"
+            sleep 10
+          done
+          echo "::error::Staging did not become healthy after deploy"
+          exit 1
