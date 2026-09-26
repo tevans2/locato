@@ -25,6 +25,7 @@ import { el } from "../ui/dom/createElement";
 import { createThemeToggle } from "../ui/theme";
 import { createSoundToggle } from "../ui/dom/sfx";
 import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
+import { createAcademyProgressStore } from "./academyProgress";
 
 export interface AppOptions {
   readonly root: HTMLElement;
@@ -73,10 +74,13 @@ export function createApp(options: AppOptions): App {
   // Account controls persist across navigation and are fixed to the top-right of the viewport.
   // Persistent social channel (presence + friend/invite events) for the signed-in user.
   const social = createSocialClient(resolveSocialUrl(window.location));
+  const academyProgress = createAcademyProgressStore(options.storage);
   const authControls = createAuthControls({
     onAuthChange: (state) => {
       if (state.user) social.connect();
       else social.disconnect();
+      if (state.user) void academyProgress.syncWithAccount();
+      else academyProgress.detachAccount();
     },
     onViewStats: () => navigate({ type: "stats" }),
     onViewFriends: () => navigate({ type: "friends" }),
@@ -683,6 +687,61 @@ export function createApp(options: AppOptions): App {
     );
   }
 
+  // Academy screens (hub, lesson, placement, country profile) all need the world map and are
+  // lazy-loaded, so they share one loader.
+  async function startAcademyScreen(route: Extract<AppRoute, { type: "academy" | "academy-lesson" | "academy-placement" | "country-profile" }>): Promise<void> {
+    const run = navigationRun;
+    mount(createLoadingScreen(route.type === "country-profile" ? "Opening the atlas…" : "Opening the Academy…"));
+    const worldCountryFeatures = await loadWorldCountryFeatures();
+    if (run !== navigationRun) return;
+    const shared = { countryIndex: options.countryIndex, worldCountryFeatures, progressStore: academyProgress };
+    const openAcademy = (groupId?: string) => navigate({ type: "academy", ...(groupId ? { groupId } : {}) });
+    const startLesson = (lessonId: string) => navigate({ type: "academy-lesson", lessonId });
+    const openCountry = (code: string) => navigate({ type: "country-profile", code: code.toUpperCase() });
+
+    if (route.type === "academy") {
+      const { createAcademyScreen } = await import("../ui/screens/AcademyScreen");
+      if (run !== navigationRun) return;
+      mount(createAcademyScreen({
+        ...shared,
+        ...(route.groupId ? { initialGroupId: route.groupId } : {}),
+        onHome: () => navigate({ type: "landing" }),
+        onBack: () => goBack(),
+        onStartLesson: startLesson,
+        onStartPlacement: () => navigate({ type: "academy-placement" }),
+        onOpenCountry: openCountry,
+        onGroupChange: (groupId) => {
+          const next: AppRoute = { type: "academy", ...(groupId ? { groupId } : {}) };
+          window.history.replaceState({ route: next, idx: historyState()?.idx ?? 0 } satisfies HistoryState, "", buildRouteUrl(next, window.location));
+        },
+      }));
+      return;
+    }
+    if (route.type === "academy-lesson") {
+      const { createLessonScreen } = await import("../ui/screens/LessonScreen");
+      if (run !== navigationRun) return;
+      mount(createLessonScreen({ ...shared, lessonId: route.lessonId, onExit: openAcademy, onStartLesson: startLesson, onOpenCountry: openCountry }));
+      return;
+    }
+    if (route.type === "academy-placement") {
+      const { createPlacementScreen } = await import("../ui/screens/PlacementScreen");
+      if (run !== navigationRun) return;
+      mount(createPlacementScreen({ ...shared, onDone: openAcademy, onStartLesson: startLesson }));
+      return;
+    }
+    const { createCountryProfileScreen } = await import("../ui/screens/CountryProfileScreen");
+    if (run !== navigationRun) return;
+    mount(createCountryProfileScreen({
+      ...shared,
+      code: route.code,
+      onBack: () => goBack(),
+      onHome: () => navigate({ type: "landing" }),
+      onOpenCountry: openCountry,
+      onStartLesson: startLesson,
+      onOpenAcademy: openAcademy,
+    }));
+  }
+
   function startLeaderboard(mode?: GameModeId, variant?: string): void {
     mount(
       createLeaderboardScreen({
@@ -795,6 +854,10 @@ export function createApp(options: AppOptions): App {
     if (route.type === "leaderboard") {
       startLeaderboard(route.mode, route.variant);
       return;
+    }
+
+    if (route.type === "academy" || route.type === "academy-lesson" || route.type === "academy-placement" || route.type === "country-profile") {
+      runNavigation(startAcademyScreen(route));
     }
   }
 
