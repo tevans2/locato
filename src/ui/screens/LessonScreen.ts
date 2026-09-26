@@ -7,6 +7,7 @@ import {
   answerStep,
   buildLesson,
   buildLookalikeDrill,
+  buildMistakesLesson,
   buildReviewLesson,
   cardKey,
   createLessonSession,
@@ -16,7 +17,6 @@ import {
   groupCompletion,
   groupForCountry,
   recordLessonAttempt,
-  stepForCard,
   stepSkill,
   suggestNextGroup,
   toDayKey,
@@ -24,6 +24,7 @@ import {
   type AcademySkill,
   type LearningGroup,
   type Lesson,
+  type LessonAttempt,
   type LessonSession,
   type LessonStep,
   type SessionStep,
@@ -172,7 +173,16 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   let stepAbort: AbortController | null = null;
   let streak = 0;
   let bestStreak = 0;
-  let mistakes = new Map<string, { code: CountryCode; skill: AcademySkill }>();
+  /** Distinct cards missed on a first try this round (retries and repeats excluded). */
+  const missedCards = (): LessonAttempt[] => {
+    const seen = new Set<string>();
+    return session.attempts.filter((attempt) => {
+      const key = cardKey(attempt.code, attempt.skill);
+      if (attempt.correct || attempt.retry || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
   let meetTotal = lesson.steps.filter((step) => step.kind === "meet").length;
   let meetSeen = 0;
 
@@ -198,6 +208,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       map,
       random,
       retry: current.retry,
+      promoted: current.promoted === true,
       onAnswer: (answer) => handleAnswer(current, answer),
       onOpenCountry: options.onOpenCountry,
       announce,
@@ -282,7 +293,11 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     return {
       tone: "warm",
       headline: answer.gaveUp ? "Here's the answer" : missHeadline(random),
-      detail: current.retry || kind === "practice" ? "No stress — it'll come round again in a review." : "We'll try this one again in a moment.",
+      detail: current.promoted
+        ? "You picked it out earlier — recalling it from scratch takes a few goes."
+        : current.retry || kind === "practice"
+          ? "No stress — it'll come round again in a review."
+          : "We'll try this one again in a moment.",
       ...missDetails(countryIndex, step, skill, answer),
       ...more,
     };
@@ -302,11 +317,11 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     root.dataset.phase = "feedback";
     session = answerStep(session, answer.correct, ease);
     const attempt = session.attempts.at(-1);
-    if (attempt && kind !== "practice") {
+    // Every round is real practice, mistakes review included: a first answer per card reaches spaced repetition.
+    if (attempt) {
       const time = now();
       progressStore.update((progress) => recordLessonAttempt(progress, attempt, time, toDayKey(time)));
     }
-    if (!answer.correct && !current.retry) mistakes.set(cardKey(step.code, skill), { code: step.code, skill });
 
     streak = answer.correct ? streak + 1 : 0;
     bestStreak = Math.max(bestStreak, streak);
@@ -328,10 +343,8 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   }
 
   function startPractice(): void {
-    const steps = [...mistakes.values()].map(({ code, skill }) => stepForCard(code, skill, 1, countryIndex, random));
-    mistakes = new Map();
     kind = "practice";
-    lesson = { id: "practice", title: "Mistakes review", steps };
+    lesson = buildMistakesLesson(missedCards(), countryIndex, random);
     session = createLessonSession(lesson);
     streak = 0;
     bestStreak = 0;
@@ -352,6 +365,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     const newCodes = [...new Set(lesson.steps.filter((step) => step.kind === "meet").map((step) => step.code))];
     const group = kind === "group" ? resolved!.group : null;
     const suggestion = suggestNextGroup(progress);
+    const missed = missedCards();
 
     let primary: CompletionAction | null = null;
     if (group) {
@@ -372,7 +386,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       group: `${lesson.title}, one step closer.`,
       review: "Those memories just got a little stronger.",
       lookalikes: "Your eye for the details is sharpening.",
-      practice: "Practice round — your review schedule stays as it was.",
+      practice: "Those cards are back on track in your review schedule.",
     };
 
     const view = createCompletionView({
@@ -389,7 +403,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       levelBefore: academyLevel(startProgress),
       levelAfter: academyLevel(progress),
       primary,
-      review: mistakes.size > 0 ? { label: `Review mistakes (${mistakes.size})`, run: startPractice } : null,
+      review: missed.length > 0 ? { label: `Review mistakes (${missed.length})`, run: startPractice } : null,
       back: { label: "Back to Academy", run: exit },
       onOpenCountry: options.onOpenCountry,
       countryIndex,

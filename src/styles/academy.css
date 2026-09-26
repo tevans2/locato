@@ -348,7 +348,7 @@
 #academy .academy-map.has-group .academy-map-dot:not(.is-in-group) { opacity: 0.35; }
 #academy .academy-map .academy-map-dot:is(.is-picked, .is-hot, :hover) { stroke: var(--acad-ink); stroke-width: 2.4; }
 
-#academy .academy-map .world-map-controls { position: absolute; top: auto; left: auto; bottom: 12px; right: 12px; }
+#academy .academy-map .world-map-controls { top: auto; left: auto; bottom: 12px; right: 12px; }
 
 #academy .academy-map .world-map-control-button {
   min-width: 34px;

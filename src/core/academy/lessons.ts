@@ -22,9 +22,19 @@ export const LESSON_MAX_STEPS = 20;
 export const LESSON_MAX_NEW_COUNTRIES = 3;
 /** Other steps shown between a miss and its retry. */
 export const REQUEUE_GAP = 3;
+/** Other steps shown between a correct choice and its promoted recall version. */
+export const PROMOTE_GAP = 4;
+/** Steps a lesson with new countries leaves free so correct answers can graduate in-lesson. */
+export const LESSON_PROMOTION_ROOM = 4;
+/** Overdue cards of a group's seen countries always mixed into a lesson that introduces new ones. */
+const MIN_DUE_REVIEWS_WITH_NEW = 2;
+/** Most distinct cards a mistakes lesson drills (each may graduate to a recall step). */
+export const MISTAKES_MAX_CARDS = 8;
 
 // Easiest first, so a new country's first ladder rungs are the gentlest.
 const SKILL_LADDER: readonly AcademySkill[] = ["flag", "map", "shape", "capital"];
+/** New-country skills whose correct choice graduates to typing (map stays on choices for a first lesson). */
+const PROMOTABLE_NEW_SKILLS: ReadonlySet<AcademySkill> = new Set(["flag", "shape", "capital"]);
 
 type Random = () => number;
 
@@ -135,9 +145,12 @@ export function buildLesson(
 
   const introduced: CountryCode[] = newCodes.slice(0, LESSON_MAX_NEW_COUNTRIES);
   const stepCount = (seen: number) => introduced.length * (1 + ACADEMY_SKILLS.length) + seen;
+  // Leave room for new countries' correct choices to graduate to typed recall within the lesson.
+  const fillTarget = introduced.length > 0 ? Math.max(LESSON_MIN_STEPS, LESSON_TARGET_STEPS - LESSON_PROMOTION_ROOM) : LESSON_TARGET_STEPS;
 
-  let seenTaken = 0;
-  while (seenTaken < seenCards.length && stepCount(seenTaken) < LESSON_TARGET_STEPS) seenTaken += 1;
+  // ...but never crowd out overdue reviews entirely.
+  let seenTaken = Math.min(MIN_DUE_REVIEWS_WITH_NEW, seenCards.filter((entry) => entry.due).length);
+  while (seenTaken < seenCards.length && stepCount(seenTaken) < fillTarget) seenTaken += 1;
   while (stepCount(seenTaken) < LESSON_MIN_STEPS && introduced.length < newCodes.length) {
     introduced.push(newCodes[introduced.length]!);
   }
@@ -152,9 +165,13 @@ export function buildLesson(
       SKILL_LADDER.indexOf(left.skill) - SKILL_LADDER.indexOf(right.skill),
   );
 
+  const introducedSet = new Set(introduced);
   const cardSteps = interleave(cardsByCountry)
     .slice(0, LESSON_MAX_STEPS - introduced.length)
-    .map(({ code, skill }) => stepForCard(code, skill, getCard(progress, code, skill).box, countryIndex, random, codes));
+    .map(({ code, skill }): LessonStep => {
+      const step = stepForCard(code, skill, getCard(progress, code, skill).box, countryIndex, random, codes);
+      return step.kind === "choice" && introducedSet.has(code) && PROMOTABLE_NEW_SKILLS.has(skill) ? { ...step, promote: true } : step;
+    });
 
   return {
     id: group.id,
@@ -178,6 +195,32 @@ export function buildReviewLesson(
     stepForCard(code, skill, getCard(progress, code, skill).box, countryIndex, random),
   );
   return { id: "review", title: "Review", steps };
+}
+
+/**
+ * A short practice round on what the player just missed: each missed card once as a fresh
+ * 3-option choice (new distractors, interleaved by country), marked to graduate to a recall step
+ * (letter-count typing, or placing on the map) when answered right. Correct attempts and repeat
+ * misses of the same card are ignored, so a lesson's `attempts` can be passed straight in.
+ */
+export function buildMistakesLesson(
+  missed: readonly { readonly code: CountryCode; readonly skill: AcademySkill; readonly correct?: boolean }[],
+  countryIndex: CountryIndex,
+  random: Random,
+  maxCards = MISTAKES_MAX_CARDS,
+): Lesson {
+  const seen = new Set<string>();
+  const cards: CardRef[] = [];
+  for (const { code, skill, correct } of missed) {
+    const key = `${code.toUpperCase()}:${skill}`;
+    if (correct === true || seen.has(key) || !countryIndex.byCode.has(code.toUpperCase())) continue;
+    seen.add(key);
+    cards.push({ code: code.toUpperCase(), skill });
+  }
+  const steps = interleave(cards)
+    .slice(0, maxCards)
+    .map(({ code, skill }): LessonStep => ({ ...(choiceStep(code, skill, 3, countryIndex, random) as Extract<LessonStep, { kind: "choice" }>), promote: true }));
+  return { id: "mistakes", title: "Mistakes review", steps };
 }
 
 /**
@@ -227,6 +270,8 @@ export interface SessionStep {
   readonly step: LessonStep;
   /** True for a re-queued copy of a missed step; retries are never re-queued again. */
   readonly retry: boolean;
+  /** True for a recall step queued after a correct `promote` choice; never promoted or re-queued. */
+  readonly promoted?: boolean;
 }
 
 export interface LessonAttempt {
@@ -234,19 +279,22 @@ export interface LessonAttempt {
   readonly skill: AcademySkill;
   readonly correct: boolean;
   readonly retry: boolean;
+  readonly promoted?: boolean;
 }
 
 export interface LessonSession {
   readonly lesson: Lesson;
   readonly queue: readonly SessionStep[];
   readonly position: number;
-  /** First-attempt results only; retries don't change the score. */
+  /** First-attempt results (promoted recall steps included); retries don't change the score. */
   readonly correct: number;
   readonly total: number;
   readonly attempts: readonly LessonAttempt[];
+  /** Promotions stop once the queue is this long, so lessons stay around 12–20 steps. */
+  readonly maxSteps: number;
 }
 
-export function createLessonSession(lesson: Lesson): LessonSession {
+export function createLessonSession(lesson: Lesson, maxSteps = LESSON_MAX_STEPS): LessonSession {
   return {
     lesson,
     queue: lesson.steps.map((step) => ({ step, retry: false })),
@@ -254,7 +302,23 @@ export function createLessonSession(lesson: Lesson): LessonSession {
     correct: 0,
     total: 0,
     attempts: [],
+    maxSteps,
   };
+}
+
+/** The recall rung above a choice: type it with letter-count slots, or place it on the map. */
+export function promotedStep(step: LessonStep): LessonStep | null {
+  if (step.kind !== "choice") return null;
+  if (step.skill === "map") return { kind: "place", code: step.code };
+  return { kind: "type", code: step.code, skill: step.skill, scaffold: "length" };
+}
+
+/** First slot at least `gap` steps ahead whose neighbours ask about other countries (else the end). */
+function promotionSlot(queue: readonly SessionStep[], from: number, code: CountryCode): number {
+  for (let index = Math.min(from, queue.length); index < queue.length; index += 1) {
+    if (queue[index - 1]?.step.code !== code && queue[index]?.step.code !== code) return index;
+  }
+  return queue.length;
 }
 
 export function currentStep(session: LessonSession): SessionStep | null {
@@ -298,11 +362,17 @@ export function answerStep(
   const position = session.position + 1;
   if (skill === null) return { ...session, position };
 
-  const attempt: LessonAttempt = { code: current.step.code, skill, correct, retry: current.retry };
+  const promoted = current.promoted === true;
+  const attempt: LessonAttempt = { code: current.step.code, skill, correct, retry: current.retry, ...(promoted ? { promoted } : {}) };
   let queue = session.queue;
-  if (!correct && !current.retry) {
+  if (!correct && !current.retry && !promoted) {
     const insertAt = Math.min(position + REQUEUE_GAP, queue.length);
     queue = [...queue.slice(0, insertAt), { step: ease(current.step), retry: true }, ...queue.slice(insertAt)];
+  }
+  const recall = correct && !current.retry && !promoted && current.step.kind === "choice" && current.step.promote ? promotedStep(current.step) : null;
+  if (recall && queue.length < session.maxSteps) {
+    const insertAt = promotionSlot(queue, position + PROMOTE_GAP, current.step.code);
+    queue = [...queue.slice(0, insertAt), { step: recall, retry: false, promoted: true }, ...queue.slice(insertAt)];
   }
 
   return {
@@ -315,8 +385,12 @@ export function answerStep(
   };
 }
 
-/** Writes one attempt to spaced repetition. Retries are skipped: the first miss already reset the card. */
+/**
+ * Writes one attempt to spaced repetition, once per card per session: retries are skipped (the
+ * first miss already reset the card) and so are promoted recall steps (the card's choice answer
+ * already counted — two answers a minute apart shouldn't jump a card two boxes).
+ */
 export function recordLessonAttempt(progress: AcademyProgress, attempt: LessonAttempt, now: number, dayKey: string): AcademyProgress {
-  if (attempt.retry) return progress;
+  if (attempt.retry || attempt.promoted) return progress;
   return recordAnswer(progress, attempt.code, attempt.skill, attempt.correct, now, dayKey);
 }

@@ -5,6 +5,9 @@ import { createSeededRandom } from "../src/core/game";
 import {
   applyPlacement,
   buildPlacementQuiz,
+  countryMastery,
+  findGroup,
+  suggestGroupAfterPlacement,
   createPlacementState,
   emptyProgress,
   getCard,
@@ -71,8 +74,16 @@ describe("applyPlacement", () => {
     expect(summary.total).toBe(20);
     const untestedTier1 = FAME_TIER_1_CODES.find((code) => !state.results.some((result) => result.code === code))!;
     expect(getCard(progress, untestedTier1, "flag").box).toBe(2);
-    expect(summary.knownCount).toBeGreaterThan(40);
-    expect(summary.suggestedGroupId).toBeTruthy();
+    // Tested and extrapolated countries are reported separately and never overlap.
+    expect(summary.testedCorrect).toBe(new Set(state.results.filter((r) => r.correct).map((r) => r.code)).size);
+    expect(summary.testedCorrect).toBeLessThanOrEqual(summary.correct);
+    expect(summary.extrapolatedCount).toBeGreaterThan(40);
+    const seeded = new Set(Object.keys(progress.cards).map((key) => key.split(":")[0]));
+    expect(summary.extrapolatedCount + summary.testedCorrect).toBe(seeded.size);
+    // A tier-2 player starts on a difficulty-2+ unit with countries they haven't met.
+    const group = findGroup(summary.suggestedGroupId!)!;
+    expect(group.difficulty).toBeGreaterThanOrEqual(2);
+    expect(group.countryCodes.some((code) => countryMastery(progress, code) === "new")).toBe(true);
     const tier3Untested = rawCountries.map((c) => c.code).find((code) => fameTier(code) === 3 && !state.results.some((r) => r.code === code))!;
     expect(getCard(progress, tier3Untested, "flag").box).toBe(0);
   });
@@ -85,8 +96,48 @@ describe("applyPlacement", () => {
       { code: "BR", skill: "shape", correct: false },
     ];
     const { progress, summary } = applyPlacement(emptyProgress(), results, NOW);
-    expect(summary).toMatchObject({ estimatedTier: 0, correct: 1, total: 4, knownCount: 1, suggestedGroupId: "europe-big-names" });
+    expect(summary).toMatchObject({ estimatedTier: 0, correct: 1, total: 4, testedCorrect: 1, extrapolatedCount: 0, suggestedGroupId: "europe-big-names" });
     expect(Object.keys(progress.cards)).toEqual(["FR:flag"]);
+  });
+
+  it("sends a beginner to a difficulty-1 unit even when a starter unit got a correct answer", () => {
+    const results: PlacementResult[] = ["GB", "FR", "DE", "IT", "ES", "PT", "GR"].map((code) => ({ code, skill: "flag" as const, correct: true }));
+    const wrong: PlacementResult[] = ["JP", "BR", "EG", "US", "CN"].map((code) => ({ code, skill: "capital" as const, correct: false }));
+    const { summary } = applyPlacement(emptyProgress(), [...results, ...wrong], NOW);
+    expect(summary.estimatedTier).toBe(0);
+    expect(findGroup(summary.suggestedGroupId!)!.difficulty).toBe(1);
+  });
+
+  it("skips starter units a strong player effectively knows, even with a skill never shown", () => {
+    // Right on flags, maps and outlines across tiers 1–2, but no capital questions at all.
+    const skills = ["flag", "map", "shape"] as const;
+    const tier1 = ["JP", "BR", "EG", "US", "CN", "DE"];
+    const tier2 = ["HU", "CZ", "NO", "PH", "GH", "UY"];
+    const results: PlacementResult[] = [...tier1, ...tier2].map((code, i) => ({ code, skill: skills[i % 3]!, correct: true }));
+    const { progress, summary } = applyPlacement(emptyProgress(), results, NOW);
+    expect(summary.estimatedTier).toBe(2);
+    // Capitals were never shown, so starter countries aren't formally familiar...
+    expect(countryMastery(progress, "FR")).not.toBe("familiar");
+    // ...but the suggestion still moves past them.
+    const group = findGroup(summary.suggestedGroupId!)!;
+    expect(group.difficulty).toBeGreaterThanOrEqual(2);
+    expect(suggestGroupAfterPlacement(progress, 2)?.id).toBe(group.id);
+  });
+
+  it("credits a strong staircase run whose hardest tier settles below 70%", () => {
+    const pattern = "1+ 2+ 2+ 3+ 3+ 3+ 3+ 3- 3- 2- 2+ 2+ 3+ 3+ 3+ 3+ 3+ 3- 3- 2-".split(" ");
+    const pools: Record<string, string[]> = {
+      "1": ["FR", "DE"],
+      "2": ["HU", "CZ", "NO", "PH", "GH", "UY"],
+      "3": ["LI", "SM", "TV", "NR", "PW", "KM", "ST", "GW", "BT", "BN", "TL", "LS", "SZ"],
+    };
+    const results: PlacementResult[] = pattern.map((entry, i) => ({ code: pools[entry[0]!]!.shift()!, skill: (["flag", "map", "shape", "capital"] as const)[i % 4]!, correct: entry[1] === "+" }));
+    expect(results.every((result) => fameTier(result.code) === Number(pattern[results.indexOf(result)]![0]))).toBe(true);
+    const { summary } = applyPlacement(emptyProgress(), results, NOW);
+    expect(summary.correct).toBe(14);
+    // 9/13 deep cuts (69%) is a strong result on a staircase that climbs after every right answer.
+    expect(summary.estimatedTier).toBe(3);
+    expect(findGroup(summary.suggestedGroupId!)!.difficulty).toBeGreaterThanOrEqual(2);
   });
 
   it("skip marks placement done without cards", () => {

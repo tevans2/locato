@@ -6,6 +6,7 @@ import {
   answerStep,
   buildLesson,
   buildLookalikeDrill,
+  buildMistakesLesson,
   buildReviewLesson,
   createLessonSession,
   currentStep,
@@ -15,7 +16,9 @@ import {
   isSessionComplete,
   LEARNING_GROUPS,
   LOOKALIKES,
+  LESSON_MAX_STEPS,
   pickDistractors,
+  promotedStep,
   recordAnswer,
   recordLessonAttempt,
   seedCard,
@@ -187,6 +190,110 @@ describe("lesson session", () => {
     expect(progress.cards["FR:capital"]).toMatchObject({ box: 1, wrong: 1 });
     const retry = recordLessonAttempt(progress, { code: "FR", skill: "capital", correct: true, retry: true }, NOW, "2026-09-26");
     expect(retry).toBe(progress);
+  });
+});
+
+describe("in-lesson promotion", () => {
+  it("marks new countries' flag/shape/capital choices to graduate, leaving room in the lesson", () => {
+    const group = findGroup("europe-big-names")!;
+    const lesson = buildLesson(group, emptyProgress(), index, NOW, createSeededRandom("fresh"));
+    const promotable = lesson.steps.filter((step) => step.kind === "choice" && step.promote);
+    expect(promotable.length).toBeGreaterThanOrEqual(3);
+    expect(promotable.every((step) => step.kind === "choice" && step.skill !== "map")).toBe(true);
+    expect(lesson.steps.length).toBeLessThanOrEqual(LESSON_MAX_STEPS - 3);
+  });
+
+  it("does not mark review cards of seen countries", () => {
+    const group = findGroup("europe-big-names")!;
+    const lesson = buildLesson(group, allBoxes(emptyProgress(), group.countryCodes, 1), index, NOW, createSeededRandom("seen"));
+    expect(lesson.steps.some((step) => step.kind === "choice" && step.promote)).toBe(false);
+  });
+
+  it("queues a letter-count typing step a few steps after a correct choice, never next to the same country", () => {
+    const group = findGroup("europe-big-names")!;
+    const lesson = buildLesson(group, emptyProgress(), index, NOW, createSeededRandom("fresh"));
+    let session = createLessonSession(lesson);
+    while (!isSessionComplete(session)) session = answerStep(session, true);
+    const promoted = session.queue.filter((entry) => entry.promoted);
+    expect(promoted.length).toBeGreaterThan(0);
+    expect(promoted.every((entry) => entry.step.kind === "type" && entry.step.scaffold === "length")).toBe(true);
+    expect(session.queue.length).toBeLessThanOrEqual(LESSON_MAX_STEPS);
+    expect(session.queue.length).toBeGreaterThanOrEqual(12);
+    noBackToBack(session.queue.map((entry) => entry.step));
+    // Promoted steps count toward the score but reach spaced repetition only once per card.
+    expect(session.total).toBe(session.attempts.length);
+    let progress = emptyProgress();
+    for (const attempt of session.attempts) progress = recordLessonAttempt(progress, attempt, NOW, "2026-09-26");
+    const answered = Object.values(progress.cards).reduce((sum, card) => sum + card.correct + card.wrong, 0);
+    expect(answered).toBe(session.attempts.length - promoted.length);
+  });
+
+  it("does not promote misses, retries or promoted steps, and respects the step cap", () => {
+    const steps: LessonStep[] = [
+      { kind: "choice", code: "FR", skill: "flag", options: ["FR", "IT"], promote: true },
+      { kind: "choice", code: "DE", skill: "map", options: ["DE", "PL"], promote: true },
+      { kind: "choice", code: "ES", skill: "capital", options: ["ES", "PT"], promote: true },
+    ];
+    let session = createLessonSession({ id: "t", title: "t", steps });
+    session = answerStep(session, false); // FR missed: retry, no promotion
+    session = answerStep(session, true); // DE map: promoted to placing
+    expect(session.queue.map((entry) => [entry.step.kind, entry.step.code, !!entry.retry, !!entry.promoted])).toEqual([
+      ["choice", "FR", false, false],
+      ["choice", "DE", false, false],
+      ["choice", "ES", false, false],
+      ["choice", "FR", true, false],
+      ["place", "DE", false, true],
+    ]);
+    session = answerStep(session, true); // ES capital
+    session = answerStep(session, true); // FR retry: never promoted
+    expect(session.queue.filter((entry) => entry.promoted)).toHaveLength(2);
+    session = answerStep(session, false); // promoted place missed: not re-queued
+    expect(session.queue).toHaveLength(6);
+    while (!isSessionComplete(session)) session = answerStep(session, true);
+    expect(session.queue).toHaveLength(6);
+
+    const capped = answerStep(createLessonSession({ id: "t", title: "t", steps }, 3), true);
+    expect(capped.queue).toHaveLength(3);
+  });
+
+  it("maps a choice to its recall rung", () => {
+    expect(promotedStep({ kind: "choice", code: "FR", skill: "capital", options: ["FR", "IT"] })).toEqual({ kind: "type", code: "FR", skill: "capital", scaffold: "length" });
+    expect(promotedStep({ kind: "choice", code: "FR", skill: "map", options: ["FR", "IT"] })).toEqual({ kind: "place", code: "FR" });
+    expect(promotedStep({ kind: "place", code: "FR" })).toBeNull();
+  });
+});
+
+describe("mistakes lesson", () => {
+  it("drills each missed card once as a fresh 3-option choice that can graduate", () => {
+    const attempts = [
+      { code: "FR", skill: "capital" as const, correct: false, retry: false },
+      { code: "DE", skill: "flag" as const, correct: true, retry: false },
+      { code: "FR", skill: "capital" as const, correct: false, retry: true },
+      { code: "IT", skill: "map" as const, correct: false, retry: false },
+      { code: "FR", skill: "flag" as const, correct: false, retry: false },
+    ];
+    const lesson = buildMistakesLesson(attempts, index, createSeededRandom("m"));
+    expect(lesson.id).toBe("mistakes");
+    expect(lesson.steps.map((step) => [step.code, step.kind === "meet" ? null : step.kind === "place" ? "map" : step.skill])).toEqual([
+      ["FR", "capital"],
+      ["IT", "map"],
+      ["FR", "flag"],
+    ]);
+    expect(lesson.steps.every((step) => step.kind === "choice" && step.options.length === 3 && step.promote)).toBe(true);
+    assertValidOptions(lesson.steps);
+  });
+
+  it("stays short and records a correct answer on a just-missed card normally", () => {
+    const many = LEARNING_GROUPS[0]!.countryCodes.flatMap((code) => ACADEMY_SKILLS.map((skill) => ({ code, skill, correct: false })));
+    expect(buildMistakesLesson(many, index, createSeededRandom("m")).steps.length).toBeLessThanOrEqual(8);
+
+    let progress = recordAnswer(emptyProgress(), "FR", "capital", false, NOW - 60_000, "2026-09-26");
+    expect(progress.cards["FR:capital"]).toMatchObject({ box: 1 });
+    let session = createLessonSession(buildMistakesLesson([{ code: "FR", skill: "capital" }], index, createSeededRandom("m")));
+    while (!isSessionComplete(session)) session = answerStep(session, true);
+    expect(session.queue.map((entry) => entry.step.kind)).toEqual(["choice", "type"]);
+    for (const attempt of session.attempts) progress = recordLessonAttempt(progress, attempt, NOW, "2026-09-26");
+    expect(progress.cards["FR:capital"]).toMatchObject({ box: 2, correct: 1, wrong: 1 });
   });
 });
 

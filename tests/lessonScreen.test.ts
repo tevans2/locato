@@ -126,10 +126,18 @@ describe("Lesson player", () => {
     ui.cont();
 
     let sawRetry = false;
+    let promoted = 0;
     let guard = 0;
     while (ui.info().phase === "step" && guard++ < 60) {
       const current = ui.info();
       if (current.retry && current.code === missed.code) sawRetry = true;
+      if (current.kind === "type") {
+        // A brand-new country graduates from choices to typing with letter-count slots.
+        promoted += 1;
+        expect(ui.root.querySelector(".lx-type")?.getAttribute("data-scaffold")).toBe("length");
+        expect(ui.root.querySelectorAll(".lx-slot").length).toBeGreaterThan(2);
+        expect(ui.root.querySelector(".lx-kicker-levelup")).not.toBeNull();
+      }
       ui.answer(true);
       if (ui.info().phase === "feedback") {
         expect(ui.root.querySelector<HTMLElement>(".lx-tray")!.dataset.tone).toBe("good");
@@ -137,15 +145,16 @@ describe("Lesson player", () => {
       }
     }
     expect(sawRetry).toBe(true);
+    expect(promoted).toBeGreaterThan(0);
     expect(ui.info().phase).toBe("complete");
     const accuracy = ui.root.querySelector(".lx-stat-note")?.textContent ?? "";
     expect(accuracy).toMatch(/^(\d+) of (\d+) first tries$/);
     const [, correct, total] = accuracy.match(/^(\d+) of (\d+)/)!.map(Number);
     expect(total! - correct!).toBe(1);
 
-    // Every first attempt reached spaced repetition; the retry did not double-count.
+    // Every first attempt reached spaced repetition; retries and promoted recall steps did not double-count.
     const cards = Object.values(ui.store.get().cards) as CardProgress[];
-    expect(cards.reduce((sum, c) => sum + c.correct + c.wrong, 0)).toBe(total);
+    expect(cards.reduce((sum, c) => sum + c.correct + c.wrong, 0)).toBe(total! - promoted);
     expect(getCard(ui.store.get(), missed.code, missed.skill as never).wrong).toBe(1);
 
     // Group completion moved, and the next-lesson button re-runs the unfinished group.
@@ -153,9 +162,21 @@ describe("Lesson player", () => {
     ui.root.querySelector<HTMLButtonElement>(".lx-done-next")!.click();
     expect(ui.onStartLesson).toHaveBeenCalledWith("europe-big-names");
 
-    // The missed card can be practised straight away.
+    // The missed card can be practised straight away, as a fresh choice that counts for real.
+    expect(ui.root.querySelector(".lx-done-review")?.textContent).toBe("Review mistakes (1)");
     ui.root.querySelector<HTMLButtonElement>(".lx-done-review")!.click();
-    expect(ui.info()).toMatchObject({ phase: "step", code: missed.code });
+    expect(ui.info()).toMatchObject({ phase: "step", kind: "choice", code: missed.code, skill: missed.skill, retry: false });
+    expect(ui.root.querySelectorAll(".lx-option")).toHaveLength(3);
+    ui.answer(true);
+    expect(getCard(ui.store.get(), missed.code, missed.skill as never)).toMatchObject({ box: 2, correct: 1, wrong: 1 });
+    ui.cont();
+    if (missed.skill === "map") expect(ui.info()).toMatchObject({ kind: "place", code: missed.code });
+    else expect(ui.info()).toMatchObject({ kind: "type", code: missed.code });
+    ui.answer(true);
+    ui.cont();
+    expect(ui.info().phase).toBe("complete");
+    expect(ui.root.querySelector(".lx-done-review")).toBeNull();
+    expect(getCard(ui.store.get(), missed.code, missed.skill as never).box).toBe(2);
 
     ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
     expect(ui.onExit).toHaveBeenCalledWith("europe-big-names");

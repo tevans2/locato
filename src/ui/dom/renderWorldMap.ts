@@ -2,6 +2,7 @@ import type { CountryId, CountryIndex } from "../../core/countries";
 import {
   MAP_VIEWBOX_HEIGHT,
   MAP_VIEWBOX_WIDTH,
+  mainLandmassBounds,
   projectWorldMapPosition,
   type ProjectedPoint,
   type WorldCountryFeature,
@@ -163,29 +164,6 @@ function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
   return ringCentroid(points) ?? centerOfBounds(points);
 }
 
-function featureProjectedPoints(feature: WorldCountryFeature): ProjectedPoint[] {
-  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
-  return polygons.flatMap((polygon) => polygon.flatMap((ring) => ring.map(projectWorldMapPosition)));
-}
-
-function boundsForPoints(points: readonly ProjectedPoint[]): ViewBoxState | null {
-  if (points.length === 0) return null;
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const [x, y] of points) {
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-
-  return { x: minX, y: minY, width: Math.max(0.001, maxX - minX), height: Math.max(0.001, maxY - minY) };
-}
-
 function createButton(text: string, label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.className = "world-map-control-button";
@@ -307,7 +285,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
     if (country) {
       const center = countryCenter(feature);
-      const bounds = boundsForPoints(featureProjectedPoints(feature));
+      // Frame the home landmass: France without French Guiana, the US without Alaska and Hawaii.
+      const bounds = mainLandmassBounds(feature);
       path.dataset.countryId = String(country.id);
       pathByCountryId.set(country.id, path);
       if (bounds) boundsByCountryId.set(country.id, bounds);

@@ -471,6 +471,7 @@
 }
 
 #app .lx .lx-kicker-retry,
+#app .lx .lx-kicker-levelup,
 #app .lx .lx-badge-new {
   display: inline-flex;
   align-items: center;
@@ -485,6 +486,7 @@
   background: var(--lx-warm-soft);
 }
 
+#app .lx .lx-kicker-levelup,
 #app .lx .lx-badge-new {
   color: var(--lx-hi-ink);
   background: var(--lx-hi-soft);
@@ -991,8 +993,13 @@
 #app .lx .lx-slots {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px 16px;
   margin-top: 14px;
+}
+
+#app .lx .lx-slot-word {
+  display: flex;
+  gap: 6px;
 }
 
 #app .lx .lx-slot {
@@ -1010,7 +1017,18 @@
 }
 
 #app .lx .lx-slot-gap {
-  width: 12px;
+  display: grid;
+  place-items: end center;
+  min-width: 6px;
+  height: 32px;
+  font: 800 1rem/1 var(--font-sans);
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  #app .lx .lx-slots { gap: 8px 12px; }
+  #app .lx .lx-slot-word { gap: 4px; }
+  #app .lx .lx-slot { width: 20px; }
 }
 
 /* ------------------------------------------------------------------------------------------ */

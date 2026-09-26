@@ -2,7 +2,7 @@
 // tinted and clickable, and the capital marked with a labelled dot.
 
 import type { CountryId, CountryIndex } from "../../../core/countries";
-import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH, projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon } from "../../../core/map";
+import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH, mainLandmassBounds, projectWorldMapPosition, unionMapRects, type MapRect, type WorldCountryFeature } from "../../../core/map";
 import type { CountryProfile } from "../../../core/countries/profiles";
 import { createWorldMapView, type WorldMapView } from "../../dom/renderWorldMap";
 
@@ -25,80 +25,19 @@ export interface ProfileLocator {
   readonly destroy: () => void;
 }
 
-export interface Rect {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
-function polygonRect(polygon: WorldMapPolygon): Rect | null {
-  const ring = polygon[0];
-  if (!ring || ring.length === 0) return null;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const position of ring) {
-    const [x, y] = projectWorldMapPosition(position);
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-  }
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-}
-
-function union(a: Rect, b: Rect): Rect {
-  const x = Math.min(a.x, b.x);
-  const y = Math.min(a.y, b.y);
-  return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y };
-}
-
-function gapBetween(a: Rect, b: Rect): number {
-  const dx = Math.max(0, a.x - (b.x + b.width), b.x - (a.x + a.width));
-  const dy = Math.max(0, a.y - (b.y + b.height), b.y - (a.y + a.height));
-  return Math.hypot(dx, dy);
-}
-
-function distanceToPoint(rect: Rect, [px, py]: readonly [number, number]): number {
-  const dx = Math.max(0, rect.x - px, px - (rect.x + rect.width));
-  const dy = Math.max(0, rect.y - py, py - (rect.y + rect.height));
-  return Math.hypot(dx, dy);
-}
+export type Rect = MapRect;
 
 /**
- * Map-space rectangle worth framing for a country: start from the landmass nearest the capital
- * and grow by absorbing nearby islands, so far-flung territories (French Guiana, Chukotka across
- * the date line) don't zoom the map out to the whole world.
+ * Map-space rectangle worth framing for a country: the landmass group round the capital (see
+ * `mainLandmassBounds`), so far-flung territories (French Guiana, Svalbard, Chukotka across the
+ * date line) don't zoom the map out to the whole world. The capital itself is always in frame.
  */
 export function countryFrame(feature: WorldCountryFeature | undefined, anchorLatLng: readonly [number, number] | null): Rect | null {
   const anchor = anchorLatLng ? projectWorldMapPosition([anchorLatLng[1], anchorLatLng[0]]) : null;
-  if (!feature) {
-    return anchor ? { x: anchor[0], y: anchor[1], width: 0, height: 0 } : null;
-  }
-  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
-  const rects = polygons.map(polygonRect).filter((rect): rect is Rect => rect !== null);
-  if (rects.length === 0) return null;
-
-  const size = (r: Rect) => r.width * r.height;
-  const start = anchor
-    ? rects.reduce((best, rect) => {
-        const d = distanceToPoint(rect, anchor) - distanceToPoint(best, anchor);
-        return d < -0.01 || (Math.abs(d) <= 0.01 && size(rect) > size(best)) ? rect : best;
-      })
-    : rects.reduce((best, rect) => (size(rect) > size(best) ? rect : best));
-
-  let frame = start;
-  let remaining = rects.filter((rect) => rect !== start);
-  // Reach is fixed by the home landmass so a trail of tiny islets can't snowball the frame.
-  const reach = Math.max(6, Math.max(start.width, start.height) * 0.45);
-  let grew = true;
-  while (grew && remaining.length) {
-    grew = false;
-    const next: Rect[] = [];
-    for (const rect of remaining) {
-      if (gapBetween(frame, rect) <= reach) { frame = union(frame, rect); grew = true; } else next.push(rect);
-    }
-    remaining = next;
-  }
-  if (anchor) frame = union(frame, { x: anchor[0], y: anchor[1], width: 0, height: 0 });
-  return frame;
+  const anchorRect = anchor ? { x: anchor[0], y: anchor[1], width: 0, height: 0 } : null;
+  const land = feature ? mainLandmassBounds(feature, { anchor: anchorLatLng ? [anchorLatLng[1], anchorLatLng[0]] : null }) : null;
+  if (!land) return feature ? null : anchorRect;
+  return anchorRect ? unionMapRects([land, anchorRect]) : land;
 }
 
 /** Padded 2:1 view around a frame, never tighter than MIN_VIEW_WIDTH map units. */

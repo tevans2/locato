@@ -91,6 +91,11 @@ describe("Placement quiz", () => {
     expect(Object.keys(progress.cards).length).toBeGreaterThan(0);
     expect(ui.root.querySelector(".lx-result-title")?.textContent).toBeTruthy();
     expect(ui.root.textContent).toContain("16/20");
+    // Honest copy: untested countries are "likely familiar", never "countries you know".
+    const stats = [...ui.root.querySelectorAll(".lx-stat")].map((stat) => stat.textContent ?? "");
+    expect(stats.join(" ")).not.toMatch(/you know/i);
+    const prefilled = stats.find((text) => text.includes("Likely familiar"));
+    if (prefilled) expect(prefilled).toMatch(/^~\d+/);
 
     const start = ui.root.querySelector<HTMLButtonElement>(".lx-result-start");
     expect(start).not.toBeNull();

@@ -1,5 +1,5 @@
 import type { CountryCode, CountryIndex } from "../../../core/countries";
-import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH, projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon } from "../../../core/map";
+import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH, mainLandmassBounds, projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon } from "../../../core/map";
 
 /**
  * A small, themeable world map for Academy lessons. One instance is shared by every step of a
@@ -91,23 +91,6 @@ function pathFor(feature: WorldCountryFeature): string {
   return d;
 }
 
-function polygonBox(polygon: WorldMapPolygon): Box | null {
-  const ring = polygon[0];
-  if (!ring || ring.length === 0) return null;
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of ring) {
-    const [x, y] = projectWorldMapPosition(point);
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-}
-
 export function unionBoxes(boxes: readonly Box[]): Box | null {
   if (boxes.length === 0) return null;
   const minX = Math.min(...boxes.map((box) => box.x));
@@ -117,17 +100,10 @@ export function unionBoxes(boxes: readonly Box[]): Box | null {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
-/** Bounds of the largest landmass plus nearby islands; far-flung territories are ignored. */
+/** Bounds of the home landmass plus nearby islands; far-flung territories are ignored. */
 export function mainLandBox(feature: WorldCountryFeature): Box | null {
-  const boxes = polygonsOf(feature)
-    .map(polygonBox)
-    .filter((box): box is Box => box !== null);
-  if (boxes.length === 0) return null;
-  const largest = boxes.reduce((best, box) => (box.w * box.h > best.w * best.h ? box : best));
-  const cx = largest.x + largest.w / 2;
-  const cy = largest.y + largest.h / 2;
-  const reach = Math.max(40, largest.w * 0.5, largest.h * 0.5);
-  return unionBoxes(boxes.filter((box) => Math.hypot(box.x + box.w / 2 - cx, box.y + box.h / 2 - cy) <= reach)) ?? largest;
+  const rect = mainLandmassBounds(feature);
+  return rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null;
 }
 
 function prefersReducedMotion(): boolean {

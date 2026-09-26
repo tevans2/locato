@@ -1,11 +1,11 @@
 import { CONTINENTS, type Continent, type CountryCode, type CountryIndex } from "../countries";
 import { fameTier, type FameTier } from "../countries/fame";
 import { shuffle } from "../game/random";
-import { ACADEMY_COUNTRY_CODES, groupForCountry } from "./groups";
+import { ACADEMY_COUNTRY_CODES, groupForCountry, LEARNING_GROUPS } from "./groups";
 import { pickDistractors } from "./lessons";
-import { suggestNextGroup } from "./mastery";
+import { countryMastery, suggestNextGroup } from "./mastery";
 import { seedCard } from "./srs";
-import { ACADEMY_SKILLS, type AcademyProgress, type AcademySkill, type LeitnerBox } from "./types";
+import { ACADEMY_SKILLS, type AcademyProgress, type AcademySkill, type LearningGroup, type LeitnerBox } from "./types";
 
 export const PLACEMENT_LENGTH = 20;
 /** Box given to a card the player answered correctly in placement. */
@@ -14,6 +14,12 @@ export const PLACEMENT_KNOWN_BOX: LeitnerBox = 3;
 export const PLACEMENT_EXTRAPOLATED_BOX: LeitnerBox = 2;
 const ESTIMATE_MIN_ANSWERS = 3;
 const ESTIMATE_MIN_ACCURACY = 0.7;
+/**
+ * Accuracy needed across a tier and everything harder. The adaptive staircase climbs after each
+ * right answer, so a strong player's hardest tier settles near 50%; pooling the harder questions
+ * credits them (9/13 deep cuts right is not a "fresh start").
+ */
+const ESTIMATE_MIN_POOLED_ACCURACY = 0.6;
 
 type Random = () => number;
 
@@ -132,8 +138,13 @@ export interface PlacementSummary {
   readonly label: string;
   readonly correct: number;
   readonly total: number;
-  /** Countries with at least one seeded card. */
-  readonly knownCount: number;
+  /** Distinct countries the player answered right in the quiz itself. */
+  readonly testedCorrect: number;
+  /**
+   * Untested countries pre-filled from the estimated tier (box 2 in the skills shown). These are
+   * a guess, not knowledge: reviews will confirm or correct them.
+   */
+  readonly extrapolatedCount: number;
   readonly suggestedGroupId: string | null;
 }
 
@@ -144,16 +155,16 @@ const TIER_LABELS: Readonly<Record<0 | FameTier, string>> = {
   3: "Seasoned geographer",
 };
 
-function tierAccuracy(results: readonly PlacementResult[], tier: FameTier): { answered: number; accuracy: number } {
-  const inTier = results.filter((result) => fameTier(result.code) === tier);
+function tierAccuracy(results: readonly PlacementResult[], tier: FameTier, andHarder = false): { answered: number; accuracy: number } {
+  const inTier = results.filter((result) => (andHarder ? fameTier(result.code) >= tier : fameTier(result.code) === tier));
   const correct = inTier.filter((result) => result.correct).length;
   return { answered: inTier.length, accuracy: inTier.length === 0 ? 0 : correct / inTier.length };
 }
 
 /**
  * Seeds cards from placement answers: each correct answer puts that card in box 3. The estimated
- * tier is the highest fame tier answered well (≥3 questions, ≥70% right); knowing a harder tier
- * implies the easier ones. Every country in an estimated tier 1–2 also gets box 2 in the skills
+ * tier is the highest fame tier answered well — ≥3 questions and ≥70% right in that tier, or ≥60%
+ * right across it and every harder tier; knowing a harder tier implies the easier ones. Every country in an estimated tier 1–2 also gets box 2 in the skills
  * the player got right at that tier or above. Deep cuts are never extrapolated.
  */
 export function applyPlacement(
@@ -164,16 +175,25 @@ export function applyPlacement(
 ): { readonly progress: AcademyProgress; readonly summary: PlacementSummary } {
   let estimatedTier: 0 | FameTier = 0;
   for (const tier of [1, 2, 3] as const) {
-    const { answered, accuracy } = tierAccuracy(results, tier);
-    if (answered >= ESTIMATE_MIN_ANSWERS && accuracy >= ESTIMATE_MIN_ACCURACY) estimatedTier = tier;
+    const own = tierAccuracy(results, tier);
+    const pooled = tierAccuracy(results, tier, true);
+    const ownOk = own.answered >= ESTIMATE_MIN_ANSWERS && own.accuracy >= ESTIMATE_MIN_ACCURACY;
+    const pooledOk = pooled.answered >= ESTIMATE_MIN_ANSWERS && pooled.accuracy >= ESTIMATE_MIN_POOLED_ACCURACY;
+    if (ownOk || pooledOk) estimatedTier = tier;
   }
 
+  const testedCorrectCodes = new Set(results.filter((result) => result.correct).map((result) => result.code));
+  const extrapolated = new Set<CountryCode>();
   let next = progress;
   for (const tier of [1, 2] as const) {
     if (tier > estimatedTier) break;
     const skills = new Set(results.filter((result) => result.correct && fameTier(result.code) >= tier).map((result) => result.skill));
     for (const code of countryCodes.filter((candidate) => fameTier(candidate) === tier)) {
-      for (const skill of skills) next = seedCard(next, code, skill, PLACEMENT_EXTRAPOLATED_BOX, now);
+      for (const skill of skills) {
+        const seeded = seedCard(next, code, skill, PLACEMENT_EXTRAPOLATED_BOX, now);
+        if (seeded !== next && !testedCorrectCodes.has(code)) extrapolated.add(code);
+        next = seeded;
+      }
     }
   }
 
@@ -182,11 +202,6 @@ export function applyPlacement(
   }
 
   next = { ...next, placementCompletedAt: next.placementCompletedAt ?? now, updatedAt: Math.max(next.updatedAt, now) };
-  const knownCount = new Set(
-    Object.entries(next.cards)
-      .filter(([, card]) => card.box > 0)
-      .map(([key]) => key.split(":")[0]),
-  ).size;
 
   return {
     progress: next,
@@ -195,10 +210,31 @@ export function applyPlacement(
       label: TIER_LABELS[estimatedTier],
       correct: results.filter((result) => result.correct).length,
       total: results.length,
-      knownCount,
-      suggestedGroupId: suggestNextGroup(next)?.id ?? null,
+      testedCorrect: testedCorrectCodes.size,
+      extrapolatedCount: extrapolated.size,
+      suggestedGroupId: suggestGroupAfterPlacement(next, estimatedTier)?.id ?? null,
     },
   };
+}
+
+/**
+ * Where to start after placement: the first group in suggested order that still has a country
+ * the player hasn't met (tested or pre-filled), within a difficulty band for their tier — so a
+ * beginner starts on a difficulty-1 unit and a strong player skips the starter units whose
+ * countries placement already filled in (even when a skill, say capitals, was never shown and
+ * so those countries aren't formally "familiar").
+ */
+export function suggestGroupAfterPlacement(progress: AcademyProgress, estimatedTier: 0 | FameTier): LearningGroup | null {
+  const floor = Math.max(1, estimatedTier);
+  const ceiling = Math.min(3, estimatedTier + 1);
+  const hasUnmet = (group: LearningGroup) => group.countryCodes.some((code) => countryMastery(progress, code) === "new");
+  const candidates = LEARNING_GROUPS.filter(hasUnmet);
+  return (
+    candidates.find((group) => group.difficulty >= floor && group.difficulty <= ceiling) ??
+    candidates.find((group) => group.difficulty >= floor) ??
+    candidates[0] ??
+    suggestNextGroup(progress)
+  );
 }
 
 export function skipPlacement(progress: AcademyProgress, now: number): AcademyProgress {

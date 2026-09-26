@@ -225,8 +225,10 @@ export function createPlacementScreen(options: PlacementScreenOptions): Screen {
         el("div", {
           className: "lx-done-stats",
           children: [
-            resultStat(String(summary.knownCount), "Countries you know", "already on your map"),
             resultStat(`${summary.correct}/${summary.total}`, "Answered right", "in the quiz"),
+            ...(summary.extrapolatedCount > 0
+              ? [resultStat(`~${summary.extrapolatedCount}`, "Likely familiar", "pre-filled from your level; reviews will check")]
+              : [resultStat(String(summary.testedCorrect), plural(summary.testedCorrect, "Country", "Countries") + " on your map", "from the quiz")]),
           ],
         }),
         ...(group
@@ -250,7 +252,8 @@ export function createPlacementScreen(options: PlacementScreenOptions): Screen {
     stage.classList.add("is-centered");
     playVictory();
     card.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
-    announce(`Placement complete. ${summary.label}. ${summary.knownCount} countries known.`);
+    const prefilled = summary.extrapolatedCount > 0 ? ` About ${summary.extrapolatedCount} more countries pre-filled as likely familiar.` : "";
+    announce(`Placement complete. ${summary.label}. ${summary.correct} of ${summary.total} right.${prefilled}`);
   }
 
   function announce(message: string): void {
@@ -282,6 +285,10 @@ export function createPlacementScreen(options: PlacementScreenOptions): Screen {
 
 function fact(value: string, label: string): HTMLElement {
   return el("li", { children: [el("strong", { text: value }), el("span", { text: label })] });
+}
+
+function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
 }
 
 function resultStat(value: string, label: string, note: string): HTMLElement {

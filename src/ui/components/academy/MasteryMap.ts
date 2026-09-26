@@ -1,6 +1,6 @@
 import { countryMastery, groupForCountry, type AcademyProgress, type LearningGroup, type MasteryLevel } from "../../../core/academy";
 import type { Continent, CountryCode, CountryId, CountryIndex } from "../../../core/countries";
-import { projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon } from "../../../core/map";
+import { mainLandmassBounds, projectWorldMapPosition, type WorldCountryFeature, type WorldMapPolygon } from "../../../core/map";
 import { el } from "../../dom/createElement";
 import { createWorldMapView, type WorldMapView } from "../../dom/renderWorldMap";
 
@@ -81,7 +81,7 @@ function boundsOf(points: readonly (readonly [number, number])[]): Bounds | null
 }
 
 interface CountryGeometryInfo {
-  /** Bounds of the largest landmass: frames France without French Guiana, Kiribati without the date line. */
+  /** Bounds of the home landmass: frames France without French Guiana, Kiribati without the date line. */
   readonly mainBounds: Bounds;
   readonly tiny: boolean;
 }
@@ -101,7 +101,7 @@ function measureFeature(feature: WorldCountryFeature): CountryGeometryInfo | nul
   }
   if (!largest) return null;
   const span = Math.max(largest.bounds.width, largest.bounds.height);
-  return { mainBounds: largest.bounds, tiny: totalArea < TINY_COUNTRY_AREA || span < TINY_COUNTRY_SPAN };
+  return { mainBounds: mainLandmassBounds(feature) ?? largest.bounds, tiny: totalArea < TINY_COUNTRY_AREA || span < TINY_COUNTRY_SPAN };
 }
 
 function unionBounds(list: readonly Bounds[]): Bounds | null {

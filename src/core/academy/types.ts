@@ -68,6 +68,11 @@ export type LessonStep =
       readonly skill: AcademySkill;
       /** Country codes to offer, including the answer, already shuffled. 2–4 options. */
       readonly options: readonly CountryCode[];
+      /**
+       * A correct first answer graduates the card within the lesson: a recall version (typed with
+       * letter-count slots, or placing on the map) is queued a few steps later.
+       */
+      readonly promote?: boolean;
     }
   | {
       readonly kind: "type";

@@ -3276,7 +3276,9 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
   pointer-events: none;
 }
 
-.world-map-panel > *,
+/* Lift content above the ::before frame. Zero specificity (:where) so a child's own positioning
+   wins — the world map's zoom controls and hover label are absolutely placed overlays. */
+:where(.world-map-panel) > *,
 .world-globe-panel > *,
 .puzzle-board-shell > *,
 .streetview-stage > *,

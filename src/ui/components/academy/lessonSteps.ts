@@ -41,6 +41,8 @@ export interface StepContext {
   readonly random: () => number;
   /** This is a re-queued, easier copy of a step the player missed. */
   readonly retry?: boolean;
+  /** This is a recall step the player graduated to by answering its choice correctly. */
+  readonly promoted?: boolean;
   readonly onAnswer: (answer: StepAnswer) => void;
   readonly onOpenCountry?: (code: CountryCode) => void;
   /** Screen-reader announcement (feedback tray owns the main live region). */
@@ -94,14 +96,16 @@ export function countryFlavour(code: CountryCode): CountryFlavour | null {
 
 // ---------------------------------------------------------------------------------------------
 
-function stepHead(kicker: string, title: string, retry: boolean, extra?: Node): { head: HTMLElement; title: HTMLHeadingElement } {
+function stepHead(kicker: string, title: string, ctx: Pick<StepContext, "retry" | "promoted">, extra?: Node): { head: HTMLElement; title: HTMLHeadingElement } {
   const heading = el("h2", { className: "lx-step-title", text: title, attrs: { tabindex: "-1" } });
+  const badge = ctx.retry
+    ? el("span", { className: "lx-kicker-retry", children: [icon("retry"), document.createTextNode("Second chance")] })
+    : ctx.promoted
+      ? el("span", { className: "lx-kicker-levelup", children: [icon("spark"), document.createTextNode("Level up")] })
+      : null;
   const kick = el("p", {
     className: "lx-kicker",
-    children: [
-      el("span", { className: "lx-kicker-skill", text: kicker }),
-      ...(retry ? [el("span", { className: "lx-kicker-retry", children: [icon("retry"), document.createTextNode("Second chance")] })] : []),
-    ],
+    children: [el("span", { className: "lx-kicker-skill", text: kicker }), ...(badge ? [badge] : [])],
   });
   return { head: el("header", { className: "lx-step-head", children: [kick, heading, ...(extra ? [extra] : [])] }), title: heading };
 }
@@ -269,7 +273,7 @@ export interface ChoiceInput {
 export function createChoiceStep(input: ChoiceInput, ctx: StepContext): StepView {
   const { code, skill } = input;
   const name = countryName(ctx.countryIndex, code);
-  const { head, title } = stepHead(skillLabel(skill), choicePromptTitle(skill, name), !!ctx.retry);
+  const { head, title } = stepHead(skillLabel(skill), choicePromptTitle(skill, name), ctx);
   const { media, mount } = promptMedia(ctx, code, skill);
   let answered = false;
 
@@ -363,7 +367,7 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
   const country = countryOf(ctx.countryIndex, code);
   const name = country?.name ?? code;
   const answer = answerLabel(ctx.countryIndex, code, skill);
-  const { head } = stepHead(skillLabel(skill), typePromptTitle(skill, name), !!ctx.retry);
+  const { head } = stepHead(skillLabel(skill), typePromptTitle(skill, name), ctx);
   const { media, mount } = promptMedia(ctx, code, skill);
   const id = `lx-type-${(inputId += 1)}`;
   const firstLetter = answer.trim().charAt(0).toLocaleUpperCase();
@@ -466,12 +470,17 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
 function letterSlots(answer: string): { element: HTMLElement; update: (value: string) => void } {
   const element = el("div", { className: "lx-slots", attrs: { "aria-hidden": "true" } });
   const cells: HTMLElement[] = [];
-  for (const char of answer) {
-    if (/\p{L}/u.test(char)) {
-      const cell = el("span", { className: "lx-slot" });
-      cells.push(cell);
-      element.append(cell);
-    } else element.append(el("span", { className: "lx-slot-gap", text: char === " " ? "" : char }));
+  // One unbreakable group per word, so long names wrap between words, never mid-word.
+  for (const word of answer.split(/\s+/).filter(Boolean)) {
+    const group = el("span", { className: "lx-slot-word" });
+    for (const char of word) {
+      if (/\p{L}/u.test(char)) {
+        const cell = el("span", { className: "lx-slot" });
+        cells.push(cell);
+        group.append(cell);
+      } else group.append(el("span", { className: "lx-slot-gap", text: char }));
+    }
+    element.append(group);
   }
   return {
     element,
@@ -490,7 +499,7 @@ function letterSlots(answer: string): { element: HTMLElement; update: (value: st
 
 export function createPlaceStep(code: CountryCode, ctx: StepContext): StepView {
   const name = countryName(ctx.countryIndex, code);
-  const { head, title } = stepHead("Map", `Find ${name}`, !!ctx.retry, el("p", { className: "lx-step-sub", text: "Tap the country. Drag or zoom to explore." }));
+  const { head, title } = stepHead("Map", `Find ${name}`, ctx, el("p", { className: "lx-step-sub", text: "Tap the country. Drag or zoom to explore." }));
   const figure = el("figure", { className: "lx-media lx-media-map is-place" });
   const dontKnow = secondaryButton(ctx.skipLabel ?? "I don't know", "lx-dont-know");
   let misses = 0;

@@ -9,5 +9,7 @@ export {
   projectWorldMapPosition,
 } from "./projection";
 export type { ProjectedPoint } from "./projection";
+export { featureBounds, mainLandmassBounds, unionMapRects } from "./mainLandmass";
+export type { MainLandmassOptions, MapRect } from "./mainLandmass";
 export { loadWorldCountryFeatures } from "./worldMapData";
 export type { WorldCountryFeature, WorldCountryGeometry, WorldMapPolygon, WorldMapPosition, WorldMapRing } from "./types";
