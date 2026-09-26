@@ -67,6 +67,8 @@ export interface WorldMapView {
   readonly pathByCountryId: ReadonlyMap<CountryId, SVGPathElement>;
   readonly missingDotByCountryId: ReadonlyMap<CountryId, SVGCircleElement>;
   readonly focusCountry: (countryId: CountryId, options?: { readonly animate?: boolean }) => void;
+  /** Fit an arbitrary map-space rectangle (e.g. a region or continent), keeping the map's aspect ratio. */
+  readonly focusBounds: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }, options?: { readonly animate?: boolean }) => void;
   readonly resetView: (options?: { readonly animate?: boolean }) => void;
   readonly showCountryLabel: (countryId: CountryId | null) => void;
 }
@@ -402,6 +404,17 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     moveToViewBox(focusViewBoxForBounds(bounds), options.animate ?? true);
   }
 
+  function focusBounds(bounds: ViewBoxState, options: { readonly animate?: boolean } = {}): void {
+    const aspect = VIEWBOX_HEIGHT / VIEWBOX_WIDTH;
+    const width = Math.max(bounds.width, bounds.height / aspect);
+    moveToViewBox({
+      x: bounds.x + bounds.width / 2 - width / 2,
+      y: bounds.y + bounds.height / 2 - (width * aspect) / 2,
+      width,
+      height: width * aspect,
+    }, options.animate ?? true);
+  }
+
   function resetView(options: { readonly animate?: boolean } = {}): void {
     moveToViewBox(DEFAULT_VIEWBOX, options.animate ?? true);
   }
@@ -582,7 +595,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   element.className = "world-map-panel";
   element.append(svg, controls, countryLabel);
 
-  return { element, pathByCountryId, missingDotByCountryId, focusCountry, resetView, showCountryLabel };
+  return { element, pathByCountryId, missingDotByCountryId, focusCountry, focusBounds, resetView, showCountryLabel };
 }
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {
