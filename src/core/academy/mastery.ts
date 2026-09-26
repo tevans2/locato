@@ -1,6 +1,6 @@
 import type { Continent, CountryCode } from "../countries";
-import { ACADEMY_COUNTRY_CODES, LEARNING_GROUPS, groupsForContinent } from "./groups";
-import { boxOf } from "./srs";
+import { ACADEMY_COUNTRY_CODES, LEARNING_GROUPS, groupForCountry, groupsForContinent } from "./groups";
+import { boxOf, parseCardKey } from "./srs";
 import { ACADEMY_SKILLS, type AcademyLevel, type AcademyProgress, type LearningGroup, type MasteryLevel } from "./types";
 
 /** Box every skill must reach for "familiar" (or an average of FAMILIAR_AVERAGE_BOX with every skill seen). */
@@ -135,3 +135,19 @@ export function suggestNextGroup(progress: AcademyProgress): LearningGroup | nul
   return LEARNING_GROUPS.find((group) => !groupCompletion(progress, group).completed) ?? null;
 }
 
+
+/**
+ * The unfinished group the player last practised in a lesson (cards answered after placement),
+ * or null when they haven't started one — placement pre-fills don't count as "started".
+ */
+export function resumeGroup(progress: AcademyProgress): LearningGroup | null {
+  const since = progress.placementCompletedAt ?? 0;
+  let latest: { at: number; group: LearningGroup } | null = null;
+  for (const [key, card] of Object.entries(progress.cards)) {
+    if (card.lastSeenAt <= since || (latest && card.lastSeenAt <= latest.at)) continue;
+    const parsed = parseCardKey(key);
+    const group = parsed ? groupForCountry(parsed.code) : null;
+    if (group && !groupCompletion(progress, group).completed) latest = { at: card.lastSeenAt, group };
+  }
+  return latest?.group ?? null;
+}

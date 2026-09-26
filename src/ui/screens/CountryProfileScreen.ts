@@ -51,6 +51,8 @@ export interface CountryProfileScreenOptions {
   readonly onHome: () => void;
   /** Open another country's profile (neighbours, lookalikes). */
   readonly onOpenCountry: (code: string) => void;
+  /** Flip to the previous/next country in the atlas; replaces the page rather than stacking history. Defaults to onOpenCountry. */
+  readonly onFlipCountry?: (code: string) => void;
   readonly onStartLesson: (lessonId: string) => void;
   readonly onOpenAcademy: (groupId?: string) => void;
 }
@@ -198,6 +200,7 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
   const index = profile ? ordered.findIndex((p) => p.code === profile.code) : -1;
   const prev = index >= 0 ? ordered[(index - 1 + ordered.length) % ordered.length]! : null;
   const next = index >= 0 ? ordered[(index + 1) % ordered.length]! : null;
+  const flip = (code: string): void => (options.onFlipCountry ?? options.onOpenCountry)(code);
 
   const topbar = el("header", {
     className: "cp-topbar",
@@ -227,9 +230,9 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
               className: "cp-stepper",
               attrs: { role: "group", "aria-label": "Browse alphabetically" },
               children: [
-                button("cp-step cp-step-prev", [profileIcon("arrowLeft")], () => options.onOpenCountry(prev.code), { "aria-label": `Previous country: ${prev.name}`, title: `${prev.name} (←)` }),
+                button("cp-step cp-step-prev", [profileIcon("arrowLeft")], () => flip(prev.code), { "aria-label": `Previous country: ${prev.name}`, title: `${prev.name} (←)` }),
                 el("span", { className: "cp-step-count", text: `${index + 1} / ${ordered.length}`, attrs: { "aria-hidden": "true" } }),
-                button("cp-step cp-step-next", [profileIcon("arrowRight")], () => options.onOpenCountry(next.code), { "aria-label": `Next country: ${next.name}`, title: `${next.name} (→)` }),
+                button("cp-step cp-step-next", [profileIcon("arrowRight")], () => flip(next.code), { "aria-label": `Next country: ${next.name}`, title: `${next.name} (→)` }),
               ],
             }),
           ]
@@ -258,8 +261,8 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isTypingTarget(event.target)) return;
       if (!element.isConnected) return;
-      if (event.key === "ArrowLeft" && prev) { event.preventDefault(); options.onOpenCountry(prev.code); }
-      if (event.key === "ArrowRight" && next) { event.preventDefault(); options.onOpenCountry(next.code); }
+      if (event.key === "ArrowLeft" && prev) { event.preventDefault(); flip(prev.code); }
+      if (event.key === "ArrowRight" && next) { event.preventDefault(); flip(next.code); }
     };
     document.addEventListener("keydown", onKey);
     cleanups.push(() => document.removeEventListener("keydown", onKey));
@@ -633,13 +636,13 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
               profileIcon("arrowLeft"),
               el("span", { className: "cp-browse-text", children: [el("span", { className: "cp-browse-dir", text: "Previous" }), el("span", { className: "cp-browse-name", text: prev.name })] }),
               flagImage(prev, "cp-browse-flag", ""),
-            ], () => options.onOpenCountry(prev.code), { "data-code": prev.code }),
+            ], () => flip(prev.code), { "data-code": prev.code }),
             el("p", { className: "cp-browse-hint", children: [text("Use "), el("kbd", { text: "←" }), text(" "), el("kbd", { text: "→" }), text(" to flip pages")] }),
             button("cp-browse-link is-next", [
               flagImage(next, "cp-browse-flag", ""),
               el("span", { className: "cp-browse-text", children: [el("span", { className: "cp-browse-dir", text: "Next" }), el("span", { className: "cp-browse-name", text: next.name })] }),
               profileIcon("arrowRight"),
-            ], () => options.onOpenCountry(next.code), { "data-code": next.code }),
+            ], () => flip(next.code), { "data-code": next.code }),
           ],
         })
       : null;

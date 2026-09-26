@@ -11,6 +11,7 @@ import {
   LEARNING_GROUPS,
   skipPlacement,
   studyStreak,
+  resumeGroup,
   suggestNextGroup,
   toDayKey,
   type AcademyProgress,
@@ -290,7 +291,8 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
   }
 
   function continueCard(progress: AcademyProgress): HTMLElement {
-    const next = suggestNextGroup(progress);
+    const resume = resumeGroup(progress);
+    const next = resume ?? suggestNextGroup(progress);
     if (!next) {
       return el("section", {
         className: "academy-continue is-done",
@@ -306,7 +308,7 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
       className: "academy-continue",
       attrs: { "aria-labelledby": "academy-continue-title" },
       children: [
-        el("p", { className: "academy-kicker", text: summary.started ? "Pick up where you left off" : `Up next · Stop ${next.order + 1}` }),
+        el("p", { className: "academy-kicker", text: resume ? "Pick up where you left off" : `Up next · Stop ${next.order + 1}` }),
         el("h2", { attrs: { id: "academy-continue-title" }, text: next.title }),
         el("p", { className: "academy-continue-blurb", text: next.blurb }),
         flagStrip(next.countryCodes, countryIndex),
@@ -321,7 +323,7 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
             el("button", {
               className: "academy-button academy-button-primary academy-continue-start",
               attrs: { type: "button" },
-              children: [el("span", { text: summary.started ? "Continue lesson" : "Start lesson" }), hubIcon("arrow")],
+              children: [el("span", { text: resume ? "Continue lesson" : "Start lesson" }), hubIcon("arrow")],
               on: { click: () => options.onStartLesson(next.id) },
             }),
             el("button", {

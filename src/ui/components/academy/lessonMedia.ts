@@ -34,7 +34,9 @@ export function flagImage(country: Country | undefined, className = "lx-flag", d
 
 /** Silhouette drawn with a CSS mask so it takes the theme's ink colour in light and dark. */
 export function outlineImage(code: CountryCode, className = "lx-outline"): HTMLElement {
-  const src = `url("${outlineSrc(code)}")`;
+  // Resolve against the page: a relative url() inside a custom property resolves against the
+  // stylesheet that uses it (dist/assets/*.css in production), which would 404 the shape.
+  const src = `url("${new URL(outlineSrc(code), document.baseURI).href}")`;
   const shape = el("span", { className, attrs: { role: "img", "aria-label": "A country's outline" } });
   shape.style.setProperty("--lx-shape", src);
   return shape;

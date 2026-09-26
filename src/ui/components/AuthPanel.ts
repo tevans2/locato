@@ -67,7 +67,7 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
 
   const emailInput = el("input", { attrs: { id: "auth-email", type: "email", placeholder: "Email", autocomplete: "email", "aria-label": "Email" } });
   const passwordInput = el("input", { attrs: { id: "auth-password", type: "password", placeholder: "Password", autocomplete: "current-password", "aria-label": "Password" } });
-  const displayNameInput = el("input", { attrs: { id: "auth-display-name", type: "text", placeholder: "Username", autocomplete: "username", maxlength: "20", minlength: "3", pattern: "[A-Za-z0-9_-]+", "aria-label": "Username", title: "3–20 characters: letters, numbers, underscore or hyphen" } });
+  const displayNameInput = el("input", { attrs: { id: "auth-display-name", type: "text", placeholder: "Username", autocomplete: "username", maxlength: "20", minlength: "3", pattern: "[A-Za-z0-9_\\-]+", "aria-label": "Username", title: "3–20 characters: letters, numbers, underscore or hyphen" } });
   const submitButton = el("button", { className: "primary-action auth-submit", text: "Sign in", attrs: { type: "submit" } });
 
   const oauthSection = el("div", {

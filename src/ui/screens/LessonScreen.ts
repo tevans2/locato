@@ -256,8 +256,14 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     if (input) bindKeyboardAwareInput(root, input, stepAbort.signal);
     else root.classList.remove("is-mobile-typing", "has-virtual-keyboard");
     map.setInsetBottom(0);
-    view.mounted();
-    view.focus();
+    // The first step renders before the app attaches the screen; focus and map framing need the
+    // live DOM, so wait until the (synchronous) mount has happened.
+    const activate = (): void => {
+      view.mounted();
+      view.focus();
+    };
+    if (root.isConnected) activate();
+    else queueMicrotask(() => { if (stepView === view) activate(); });
   }
 
   /** Keep a revealed map answer visible above the feedback tray. */
@@ -372,6 +378,10 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       const after = groupCompletion(progress, group);
       if (!after.completed) primary = { label: "Next lesson", run: () => options.onStartLesson(group.id) };
       else if (suggestion) primary = { label: `Next: ${suggestion.title}`, run: () => options.onStartLesson(suggestion.id) };
+    } else if (kind === "practice" && resolved!.group && !groupCompletion(progress, resolved!.group).completed) {
+      // Mistakes reviewed mid-group: carry on with the same group rather than jumping elsewhere.
+      const resumeId = resolved!.group.id;
+      primary = { label: "Next lesson", run: () => options.onStartLesson(resumeId) };
     } else if (suggestion) {
       primary = { label: kind === "practice" ? "Keep learning" : `Learn: ${suggestion.title}`, run: () => options.onStartLesson(suggestion.id) };
     }

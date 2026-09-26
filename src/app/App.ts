@@ -56,11 +56,15 @@ function createDefaultOnlineTransport(): MultiplayerTransport {
 interface NavigateOptions {
   /** Push a browser history entry (default). Pass false when rendering an existing entry (popstate/start). */
   readonly push?: boolean;
+  /** Replace the current history entry instead of pushing (e.g. flipping through atlas pages). */
+  readonly replace?: boolean;
 }
 
 interface HistoryState {
   readonly route: AppRoute;
   readonly idx: number;
+  /** The route this entry was pushed from, so "Back to X" buttons can pop instead of stacking. */
+  readonly prev?: AppRoute;
 }
 
 export function createApp(options: AppOptions): App {
@@ -108,7 +112,19 @@ export function createApp(options: AppOptions): App {
     const current = historyState();
     // Re-selecting the current screen shouldn't stack duplicate history entries.
     if (current && JSON.stringify(current.route) === JSON.stringify(route)) return;
-    window.history.pushState({ route, idx: (current?.idx ?? 0) + 1 } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+    window.history.pushState({ route, idx: (current?.idx ?? 0) + 1, ...(current ? { prev: current.route } : {}) } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+  }
+
+  function replaceRoute(route: AppRoute): void {
+    const current = historyState();
+    window.history.replaceState({ route, idx: current?.idx ?? 0, ...(current?.prev ? { prev: current.prev } : {}) } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+  }
+
+  /** Return to a screen of this type: pop history when we came straight from it, else push it. */
+  function returnTo(route: AppRoute): void {
+    const current = historyState();
+    if (current && current.idx > 0 && current.prev?.type === route.type) window.history.back();
+    else navigate(route);
   }
 
   function goBack(): void {
@@ -222,7 +238,7 @@ export function createApp(options: AppOptions): App {
     if (initialState) {
       const current = historyState();
       const resumedRoute: AppRoute = { type: "solo-game", categoryIds: activeCategories, continueSaved: true, ...(activeCategories.includes("flags") ? { flagPool: activeFlagPool } : {}) };
-      window.history.replaceState({ route: resumedRoute, idx: current?.idx ?? 0 } satisfies HistoryState, "", buildRouteUrl(resumedRoute, window.location));
+      window.history.replaceState({ route: resumedRoute, idx: current?.idx ?? 0, ...(current?.prev ? { prev: current.prev } : {}) } satisfies HistoryState, "", buildRouteUrl(resumedRoute, window.location));
     }
     let worldCountryFeatures: readonly WorldCountryFeature[] | undefined;
 
@@ -697,6 +713,9 @@ export function createApp(options: AppOptions): App {
     if (run !== navigationRun) return;
     const shared = { countryIndex: options.countryIndex, worldCountryFeatures, progressStore: academyProgress };
     const openAcademy = (groupId?: string) => navigate({ type: "academy", ...(groupId ? { groupId } : {}) });
+    // Leaving a lesson or placement pops back to the hub entry it was opened from (so browser Back
+    // doesn't re-enter the finished lesson); the hub restores its own open group from that entry.
+    const exitToAcademy = (groupId?: string) => returnTo({ type: "academy", ...(groupId ? { groupId } : {}) });
     const startLesson = (lessonId: string) => navigate({ type: "academy-lesson", lessonId });
     const openCountry = (code: string) => navigate({ type: "country-profile", code: code.toUpperCase() });
 
@@ -713,7 +732,8 @@ export function createApp(options: AppOptions): App {
         onOpenCountry: openCountry,
         onGroupChange: (groupId) => {
           const next: AppRoute = { type: "academy", ...(groupId ? { groupId } : {}) };
-          window.history.replaceState({ route: next, idx: historyState()?.idx ?? 0 } satisfies HistoryState, "", buildRouteUrl(next, window.location));
+          const current = historyState();
+          window.history.replaceState({ route: next, idx: current?.idx ?? 0, ...(current?.prev ? { prev: current.prev } : {}) } satisfies HistoryState, "", buildRouteUrl(next, window.location));
         },
       }));
       return;
@@ -721,13 +741,13 @@ export function createApp(options: AppOptions): App {
     if (route.type === "academy-lesson") {
       const { createLessonScreen } = await import("../ui/screens/LessonScreen");
       if (run !== navigationRun) return;
-      mount(createLessonScreen({ ...shared, lessonId: route.lessonId, onExit: openAcademy, onStartLesson: startLesson, onOpenCountry: openCountry }));
+      mount(createLessonScreen({ ...shared, lessonId: route.lessonId, onExit: exitToAcademy, onStartLesson: startLesson, onOpenCountry: openCountry }));
       return;
     }
     if (route.type === "academy-placement") {
       const { createPlacementScreen } = await import("../ui/screens/PlacementScreen");
       if (run !== navigationRun) return;
-      mount(createPlacementScreen({ ...shared, onDone: openAcademy, onStartLesson: startLesson }));
+      mount(createPlacementScreen({ ...shared, onDone: exitToAcademy, onStartLesson: startLesson }));
       return;
     }
     const { createCountryProfileScreen } = await import("../ui/screens/CountryProfileScreen");
@@ -738,6 +758,7 @@ export function createApp(options: AppOptions): App {
       onBack: () => goBack(),
       onHome: () => navigate({ type: "landing" }),
       onOpenCountry: openCountry,
+      onFlipCountry: (code) => navigate({ type: "country-profile", code: code.toUpperCase() }, { replace: true }),
       onStartLesson: startLesson,
       onOpenAcademy: openAcademy,
     }));
@@ -759,7 +780,8 @@ export function createApp(options: AppOptions): App {
 
   function navigate(route: AppRoute, navigateOptions?: NavigateOptions): void {
     navigationRun += 1;
-    if (navigateOptions?.push !== false) pushRoute(route);
+    if (navigateOptions?.replace) replaceRoute(route);
+    else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {
       mount(
         createLandingScreen({

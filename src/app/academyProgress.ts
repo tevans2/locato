@@ -1,4 +1,5 @@
-import { mergeProgress, type AcademyProgress } from "../core/academy";
+import { mergeProgress } from "../core/academy/srs";
+import type { AcademyProgress } from "../core/academy/types";
 import { fetchAcademyProgress, pushAcademyProgress } from "../core/academy/sync";
 import { readAcademyProgress, saveAcademyProgress } from "../storage/academySave";
 

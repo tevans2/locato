@@ -9,6 +9,7 @@ import {
   groupCompletion,
   LEARNING_GROUPS,
   levelForMastered,
+  resumeGroup,
   seedCard,
   studyStreak,
   suggestNextGroup,
@@ -55,6 +56,13 @@ describe("group completion", () => {
 
   it("suggests the first group for a fresh player", () => {
     expect(suggestNextGroup(emptyProgress())?.id).toBe("europe-big-names");
+  });
+
+  it("resumes the unfinished group last practised after placement, ignoring placement pre-fills", () => {
+    const placed: AcademyProgress = { ...seedCard(emptyProgress(), "JP", "flag", 3, 1000), placementCompletedAt: 1000 };
+    expect(resumeGroup(placed)).toBeNull();
+    const practised = seedCard(seedCard(placed, "KZ", "flag", 1, 5000), "FR", "flag", 1, 3000);
+    expect(resumeGroup(practised)?.id).toBe("the-stans");
   });
 });
 
