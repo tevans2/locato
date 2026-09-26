@@ -1,5 +1,6 @@
 import { normalizeUsername } from "../auth/AuthService";
 import { FLAG_POOLS } from "../../src/core/flagPools";
+import type { AcademyProgress } from "../../src/core/academy/types";
 import { CONTINENTS, GAME_MODE_IDS, isLeaderboardGameMode, normalizeLeaderboardVariant } from "../leaderboard/validation";
 import type { AdminRoomSummary, RoomManagerStats } from "../rooms/RoomManager";
 import type {
@@ -74,6 +75,16 @@ export interface AdminOverview {
   readonly topPlayers: readonly { readonly user: PublicUser; readonly games: number; readonly dailies: number; readonly lastActiveAt: number }[];
 }
 
+// Headline numbers only — the dossier never ships the raw progress blob.
+export interface AdminAcademySummary {
+  readonly cardsSeen: number;
+  // Cards in the top Leitner box (5 = long-term memory).
+  readonly cardsMastered: number;
+  readonly activeDays: number;
+  readonly placementCompletedAt: number | null;
+  readonly updatedAt: number;
+}
+
 export interface AdminUserDetail {
   readonly user: AuthUser & { readonly hasPassword: boolean };
   readonly online: boolean;
@@ -87,6 +98,7 @@ export interface AdminUserDetail {
   readonly friends: readonly PublicUser[];
   readonly friendRequests: { readonly incoming: number; readonly outgoing: number };
   readonly events: readonly AdminEvent[];
+  readonly academy: AdminAcademySummary | null;
 }
 
 export interface AdminDailyEntry {
@@ -227,6 +239,26 @@ export class AdminService {
       friends: this.store.listFriends(id),
       friendRequests: { incoming: requests.incoming.length, outgoing: requests.outgoing.length },
       events: this.store.listEvents({ level: null, action: null, ip: null, userId: id, before: null, limit: 50 }),
+      academy: this.academySummary(id),
+    };
+  }
+
+  private academySummary(userId: string): AdminAcademySummary | null {
+    const stored = this.store.getAcademyProgress(userId);
+    if (!stored) return null;
+    let progress: AcademyProgress;
+    try {
+      progress = JSON.parse(stored.progress) as AcademyProgress;
+    } catch {
+      return null;
+    }
+    const cards = Object.values(progress.cards ?? {});
+    return {
+      cardsSeen: cards.filter((card) => card.lastSeenAt > 0 || card.box > 0).length,
+      cardsMastered: cards.filter((card) => card.box === 5).length,
+      activeDays: Object.values(progress.activity ?? {}).filter((count) => count > 0).length,
+      placementCompletedAt: progress.placementCompletedAt ?? null,
+      updatedAt: stored.updatedAt,
     };
   }
 
@@ -252,6 +284,8 @@ export class AdminService {
     return this.store.deleteUserSessions(id);
   }
 
+  // Deliberately leaves Academy progress alone: it's learning state, not competitive stats, and
+  // wiping it server-side would just be re-uploaded (and merged back) from the player's device.
   resetUserStats(id: string): boolean {
     if (!this.store.findUserById(id)) return false;
     this.store.resetUserStats(id);
