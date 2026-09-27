@@ -100,14 +100,15 @@ export function skillLabel(skill: AcademySkill): string {
   }
 }
 
-export function choicePromptTitle(skill: AcademySkill, name: string): string {
+export function choicePromptTitle(skill: AcademySkill): string {
   switch (skill) {
     case "flag":
       return "Which country flies this flag?";
     case "shape":
       return "Which country has this shape?";
     case "capital":
-      return `What's the capital of ${name}?`;
+      // The country is named in the prompt card, so the title stays one line like the other skills.
+      return "Name its capital city";
     case "map":
       return "Which country is highlighted?";
   }

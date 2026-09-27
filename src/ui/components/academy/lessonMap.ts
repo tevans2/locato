@@ -21,7 +21,8 @@ const MIN_VIEW_WIDTH = 14;
 const MAX_VIEW_WIDTH = MAP_VIEWBOX_WIDTH * 1.08;
 
 export type MapTone = "target" | "good" | "picked";
-export type MapMode = "static" | "interactive";
+/** static: a fixed picture; explore: pan and zoom to look around, but clicks don't answer; interactive: pan, zoom and click to answer. */
+export type MapMode = "static" | "explore" | "interactive";
 
 export interface Box {
   readonly x: number;
@@ -295,7 +296,7 @@ export function createLessonMap(features: readonly WorldCountryFeature[], countr
     redrawMarks();
   }
 
-  // Pan, pinch and wheel zoom (interactive mode only).
+  // Pan, pinch and wheel zoom (explore and interactive modes).
   const pointers = new Map<number, { x: number; y: number }>();
   let pan: { x: number; y: number; view: ViewBox; moved: boolean } | null = null;
   let pinch: { distance: number; view: ViewBox; cx: number; cy: number } | null = null;
@@ -316,7 +317,7 @@ export function createLessonMap(features: readonly WorldCountryFeature[], countr
   }
 
   svg.addEventListener("pointerdown", (event) => {
-    if (mode !== "interactive" || event.button > 0) return;
+    if (mode === "static" || event.button > 0) return;
     suppressClick = false;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size === 1) {
@@ -384,7 +385,7 @@ export function createLessonMap(features: readonly WorldCountryFeature[], countr
   svg.addEventListener(
     "wheel",
     (event) => {
-      if (mode !== "interactive") return;
+      if (mode === "static") return;
       event.preventDefault();
       const delta = Math.max(-140, Math.min(140, event.deltaMode === 1 ? event.deltaY * 40 : event.deltaY));
       apply(clampView(zoomAround(view, Math.exp(delta * 0.0022), clientToMap(event.clientX, event.clientY, view))));
@@ -422,8 +423,12 @@ export function createLessonMap(features: readonly WorldCountryFeature[], countr
     setMode: (next) => {
       mode = next;
       element.classList.toggle("is-static", next === "static");
+      element.classList.toggle("is-explore", next === "explore");
       element.classList.toggle("is-interactive", next === "interactive");
-      svg.setAttribute("aria-label", next === "interactive" ? "World map. Drag to move, scroll or pinch to zoom, click a country to answer." : "World map");
+      svg.setAttribute(
+        "aria-label",
+        next === "interactive" ? "World map. Drag to move, scroll or pinch to zoom, click a country to answer." : next === "explore" ? "World map with the country highlighted. Drag to move, scroll or pinch to zoom out and see where it is." : "World map",
+      );
     },
     setTone: (code, tone) => {
       const upper = code.toUpperCase();

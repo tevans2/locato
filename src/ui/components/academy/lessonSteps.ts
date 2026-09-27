@@ -127,7 +127,10 @@ function promptMedia(ctx: StepContext, code: CountryCode, skill: AcademySkill): 
     return {
       media: el("figure", {
         className: "lx-media lx-media-capital",
-        children: [flagImage(country, "lx-flag lx-flag-capital", true), el("figcaption", { className: "lx-capital-country", text: country?.name ?? code })],
+        children: [
+          flagImage(country, "lx-flag lx-flag-capital", true),
+          el("figcaption", { className: "lx-capital-caption", children: [el("span", { className: "lx-capital-kicker", text: "Capital of" }), el("span", { className: "lx-capital-country", text: country?.name ?? code })] }),
+        ],
       }),
       mount: () => undefined,
     };
@@ -136,8 +139,9 @@ function promptMedia(ctx: StepContext, code: CountryCode, skill: AcademySkill): 
   return {
     media: figure,
     mount: () => {
-      figure.append(ctx.map.element);
-      ctx.map.setMode("static");
+      figure.append(ctx.map.element, el("figcaption", { className: "lx-map-tip", text: "Drag or scroll to look around" }));
+      // Beginners often need to zoom out to work out where the highlighted country sits.
+      ctx.map.setMode("explore");
       ctx.map.onCountryClick = null;
       ctx.map.setHitAreas([], null);
       ctx.map.clearHint();
@@ -272,8 +276,7 @@ export interface ChoiceInput {
 
 export function createChoiceStep(input: ChoiceInput, ctx: StepContext): StepView {
   const { code, skill } = input;
-  const name = countryName(ctx.countryIndex, code);
-  const { head, title } = stepHead(skillLabel(skill), choicePromptTitle(skill, name), ctx);
+  const { head, title } = stepHead(skillLabel(skill), choicePromptTitle(skill), ctx);
   const { media, mount } = promptMedia(ctx, code, skill);
   let answered = false;
 
