@@ -39,6 +39,8 @@ export interface MultiplayerLobbyScreenOptions {
   readonly inviteUserId?: string;
   /** Remembers the name a guest plays under (shared with Compete). */
   readonly storage?: Storage;
+  /** The room this tab is in changed (null = left), so the URL can carry `?room=CODE` for sharing and refresh. */
+  readonly onRoomCodeChange?: (roomCode: string | null) => void;
 }
 
 // Ephemeral reconnect credentials. Kept in sessionStorage so a page reload or a dropped socket
@@ -551,6 +553,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     localPlayerId = null;
     sessionToken = null;
     joinedRoomCode = null;
+    options.onRoomCodeChange?.(null);
     chatOpen = false;
     lastSeenChatCount = 0;
   }
@@ -730,6 +733,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         joinedRoomCode = message.roomCode;
         if (allowSessionPersistence) writeStoredSession({ roomCode: message.roomCode, playerId: message.playerId, sessionToken: message.sessionToken });
         feedback = `Connected to room ${message.roomCode}.`;
+        options.onRoomCodeChange?.(message.roomCode);
         break;
       case "ROOM_SNAPSHOT":
         room = message.room;

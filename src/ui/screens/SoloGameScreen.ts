@@ -838,7 +838,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       gameMode: options.selectedGameMode,
       run: runType,
       ...(timed ? { clock: clockValue } : {}),
-      onBack: () => shell.goBack(timed ? "compete" : "play"),
+      // A cold timed link backs out to its own board rather than the Compete landing tab.
+      onBack: () => shell.goBack(timed ? () => shell.openCompete(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
       backLabel: timed ? "Back to Compete" : "Back",
       onHowToPlay: () => showHintPopover("How to play", getGameModeOption(options.selectedGameMode).description),
       extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: restartFromMenu }],

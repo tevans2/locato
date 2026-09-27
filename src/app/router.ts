@@ -99,7 +99,8 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     params.set("game", route.categoryIds?.find(isPromptGameModeId) ?? "flags");
     if (route.categoryIds && route.categoryIds.length > 1) params.set("categories", route.categoryIds.join(","));
     if (route.flagPool) params.set("flagPool", route.flagPool);
-    params.set("resume", "1");
+    // Practice runs resume their per-mode save anyway; the flag stays for old links. Timed runs never resume.
+    if (route.run !== "timed") params.set("resume", "1");
     if (route.run === "timed") params.set("run", "timed");
   } else if (route.type === "country-guessing") {
     params.set("game", route.mode ?? "name-all");

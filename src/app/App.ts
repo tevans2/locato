@@ -14,11 +14,8 @@ import { findMapTapLocation } from "../core/maptap/locations";
 import { streetViewCountryRounds } from "../core/streetview";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
-import { createStatsScreen } from "../ui/screens/StatsScreen";
-import { createFriendsScreen } from "../ui/screens/FriendsScreen";
 import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClient";
 import type { SocialServerMessage } from "../core/social/socialProtocol";
-import { createCompeteScreen } from "../ui/screens/CompeteScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
 import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
@@ -112,6 +109,7 @@ export function createApp(options: AppOptions): App {
     goHome: () => navigate({ type: "landing" }),
     goBack: (fallback = "play") => {
       if ((historyState()?.idx ?? 0) > 0) window.history.back();
+      else if (typeof fallback === "function") fallback();
       else navigate(SECTION_ROUTES[fallback]);
     },
     openGame: (mode, run = "practice", variant) => openGame(mode, run, variant),
@@ -820,6 +818,11 @@ export function createApp(options: AppOptions): App {
     if (run !== navigationRun) return;
     mount(
       createMultiplayerLobbyScreen({ shell,
+        // In a room the URL is its invite link, so a refresh or a copied address lands back in it.
+        // Only while the lobby is still on screen, so leaving a room on the way out can't rewrite the next page's URL.
+        onRoomCodeChange: (roomCode) => {
+          if (run === navigationRun) replaceRoute(roomCode ? { type: "multiplayer", joinCode: roomCode } : { type: "multiplayer" });
+        },
         countryIndex: options.countryIndex,
         worldCountryFeatures,
         createOnlineTransport: createDefaultOnlineTransport,
@@ -906,7 +909,10 @@ export function createApp(options: AppOptions): App {
   }
 
   /** Compete (also the legacy `leaderboard` route). Picking a board replaces the URL, it doesn't push. */
-  function startCompete(mode?: GameModeId, variant?: string, tab?: "leaderboards"): void {
+  async function startCompete(mode?: GameModeId, variant?: string, tab?: "leaderboards"): Promise<void> {
+    const run = navigationRun;
+    const { createCompeteScreen } = await import("../ui/screens/CompeteScreen");
+    if (run !== navigationRun) return;
     const boardRoute = (nextMode: GameModeId, nextVariant: string): AppRoute => ({ type: "compete", tab: "leaderboards", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) });
     mount(
       createCompeteScreen({
@@ -946,7 +952,7 @@ export function createApp(options: AppOptions): App {
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
     if (route.type === "compete" || route.type === "leaderboard") {
-      startCompete(route.mode, route.variant, route.type === "compete" ? route.tab : route.mode ? "leaderboards" : undefined);
+      runNavigation(startCompete(route.mode, route.variant, route.type === "compete" ? route.tab : route.mode ? "leaderboards" : undefined));
       return;
     }
     // `flag-gallery` is the legacy name for the Atlas (`?view=flags`).
@@ -990,7 +996,7 @@ export function createApp(options: AppOptions): App {
       // Await the record so the just-finished run appears in the freshly fetched stats.
       const run = navigationRun;
       mount(createLoadingScreen("Gathering your discoveries…"));
-      runNavigation(leavingSolo.then(() => {
+      runNavigation(Promise.all([leavingSolo, import("../ui/screens/StatsScreen")]).then(([, { createStatsScreen }]) => {
         if (run !== navigationRun) return;
         const initialTab = pendingStatsTab;
         pendingStatsTab = "stats";
@@ -1000,24 +1006,31 @@ export function createApp(options: AppOptions): App {
     }
 
     if (route.type === "friends") {
-      mount(createFriendsScreen({ shell,
-        onOpenTab: (tab) => {
-          pendingStatsTab = tab;
-          navigate({ type: "stats" });
-        },
-        ...(route.username ? { initialUsername: route.username } : {}),
-        getCurrentUsername: () => authControls.getUser()?.displayName ?? null,
-        appOrigin: window.location.origin,
-        subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
-          if (message.type !== "GAME_INVITE") listener();
-        }),
-      }));
+      runNavigation(startFriends(route.username));
       return;
     }
 
     if (route.type === "academy" || route.type === "academy-lesson" || route.type === "academy-placement" || route.type === "country-profile") {
       runNavigation(startAcademyScreen(route));
     }
+  }
+
+  async function startFriends(username?: string): Promise<void> {
+    const run = navigationRun;
+    const { createFriendsScreen } = await import("../ui/screens/FriendsScreen");
+    if (run !== navigationRun) return;
+    mount(createFriendsScreen({ shell,
+      onOpenTab: (tab) => {
+        pendingStatsTab = tab;
+        navigate({ type: "stats" });
+      },
+      ...(username ? { initialUsername: username } : {}),
+      getCurrentUsername: () => authControls.getUser()?.displayName ?? null,
+      appOrigin: window.location.origin,
+      subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
+        if (message.type !== "GAME_INVITE") listener();
+      }),
+    }));
   }
 
   // Surface incoming game invites as a dismissible toast anywhere in the app.

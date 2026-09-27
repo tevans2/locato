@@ -49,8 +49,11 @@ export interface ShellContext {
   readonly openSection: (section: SiteSection) => void;
   /** The logo's target. Always `/`. */
   readonly goHome: () => void;
-  /** Browser Back. On a cold start (nothing to pop) opens `fallback`'s section home (default "play"). */
-  readonly goBack: (fallback?: SiteSection) => void;
+  /**
+   * Browser Back. On a cold start (nothing to pop) opens `fallback`: a section's home (default
+   * "play"), or a function for a more specific place (e.g. the board a timed run belongs to).
+   */
+  readonly goBack: (fallback?: SiteSection | (() => void)) => void;
   /**
    * Start a mode. Practice resumes that mode's saved run; "timed" opens `&run=timed` (leaderboard
    * modes only; others fall back to practice). `variant` is the leaderboard variant: a flag set

@@ -94,8 +94,9 @@ describe("shareable game routes", () => {
   });
 
   it("carries the timed run type on game URLs", () => {
-    const solo: AppRoute = { type: "solo-game", categoryIds: ["capitals"], continueSaved: true, run: "timed" };
-    expect(buildRouteUrl(solo, { pathname: "/" })).toBe("/?game=capitals&resume=1&run=timed");
+    // Timed runs never resume a save, so their URL has no resume flag.
+    const solo: AppRoute = { type: "solo-game", categoryIds: ["capitals"], continueSaved: false, run: "timed" };
+    expect(buildRouteUrl(solo, { pathname: "/" })).toBe("/?game=capitals&run=timed");
     expect(parse(buildRouteUrl(solo, { pathname: "/" }))).toEqual(solo);
     const map: AppRoute = { type: "country-guessing", mode: "puzzle", run: "timed" };
     expect(buildRouteUrl(map, { pathname: "/" })).toBe("/?game=puzzle&run=timed");

@@ -862,7 +862,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         gameMode: playMode,
         run: runType,
         ...(timed ? { clock: clockValue } : {}),
-        onBack: () => shell.goBack(timed ? "compete" : "play"),
+        // A cold timed link backs out to its own board rather than the Compete landing tab.
+        onBack: () => shell.goBack(timed ? () => shell.openCompete(playMode, playMode === "puzzle" ? puzzleContinent : undefined) : "play"),
         backLabel: timed ? "Back to Compete" : "Back",
         onHowToPlay: () => showFeedback(feedback, getGameModeOption(playMode).description, "neutral"),
         extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: () => resetButton.click() }],
