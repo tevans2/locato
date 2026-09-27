@@ -32,7 +32,7 @@ import {
 } from "../../core/academy";
 import { createRandomSeed, createSeededRandom } from "../../core/game/random";
 import { el } from "../dom/createElement";
-import { confirmDialog } from "../dom/confirm";
+import { confirmDialog } from "../shell/confirmDialog";
 import { bindKeyboardAwareInput } from "../dom/mobileKeyboard";
 import { playCorrect, playRoundTaken, playVictory } from "../dom/sfx";
 import { createCompletionView, createLessonTopBar, createMessageView, type CompletionAction } from "../components/academy/lessonChrome";

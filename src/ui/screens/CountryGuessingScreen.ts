@@ -4,7 +4,7 @@ import { CONTINENTS, type Continent, type Country, type CountryId, type CountryI
 import { getGameModeOption, type GameModeId, type WorldMapGameModeId } from "../../core/gameModes";
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
-import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
+import { formatTimerCompletionSuffix, postTimedRun } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer } from "../../core/timer/playTimer";
 import { recordWorldAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
@@ -206,13 +206,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
-    const serverAccepted = await submitTimerToLeaderboard({
+    const { serverAccepted, rank } = await postTimedRun({
       gameMode: playMode,
       variant: playMode === "puzzle" ? puzzleContinent : "",
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
-    return { isNewLocalBest, serverAccepted };
+    return { isNewLocalBest, serverAccepted, rank };
   }
 
   function renderTargetPrompt(): void {

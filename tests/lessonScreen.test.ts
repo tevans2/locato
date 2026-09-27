@@ -275,12 +275,12 @@ describe("Lesson player", () => {
     expect(ui.root.dataset.leaveConfirm).toContain("answers so far are saved");
     ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
     expect(ui.onExit).not.toHaveBeenCalled();
-    expect(document.querySelector(".confirm-dialog")?.textContent).toContain("Leave this lesson?");
-    document.querySelector<HTMLButtonElement>(".confirm-dialog-cancel")!.click();
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain("Leave this lesson?");
+    document.querySelector<HTMLButtonElement>('[data-action="cancel"]')!.click();
     await Promise.resolve();
     expect(ui.onExit).not.toHaveBeenCalled();
     ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
-    document.querySelector<HTMLButtonElement>(".confirm-dialog-confirm")!.click();
+    document.querySelector<HTMLButtonElement>('[data-action="confirm"]')!.click();
     await Promise.resolve();
     expect(ui.onExit).toHaveBeenCalledTimes(1);
   });

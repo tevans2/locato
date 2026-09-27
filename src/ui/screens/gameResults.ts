@@ -11,6 +11,8 @@ export interface TimedPostOutcome {
   readonly isNewLocalBest: boolean;
   /** null = not signed in (nothing posted); true = posted; false = kept locally (not faster than the posted best). */
   readonly serverAccepted: boolean | null;
+  /** Signed in: rank after posting. Guest: where the time would place. */
+  readonly rank?: number | null;
 }
 
 export interface RunResultsInput {
@@ -41,11 +43,13 @@ export interface RunResultsHandle {
 /** One line for the leaderboard submission of a finished timed run. */
 export function timedPostingLine(outcome: TimedPostOutcome): string {
   const best = outcome.isNewLocalBest ? "New personal best. " : "";
-  // TODO(compete-rank): once the Compete agent's rank helper lands in src/core/timer/leaderboardSync.ts,
-  // show "Posted — you're #N on the board" here instead of the plain confirmation.
-  if (outcome.serverAccepted === null) return `${best}Sign in to post your time to the leaderboard — your best is kept on this device.`;
-  if (outcome.serverAccepted) return `${best}Posted to the leaderboard.`;
-  return `${best}Saved on this device — your posted best is still faster.`;
+  const rank = outcome.rank ?? null;
+  if (outcome.serverAccepted === null) {
+    const place = rank ? `That would place #${rank} on the board. ` : "";
+    return `${best}${place}Sign in to post your time to the leaderboard — your best is kept on this device.`;
+  }
+  if (outcome.serverAccepted) return `${best}Posted to the leaderboard${rank ? ` — you're #${rank}` : ""}.`;
+  return `${best}Saved on this device — your posted best is still faster${rank ? ` (you're #${rank})` : ""}.`;
 }
 
 function missedChips(countries: readonly Country[]): ResultsMissedCountry[] {

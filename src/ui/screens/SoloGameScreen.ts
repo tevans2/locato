@@ -9,7 +9,7 @@ import { getGameModeOption, isLeaderboardMode, type GameModeId, type PromptGameM
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
-import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
+import { formatTimerCompletionSuffix, postTimedRun } from "../../core/timer/leaderboardSync";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer } from "../../core/timer/playTimer";
 import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
@@ -265,13 +265,13 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
-    const serverAccepted = await submitTimerToLeaderboard({
+    const { serverAccepted, rank } = await postTimedRun({
       gameMode: options.selectedGameMode,
       variant: leaderboardVariant,
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
-    return { isNewLocalBest, serverAccepted };
+    return { isNewLocalBest, serverAccepted, rank };
   }
 
   function applyEvents(events: readonly GameEvent[]): void {
