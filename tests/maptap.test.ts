@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { haversineDistanceKm, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_DEFAULT_TOLERANCE_KM, MAP_TAP_MAX_SCORE, scoreMapTapDistance, scoreMapTapGuess } from "../src/core/maptap";
+import { filterMapTapLocations, haversineDistanceKm, isMapTapCategory, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_DEFAULT_TOLERANCE_KM, MAP_TAP_LOCATIONS, MAP_TAP_MAX_SCORE, scoreMapTapDistance, scoreMapTapGuess, type MapTapCategory } from "../src/core/maptap";
+
 
 describe("MapTap distance and scoring", () => {
   it("returns zero distance for the same coordinate", () => {
@@ -51,5 +52,33 @@ describe("MapTap distance and scoring", () => {
     const scored = scoreMapTapGuess({ lat: 55.7525 + 0.2, lng: 37.6231 }, { lat: 55.7525, lng: 37.6231 });
     expect(scored.toleranceKm).toBe(MAP_TAP_DEFAULT_TOLERANCE_KM);
     expect(scored.score).toBe(MAP_TAP_MAX_SCORE);
+  });
+});
+
+describe("MapTap location pool", () => {
+  const categories: readonly MapTapCategory[] = ["city", "region", "mountain", "mountain-range", "ocean", "poi", "landmark"];
+
+  it("offers a large pool with every selectable category represented", () => {
+    expect(MAP_TAP_LOCATIONS.length).toBeGreaterThanOrEqual(130);
+    for (const category of categories) {
+      expect(isMapTapCategory(category)).toBe(true);
+      expect(filterMapTapLocations({ category }).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("uses unique ids and valid globe coordinates", () => {
+    expect(new Set(MAP_TAP_LOCATIONS.map((location) => location.id)).size).toBe(MAP_TAP_LOCATIONS.length);
+    for (const location of MAP_TAP_LOCATIONS) {
+      expect(location.lat).toBeGreaterThanOrEqual(-90);
+      expect(location.lat).toBeLessThanOrEqual(90);
+      expect(location.lng).toBeGreaterThanOrEqual(-180);
+      expect(location.lng).toBeLessThanOrEqual(180);
+    }
+  });
+
+  it("combines category and difficulty filters", () => {
+    const hardOceans = filterMapTapLocations({ category: "ocean", difficulty: "hard" });
+    expect(hardOceans.length).toBeGreaterThan(0);
+    expect(hardOceans.every((location) => location.category === "ocean" && location.difficulty === "hard")).toBe(true);
   });
 });

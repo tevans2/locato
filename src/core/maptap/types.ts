@@ -1,4 +1,4 @@
-export type MapTapCategory = "city" | "mountain" | "poi" | "landmark";
+export type MapTapCategory = "city" | "region" | "mountain" | "mountain-range" | "ocean" | "poi" | "landmark";
 export type MapTapDifficulty = "easy" | "medium" | "hard";
 
 export interface MapTapLocation {

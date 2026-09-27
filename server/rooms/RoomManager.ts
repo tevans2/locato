@@ -5,7 +5,9 @@ import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type Roo
 import { MapTapRoom } from "./MapTapRoom";
 import { GeoGuessrRoom } from "./GeoGuessrRoom";
 import { getCategory, resolveCategoryIds } from "../../src/core/categories";
+import type { MapTapCategory } from "../../src/core/maptap/types";
 import type { FlagPool } from "../../src/core/flagPools";
+
 
 export interface MultiplayerConnection {
   readonly send: (message: string) => unknown;
@@ -213,6 +215,7 @@ export class RoomManager {
     switch (message.type) {
       case "CREATE_ROOM":
         this.createRoom(connection, message.playerName, message.categoryIds, now, {
+          ...(message.mapTapCategories !== undefined ? { mapTapCategories: message.mapTapCategories } : {}),
           ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}),
           ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}),
           ...(message.flagPool !== undefined ? { flagPool: message.flagPool } : {}),
@@ -236,8 +239,11 @@ export class RoomManager {
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (isMapTapRoom(room) || isGeoGuessrRoom(room)) {
+          if (isMapTapRoom(room)) {
+            this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.mapTapCategories !== undefined ? { mapTapCategories: message.mapTapCategories } : {}), ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
+          } else if (isGeoGuessrRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
+
           } else {
             this.sendRoomResult(
               connection,
@@ -303,8 +309,9 @@ export class RoomManager {
     playerName: string,
     categoryIds: readonly string[],
     now: number,
-    settings: { readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool },
+    settings: { readonly roundLimit?: number; readonly roundDurationMs?: number; readonly mapTapCategories?: readonly MapTapCategory[]; readonly flagPool?: FlagPool },
   ): void {
+
     if (this.rooms.size >= this.maxRooms) {
       sendError(connection, "too-many-rooms", "The server is at room capacity.");
       return;
@@ -328,6 +335,7 @@ export class RoomManager {
           seed: createId("seed"),
           now,
           maxPlayers: this.maxPlayersPerRoom,
+          ...(settings.mapTapCategories !== undefined ? { mapTapCategories: settings.mapTapCategories } : {}),
           ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
           ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
         })
