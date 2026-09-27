@@ -21,7 +21,7 @@ import {
   Split,
   Users,
 } from "lucide-react";
-import { readSoloSave } from "../../storage/localSave";
+import { readLatestSoloSave } from "../../storage/localSave";
 import { readAcademyProgress } from "../../storage/academySave";
 import { academyLevel } from "../../core/academy/mastery";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, type GameModeId } from "../../core/gameModes";
@@ -98,12 +98,15 @@ const MODE_GROUPS: readonly LandingGroup[] = [
 
 const COUNTRY_COUNT = 196;
 
-function hasResumableSolo(storage?: Storage): boolean {
-  if (!storage) return false;
-  const save = readSoloSave(storage);
-  if (!save) return false;
-  const status = save.status ?? (save.currentCountryCode === null ? "complete" : "playing");
-  return status !== "complete";
+/** "Flags · 42/196" for the most recently played practice run, or null when there's none to resume. */
+function resumableSoloLabel(storage?: Storage): string | null {
+  if (!storage) return null;
+  const save = readLatestSoloSave(storage);
+  if (!save) return null;
+  const titles = MODE_GROUPS.flatMap((group) => group.modes);
+  const modeTitle = save.categoryIds.length === 1 ? titles.find((mode) => mode.id === save.categoryIds[0])?.title ?? null : "Mixed";
+  const progress = `${save.guessedCountryCodes.length}/${save.poolCountryCodes.length}`;
+  return modeTitle ? `${modeTitle} · ${progress}` : progress;
 }
 
 function routeMode(options: LandingScreenOptions, mode: GameModeId): void {
@@ -177,7 +180,7 @@ function ModePreviewArtwork({ mode }: { readonly mode: GameModeId }) {
 function LandingGamePicker(options: LandingScreenOptions) {
   const [group, setGroup] = useState(MODE_GROUPS[0]!);
   const [mode, setMode] = useState(group.modes[0]!);
-  const resumable = hasResumableSolo(options.storage);
+  const resumeLabel = resumableSoloLabel(options.storage);
   const allModes = MODE_GROUPS.flatMap((item) => item.modes);
   const modeNumber = String(allModes.findIndex((item) => item.id === mode.id) + 1).padStart(2, "0");
 
@@ -196,7 +199,7 @@ function LandingGamePicker(options: LandingScreenOptions) {
       </div>
       <div className="mode-picker-shortcuts">
         <button type="button" onClick={options.onDailyChallenge}><CalendarDays size={16} /> Daily challenge <ArrowUpRight size={14} /></button>
-        {resumable ? <button type="button" onClick={options.onPlay}>Resume game <ArrowRight size={15} /></button> : <button type="button" onClick={options.onMultiplayer}><Users size={16} /> Multiplayer <ArrowUpRight size={14} /></button>}
+        {resumeLabel ? <button type="button" onClick={options.onPlay} aria-label={`Resume game: ${resumeLabel}`}>Resume {resumeLabel} <ArrowRight size={15} /></button> : <button type="button" onClick={options.onMultiplayer}><Users size={16} /> Multiplayer <ArrowUpRight size={14} /></button>}
       </div>
     </div>
     <section className="mode-preview" id="mode-preview" aria-label="Selected game" aria-live="polite">

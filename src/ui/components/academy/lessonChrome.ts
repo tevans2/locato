@@ -1,6 +1,7 @@
 import type { CountryCode, CountryIndex } from "../../../core/countries";
 import type { CompletionSummary, AcademyLevelStatus, LearningGroup } from "../../../core/academy";
 import { el } from "../../dom/createElement";
+import { createFocusBar } from "../../shell/FocusBar";
 import { confetti, countryOf, flagImage, icon } from "./lessonMedia";
 
 /** Lesson frame pieces: top bar with progress + combo, completion card and friendly states. */
@@ -12,18 +13,6 @@ export interface LessonTopBar {
 }
 
 export function createLessonTopBar(options: { readonly title: string; readonly exitLabel?: string; readonly onExit: () => void }): LessonTopBar {
-  const exit = el("button", {
-    className: "lx-exit",
-    attrs: { type: "button", "aria-label": options.exitLabel ?? "Leave lesson" },
-    children: [icon("close")],
-    on: { click: options.onExit },
-  });
-  const fill = el("span", { className: "lx-progress-fill" });
-  const progress = el("div", {
-    className: "lx-progress",
-    attrs: { role: "progressbar", "aria-label": "Lesson progress", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
-    children: [fill],
-  });
   const streakCount = el("span", { className: "lx-streak-count", text: "0" });
   const streak = el("span", {
     className: "lx-streak",
@@ -32,24 +21,23 @@ export function createLessonTopBar(options: { readonly title: string; readonly e
   });
   streak.hidden = true;
 
-  const element = el("header", {
-    className: "lx-top",
-    children: [
-      exit,
-      el("p", { className: "lx-top-title", text: options.title }),
-      el("div", { className: "lx-top-progress", children: [progress, streak] }),
-    ],
+  // The shell's FocusBar supplies structure and behaviour; the lesson keeps its own skin.
+  const bar = createFocusBar({
+    onClose: options.onExit,
+    closeLabel: options.exitLabel ?? "Leave lesson",
+    closeIcon: icon("close"),
+    title: options.title,
+    progress: 0,
+    progressLabel: "Lesson progress",
+    trailing: streak,
+    classNames: { root: "lx-top", close: "lx-exit", title: "lx-top-title", progressWrap: "lx-top-progress", progress: "lx-progress", progressFill: "lx-progress-fill" },
   });
+  bar.close.removeAttribute("title");
+  const element = bar.element;
 
   return {
     element,
-    setProgress: (done, total) => {
-      const percent = total <= 0 ? 0 : Math.max(0, Math.min(100, (done / total) * 100));
-      fill.style.width = `${percent.toFixed(2)}%`;
-      progress.setAttribute("aria-valuenow", String(Math.round(percent)));
-      progress.setAttribute("aria-valuetext", `${done} of ${total} steps`);
-      fill.classList.toggle("is-started", done > 0);
-    },
+    setProgress: (done, total) => bar.setProgress(total <= 0 ? 0 : done / total, `${done} of ${total} steps`),
     setStreak: (value) => {
       const show = value >= 2;
       const grew = show && Number(streakCount.textContent) < value;

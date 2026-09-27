@@ -27,6 +27,19 @@ import { createCapitalRecallMapView, type CapitalRecallMapView } from "../dom/re
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createMobileMenu } from "../dom/mobileMenu";
 import { createBrandLockup } from "../dom/createBrandLockup";
+import { confirmDialog } from "../dom/confirm";
+
+/** Answered prompts after which Restart / switching timer mode asks before wiping the run. */
+export const RESTART_CONFIRM_THRESHOLD = 5;
+
+export interface DailyPromptProgress {
+  readonly score: number;
+  readonly hintsUsed: number;
+  readonly marks: readonly DailyRoundMark[];
+  /** Penalties already taken on the round in progress. */
+  readonly roundHintsUsed: number;
+  readonly roundWrongGuesses: number;
+}
 
 export interface SoloGameScreenOptions {
   readonly countryIndex: CountryIndex;
@@ -53,6 +66,10 @@ export interface SoloGameScreenOptions {
   readonly dailyChallenge?: {
     readonly date: string;
     readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[] }) => void;
+    /** Progress restored from a saved daily (the engine carries the matching state). */
+    readonly initialProgress?: DailyPromptProgress;
+    /** Called after every answer, hint or wrong guess so the daily can be saved and resumed. */
+    readonly onProgress?: (progress: DailyPromptProgress) => void;
   };
 }
 
@@ -83,11 +100,12 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const activeFlagPool = options.flagPool ?? DEFAULT_FLAG_POOL;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
-  const dailyMarks: DailyRoundMark[] = [];
-  let dailyHintsUsed = 0;
-  let dailyRoundHintsUsed = 0;
-  let dailyRoundWrongGuesses = 0;
-  let dailyScore = 0;
+  const restoredDaily = options.dailyChallenge?.initialProgress;
+  const dailyMarks: DailyRoundMark[] = [...(restoredDaily?.marks ?? [])];
+  let dailyHintsUsed = restoredDaily?.hintsUsed ?? 0;
+  let dailyRoundHintsUsed = restoredDaily?.roundHintsUsed ?? 0;
+  let dailyRoundWrongGuesses = restoredDaily?.roundWrongGuesses ?? 0;
+  let dailyScore = restoredDaily?.score ?? 0;
   let dailyCompleted = false;
   let soloHintsUsed = 0;
   const stats = createStatsView();
@@ -588,6 +606,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       input.value = "";
     }
     if (engine.getState().status === "playing" && shouldAutoFocusTextInput()) input.focus();
+    if (isDailyChallenge && events.length > 0) {
+      options.dailyChallenge?.onProgress?.({ score: dailyScore, hintsUsed: dailyHintsUsed, marks: [...dailyMarks], roundHintsUsed: dailyRoundHintsUsed, roundWrongGuesses: dailyRoundWrongGuesses });
+    }
     if (isDailyChallenge) completeDailyIfNeeded(events);
   }
 
@@ -717,11 +738,22 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   skipButton.addEventListener("click", skipRound, { signal: controller.signal });
   mobileSkipButton.addEventListener("click", skipRound, { signal: controller.signal });
   hintPopoverClose.addEventListener("click", hideHintPopover, { signal: controller.signal });
+  /** Ask before wiping a run with real progress; short runs reset straight away. */
+  async function confirmWipeRun(message: string, confirmLabel: string): Promise<boolean> {
+    const state = engine.getState();
+    const answered = state.guessedCountryIds.size + state.skippedCountryIds.size;
+    if (state.status === "complete" || answered < RESTART_CONFIRM_THRESHOLD) return true;
+    return confirmDialog(`${message} You've answered ${answered} so far — this run will be lost.`, { confirmLabel, cancelLabel: "Keep playing" });
+  }
+
   resetButton.addEventListener(
     "click",
     () => {
       dismissKeyboardIfTouchInput(input);
-      resetRun(playTimer.mode === "count-up" ? "Timer reset. Start with your first correct answer." : "Fresh run started.");
+      void confirmWipeRun("Start a fresh run?", "Restart").then((confirmed) => {
+        if (!confirmed || controller.signal.aborted) return;
+        resetRun(playTimer.mode === "count-up" ? "Timer reset. Start with your first correct answer." : "Fresh run started.");
+      });
     },
     { signal: controller.signal },
   );
@@ -730,9 +762,16 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     "change",
     () => {
       const nextMode: PlayTimerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
-      playTimer.setMode(nextMode);
       dismissKeyboardIfTouchInput(input);
-      resetRun(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct answer." : "Practice mode ready.");
+      void confirmWipeRun(nextMode === "count-up" ? "Switch to Timer mode? Timed runs start fresh." : "Switch to Practice mode? This starts a fresh run.", "Switch and restart").then((confirmed) => {
+        if (controller.signal.aborted) return;
+        if (!confirmed) {
+          timerModeSelect.value = playTimer.mode;
+          return;
+        }
+        playTimer.setMode(nextMode);
+        resetRun(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct answer." : "Practice mode ready.");
+      });
     },
     { signal: controller.signal },
   );

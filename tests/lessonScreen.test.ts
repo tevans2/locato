@@ -259,13 +259,29 @@ describe("Lesson player", () => {
     expect(ui.onStartLesson).toHaveBeenCalledWith("europe-big-names");
   });
 
-  it("drills lookalikes for a country", () => {
+  it("drills lookalikes for a country", async () => {
     const ui = setup({ lessonId: "lookalikes:TD" });
     expect(ui.info()).toMatchObject({ phase: "step", kind: "choice" });
     expect(["TD", "RO"]).toContain(ui.info().code);
+    ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
+    // Nothing answered yet: leaving needs no confirmation.
+    expect(ui.onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before leaving a lesson mid-way", async () => {
+    const ui = setup({ lessonId: "lookalikes:TD" });
     ui.answer(false);
     expect(ui.root.querySelector(".lx-tip")?.textContent).toContain("Chad");
+    expect(ui.root.dataset.leaveConfirm).toContain("answers so far are saved");
     ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
+    expect(ui.onExit).not.toHaveBeenCalled();
+    expect(document.querySelector(".confirm-dialog")?.textContent).toContain("Leave this lesson?");
+    document.querySelector<HTMLButtonElement>(".confirm-dialog-cancel")!.click();
+    await Promise.resolve();
+    expect(ui.onExit).not.toHaveBeenCalled();
+    ui.root.querySelector<HTMLButtonElement>(".lx-exit")!.click();
+    document.querySelector<HTMLButtonElement>(".confirm-dialog-confirm")!.click();
+    await Promise.resolve();
     expect(ui.onExit).toHaveBeenCalledTimes(1);
   });
 });

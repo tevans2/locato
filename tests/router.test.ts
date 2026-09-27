@@ -35,10 +35,11 @@ describe("shareable game routes", () => {
     { type: "friends", username: "curious_explorer" },
     { type: "daily-challenge" },
     { type: "stats" },
-    { type: "flag-gallery" },
+    { type: "atlas" },
     { type: "friends" },
     { type: "multiplayer" },
-    { type: "leaderboard", mode: "flags", variant: "timer" },
+    { type: "compete" },
+    { type: "compete", mode: "flags", variant: "timer" },
     { type: "academy" },
     { type: "academy", groupId: "western-europe" },
     { type: "academy-lesson", lessonId: "review" },
@@ -53,9 +54,30 @@ describe("shareable game routes", () => {
     expect(parse("/?game=unknown")).toBeNull();
     expect(parse("/?view=unknown")).toBeNull();
     expect(parse("/?room=%20")).toBeNull();
-    expect(parse("/?view=leaderboard&mode=unknown")).toEqual({ type: "leaderboard" });
+    expect(parse("/?view=leaderboard&mode=unknown")).toEqual({ type: "compete" });
     expect(parse("/?country=france")).toBeNull();
     expect(parse("/?view=academy&group=Bad%20Id")).toEqual({ type: "academy" });
     expect(buildRouteUrl({ type: "landing" }, { pathname: "/" })).toBe("/");
+  });
+
+  it("keeps old leaderboard and flag links working as Compete and Atlas", () => {
+    expect(parse("/?view=leaderboard")).toEqual({ type: "compete" });
+    expect(parse("/?view=leaderboard&mode=capitals&variant=Europe")).toEqual({ type: "compete", mode: "capitals", variant: "Europe" });
+    expect(parse("/?view=flags")).toEqual({ type: "atlas" });
+    // Legacy route types still build the new URLs.
+    expect(buildRouteUrl({ type: "leaderboard", mode: "flags" }, { pathname: "/" })).toBe("/?view=compete&mode=flags");
+    expect(buildRouteUrl({ type: "flag-gallery" }, { pathname: "/" })).toBe("/?view=atlas");
+  });
+
+  it("carries the timed run type on game URLs", () => {
+    const solo: AppRoute = { type: "solo-game", categoryIds: ["capitals"], continueSaved: true, run: "timed" };
+    expect(buildRouteUrl(solo, { pathname: "/" })).toBe("/?game=capitals&resume=1&run=timed");
+    expect(parse(buildRouteUrl(solo, { pathname: "/" }))).toEqual(solo);
+    const map: AppRoute = { type: "country-guessing", mode: "puzzle", run: "timed" };
+    expect(buildRouteUrl(map, { pathname: "/" })).toBe("/?game=puzzle&run=timed");
+    expect(parse(buildRouteUrl(map, { pathname: "/" }))).toEqual(map);
+    // Practice is the default and never written; unknown run values are ignored.
+    expect(parse("/?game=puzzle&run=practice")).toEqual({ type: "country-guessing", mode: "puzzle" });
+    expect(parse("/?game=flags&run=bogus")).toEqual({ type: "solo-game", categoryIds: ["flags"], continueSaved: false });
   });
 });

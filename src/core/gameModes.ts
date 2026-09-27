@@ -126,3 +126,92 @@ export function promptGameModeFromCategoryIds(categoryIds: readonly string[]): P
   const selected = categoryIds.find(isPromptGameModeId);
   return selected ?? "flags";
 }
+
+// ---------------------------------------------------------------------------------------------
+// Catalogue used by the navigation shell (landing, game switcher, Compete). docs/navigation.md
+// fixes the grouping: the same three groups, in the same order, everywhere.
+
+export type GameModeGroupId = "clues" | "map" | "street-view";
+
+/** Lucide icon names; the shell's icon set (src/ui/shell/icons.ts) draws every one of them. */
+export type GameModeIcon =
+  | "flag" | "palette" | "shapes" | "hash" | "crown" | "map-pin" | "globe" | "mouse-pointer-click"
+  | "eye" | "puzzle" | "orbit" | "split" | "binoculars";
+
+export interface GameModeCatalogueEntry {
+  readonly id: GameModeId;
+  /** Sentence-case name shown in the switcher, picker and Compete. */
+  readonly label: string;
+  /** One short line (under ~50 characters). */
+  readonly blurb: string;
+  readonly icon: GameModeIcon;
+  /** Has a Compete leaderboard, so it can be played as a timed run. */
+  readonly leaderboard: boolean;
+}
+
+export interface GameModeGroup {
+  readonly id: GameModeGroupId;
+  readonly label: "Clues" | "Map" | "Street View";
+  readonly tagline: string;
+  readonly modes: readonly GameModeCatalogueEntry[];
+}
+
+/** Mirrors server/leaderboard/validation.ts GAME_MODE_IDS (a test keeps the two in sync). */
+export const LEADERBOARD_GAME_MODE_IDS = ["flags", "shapes", "codes", "capitals", "capital-recall", "name-all", "click-country", "spot-country", "puzzle"] as const;
+export type LeaderboardGameModeId = (typeof LEADERBOARD_GAME_MODE_IDS)[number];
+
+export function isLeaderboardMode(id: string): id is LeaderboardGameModeId {
+  return (LEADERBOARD_GAME_MODE_IDS as readonly string[]).includes(id);
+}
+
+const entry = (id: GameModeId, label: string, blurb: string, icon: GameModeIcon): GameModeCatalogueEntry => ({ id, label, blurb, icon, leaderboard: isLeaderboardMode(id) });
+
+export const GAME_MODE_GROUPS: readonly GameModeGroup[] = [
+  {
+    id: "clues",
+    label: "Clues",
+    tagline: "One clue on screen — name the country it belongs to.",
+    modes: [
+      entry("flags", "Flags", "Name the country from its flag.", "flag"),
+      entry("flag-colors", "Flag colours", "Reveal the hidden flag, colour by colour.", "palette"),
+      entry("shapes", "Country outlines", "Name a country from its outline alone.", "shapes"),
+      entry("codes", "Country codes", "Decode the country behind its ISO code.", "hash"),
+      entry("capitals", "Capitals", "See a capital and name its country.", "crown"),
+      entry("capital-recall", "Capital recall", "See a country and name its capital.", "map-pin"),
+    ],
+  },
+  {
+    id: "map",
+    label: "Map",
+    tagline: "Point, click and drag your way around the world.",
+    modes: [
+      entry("name-all", "Name all countries", "Type every country you know.", "globe"),
+      entry("click-country", "Click the country", "Find the named country on the map.", "mouse-pointer-click"),
+      entry("spot-country", "Spot the country", "Name the country that lights up.", "eye"),
+      entry("puzzle", "Puzzle", "Rebuild a continent by hand.", "puzzle"),
+      entry("map-tap", "MapTap", "Pin cities and landmarks on the globe.", "orbit"),
+      entry("worldsplit", "Worldsplit", "Draw one line to split a population.", "split"),
+    ],
+  },
+  {
+    id: "street-view",
+    label: "Street View",
+    tagline: "Dropped on a random street somewhere on earth.",
+    modes: [
+      entry("geoguessr", "GeoGuessr", "Explore the street, then pin the spot.", "map-pin"),
+      entry("streetview-country", "Street View country", "Look around and name the country.", "binoculars"),
+    ],
+  },
+];
+
+export function gameModeCatalogueEntry(id: GameModeId): GameModeCatalogueEntry {
+  for (const group of GAME_MODE_GROUPS) {
+    const found = group.modes.find((mode) => mode.id === id);
+    if (found) return found;
+  }
+  return GAME_MODE_GROUPS[0]!.modes[0]!;
+}
+
+export function gameModeGroupOf(id: GameModeId): GameModeGroup {
+  return GAME_MODE_GROUPS.find((group) => group.modes.some((mode) => mode.id === id)) ?? GAME_MODE_GROUPS[0]!;
+}

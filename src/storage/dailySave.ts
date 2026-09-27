@@ -1,4 +1,5 @@
 import { createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, type DailyRoundMark } from "../core/dailyChallenge";
+import type { SoloSave } from "./localSave";
 
 const DAILY_SAVE_PREFIX = "locato:daily:";
 const DAILY_SAVE_SUFFIX = ":v2";
@@ -76,4 +77,82 @@ export function readDailyResult(storage: Storage, date: string, userId?: string 
 
   const legacyRaw = storage.getItem(legacyDailySaveKey(date));
   return legacyRaw ? parseDailyResult(legacyRaw, date) : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// In-progress daily: saved after every round so leaving, Back or a refresh resumes where the
+// player left off (and a round can't be replayed after its answer was shown).
+
+const DAILY_PROGRESS_PREFIX = "locato:daily-progress:";
+const DAILY_PROGRESS_SUFFIX = ":v1";
+
+export type DailyStage = "prompt" | "map-tap" | "street-view";
+
+export interface DailyProgressSave {
+  readonly version: 1;
+  readonly date: string;
+  readonly seed: string;
+  readonly stage: DailyStage;
+  /** Rounds finished so far (0–10); equals marks.length. */
+  readonly roundIndex: number;
+  readonly score: number;
+  readonly marks: readonly DailyRoundMark[];
+  readonly hintsUsed: number;
+  /** Active play time so far; time away from the daily is not counted. */
+  readonly elapsedMs: number;
+  /** Prompt stage only: the engine's saved run, so the same country order resumes. */
+  readonly engine: SoloSave | null;
+  /** Prompt stage only: penalties already taken on the round in progress. */
+  readonly roundHintsUsed: number;
+  readonly roundWrongGuesses: number;
+  readonly updatedAt: number;
+}
+
+export function dailyProgressKey(userId?: string | null): string {
+  return `${DAILY_PROGRESS_PREFIX}${dailySaveScope(userId)}${DAILY_PROGRESS_SUFFIX}`;
+}
+
+export function saveDailyProgress(storage: Storage, progress: DailyProgressSave, userId?: string | null): void {
+  storage.setItem(dailyProgressKey(userId), JSON.stringify(progress));
+}
+
+export function clearDailyProgress(storage: Storage, userId?: string | null): void {
+  storage.removeItem(dailyProgressKey(userId));
+}
+
+const DAILY_STAGES: readonly DailyStage[] = ["prompt", "map-tap", "street-view"];
+
+/** Today's in-progress daily, or null. A stored run for any other date (or seed) is discarded. */
+export function readDailyProgress(storage: Storage, date: string, seed: string, userId?: string | null): DailyProgressSave | null {
+  const key = dailyProgressKey(userId);
+  const raw = storage.getItem(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<DailyProgressSave>;
+    const valid =
+      parsed.version === 1 &&
+      parsed.date === date &&
+      parsed.seed === seed &&
+      DAILY_STAGES.includes(parsed.stage as DailyStage) &&
+      Array.isArray(parsed.marks) &&
+      parsed.marks.length <= DAILY_COUNTRY_COUNT &&
+      typeof parsed.roundIndex === "number" &&
+      typeof parsed.score === "number" &&
+      parsed.score >= 0 &&
+      parsed.score <= DAILY_MAX_SCORE &&
+      typeof parsed.hintsUsed === "number" &&
+      typeof parsed.elapsedMs === "number";
+    if (valid) {
+      return {
+        ...(parsed as DailyProgressSave),
+        engine: parsed.engine ?? null,
+        roundHintsUsed: parsed.roundHintsUsed ?? 0,
+        roundWrongGuesses: parsed.roundWrongGuesses ?? 0,
+      };
+    }
+  } catch {
+    // fall through: unreadable progress is discarded
+  }
+  storage.removeItem(key);
+  return null;
 }

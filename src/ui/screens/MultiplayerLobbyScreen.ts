@@ -10,6 +10,7 @@ import type { AuthControls } from "../components/AuthPanel";
 import { getPlayerEmoji } from "../../core/auth/avatars";
 import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
+import { confirmDialog } from "../dom/confirm";
 import { enhanceDropdown } from "../dom/dropdown";
 import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createBrandLockup } from "../dom/createBrandLockup";
@@ -601,6 +602,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
 
   function render(): void {
     const hasRoom = room !== null;
+    // App-level exits (Home button, accepting another invite) read this to ask before leaving.
+    const leaveMessage = leaveConfirmMessage();
+    const screenElement = statusText.closest<HTMLElement>(".multiplayer-screen");
+    if (screenElement && leaveMessage) screenElement.dataset.leaveConfirm = leaveMessage;
+    else if (screenElement) delete screenElement.dataset.leaveConfirm;
     statusText.hidden = !hasRoom;
     statusText.textContent = `${status}: ${feedback}`;
     setupPanel.hidden = hasRoom;
@@ -925,24 +931,33 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     },
     { signal: controller.signal },
   );
-  dailyButton.addEventListener(
-    "click",
-    () => {
+  /** Leaving mid-game or with other players present asks first; an empty lobby just goes. */
+  function leaveConfirmMessage(): string | null {
+    if (!room) return null;
+    const othersPresent = room.players.some((player) => player.id !== localPlayerId);
+    const gameInProgress = room.status !== "lobby" && room.status !== "complete";
+    if (gameInProgress) return "Leave this game? You'll drop out of the match in progress.";
+    return othersPresent ? `Leave room ${room.roomCode}? The other players will carry on without you.` : null;
+  }
+
+  function leaveScreen(go: () => void): void {
+    const message = leaveConfirmMessage();
+    const proceed = (): void => {
       disconnectCurrentTransport();
       clearStoredSession();
-      options.onDailyChallenge();
-    },
-    { signal: controller.signal },
-  );
-  backButton.addEventListener(
-    "click",
-    () => {
-      disconnectCurrentTransport();
-      clearStoredSession();
-      options.onBackToSolo();
-    },
-    { signal: controller.signal },
-  );
+      go();
+    };
+    if (!message) {
+      proceed();
+      return;
+    }
+    void confirmDialog(message, { confirmLabel: "Leave room", cancelLabel: "Stay" }).then((leave) => {
+      if (leave && !controller.signal.aborted) proceed();
+    });
+  }
+
+  dailyButton.addEventListener("click", () => leaveScreen(options.onDailyChallenge), { signal: controller.signal });
+  backButton.addEventListener("click", () => leaveScreen(options.onBackToSolo), { signal: controller.signal });
 
   const element = el("section", {
     className: "game-screen multiplayer-screen",
@@ -950,7 +965,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       el("header", {
         className: "game-header multiplayer-header",
         children: [
-          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrandLockup(options.onHome), statusText] }),
+          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrandLockup(() => leaveScreen(options.onHome)), statusText] }),
           el("div", { className: "game-header-actions", children: [dailyButton, backButton] }),
         ],
       }),
