@@ -23,10 +23,9 @@
 .country-profile-screen *::before,
 .country-profile-screen *::after { box-sizing: border-box; }
 
-#country-profile .cp-topbar,
 #country-profile .cp-atlasbar,
 #country-profile .cp-page {
-  width: min(var(--cp-max), 100%);
+  width: min(var(--cp-max), calc(100% - 2 * var(--shell-gutter, 0px)));
   margin-inline: auto;
 }
 
@@ -65,30 +64,14 @@
 #country-profile .cp-icon { display: inline-grid; place-items: center; flex: none; width: 1.15em; height: 1.15em; }
 #country-profile .cp-icon svg { width: 100%; height: 100%; }
 
-/* ---- Top bar ------------------------------------------------------------------------ */
+/* ---- Breadcrumb bar (under the shared SiteHeader) ------------------------------------ */
 
-#country-profile .cp-topbar {
-  min-height: 64px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 var(--floating-controls-clearance) 12px 0;
-  border-bottom: 1px solid var(--cp-rule-strong);
-}
-
-/* The app-wide button skins (full width on phones, a surface fill in dark mode) outrank the
-   brand button's own reset, and phones hide the wordmark app-wide; this header has room for it. */
-#country-profile .cp-topbar .brand-home-button { flex: none; width: auto; min-width: 0; min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; gap: 8px; }
-#country-profile .cp-topbar .brand-name { display: inline; background: none; white-space: nowrap; }
-
-#country-profile .cp-crumbs { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--muted); }
+#country-profile .cp-crumbs { min-width: 0; display: flex; align-items: center; gap: 8px; margin-right: auto; font-size: .84rem; font-weight: 650; color: var(--muted); white-space: nowrap; }
+#country-profile .cp-crumb.is-current { overflow: hidden; text-overflow: ellipsis; }
 #country-profile .cp-crumb { padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 #country-profile button.cp-crumb:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 #country-profile .cp-crumb.is-current { color: var(--text); font-weight: 700; }
 #country-profile .cp-crumb-sep { color: var(--subtle); }
-
-#country-profile .cp-back:hover { background: var(--accent-soft); }
-#country-profile .cp-back { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--cp-rule-strong); border-radius: 8px; background: var(--surface); font-size: .8rem; font-weight: 700; cursor: pointer; }
 
 #country-profile .cp-atlasbar {
   display: flex;
@@ -755,11 +738,8 @@ svg.cp-feature-shape path { fill: var(--brand); stroke: var(--brand); stroke-wid
 }
 
 @media (max-width: 700px) {
-  #country-profile .cp-topbar { gap: 10px; min-height: 56px; padding: 0 186px 8px 0; }
-  #country-profile .cp-back-label { display: none; }
-  #country-profile .cp-crumbs { display: none; }
-  #country-profile .cp-back { width: 38px; padding: 0; justify-content: center; }
-  #country-profile .cp-atlasbar { gap: 10px; padding: 12px 0; }
+  #country-profile .cp-atlasbar { flex-wrap: wrap; gap: 10px; padding: 10px 0 12px; }
+  #country-profile .cp-crumbs { flex: 1 0 100%; font-size: .8rem; }
   #country-profile .cp-step-count { display: none; }
   #country-profile .cp-hero { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 22px 0 36px; }
   #country-profile .cp-flag-plate { order: -1; }

@@ -119,6 +119,22 @@ export function saveSoloGame(storage: Storage, index: CountryIndex, state: GameS
   storage.setItem(saveKeyFor(save), JSON.stringify(save));
 }
 
+/**
+ * Save the run in progress — practice runs only. Timed runs are deliberately never saved: the
+ * clock is wall time so they can't be resumed honestly, and they must not overwrite (or, on
+ * restart, clear) the mode's practice run. Leaving a timed run asks first instead.
+ */
+export function persistSoloRun(storage: Storage, index: CountryIndex, state: GameState, run: "practice" | "timed", updatedAt = Date.now(), flagPool: FlagPool = DEFAULT_FLAG_POOL): void {
+  if (run === "timed") return;
+  saveSoloGame(storage, index, state, updatedAt, flagPool);
+}
+
+/** Restart: clears the mode's practice save; a timed restart leaves it alone. */
+export function clearSoloRun(storage: Storage, categoryIds: readonly string[], run: "practice" | "timed", flagPool?: FlagPool | null): void {
+  if (run === "timed") return;
+  clearSoloSave(storage, categoryIds, flagPool);
+}
+
 /** Clear one mode's practice run (Restart). Other modes keep their saves. */
 export function clearSoloSave(storage: Storage, categoryIds: readonly string[], flagPool?: FlagPool | null): void {
   migrateLegacySoloSave(storage);

@@ -20,7 +20,7 @@ import {
 import type { Continent, CountryCode, CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import { el } from "../dom/createElement";
-import { createBrandLockup } from "../dom/createBrandLockup";
+import { createSiteHeader, markShellScreen, type SiteHeaderHandle } from "../shell";
 import { createMasteryMap } from "../components/academy/MasteryMap";
 import { flagStrip, groupCard } from "../components/academy/hubCards";
 import { groupPanel } from "../components/academy/hubGroupPanel";
@@ -41,6 +41,8 @@ export interface AcademyScreenOptions {
   readonly onStartLesson: (lessonId: string) => void;
   readonly onStartPlacement: () => void;
   readonly onOpenCountry: (code: string) => void;
+  /** The heading's "Atlas →" link (the index of every country). */
+  readonly onOpenAtlas?: () => void;
   /** Called when the open group changes so the URL can follow (replaces, not pushes). */
   readonly onGroupChange: (groupId: string | null) => void;
   /** Clock override for tests. */
@@ -75,20 +77,25 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
   });
 
   // ---------- Header ----------
+  // Shared SiteHeader (Learn) + the page title with a small link to the Atlas.
+  const siteHeader: SiteHeaderHandle | null = options.shell ? createSiteHeader(options.shell, { section: "learn" }) : null;
   const header = el("header", {
     className: "academy-header",
     children: [
-      el("button", {
-        className: "academy-icon-button academy-back",
-        attrs: { type: "button", "aria-label": "Back" },
-        children: [hubIcon("back")],
-        on: { click: () => options.onBack() },
-      }),
-      createBrandLockup(options.onHome),
       el("div", {
         className: "academy-header-title",
         children: [el("h1", { text: "Academy" }), el("p", { text: "Learn the world one region at a time" })],
       }),
+      ...(options.onOpenAtlas
+        ? [
+            el("button", {
+              className: "academy-atlas-link",
+              attrs: { type: "button" },
+              children: [el("span", { text: "Atlas" }), hubIcon("arrow")],
+              on: { click: () => options.onOpenAtlas?.() },
+            }),
+          ]
+        : []),
     ],
   });
 
@@ -191,8 +198,9 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
     className: "academy-screen",
     // The id scopes academy.css above the app-wide button/input styles.
     attrs: { id: "academy", "aria-label": "Academy" },
-    children: [header, el("main", { className: "academy-main", children: [hero, trail] })],
+    children: [...(siteHeader ? [siteHeader.element] : []), el("div", { className: "academy-body", children: [header, el("main", { className: "academy-main", children: [hero, trail] })] })],
   });
+  if (siteHeader) markShellScreen(element, "site");
 
   // ---------- Rendering ----------
   function rankCard(progress: AcademyProgress): HTMLElement {
@@ -533,6 +541,7 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
       unsubscribe();
       element.removeEventListener("keydown", onKeyDown);
       map.destroy();
+      siteHeader?.destroy();
     },
   };
 }

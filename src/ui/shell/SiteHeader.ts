@@ -31,6 +31,35 @@ export interface SiteHeaderOptions {
   readonly title?: string;
   readonly subtitle?: string;
   readonly back?: ShellBackLink;
+  /** A small related-page link beside the title, e.g. "Atlas" on the Academy hub (rendered with →). */
+  readonly titleLink?: ShellBackLink;
+  /**
+   * Asked before the logo or a section link leaves the page; return the question to ask, or null
+   * when it is safe to go. Default: the screen root's `data-leave-confirm` (multiplayer room, …).
+   */
+  readonly leaveGuard?: () => string | null;
+  /** Runs once leaving is confirmed, right before navigating (e.g. drop out of a room). */
+  readonly onLeave?: () => void;
+}
+
+/** Guard + hook applied to every navigation the header starts. */
+type LeaveCheck = (origin: HTMLElement, go: () => void) => void;
+
+function createLeaveCheck(ctx: ShellContext, options: Pick<SiteHeaderOptions, "leaveGuard" | "onLeave"> = {}): LeaveCheck {
+  return (origin, go) => {
+    const message = options.leaveGuard ? options.leaveGuard() : origin.closest<HTMLElement>("[data-leave-confirm]")?.dataset.leaveConfirm ?? null;
+    const proceed = (): void => {
+      options.onLeave?.();
+      go();
+    };
+    if (!message) {
+      proceed();
+      return;
+    }
+    void ctx.confirmLeave(message, { confirmLabel: "Leave", cancelLabel: "Stay" }).then((leave) => {
+      if (leave) proceed();
+    });
+  };
 }
 
 export interface SiteHeaderHandle {
@@ -47,7 +76,7 @@ function isPlainClick(event: Event): boolean {
   return !(mouse.metaKey || mouse.ctrlKey || mouse.shiftKey || mouse.altKey || (typeof mouse.button === "number" && mouse.button > 0));
 }
 
-function sectionLink(ctx: ShellContext, section: (typeof SITE_SECTIONS)[number], className: string, withIcon: boolean): HTMLAnchorElement {
+function sectionLink(ctx: ShellContext, section: (typeof SITE_SECTIONS)[number], className: string, withIcon: boolean, check: LeaveCheck): HTMLAnchorElement {
   const link = el("a", {
     className,
     attrs: { href: sectionHref(section.id), "data-section": section.id },
@@ -59,7 +88,7 @@ function sectionLink(ctx: ShellContext, section: (typeof SITE_SECTIONS)[number],
   link.addEventListener("click", (event) => {
     if (!isPlainClick(event)) return;
     event.preventDefault();
-    ctx.openSection(section.id);
+    check(link, () => ctx.openSection(section.id));
   });
   return link;
 }
@@ -81,23 +110,26 @@ export interface TabBarHandle {
  * Hidden above 700px. While one is on the page, App's root reserves room for it so content
  * is never covered (see `#app:has(.shell-tabbar)` in shell.css).
  */
-export function createTabBar(ctx: ShellContext, section: SiteSection): TabBarHandle {
-  const links = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-tab", true));
+export function createTabBar(ctx: ShellContext, section: SiteSection, guard: Pick<SiteHeaderOptions, "leaveGuard" | "onLeave"> = {}): TabBarHandle {
+  const check = createLeaveCheck(ctx, guard);
+  const links = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-tab", true, check));
   const element = el("nav", { className: "shell-tabbar", attrs: { "aria-label": "Sections" }, children: links });
   markCurrent(links, section);
   return { element, setSection: (next) => markCurrent(links, next) };
 }
 
-export function createBrandButton(ctx: ShellContext): HTMLButtonElement {
-  return el("button", {
+export function createBrandButton(ctx: ShellContext, guard: Pick<SiteHeaderOptions, "leaveGuard" | "onLeave"> = {}): HTMLButtonElement {
+  const check = createLeaveCheck(ctx, guard);
+  const button: HTMLButtonElement = el("button", {
     className: "shell-brand",
     attrs: { type: "button", "aria-label": "Locato home" },
     children: [
       el("img", { className: "shell-brand-logo", attrs: { src: "/logo.svg", alt: "", width: "28", height: "28" } }),
       el("span", { className: "shell-brand-name", children: [document.createTextNode("locato"), el("span", { className: "shell-brand-dot", text: "." })] }),
     ],
-    on: { click: () => ctx.goHome() },
+    on: { click: () => check(button, () => ctx.goHome()) },
   });
+  return button;
 }
 
 export function createBackLink(back: ShellBackLink, className = "shell-back"): HTMLButtonElement {
@@ -114,15 +146,17 @@ export function createBackLink(back: ShellBackLink, className = "shell-back"): H
  * The shared controls cluster moves into this header when it is built.
  */
 export function createSiteHeader(ctx: ShellContext, options: SiteHeaderOptions): SiteHeaderHandle {
-  const navLinks = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-nav-link", false));
-  const tabBar = createTabBar(ctx, options.section);
+  const guard = { ...(options.leaveGuard ? { leaveGuard: options.leaveGuard } : {}), ...(options.onLeave ? { onLeave: options.onLeave } : {}) };
+  const check = createLeaveCheck(ctx, guard);
+  const navLinks = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-nav-link", false, check));
+  const tabBar = createTabBar(ctx, options.section, guard);
   const element = el("header", {
     className: "shell-site-header",
     children: [
       el("div", {
         className: "shell-site-bar",
         children: [
-          createBrandButton(ctx),
+          createBrandButton(ctx, guard),
           el("nav", { className: "shell-site-nav", attrs: { "aria-label": "Sections" }, children: navLinks }),
           el("div", { className: "shell-site-end", children: [ctx.controls] }),
         ],
@@ -133,11 +167,20 @@ export function createSiteHeader(ctx: ShellContext, options: SiteHeaderOptions):
 
   let heading: HTMLElement | null = null;
   if (options.title || options.subtitle || options.back) {
+    const title = options.title ? el("h1", { className: "shell-heading-title", text: options.title }) : null;
+    const titleLink = options.titleLink
+      ? el("button", {
+          className: "shell-heading-link",
+          attrs: { type: "button" },
+          children: [el("span", { text: options.titleLink.label }), shellIcon("arrow-right", 15, 2)],
+          on: { click: () => options.titleLink?.onClick() },
+        })
+      : null;
     heading = el("div", {
       className: "shell-heading",
       children: [
         ...(options.back ? [createBackLink(options.back)] : []),
-        ...(options.title ? [el("h1", { className: "shell-heading-title", text: options.title })] : []),
+        ...(title && titleLink ? [el("div", { className: "shell-heading-row", children: [title, titleLink] })] : title ? [title] : []),
         ...(options.subtitle ? [el("p", { className: "shell-heading-sub", text: options.subtitle })] : []),
       ],
     });

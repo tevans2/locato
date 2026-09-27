@@ -11,7 +11,8 @@ import type { AuthControls } from "../components/AuthPanel";
 import { getPlayerEmoji } from "../../core/auth/avatars";
 import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
-import { confirmDialog } from "../dom/confirm";
+import { confirmDialog } from "../shell/confirmDialog";
+import { createSiteHeader, markShellScreen } from "../shell";
 import { enhanceDropdown } from "../dom/dropdown";
 import { createFlagPoolSelector } from "../dom/flagPoolSelector";
 import { createBrandLockup } from "../dom/createBrandLockup";
@@ -388,7 +389,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   const createButton = el("button", { className: "primary-action", text: "Create online room", attrs: { type: "button" } });
   const joinButton = el("button", { className: "secondary-action", text: "Join online room", attrs: { type: "button" } });
   const copyButton = el("button", { className: "ghost-action copy-code", text: "Copy code", attrs: { type: "button" } });
-  const dailyButton = el("button", { className: "ghost-action nav-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge" } });
+  const dailyButton = el("button", { className: "ghost-action nav-action screen-header-action", text: "Daily challenge", attrs: { type: "button", "aria-label": "Open daily challenge" } });
   const backButton = el("button", { className: "ghost-action nav-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
   const chatList = el("ol", { className: "multiplayer-chat-list", attrs: { "aria-live": "polite" } });
   const chatInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: String(MAX_CHAT_MESSAGE_LENGTH), placeholder: "Message room" } });
@@ -962,21 +963,50 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   dailyButton.addEventListener("click", () => leaveScreen(options.onDailyChallenge), { signal: controller.signal });
   backButton.addEventListener("click", () => leaveScreen(options.onBackToSolo), { signal: controller.signal });
 
-  const element = el("section", {
-    className: "game-screen multiplayer-screen",
-    children: [
-      el("header", {
-        className: "game-header multiplayer-header",
+  const layout = el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element, geoGuessrGameView.element] });
+  // Site page (Compete): the shared header's logo and section links ask before leaving a room.
+  const siteHeader = options.shell
+    ? createSiteHeader(options.shell, {
+        section: "compete",
+        leaveGuard: () => leaveConfirmMessage(),
+        onLeave: () => {
+          disconnectCurrentTransport();
+          clearStoredSession();
+        },
+      })
+    : null;
+  const element = siteHeader
+    ? markShellScreen(
+        el("section", {
+          className: "game-screen multiplayer-screen",
+          attrs: { id: "multiplayer", "data-section": "compete" },
+          children: [
+            siteHeader.element,
+            el("div", {
+              className: "multiplayer-body",
+              children: [el("div", { className: "multiplayer-heading", children: [el("h1", { className: "shell-heading-title", text: "Multiplayer" }), statusText] }), layout],
+            }),
+            chatDock,
+            endGameModal.element,
+          ],
+        }),
+        "site",
+      )
+    : el("section", {
+        className: "game-screen multiplayer-screen",
         children: [
-          el("div", { className: "game-header-left multiplayer-header-left", children: [createBrandLockup(() => leaveScreen(options.onHome)), statusText] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, backButton] }),
+          el("header", {
+            className: "game-header multiplayer-header",
+            children: [
+              el("div", { className: "game-header-left multiplayer-header-left", children: [createBrandLockup(() => leaveScreen(options.onHome)), statusText] }),
+              el("div", { className: "game-header-actions", children: [dailyButton, backButton] }),
+            ],
+          }),
+          layout,
+          chatDock,
+          endGameModal.element,
         ],
-      }),
-      el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element, geoGuessrGameView.element] }),
-      chatDock,
-      endGameModal.element,
-    ],
-  });
+      });
 
   const storedSession = readStoredSession();
   if (storedSession) {
@@ -1005,6 +1035,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       gameView.destroy();
       mapTapGameView.destroy();
       geoGuessrGameView.destroy();
+      siteHeader?.destroy();
     },
   };
 }

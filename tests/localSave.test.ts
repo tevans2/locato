@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { indexCountries, type RawCountry } from "../src/core/countries";
 import { createGameEngine } from "../src/core/game";
-import { clearSoloSave, createSoloSave, hydrateGameState, LEGACY_SOLO_SAVE_KEY, readLatestSoloSave, readSoloSave, saveSoloGame, soloSaveKey } from "../src/storage/localSave";
+import { clearSoloRun, clearSoloSave, createSoloSave, persistSoloRun, hydrateGameState, LEGACY_SOLO_SAVE_KEY, readLatestSoloSave, readSoloSave, saveSoloGame, soloSaveKey } from "../src/storage/localSave";
 
 const countries = [
   { name: "Japan", code: "JP", aliases: [], continent: "Asia", flagSrc: "assets/flags/jp.svg", capital: "Tokyo", capitalAliases: [] },
@@ -96,6 +96,27 @@ describe("local save", () => {
     expect(other.getItem(soloSaveKey(["flags"], "countries"))).toBeNull();
     expect(readSoloSave(other, ["flags"])?.seed).toBe("old");
     expect(other.getItem(soloSaveKey(["flags"], "countries"))).not.toBeNull();
+  });
+});
+
+describe("timed runs and the practice save", () => {
+  it("never writes or clears the mode's practice save", () => {
+    const storage = new MemoryStorage();
+    const index = indexCountries(countries);
+    const practice = createGameEngine({ countryIndex: index, categoryIds: ["flags"], seed: "practice-run", now: 1000 });
+    practice.dispatch({ type: "SUBMIT_GUESS", value: index.byId[practice.getState().currentCountryId!]!.name, now: 1100 });
+    persistSoloRun(storage, index, practice.getState(), "practice", 1200);
+    const before = storage.getItem(soloSaveKey(["flags"]));
+    expect(before).not.toBeNull();
+
+    const timed = createGameEngine({ countryIndex: index, categoryIds: ["flags"], seed: "timed-run", now: 2000 });
+    persistSoloRun(storage, index, timed.getState(), "timed", 2100);
+    clearSoloRun(storage, ["flags"], "timed");
+    expect(storage.getItem(soloSaveKey(["flags"]))).toBe(before);
+    expect(readSoloSave(storage, ["flags"])?.seed).toBe("practice-run");
+
+    clearSoloRun(storage, ["flags"], "practice");
+    expect(readSoloSave(storage, ["flags"])).toBeNull();
   });
 });
 

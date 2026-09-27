@@ -10,15 +10,18 @@ import {
   type FriendsData,
   type PublicUser,
 } from "../../core/auth";
-import { buildStats } from "./StatsScreen";
+import { buildStats, signInPrompt } from "./StatsScreen";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
+import { createSitePage } from "../shell/SiteHeader";
+import { createYouHeading, createYouTabs, type YouTab } from "../components/youTabs";
+import "../../styles/you.css";
 
 export interface FriendsScreenOptions {
   /** Navigation shell (docs/navigation.md). */
-  readonly shell?: ShellContext;
-  readonly onBack: () => void;
-  readonly onDailyChallenge?: () => void;
+  readonly shell: ShellContext;
+  /** The Stats / Achievements tabs. */
+  readonly onOpenTab: (tab: Exclude<YouTab, "friends">) => void;
   readonly initialUsername?: string;
   readonly currentUsername?: string | null;
   readonly appOrigin?: string;
@@ -67,21 +70,32 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const outgoingSection = el("section", { className: "friend-section", children: [el("h2", { text: "Sent" }), outgoingList] });
   const friendsSection = el("section", { className: "friend-section", children: [el("h2", { text: "Friends" }), friendsList] });
 
-  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" }, on: { click: () => options.onBack() } });
-  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) }, on: { click: () => options.onDailyChallenge?.() } });
-
-  const element = el("section", {
-    className: "game-screen friends-screen",
-    children: [
-      ...(options.initialUsername ? [el("p", { className: "friend-link-hint", text: `Friend link opened for ${options.initialUsername}. Send a request when you're signed in.` })] : []),
-      el("header", { className: "friends-header", children: [el("h1", { text: "Friends" }), el("div", { className: "screen-header-actions", children: [dailyButton, backButton] })] }),
-      el("section", { className: "friend-section", children: [el("h2", { text: "Add a friend" }), addForm, addFeedback] }),
-      incomingSection,
-      outgoingSection,
-      friendsSection,
-      profilePanel,
-    ],
+  const heading = createYouHeading("Friends", "Add friends by username, see who's online and compare stats.");
+  const tabs = createYouTabs("friends", (tab) => {
+    if (tab !== "friends") options.onOpenTab(tab);
   });
+  const signedIn = options.shell.signedIn();
+  const body = el("div", {
+    className: "friends-screen friends-body",
+    children: signedIn
+      ? [
+          ...(options.initialUsername ? [el("p", { className: "friend-link-hint", text: `Friend link opened for ${options.initialUsername}. Send them a request below.` })] : []),
+          el("section", { className: "friend-section", children: [el("h2", { text: "Add a friend" }), addForm, addFeedback] }),
+          incomingSection,
+          outgoingSection,
+          friendsSection,
+          profilePanel,
+        ]
+      : [
+          signInPrompt(
+            options.shell,
+            options.initialUsername ? `Sign in to add ${options.initialUsername}` : "Sign in to add friends",
+            options.initialUsername ? "You opened a friend link. Sign in, then send them a request from here." : "Friends can see each other online, compare stats and invite each other to multiplayer games.",
+          ),
+        ],
+  });
+  const page = createSitePage(options.shell, { section: "you", id: "friends", className: "you-page", content: [heading.element, tabs.element, body] });
+  const element = page.element;
 
   function personRow(user: PublicUser, online: boolean | null, actions: readonly HTMLElement[], onProfile?: () => void): HTMLElement {
     const dot = online === null ? [] : [el("span", { className: `friend-status${online ? " is-online" : ""}`, attrs: { title: online ? "Online" : "Offline" } })];
@@ -225,14 +239,15 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
     }, 250);
   });
 
-  const unsubscribe = options.subscribe?.(() => void refresh());
-  void refresh();
+  const unsubscribe = signedIn ? options.subscribe?.(() => void refresh()) : undefined;
+  if (signedIn) void refresh();
 
   return {
     element,
     destroy: () => {
       if (searchTimer) clearTimeout(searchTimer);
       unsubscribe?.();
+      page.destroy();
     },
   };
 }

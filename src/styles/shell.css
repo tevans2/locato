@@ -1180,25 +1180,23 @@
   :is(#app, #shell-layer) .shell-progress-fill { transition: none; }
 }
 
-/* ---------- TEMPORARY: compete / atlas placeholder routes (replaced by the next wave) ---------- */
 
-#app .compete-placeholder-group :is(h2, ul) { margin: 0; padding: 0; }
-#app .compete-placeholder-groups { display: grid; gap: 34px; }
-#app .compete-placeholder-group h2 { margin-bottom: 12px; color: var(--brand); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
-#app .compete-placeholder-group ul { display: grid; list-style: none; border-top: 1px solid var(--border); }
-#app .compete-placeholder-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
-#app .compete-placeholder-mode.is-selected { background: linear-gradient(90deg, var(--accent-soft), transparent 60%); }
-#app .compete-placeholder-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--brand); }
-#app .compete-placeholder-copy { flex: 1 1 200px; display: grid; gap: 3px; min-width: 0; }
-#app .compete-placeholder-copy strong { font-size: 0.98rem; font-weight: 760; }
-#app .compete-placeholder-copy span { color: var(--muted); font-size: 0.82rem; }
-#app .compete-placeholder-mode .shell-btn { min-height: 40px; padding: 0 14px; font-size: 0.8rem; }
 
-@media (max-width: 700px) {
-  #app .compete-placeholder-copy { flex-basis: calc(100% - 60px); }
-  #app .compete-placeholder-mode .shell-btn { flex: 1 1 0; }
+/* Heading band: a title with a small related-page link ("Academy · Atlas →"). */
+#app .shell-heading-row { width: 100%; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+#app .shell-heading-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 750;
+  transition: border-color 140ms ease, background 140ms ease;
 }
-
-#app .shell-atlas-placeholder { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); }
-#app .shell-atlas-placeholder > .landing-screen-shell { flex: 1 1 auto; min-height: 0; height: auto; }
-#app .shell-atlas-placeholder .landing-topbar { display: none; }
+#app .shell-heading-link:hover { border-color: var(--brand); background: var(--accent-soft); }
+#app .shell-heading-link .shell-icon { color: var(--brand); transition: transform 180ms var(--shell-ease); }
+#app .shell-heading-link:hover .shell-icon { transform: translateX(2px); }

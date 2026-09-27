@@ -4,9 +4,8 @@ import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
-import { clearSoloSave, createSoloSave, hydrateGameState, isSoloSaveResumable, readLatestSoloSave, readSoloSave, saveSoloGame } from "../storage/localSave";
+import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
-import { confirmDialog } from "../ui/dom/confirm";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
@@ -19,9 +18,8 @@ import { createStatsScreen } from "../ui/screens/StatsScreen";
 import { createFriendsScreen } from "../ui/screens/FriendsScreen";
 import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClient";
 import type { SocialServerMessage } from "../core/social/socialProtocol";
-import { createLeaderboardScreen } from "../ui/screens/LeaderboardScreen";
+import { createCompeteScreen } from "../ui/screens/CompeteScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
-import { createFlagsScreen } from "../ui/screens/FlagsScreen";
 import { el } from "../ui/dom/createElement";
 import { createThemeToggle } from "../ui/theme";
 import { createSoundToggle } from "../ui/dom/sfx";
@@ -33,7 +31,6 @@ import { createShellControls } from "../ui/shell/controls";
 import { openGamePicker } from "../ui/shell/GamePicker";
 import { SECTION_ROUTES } from "../ui/shell/SiteHeader";
 import type { RunType, ShellContext } from "../ui/shell/types";
-import { createAtlasPlaceholderScreen, createCompetePlaceholderScreen } from "../ui/screens/ShellPlaceholderScreens";
 
 export interface AppOptions {
   readonly root: HTMLElement;
@@ -96,12 +93,6 @@ export function createApp(options: AppOptions): App {
     },
     onViewStats: () => navigate({ type: "stats" }),
     onViewFriends: () => navigate({ type: "friends" }),
-  });
-  const landingButton = el("button", {
-    className: "landing-return-action",
-    text: "Home",
-    attrs: { type: "button", "aria-label": "Go to the home page" },
-    on: { click: () => void confirmLeaveActiveScreen().then((leave) => { if (leave) navigate({ type: "landing" }); }) },
   });
   const themeToggle = createThemeToggle(options.storage);
   const soundToggle = createSoundToggle();
@@ -189,7 +180,6 @@ export function createApp(options: AppOptions): App {
     if (activeScreen?.element.dataset.shell) {
       // Shell screens carry their own controls in their header (or ⋯ menu).
       globalControls.remove();
-      landingButton.remove();
       shellControls.adoptAccount();
       options.root.append(authControls.panel);
       return;
@@ -198,7 +188,7 @@ export function createApp(options: AppOptions): App {
     // The immersive game has fixed contrast; the site theme remains available on other screens.
     globalControls.replaceChildren(soundToggle, ...(gamePreferences ? [] : [themeToggle]), authControls.trigger);
     (gamePreferences ?? options.root).append(globalControls);
-    options.root.append(landingButton, authControls.panel);
+    options.root.append(authControls.panel);
   }
 
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
@@ -252,6 +242,9 @@ export function createApp(options: AppOptions): App {
     if (showGlobalControls) attachGlobalControls();
   }
 
+  // The You tab the next Stats screen opens on (Friends → "Achievements" lands there).
+  let pendingStatsTab: "stats" | "achievements" = "stats";
+
   // The daily screen currently mounted while a daily is in progress (null otherwise), so the header
   // "Daily challenge" link doesn't restart a daily you're already playing.
   let activeDailyScreen: Screen | null = null;
@@ -264,7 +257,7 @@ export function createApp(options: AppOptions): App {
   /** Screens with unsaved state (a multiplayer room, a lesson) set data-leave-confirm to the question to ask. */
   function confirmLeaveActiveScreen(): Promise<boolean> {
     const message = activeScreen?.element.dataset.leaveConfirm;
-    return message ? confirmDialog(message, { confirmLabel: "Leave", cancelLabel: "Stay" }) : Promise.resolve(true);
+    return message ? shellConfirmDialog(message, { confirmLabel: "Leave", cancelLabel: "Stay" }) : Promise.resolve(true);
   }
 
   function showNotice(message: string): void {
@@ -284,21 +277,15 @@ export function createApp(options: AppOptions): App {
 
   function mountDailyResult(result: DailyResultSave): void {
     mount(
-      createDailyResultScreen({ shell,
-        result,
-        storage: options.storage,
-        onHome: () => navigate({ type: "landing" }),
-        // "Back to modes": the game list, not whichever solo run was last open.
-        onBackToSolo: () => navigate({ type: "landing" }),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
-      }),
+      createDailyResultScreen({ shell, result, storage: options.storage }),
     );
   }
 
   // Every mode keeps its own practice save and opening a mode always resumes it; a fresh run is an
   // explicit Restart. `_continueSaved` (the old `resume=1` flag) is still parsed but no longer needed.
-  async function startSolo(categoryIds: readonly string[] | undefined, _continueSaved = false, requestedFlagPool?: FlagPool): Promise<void> {
+  // A timed run (`&run=timed`, from Compete) always starts fresh and is never saved, so it can't
+  // overwrite or clear the mode's practice run (see persistSoloRun).
+  async function startSolo(categoryIds: readonly string[] | undefined, _continueSaved = false, requestedFlagPool?: FlagPool, requestedRun: RunType = "practice"): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your game…"));
     const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
@@ -306,9 +293,10 @@ export function createApp(options: AppOptions): App {
     // No mode given (landing "Resume game"): the most recently played mode.
     const latest = categoryIds ? null : readLatestSoloSave(options.storage);
     const resolved = resolveCategoryIds(categoryIds ?? latest?.categoryIds ?? DEFAULT_CATEGORY_IDS);
+    const soloRun: RunType = requestedRun === "timed" && resolved.length === 1 && isLeaderboardMode(resolved[0]!) ? "timed" : "practice";
     const requestedPool = requestedFlagPool === undefined ? undefined : normalizeFlagPool(requestedFlagPool);
     const lookupPool = resolved.includes("flags") ? requestedPool ?? (latest ? normalizeFlagPool(latest.flagPool) : undefined) : undefined;
-    const candidate = readSoloSave(options.storage, resolved, lookupPool);
+    const candidate = soloRun === "timed" ? null : readSoloSave(options.storage, resolved, lookupPool);
     const save = candidate && isSoloSaveResumable(candidate) ? candidate : null;
     const activeCategories = save ? save.categoryIds : resolved;
     const activeFlagPool = activeCategories.includes("flags") ? normalizeFlagPool(requestedPool ?? candidate?.flagPool) : DEFAULT_FLAG_POOL;
@@ -344,6 +332,7 @@ export function createApp(options: AppOptions): App {
         onOpenCountry: (code) => navigate({ type: "country-profile", code }),
         engine,
         selectedGameMode: promptGameModeFromCategoryIds(activeCategories),
+        run: soloRun,
         flagPool: activeFlagPool,
         onFlagPoolChange: (nextFlagPool) => {
           // Each flag set keeps its own run; switching resumes the other set's save.
@@ -357,10 +346,10 @@ export function createApp(options: AppOptions): App {
           // Record the finished run before starting a fresh one.
           void recordSoloSession(lastSoloState);
           lastSoloState = null;
-          clearSoloSave(options.storage, activeCategories, activeFlagPool);
+          clearSoloRun(options.storage, activeCategories, soloRun, activeFlagPool);
         },
         onStateChange: (state) => {
-          saveSoloGame(options.storage, promptCountryIndex, state, Date.now(), activeFlagPool);
+          persistSoloRun(options.storage, promptCountryIndex, state, soloRun, Date.now(), activeFlagPool);
           // A new seed means the previous session ended (reset / new game) — record it.
           if (lastSoloState && lastSoloState.seed !== state.seed) void recordSoloSession(lastSoloState);
           lastSoloState = state;
@@ -537,6 +526,7 @@ export function createApp(options: AppOptions): App {
           dailyChallenge: {
             date: challenge.date,
             round,
+            progress: { round: Math.min(DAILY_COUNTRY_COUNT, dailyMarks.length + 1), total: DAILY_COUNTRY_COUNT },
             onComplete: ({ missed, wrongGuesses }) => {
               dailyScore += scoreDailyRound(0, missed, wrongGuesses);
               addDailyMark(missed ? "miss" : wrongGuesses > 0 ? "hint" : "correct");
@@ -565,6 +555,7 @@ export function createApp(options: AppOptions): App {
           dailyChallenge: {
             date: challenge.date,
             target: location,
+            progress: { round: Math.min(DAILY_COUNTRY_COUNT, dailyMarks.length + 1), total: DAILY_COUNTRY_COUNT },
             onComplete: (mapTapResult) => {
               const points = scoreDailyMapTapRound(mapTapResult.score, mapTapResult.maxScore);
               dailyScore += points;
@@ -696,7 +687,7 @@ export function createApp(options: AppOptions): App {
     void task.catch((error: unknown) => { if (run === navigationRun) showLoadError(error); });
   }
 
-  async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all"): Promise<void> {
+  async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all", runType: RunType = "practice", continent?: string): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading world map...");
     mount(loading);
@@ -714,6 +705,8 @@ export function createApp(options: AppOptions): App {
           worldCountryFeatures,
           storage: options.storage,
           initialMode,
+          run: runType,
+          ...(continent ? { puzzleContinent: continent } : {}),
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -761,6 +754,7 @@ export function createApp(options: AppOptions): App {
     mount(
       createGeoGuessrScreen({ shell,
         countryIndex: options.countryIndex,
+        storage: options.storage,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -873,6 +867,7 @@ export function createApp(options: AppOptions): App {
         onStartLesson: startLesson,
         onStartPlacement: () => navigate({ type: "academy-placement" }),
         onOpenCountry: openCountry,
+        onOpenAtlas: () => navigate({ type: "atlas" }),
         onGroupChange: (groupId) => {
           const next: AppRoute = { type: "academy", ...(groupId ? { groupId } : {}) };
           const current = historyState();
@@ -904,19 +899,29 @@ export function createApp(options: AppOptions): App {
       onFlipCountry: (code) => navigate({ type: "country-profile", code: code.toUpperCase() }, { replace: true }),
       onStartLesson: startLesson,
       onOpenAcademy: openAcademy,
+      onOpenAtlas: () => returnTo({ type: "atlas" }),
     }));
   }
 
-  function startLeaderboard(mode?: GameModeId, variant?: string): void {
+  /** Learn → Atlas: the index of every country (lazy: it carries the profile data). */
+  async function startAtlas(): Promise<void> {
+    const run = navigationRun;
+    mount(createLoadingScreen("Opening the atlas…"));
+    const { createAtlasScreen } = await import("../ui/screens/AtlasScreen");
+    if (run !== navigationRun) return;
+    mount(createAtlasScreen({ shell, countryIndex: options.countryIndex, progressStore: academyProgress, onOpenAcademy: () => navigate({ type: "academy" }) }));
+  }
+
+  /** Compete (also the legacy `leaderboard` route). Picking a board replaces the URL, it doesn't push. */
+  function startCompete(mode?: GameModeId, variant?: string): void {
     mount(
-      createLeaderboardScreen({ shell,
+      createCompeteScreen({
+        shell,
         storage: options.storage,
-        ...(mode ? { initialMode: mode } : {}),
-        ...(variant ? { initialVariant: variant } : {}),
-        onHome: () => navigate({ type: "landing" }),
-        onBack: () => goBack(),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-        onSignIn: () => authControls.openPanel(),
+        ...(mode ? { mode } : {}),
+        ...(variant ? { variant } : {}),
+        onSelect: (nextMode, nextVariant) => replaceRoute({ type: "compete", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) }),
+        onMultiplayer: () => navigate({ type: "multiplayer" }),
       }),
     );
   }
@@ -928,61 +933,22 @@ export function createApp(options: AppOptions): App {
     if (navigateOptions?.replace) replaceRoute(route);
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {
-      mount(
-        createLandingScreen({ shell,
-          accountControl: authControls.trigger,
-          onHome: () => navigate({ type: "landing" }),
-          onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
-          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-          onGameMode: (gameMode) => handleGameModeChange(gameMode),
-          onFlags: () => navigate({ type: "flag-gallery" }),
-          onLeaderboard: () => navigate({ type: "leaderboard" }),
-          onMultiplayer: () => navigate({ type: "multiplayer" }),
-          onAcademy: () => navigate({ type: "academy" }),
-          storage: options.storage,
-        }),
-        false,
-      );
-      return;
-    }
-    if (route.type === "flag-gallery") {
-      mount(
-        createFlagsScreen({ shell,
-          countryIndex: options.countryIndex,
-          accountControl: authControls.trigger,
-          storage: options.storage,
-          onHome: () => navigate({ type: "landing" }),
-          onPlay: () => navigate({ type: "solo-game", categoryIds: ["flags"], continueSaved: false }),
-          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-          onMultiplayer: () => navigate({ type: "multiplayer" }),
-        }),
-        false,
-      );
+      mount(createLandingScreen({ shell, storage: options.storage }));
       return;
     }
     if (route.type === "solo-game") {
-      runNavigation(startSolo(route.categoryIds, route.continueSaved ?? false, route.flagPool));
+      runNavigation(startSolo(route.categoryIds, route.continueSaved ?? false, route.flagPool, route.run === "timed" ? "timed" : "practice"));
       return;
     }
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
-    // TEMPORARY placeholders for the new Compete and Atlas routes; the next wave builds them.
-    if (route.type === "compete") {
-      mount(createCompetePlaceholderScreen({ shell, ...(route.mode ? { mode: route.mode } : {}), onLeaderboard: (mode) => navigate({ type: "leaderboard", mode }) }));
+    if (route.type === "compete" || route.type === "leaderboard") {
+      startCompete(route.mode, route.variant);
       return;
     }
-    if (route.type === "atlas") {
-      const gallery = createFlagsScreen({ shell,
-        countryIndex: options.countryIndex,
-        // The shell header shows the account control; the gallery's own top bar is hidden.
-        accountControl: document.createElement("span"),
-        storage: options.storage,
-        onHome: () => navigate({ type: "landing" }),
-        onPlay: () => openGame("flags", "practice"),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
-      });
-      mount(createAtlasPlaceholderScreen({ shell, gallery }));
+    // `flag-gallery` is the legacy name for the Atlas (`?view=flags`).
+    if (route.type === "atlas" || route.type === "flag-gallery") {
+      runNavigation(startAtlas());
       return;
     }
     if (route.type === "daily-challenge") {
@@ -991,7 +957,7 @@ export function createApp(options: AppOptions): App {
     }
 
     if (route.type === "country-guessing") {
-      runNavigation(startCountryGuessing(route.mode ?? "name-all"));
+      runNavigation(startCountryGuessing(route.mode ?? "name-all", route.run === "timed" ? "timed" : "practice", route.continent));
       return;
     }
     if (route.type === "streetview-country") {
@@ -1019,7 +985,10 @@ export function createApp(options: AppOptions): App {
       const run = navigationRun;
       mount(createLoadingScreen("Gathering your discoveries…"));
       runNavigation(leavingSolo.then(() => {
-        if (run === navigationRun) mount(createStatsScreen({ shell, onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) }));
+        if (run !== navigationRun) return;
+        const initialTab = pendingStatsTab;
+        pendingStatsTab = "stats";
+        mount(createStatsScreen({ shell, storage: options.storage, initialTab, onFriends: () => navigate({ type: "friends" }) }));
       }));
       return;
     }
@@ -1027,8 +996,10 @@ export function createApp(options: AppOptions): App {
     if (route.type === "friends") {
       const currentUser = authControls.getUser();
       mount(createFriendsScreen({ shell,
-        onBack: () => goBack(),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        onOpenTab: (tab) => {
+          pendingStatsTab = tab;
+          navigate({ type: "stats" });
+        },
         ...(route.username ? { initialUsername: route.username } : {}),
         currentUsername: currentUser?.displayName ?? null,
         appOrigin: window.location.origin,
@@ -1036,11 +1007,6 @@ export function createApp(options: AppOptions): App {
           if (message.type !== "GAME_INVITE") listener();
         }),
       }));
-      return;
-    }
-
-    if (route.type === "leaderboard") {
-      startLeaderboard(route.mode, route.variant);
       return;
     }
 

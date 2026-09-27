@@ -1,0 +1,41 @@
+/* Daily → today's result, as a site page. The panel's inner blocks keep their game.css look. */
+
+#app #daily-result .daily-result-panel {
+  width: min(720px, 100%);
+  margin: 0;
+  padding-top: clamp(28px, 5vw, 52px);
+  gap: 20px;
+}
+
+#app #daily-result .daily-result-kicker {
+  margin: 0;
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#app #daily-result .daily-result-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  font-family: var(--font-editorial);
+  font-size: clamp(4.2rem, 13vw, 7rem);
+  font-weight: 430;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+#app #daily-result .daily-result-score strong { font-weight: inherit; }
+#app #daily-result .daily-result-score span { color: var(--muted); font-size: 0.34em; letter-spacing: -0.02em; }
+
+#app #daily-result .daily-result-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#app #daily-result .daily-result-stats article { min-width: 0; background: var(--surface); border-color: var(--border); }
+
+#app #daily-result .daily-result-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+@media (max-width: 520px) {
+  #app #daily-result .daily-result-actions .shell-btn { flex: 1 1 0; }
+}

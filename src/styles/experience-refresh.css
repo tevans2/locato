@@ -834,10 +834,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   box-shadow: none;
 }
 
-.leaderboard-screen .leaderboard-layout {
-  max-width: 900px;
-}
-
 .leaderboard-row {
   border-radius: 0;
 }
