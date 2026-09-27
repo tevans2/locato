@@ -7,26 +7,10 @@
   padding: 20px 16px 48px;
 }
 
-.friends-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
-}
-
 .friend-link-hint {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
-}
-
-.friends-header h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  letter-spacing: 0;
 }
 
 .friend-section {
@@ -255,21 +239,12 @@
   gap: 14px;
 }
 
-
 @media (max-width: 700px) {
   .friends-screen {
     gap: 10px;
     max-width: none;
     margin: 0;
     padding: 4px 0 28px;
-  }
-
-  .friends-header {
-    gap: 10px;
-  }
-
-  .friends-header h1 {
-    font-size: 1.05rem;
   }
 
   .friend-section,

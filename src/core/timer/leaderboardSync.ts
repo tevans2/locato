@@ -12,6 +12,8 @@ export interface TimedRunPosting {
   readonly serverAccepted: boolean | null;
   /** Signed in: your rank after posting. Guest: where this time would place. null when unknown or offline. */
   readonly rank: number | null;
+  /** Signed in but the post didn't go through (offline, or the server rejected the time). */
+  readonly failed?: true;
 }
 
 /** Post a finished timed run (signed in) or look up where it would place (guest). Never throws. */
@@ -26,7 +28,8 @@ export async function postTimedRun(input: {
     return { serverAccepted: null, rank: placement?.rank ?? null };
   }
   const result = await submitBestTime({ gameMode: input.gameMode, variant: input.variant, timeMs: input.timeMs });
-  return { serverAccepted: result?.accepted ?? false, rank: result?.rank ?? null };
+  if (!result) return { serverAccepted: false, rank: null, failed: true };
+  return { serverAccepted: result.accepted, rank: result.rank ?? null };
 }
 
 export function timerLeaderboardNote(result: TimerLeaderboardResult, isLoggedIn: boolean): string {

@@ -122,7 +122,8 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
       className: "shell-menu-item",
       attrs: { type: "button", role: "menuitem", ...extra },
       children: [el("span", { className: "shell-menu-icon", children: [shellIcon(iconName, 18)] }), el("span", { className: "shell-menu-label", text: label })],
-      on: { click: () => { closeMenu(false); onSelect(); } },
+      // Focus goes back to ⋯ first, so a dialog the row opens returns focus there, not to a hidden row.
+      on: { click: () => { closeMenu(); onSelect(); } },
     });
 
   const topRows: HTMLButtonElement[] = [];

@@ -23,6 +23,7 @@ describe("timed run posting", () => {
   it("stays quiet about rank when offline", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     const posting = await postTimedRun({ gameMode: "flags", variant: "", timeMs: 90_000, isLoggedIn: true });
-    expect(posting).toEqual({ serverAccepted: false, rank: null });
+    expect(posting).toEqual({ serverAccepted: false, rank: null, failed: true });
+    expect(timedPostingLine({ isNewLocalBest: true, ...posting })).toMatch(/^New personal best\. Couldn't post this time/);
   });
 });

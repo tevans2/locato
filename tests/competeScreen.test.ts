@@ -35,6 +35,7 @@ function entries(count: number, start = 1, you?: number) {
 interface FetchSetup {
   readonly signedIn?: boolean;
   readonly board?: (url: URL) => unknown | null;
+  readonly friends?: unknown;
 }
 
 function mockFetch(setup: FetchSetup = {}) {
@@ -53,6 +54,7 @@ function mockFetch(setup: FetchSetup = {}) {
       return new Response(JSON.stringify({ accepted: true, isPersonalBest: true, rank: 3, bestTimeMs: 61_000 }));
     }
     if (url.pathname === "/api/leaderboard/rank") return new Response(JSON.stringify({ rank: 4, total: 9 }));
+    if (url.pathname === "/api/friends") return new Response(JSON.stringify(setup.friends ?? { friends: [], incoming: [], outgoing: [] }));
     return new Response("{}", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -74,6 +76,7 @@ const q = <T extends Element = HTMLElement>(selector: string) => document.queryS
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -81,10 +84,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Compete screen", () => {
+describe("Compete screen: Leaderboards tab", () => {
   it("lists the nine leaderboard modes grouped as Clues and Map", async () => {
     mockFetch();
-    mount({ shell: makeShell() });
+    mount({ shell: makeShell(), tab: "leaderboards" });
     await flush();
     const groups = [...document.querySelectorAll(".compete-rail-group")];
     expect(groups.map((group) => group.querySelector("h2")?.textContent)).toEqual(["Clues", "Map"]);
@@ -97,7 +100,7 @@ describe("Compete screen", () => {
   it("selecting a mode reports it for a URL replace and reloads the board", async () => {
     const { requests } = mockFetch();
     const onSelect = vi.fn();
-    mount({ shell: makeShell(), onSelect });
+    mount({ shell: makeShell(), tab: "leaderboards", onSelect });
     await flush();
     q<HTMLButtonElement>(".compete-rail-item[data-mode='puzzle']")!.click();
     expect(onSelect).toHaveBeenLastCalledWith("puzzle", "Africa");
@@ -199,7 +202,7 @@ describe("Compete screen", () => {
   it("shows empty and error states, and retries", async () => {
     let fail = true;
     mockFetch({ board: () => (fail ? null : { entries: [], currentUser: null }) });
-    mount({ shell: makeShell() });
+    mount({ shell: makeShell(), tab: "leaderboards" });
     await flush();
     expect(q(".compete-board")?.dataset.state).toBe("error");
     expect(q(".compete-board-state")?.textContent).toContain("Couldn't load the leaderboard");
@@ -210,16 +213,166 @@ describe("Compete screen", () => {
     expect(q(".compete-board-state")?.textContent).toContain("No times on this board yet");
   });
 
-  it("shows the Race friends card only when multiplayer is wired", async () => {
+  it("labels the panel a solo timed attempt and links across to a live match", async () => {
+    mockFetch();
+    const onTab = vi.fn();
+    mount({ shell: makeShell(), mode: "capitals", onTab });
+    await flush();
+    expect(q(".compete-eyebrow")?.textContent).toBe("Clues · Solo timed attempt");
+    q<HTMLButtonElement>(".compete-cross [data-go-tab='multiplayer']")!.click();
+    expect(onTab).toHaveBeenLastCalledWith("multiplayer", "capitals", "");
+    expect(q<HTMLElement>("#compete-panel-multiplayer")!.hidden).toBe(false);
+  });
+});
+
+const friend = (id: string, username: string, online: boolean) => ({ user: { id, username, avatarEmoji: online ? "🐼" : null }, online });
+
+describe("Compete screen: tabs", () => {
+  it("opens on Multiplayer and only fetches boards once Leaderboards is shown", async () => {
+    const { requests } = mockFetch();
+    const onTab = vi.fn();
+    mount({ shell: makeShell(), onTab, onCreateRoom: vi.fn() });
+    await flush();
+    const tabs = [...document.querySelectorAll<HTMLElement>("[role='tab']")];
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["MultiplayerLive match with friendsLive", "LeaderboardsSolo timed attempt"]);
+    expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(q<HTMLElement>("#compete-panel-multiplayer")!.hidden).toBe(false);
+    expect(q<HTMLElement>("#compete-panel-leaderboards")!.hidden).toBe(true);
+    expect(requests.some((url) => url.pathname === "/api/leaderboard")).toBe(false);
+
+    tabs[1]!.click();
+    await flush();
+    expect(onTab).toHaveBeenLastCalledWith("leaderboards", "flags", "");
+    expect(q<HTMLElement>("#compete-panel-leaderboards")!.hidden).toBe(false);
+    expect(q("#compete")?.getAttribute("data-tab")).toBe("leaderboards");
+    expect(requests.some((url) => url.pathname === "/api/leaderboard")).toBe(true);
+  });
+
+  it("treats a board link (a mode) as the Leaderboards tab", async () => {
+    mockFetch();
+    mount({ shell: makeShell(), mode: "puzzle", variant: "Asia" });
+    await flush();
+    expect(q("#compete-tab-leaderboards")?.getAttribute("aria-selected")).toBe("true");
+    expect(q<HTMLElement>("#compete-panel-multiplayer")!.hidden).toBe(true);
+  });
+
+  it("moves between tabs with the arrow keys", async () => {
+    mockFetch();
+    mount({ shell: makeShell() });
+    const list = q(".compete-tabs")!;
+    list.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(q("#compete-tab-leaderboards")?.getAttribute("aria-selected")).toBe("true");
+    expect(q<HTMLElement>("#compete-tab-leaderboards")!.tabIndex).toBe(0);
+    list.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+    expect(q("#compete-tab-multiplayer")?.getAttribute("aria-selected")).toBe("true");
+  });
+});
+
+describe("Compete screen: Multiplayer tab", () => {
+  it("asks a guest for a name before creating a room, then remembers it", async () => {
+    mockFetch();
+    const onCreateRoom = vi.fn();
+    mount({ shell: makeShell(), onCreateRoom });
+    await flush();
+    const create = q<HTMLButtonElement>(".compete-create")!;
+    expect(create.textContent).toBe("Create a room");
+    create.click();
+    expect(onCreateRoom).not.toHaveBeenCalled();
+    expect(q<HTMLElement>(".compete-field-error")!.hidden).toBe(false);
+    const name = q<HTMLInputElement>(".compete-name-input")!;
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    name.value = "  Sam  ";
+    name.dispatchEvent(new Event("input"));
+    create.click();
+    expect(onCreateRoom).toHaveBeenCalledWith(undefined);
+    expect(window.localStorage.getItem("locato.mp.name")).toBe("Sam");
+  });
+
+  it("prefills the remembered name and joins by code or pasted invite link", async () => {
+    mockFetch();
+    window.localStorage.setItem("locato.mp.name", "Ana");
+    const onJoinRoom = vi.fn();
+    mount({ shell: makeShell(), onJoinRoom, onCreateRoom: vi.fn() });
+    await flush();
+    expect(q<HTMLInputElement>(".compete-name-input")!.value).toBe("Ana");
+    const input = q<HTMLInputElement>(".compete-join-input")!;
+    const form = q<HTMLFormElement>(".compete-join")!;
+    input.value = "ab";
+    form.requestSubmit();
+    expect(onJoinRoom).not.toHaveBeenCalled();
+    expect(q(".compete-join .compete-field-hint")?.classList.contains("is-error")).toBe(true);
+    input.value = "https://locato.app/?room=k7qmr";
+    form.requestSubmit();
+    expect(onJoinRoom).toHaveBeenLastCalledWith("K7QMR");
+    input.value = " x2 d4q ";
+    form.requestSubmit();
+    expect(onJoinRoom).toHaveBeenLastCalledWith("X2D4Q");
+  });
+
+  it("shows a signed-in player's friends online, each with a create-and-invite button", async () => {
+    mockFetch({ signedIn: true, friends: { friends: [friend("u1", "ben", true), friend("u2", "kofi", false), friend("u3", "ana", true)], incoming: [], outgoing: [] } });
+    const onCreateRoom = vi.fn();
+    mount({ shell: makeShell(true), onCreateRoom });
+    await flush();
+    expect(q<HTMLElement>(".compete-name-field")!.hidden).toBe(true);
+    expect(q(".compete-playing-as")?.textContent).toContain("Tate");
+    const rows = [...document.querySelectorAll<HTMLElement>(".compete-online-row")];
+    expect(rows.map((row) => row.dataset.user)).toEqual(["u1", "u3"]);
+    expect(q(".compete-online-count")?.textContent).toBe("2");
+    rows[1]!.querySelector<HTMLButtonElement>(".compete-invite")!.click();
+    expect(onCreateRoom).toHaveBeenCalledWith({ inviteUserId: "u3" });
+    // Signed in: no name is needed (the server uses the account name).
+    q<HTMLButtonElement>(".compete-create")!.click();
+    expect(onCreateRoom).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("refetches friends on presence changes and unsubscribes on destroy", async () => {
+    let online = false;
+    mockFetch({ signedIn: true, friends: undefined });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === "/auth/me") return new Response(JSON.stringify({ user: ME, stats: {} }));
+      if (url.pathname === "/api/friends") return new Response(JSON.stringify({ friends: [friend("u1", "ben", online)], incoming: [], outgoing: [] }));
+      return new Response("{}", { status: 404 });
+    }));
+    let listener: (() => void) | null = null;
+    const unsubscribe = vi.fn();
+    const screen = mount({ shell: makeShell(true), onCreateRoom: vi.fn(), onFriends: vi.fn(), subscribeFriends: (next) => { listener = next; return unsubscribe; } });
+    await flush();
+    expect(q(".compete-online")?.textContent).toContain("Your friend isn't online right now");
+    online = true;
+    listener!();
+    await flush();
+    expect(document.querySelectorAll(".compete-online-row")).toHaveLength(1);
+    screen.destroy();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("nudges guests to sign in for friends, and offers the way back into a room in progress", async () => {
+    mockFetch();
+    window.sessionStorage.setItem("locato.mp.session", JSON.stringify({ roomCode: "K7QMR", playerId: "p1", sessionToken: "t" }));
+    const shell = makeShell();
+    const onRejoinRoom = vi.fn();
+    mount({ shell, onRejoinRoom, onCreateRoom: vi.fn() });
+    await flush();
+    q<HTMLButtonElement>(".compete-online-signin")!.click();
+    expect(shell.calls).toContain("account");
+    expect(q(".compete-rejoin")?.textContent).toContain("room K7QMR");
+    q<HTMLButtonElement>(".compete-rejoin-action")!.click();
+    expect(onRejoinRoom).toHaveBeenCalledOnce();
+  });
+
+  it("links to the full room setup and across to the solo leaderboards", async () => {
     mockFetch();
     const onMultiplayer = vi.fn();
-    mount({ shell: makeShell(), onMultiplayer });
+    const onTab = vi.fn();
+    mount({ shell: makeShell(), onMultiplayer, onTab, onCreateRoom: vi.fn() });
     await flush();
-    q<HTMLButtonElement>(".compete-friends-action")!.click();
+    q<HTMLButtonElement>(".compete-custom")!.click();
     expect(onMultiplayer).toHaveBeenCalledOnce();
-    document.body.replaceChildren();
-    mount({ shell: makeShell() });
-    expect(q(".compete-friends")).toBeNull();
+    q<HTMLButtonElement>(".compete-cross-band")!.click();
+    expect(onTab).toHaveBeenLastCalledWith("leaderboards", "flags", "");
+    expect(q<HTMLElement>("#compete-panel-leaderboards")!.hidden).toBe(false);
   });
 });
 

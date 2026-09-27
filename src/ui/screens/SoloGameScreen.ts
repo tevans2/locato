@@ -265,13 +265,13 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
-    const { serverAccepted, rank } = await postTimedRun({
+    const posting = await postTimedRun({
       gameMode: options.selectedGameMode,
       variant: leaderboardVariant,
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
-    return { isNewLocalBest, serverAccepted, rank };
+    return { isNewLocalBest, ...posting };
   }
 
   function applyEvents(events: readonly GameEvent[]): void {

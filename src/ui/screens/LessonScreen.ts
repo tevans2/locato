@@ -106,7 +106,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   const random = options.random ?? createSeededRandom(createRandomSeed());
   const now = options.now ?? (() => Date.now());
   const abort = new AbortController();
-  const root = el("section", { className: "lx lesson-screen", attrs: { "data-phase": "loading", "aria-label": "Academy lesson" } });
+  const root = el("section", { className: "lx lesson-screen", attrs: { "data-shell": "focus", "data-phase": "loading", "aria-label": "Academy lesson" } });
   const announcer = el("p", { className: "lx-sr-only", attrs: { "aria-live": "polite" } });
 
   const startProgress = progressStore.get();

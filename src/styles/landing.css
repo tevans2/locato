@@ -3,11 +3,6 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .landing-screen-shell { width: 100%; height: 100%; overflow: hidden; min-height: 0; color: var(--text); }
 .landing-root { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
 .brand-period { color: var(--brand); }
-.theme-switch { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); box-shadow: none; cursor: pointer; }
-.theme-switch-label { font-size: .7rem; font-weight: 600; }
-.theme-switch-track { display: block; position: relative; width: 31px; height: 18px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-soft); }
-.theme-switch-thumb { position: absolute; left: 3px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); transition: transform 160ms ease; }
-:root[data-theme="dark"] .theme-switch-thumb { transform: translateX(13px); }
 .lp-btn { display: inline-flex; justify-content: center; align-items: center; gap: 13px; min-height: 48px; padding: 0 21px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: transparent; font-size: .82rem; font-weight: 700; text-decoration: none; cursor: pointer; transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 .lp-btn:hover { background: var(--surface-soft); transform: translateY(-2px); }
 .lp-btn-primary { color: var(--on-brand); background: var(--brand); border-color: var(--brand); }

@@ -10,8 +10,6 @@ import "../../styles/shell.css";
  */
 export interface ShellControls {
   readonly element: HTMLElement;
-  /** Put the shared account trigger back into the cluster (legacy screens borrow it). */
-  readonly adoptAccount: () => void;
   readonly destroy: () => void;
 }
 
@@ -50,17 +48,13 @@ function themeButton(storage: Storage | undefined, signal: AbortSignal): HTMLBut
 
 export function createShellControls(options: { readonly storage?: Storage; readonly account?: HTMLElement }): ShellControls {
   const controller = new AbortController();
-  const accountSlot = el("span", { className: "shell-account-slot" });
+  const accountSlot = el("span", { className: "shell-account-slot", children: options.account ? [options.account] : [] });
   const element = el("div", {
     className: "shell-controls",
     attrs: { role: "group", "aria-label": "Sound, theme and account" },
     children: [soundButton(controller.signal), themeButton(options.storage, controller.signal), accountSlot],
   });
-  const adoptAccount = (): void => {
-    if (options.account && options.account.parentElement !== accountSlot) accountSlot.append(options.account);
-  };
-  adoptAccount();
-  return { element, adoptAccount, destroy: () => controller.abort() };
+  return { element, destroy: () => controller.abort() };
 }
 
 /**

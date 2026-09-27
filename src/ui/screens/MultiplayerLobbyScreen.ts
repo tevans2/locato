@@ -11,6 +11,7 @@ import type { AuthControls } from "../components/AuthPanel";
 import { getPlayerEmoji } from "../../core/auth/avatars";
 import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
+import { MULTIPLAYER_SESSION_KEY, readPlayerName, writePlayerName } from "../../core/multiplayer/localPlayer";
 import { confirmDialog } from "../shell/confirmDialog";
 import { createSiteHeader, markShellScreen } from "../shell";
 import { enhanceDropdown } from "../dom/dropdown";
@@ -32,11 +33,17 @@ export interface MultiplayerLobbyScreenOptions {
   readonly authControls?: AuthControls;
   // When set, auto-join this room code on mount (used by friend game invites).
   readonly initialJoinCode?: string;
+  /** Compete › "Create a room": create a room with the default settings as soon as the lobby opens. */
+  readonly autoCreate?: boolean;
+  /** With `autoCreate`: invite this friend (user id) once the room exists. */
+  readonly inviteUserId?: string;
+  /** Remembers the name a guest plays under (shared with Compete). */
+  readonly storage?: Storage;
 }
 
 // Ephemeral reconnect credentials. Kept in sessionStorage so a page reload or a dropped socket
 // can reclaim the same server-side player slot (and score) instead of spawning a new identity.
-const SESSION_STORAGE_KEY = "locato.mp.session";
+const SESSION_STORAGE_KEY = MULTIPLAYER_SESSION_KEY;
 
 interface StoredSession {
   readonly roomCode: string;
@@ -315,7 +322,15 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   let allowSessionPersistence = false;
   let feedback = "Create a room or join with a code.";
 
-  const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: "Player" } });
+  const nameInput = el("input", { attrs: { type: "text", autocomplete: "nickname", maxlength: "32", placeholder: "Player name", value: readPlayerName(options.storage) ?? options.authControls?.getUser()?.displayName ?? "Player" } });
+  /** The name to send; a guest's typed name is remembered for next time (and for Compete). */
+  const claimPlayerName = (): string => {
+    const value = nameInput.value.trim();
+    if (value && value !== "Player") writePlayerName(options.storage, value);
+    return value || "Player";
+  };
+  // Compete › Invite: sent once, as soon as this player's new room exists.
+  let pendingInviteUserId: string | null = options.autoCreate ? options.inviteUserId ?? null : null;
   const joinCodeInput = el("input", { attrs: { type: "text", autocomplete: "off", maxlength: "12", placeholder: "Room code" } });
   const roundLimitSelect = el("select", {
     attrs: { "aria-label": "Rounds" },
@@ -666,6 +681,18 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     // once per room, then re-filtered every render so anyone in the lobby is excluded live.
     const authed = options.authControls?.getUser() != null;
     const showInvites = room.status === "lobby" && authed;
+    if (pendingInviteUserId && room.status === "lobby" && localPlayerId === room.hostPlayerId) {
+      const inviteeId = pendingInviteUserId;
+      const code = room.roomCode;
+      pendingInviteUserId = null;
+      void inviteFriendToGame(inviteeId, code).then((ok) => {
+        if (controller.signal.aborted) return;
+        if (ok) invited.add(inviteeId);
+        inviteSignature = ""; // rebuild the invite buttons with the new state
+        feedback = ok ? "Invite sent. They'll see it wherever they are in locato." : "Couldn't send that invite. Share the code instead.";
+        render();
+      });
+    }
     inviteSection.hidden = !showInvites;
     if (showInvites) {
       if (invitesLoadedFor !== room.roomCode) {
@@ -841,7 +868,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     "click",
     () => {
       allowSessionPersistence = true;
-      const playerName = nameInput.value.trim() || "Player";
+      const playerName = claimPlayerName();
       connectWith(options.createOnlineTransport(), () =>
         transport?.send({
           type: "CREATE_ROOM",
@@ -860,7 +887,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     "click",
     () => {
       allowSessionPersistence = true;
-      const playerName = nameInput.value.trim() || "Player";
+      const playerName = claimPlayerName();
       const roomCodeValue = joinCodeInput.value.trim();
       if (!roomCodeValue) {
         feedback = "Enter a room code to join online.";
@@ -984,7 +1011,35 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
             siteHeader.element,
             el("div", {
               className: "multiplayer-body",
-              children: [el("div", { className: "multiplayer-heading", children: [el("h1", { className: "shell-heading-title", text: "Multiplayer" }), statusText] }), layout],
+              children: [
+                el("div", {
+                  className: "multiplayer-heading",
+                  children: [
+                    el("div", {
+                      className: "multiplayer-title-block",
+                      children: [
+                        el("nav", {
+                          className: "multiplayer-crumbs",
+                          attrs: { "aria-label": "Breadcrumb" },
+                          children: [
+                            el("button", {
+                              className: "multiplayer-crumb",
+                              attrs: { type: "button" },
+                              text: "Compete",
+                              on: { click: () => leaveScreen(() => options.shell?.openSection("compete")) },
+                            }),
+                            el("span", { className: "multiplayer-crumb-sep", text: "›", attrs: { "aria-hidden": "true" } }),
+                            el("span", { className: "multiplayer-crumb-current", text: "Multiplayer", attrs: { "aria-current": "page" } }),
+                          ],
+                        }),
+                        el("h1", { className: "shell-heading-title", text: "Multiplayer" }),
+                      ],
+                    }),
+                    statusText,
+                  ],
+                }),
+                layout,
+              ],
             }),
             chatDock,
             endGameModal.element,
@@ -1021,8 +1076,12 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     // Arrived via a friend's game invite: join their room straight away.
     const code = options.initialJoinCode;
     joinCodeInput.value = code;
-    const playerName = nameInput.value.trim() || "Player";
+    const playerName = claimPlayerName();
     connectWith(options.createOnlineTransport(), () => transport?.send({ type: "JOIN_ROOM", roomCode: code, playerName }));
+  } else if (options.autoCreate) {
+    // Compete › "Create a room": straight into a new room with the default settings.
+    feedback = "Opening your room…";
+    createButton.click();
   }
 
   render();

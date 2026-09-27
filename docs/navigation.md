@@ -11,10 +11,26 @@ shell components (`src/ui/shell/`) and every screen build against.
 | **Play** (home) | `/` (landing), every game route | All 14 modes as **practice**: no clock, no leaderboard, play at your own pace. Resume. |
 | **Daily** | `?view=daily-challenge` | Today's 10-round challenge, streak and result. |
 | **Learn** | `?view=academy…`, `?view=atlas`, `?country=xx` | Academy, lessons, placement, and the Atlas: an index of every country (the old flag gallery) plus each country's profile. |
-| **Compete** | `?view=compete[&mode=&variant=]`, timed game routes, `?view=multiplayer`, `?room=` | Timed runs that post to a leaderboard, the leaderboards themselves, and multiplayer. |
+| **Compete** | `?view=compete[&tab=leaderboards][&mode=&variant=]`, timed game routes, `?view=multiplayer[&create=1]`, `?room=` | Two ways to play for keeps: **Multiplayer** (a live match with friends, the default tab) and **Leaderboards** (a solo timed attempt that posts to a global board). |
 | **You** | `?view=stats`, `?view=friends` | Stats, achievements, friends, account. |
 
 `?view=leaderboard` and `?view=flags` stay as aliases (to Compete and Atlas) so old links work.
+
+### Compete: Multiplayer vs Leaderboards
+
+Compete opens on two tabs, and the words keep them apart: **Multiplayer · Live match with friends**
+and **Leaderboards · Solo timed attempt**. Multiplayer is the default and the most prominent.
+
+- **Multiplayer** (`?view=compete`): "Create a room" opens the lobby straight into a new room with
+  the default settings (`?view=multiplayer&create=1`, replaced by `?view=multiplayer` once it
+  opens); "Have a code?" joins (`?room=CODE`, pasted invite links work); friends online each get
+  **Invite** (creates a room, then invites them: `&invite=<userId>`); "Pick modes, rounds and timer
+  first" opens the full setup. Guests can play: they pick a name (remembered on the device).
+  A tab still seated in a room gets "Back to room".
+- **Leaderboards** (`?view=compete&tab=leaderboards`): the modes, boards, your best and Start timed
+  run. Any `&mode=` (old board links, "Try it timed →") also opens this tab. Switching tab or board
+  replaces the URL. Boards are fetched only once this tab is shown.
+- The lobby's heading reads **Compete › Multiplayer**.
 
 ### Practice vs timed
 

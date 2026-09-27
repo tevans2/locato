@@ -46,6 +46,33 @@
 
 #multiplayer .multiplayer-heading .shell-heading-title { margin: 0; font-size: clamp(2rem, 4vw, 3rem); }
 
+/* Compete › Multiplayer: the lobby reads as part of Compete. */
+#multiplayer .multiplayer-title-block { display: grid; gap: 4px; }
+#multiplayer .multiplayer-crumbs { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+#multiplayer .multiplayer-crumbs .multiplayer-crumb {
+  appearance: none;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  box-shadow: none;
+  color: var(--brand);
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--brand) 35%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+#multiplayer .multiplayer-crumbs .multiplayer-crumb:hover { text-decoration-color: currentColor; }
+#multiplayer .multiplayer-crumbs .multiplayer-crumb:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+#multiplayer .multiplayer-crumb-sep { color: var(--subtle); }
+
 /* Setup and lobby read as a normal page (the page scrolls); a game in progress fills the view. */
 #multiplayer .multiplayer-body:has(> .multiplayer-layout > :is(.multiplayer-setup, .lobby-panel):not([hidden])) { flex: none; }
 #multiplayer .multiplayer-layout:has(> :is(.multiplayer-setup, .lobby-panel):not([hidden])) { flex: none; overflow: visible; }

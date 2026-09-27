@@ -118,7 +118,7 @@ describe("CountryGuessingScreen practice vs timed", () => {
     type("Brazil");
     type("Kenya");
     const card = root.querySelector(".shell-results")!;
-    expect(card.querySelector(".shell-results-kicker")?.textContent).toBe("Name all countries · Timed run");
+    expect(card.querySelector(".shell-results-kicker")?.textContent).toBe("Name all countries · Solo timed run");
     expect(card.querySelector(".shell-results-primary")?.textContent).toBe("Run again");
     [...card.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "View leaderboard")!.click();
     expect(shell.calls).toContain("compete:name-all");

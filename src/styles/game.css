@@ -7,39 +7,10 @@
   flex: 0 0 auto;
 }
 
-.mode-controls {
-  width: min(720px, 100%);
-  display: grid;
-  gap: 7px;
-  justify-items: end;
-}
-
-.mode-select-row {
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  gap: 8px;
-  width: 100%;
-}
-
-.mode-select-row > .category-dropdown {
-  flex: 0 1 300px;
-  margin-right: auto;
-}
-
 .mode-select {
   width: auto;
   min-width: 172px;
   background-color: rgba(255,255,255,0.035);
-}
-
-.mode-description {
-  max-width: 520px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.35;
-  text-align: right;
 }
 .category-dropdown {
   position: relative;
@@ -271,7 +242,6 @@
   stroke-width: 1.35;
   filter: drop-shadow(0 0 6px rgba(146, 61, 40, 0.3));
 }
-
 
 .capital-recall-marker {
   opacity: 0;
@@ -701,18 +671,6 @@
   color: var(--accent);
 }
 
-.daily-badge {
-  min-height: 42px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 14px;
-  border: 1px solid rgba(217, 217, 214, 0.14);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.035);
-  font-weight: 760;
-}
-
 .daily-result-screen {
   justify-content: flex-start;
   overflow: auto;
@@ -892,8 +850,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.answer-panel .progress-card,
-.answer-panel .country-guess-mode-card {
+.answer-panel .progress-card {
   grid-column: 1 / -1;
 }
 
@@ -1056,11 +1013,6 @@
 
 .mobile-extras-panel {
   display: contents;
-}
-
-.mobile-nav-trigger,
-.mobile-nav-sheet {
-  display: none;
 }
 
 .hint-popover {
@@ -1328,28 +1280,6 @@
   white-space: nowrap;
 }
 
-.country-guess-mode-card {
-  gap: 8px;
-}
-
-.country-guess-mode-card .stat-label {
-  margin-right: 0;
-}
-
-.country-guess-timer-select {
-  min-height: 30px;
-  min-width: 112px;
-  padding: 0 34px 0 10px;
-  font-size: 0.76rem;
-  font-weight: 720;
-  background-color: rgba(255, 255, 255, 0.045);
-}
-
-.country-guess-stats.timer-is-active .country-guess-mode-card {
-  border-color: rgba(184, 227, 109, 0.34);
-  background: rgba(184, 227, 109, 0.06);
-}
-
 .country-guess-panel .actions {
   justify-content: flex-start;
 }
@@ -1421,19 +1351,6 @@
 
 .country-guess-screen [hidden] {
   display: none !important;
-}
-
-.country-guess-category-dropdown {
-  justify-self: end;
-  width: min(300px, 100%);
-}
-
-.country-guess-category-dropdown .category-dropdown-selected {
-  flex: 1 1 auto;
-}
-
-.world-map-mode-option {
-  width: 100%;
 }
 
 .world-map-panel.is-click-country-mode .world-map-svg:not(.is-panning) {
@@ -1766,10 +1683,7 @@
   }
 
   .game-header .nav-action,
-  .game-header .game-mode-dropdown .category-dropdown-summary,
-  .game-header .daily-badge,
-  .stats-header .screen-back-button,
-  .stats-header .screen-header-action {
+  .game-header .game-mode-dropdown .category-dropdown-summary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1783,9 +1697,7 @@
     white-space: nowrap;
   }
 
-  .game-header .nav-action,
-  .stats-header .screen-back-button,
-  .stats-header .screen-header-action {
+  .game-header .nav-action {
     padding-inline: 22px;
   }
 
@@ -1797,20 +1709,14 @@
      more-specific rule, the generic desktop .nav-action styling makes the empty
      mobile trigger render as a blank circular button between Multiplayer and the
      account avatar. */
-  .game-header-actions > .mobile-nav-trigger {
-    display: none;
-  }
 
-  .game-header .game-mode-dropdown .category-dropdown-summary,
-  .game-header .daily-badge {
+  .game-header .game-mode-dropdown .category-dropdown-summary {
     padding-inline: 24px;
   }
 
   .game-header .nav-action:hover:not(:disabled),
   .game-header .game-mode-dropdown .category-dropdown-summary:hover,
-  .game-header .game-mode-dropdown[open] .category-dropdown-summary,
-  .stats-header .screen-back-button:hover:not(:disabled),
-  .stats-header .screen-header-action:hover:not(:disabled) {
+  .game-header .game-mode-dropdown[open] .category-dropdown-summary {
     border-color: rgba(184, 227, 109, 0.42);
     background:
       linear-gradient(180deg, rgba(184, 227, 109, 0.12), rgba(255, 255, 255, 0.035)),
@@ -1904,7 +1810,6 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 12px;
 }
-
 
 /* Compact secondary navigation. Keeps core gameplay controls visible while moving rarely-used links out of the header. */
 .action-menu {
@@ -2127,7 +2032,6 @@
     transform: scale(1.14);
   }
 }
-
 
 .streetview-missing-key {
   display: grid;
@@ -2436,7 +2340,6 @@
 .streetview-country-screen.is-streetview-fullscreen .streetview-stats .stat-value {
   font-size: 0.78rem;
 }
-
 
 .streetview-country-screen.is-streetview-fullscreen .feedback {
   min-height: 0;
@@ -3000,10 +2903,7 @@ body:not(:has(.landing-screen-shell)) .game-header {
 }
 
 body:not(:has(.landing-screen-shell)) .game-header .nav-action,
-body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
-body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
-body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
-body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary {
   border-color: rgba(217, 217, 214, 0.14);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.024)),
@@ -3107,7 +3007,6 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
 
 .stat-card,
 .progress-card,
-.daily-badge,
 .daily-share-text,
 .daily-history-row,
 .achievement-chip,
@@ -3157,8 +3056,7 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
 
 .guess-form input,
 .maptap-filter-select,
-.puzzle-continent-select,
-.country-guess-timer-select {
+.puzzle-continent-select {
   border-color: rgba(217, 217, 214, 0.14);
   background-color: rgba(6, 10, 7, 0.62);
 }
@@ -3184,7 +3082,6 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
   border-color: rgba(238, 125, 107, 0.28);
 }
 
-.mobile-nav-sheet:not([hidden]),
 .category-dropdown-menu,
 .action-menu-panel {
   border-color: rgba(184, 227, 109, 0.18);

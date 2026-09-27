@@ -130,7 +130,7 @@ describe("SoloGameScreen practice vs timed", () => {
     answerCurrent();
     answerCurrent();
     const card = root.querySelector(".shell-results")!;
-    expect(card.querySelector(".shell-results-kicker")?.textContent).toBe("Flags · Timed run");
+    expect(card.querySelector(".shell-results-kicker")?.textContent).toBe("Flags · Solo timed run");
     expect(card.querySelector(".shell-results-primary")?.textContent).toBe("Run again");
     expect(card.textContent).toContain("View leaderboard");
     await vi.waitFor(() => expect(card.querySelector(".shell-results-sub")?.textContent).toContain("Sign in to post"));

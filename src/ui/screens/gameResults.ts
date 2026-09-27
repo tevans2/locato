@@ -13,6 +13,8 @@ export interface TimedPostOutcome {
   readonly serverAccepted: boolean | null;
   /** Signed in: rank after posting. Guest: where the time would place. */
   readonly rank?: number | null;
+  /** Signed in but the post didn't go through (offline or rejected). */
+  readonly failed?: boolean;
 }
 
 export interface RunResultsInput {
@@ -48,6 +50,7 @@ export function timedPostingLine(outcome: TimedPostOutcome): string {
     const place = rank ? `That would place #${rank} on the board. ` : "";
     return `${best}${place}Sign in to post your time to the leaderboard — your best is kept on this device.`;
   }
+  if (outcome.failed) return `${best}Couldn't post this time — it's saved on this device; post it from Compete later.`;
   if (outcome.serverAccepted) return `${best}Posted to the leaderboard${rank ? ` — you're #${rank}` : ""}.`;
   return `${best}Saved on this device — your posted best is still faster${rank ? ` (you're #${rank})` : ""}.`;
 }
@@ -71,7 +74,7 @@ export function createRunResults(shell: ShellContext, input: RunResultsInput): R
   secondary.push(...(input.extraActions ?? []));
 
   const card = createResultsCard(shell, {
-    kicker: `${label} · ${timed ? "Timed run" : "Practice"}`,
+    kicker: `${label} · ${timed ? "Solo timed run" : "Practice"}`,
     title: input.title,
     ...(input.subtitle || input.posting ? { subtitle: input.subtitle ?? (timed ? "Posting your time…" : "") } : {}),
     stats: input.stats,

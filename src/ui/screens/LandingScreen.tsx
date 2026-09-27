@@ -19,7 +19,7 @@ import {
   RotateCcw,
   Shapes,
   Split,
-  Timer,
+  Users,
 } from "lucide-react";
 import type { ShellContext } from "../shell/types";
 import { SiteHeaderMount } from "../shell/react";
@@ -207,8 +207,8 @@ function LandingMoreWays({ shell, storage, now }: LandingScreenOptions) {
       <ArrowRight className="landing-more-arrow" size={18} />
     </button>
     <button type="button" className="landing-more-card is-compete" data-testid="card-compete" onClick={() => shell.openSection("compete")}>
-      <span className="landing-more-icon" aria-hidden="true"><Timer size={22} strokeWidth={1.6} /></span>
-      <span className="landing-more-copy"><strong>Race the clock</strong><span>Timed runs post to the leaderboards.</span></span>
+      <span className="landing-more-icon" aria-hidden="true"><Users size={22} strokeWidth={1.6} /></span>
+      <span className="landing-more-copy"><strong>Play friends live</strong><span>A real-time multiplayer race for up to 8, or a solo timed run for the leaderboards.</span></span>
       <ArrowRight className="landing-more-arrow" size={18} />
     </button>
   </section>;

@@ -24,6 +24,8 @@ export interface FriendsScreenOptions {
   readonly onOpenTab: (tab: Exclude<YouTab, "friends">) => void;
   readonly initialUsername?: string;
   readonly currentUsername?: string | null;
+  /** Read the signed-in username live (it can resolve after mount); falls back to `currentUsername`. */
+  readonly getCurrentUsername?: () => string | null;
   readonly appOrigin?: string;
   // Invite an online friend to a multiplayer game (wired once presence/invites land).
   readonly onInviteToGame?: (friend: PublicUser) => void;
@@ -50,7 +52,8 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const suggestions = el("datalist", { attrs: { id: "friend-suggestions" } });
   const addButton = el("button", { className: "primary-action", text: "Add", attrs: { type: "submit" } });
   const copyFriendLinkButton = el("button", { className: "ghost-action", text: "Copy my friend link", attrs: { type: "button" } });
-  copyFriendLinkButton.hidden = !options.currentUsername;
+  const currentUsername = (): string | null => options.getCurrentUsername?.() ?? options.currentUsername ?? null;
+  copyFriendLinkButton.hidden = !currentUsername();
   const addFeedback = el("p", { className: "friend-feedback", attrs: { role: "status" } });
   const addForm = el("form", { className: "friend-add-form", children: [addInput, addButton, copyFriendLinkButton, suggestions] });
 
@@ -74,10 +77,10 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const tabs = createYouTabs("friends", (tab) => {
     if (tab !== "friends") options.onOpenTab(tab);
   });
-  const signedIn = options.shell.signedIn();
-  const body = el("div", {
-    className: "friends-screen friends-body",
-    children: signedIn
+  const body = el("div", { className: "friends-screen friends-body" });
+  // The signed-in view or the sign-in prompt; rebuilt when the player signs in or out.
+  const bodyChildren = (signedIn: boolean): HTMLElement[] =>
+    signedIn
       ? [
           ...(options.initialUsername ? [el("p", { className: "friend-link-hint", text: `Friend link opened for ${options.initialUsername}. Send them a request below.` })] : []),
           el("section", { className: "friend-section", children: [el("h2", { text: "Add a friend" }), addForm, addFeedback] }),
@@ -92,8 +95,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
             options.initialUsername ? `Sign in to add ${options.initialUsername}` : "Sign in to add friends",
             options.initialUsername ? "You opened a friend link. Sign in, then send them a request from here." : "Friends can see each other online, compare stats and invite each other to multiplayer games.",
           ),
-        ],
-  });
+        ];
   const page = createSitePage(options.shell, { section: "you", id: "friends", className: "you-page", content: [heading.element, tabs.element, body] });
   const element = page.element;
 
@@ -209,7 +211,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   });
 
   copyFriendLinkButton.addEventListener("click", () => {
-    const username = options.currentUsername;
+    const username = currentUsername();
     if (!username) return;
     const origin = options.appOrigin ?? window.location.origin;
     const url = `${origin}/?friend=${encodeURIComponent(username)}`;
@@ -239,14 +241,24 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
     }, 250);
   });
 
-  const unsubscribe = signedIn ? options.subscribe?.(() => void refresh()) : undefined;
-  if (signedIn) void refresh();
+  let unsubscribe: (() => void) | undefined;
+  function renderForAuth(): void {
+    const signedIn = options.shell.signedIn();
+    body.replaceChildren(...bodyChildren(signedIn));
+    copyFriendLinkButton.hidden = !currentUsername();
+    unsubscribe?.();
+    unsubscribe = signedIn ? options.subscribe?.(() => void refresh()) : undefined;
+    if (signedIn) void refresh();
+  }
+  renderForAuth();
+  const unsubscribeAuth = options.shell.onAuthChange?.(renderForAuth);
 
   return {
     element,
     destroy: () => {
       if (searchTimer) clearTimeout(searchTimer);
       unsubscribe?.();
+      unsubscribeAuth?.();
       page.destroy();
     },
   };

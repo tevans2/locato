@@ -21,8 +21,6 @@ import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createCompeteScreen } from "../ui/screens/CompeteScreen";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
-import { createThemeToggle } from "../ui/theme";
-import { createSoundToggle } from "../ui/dom/sfx";
 import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
 import { createAcademyProgressStore } from "./academyProgress";
 import { isLeaderboardMode } from "../core/gameModes";
@@ -80,29 +78,34 @@ export function createApp(options: AppOptions): App {
   // category change, or navigating away) — not only on full 196-country completion.
   let lastSoloState: GameState | null = null;
 
-  // Account controls persist across navigation and are fixed to the top-right of the viewport.
   // Persistent social channel (presence + friend/invite events) for the signed-in user.
   const social = createSocialClient(resolveSocialUrl(window.location));
   const academyProgress = createAcademyProgressStore(options.storage);
+  // Screens that show a guest view listen for the signed-in player changing (shell.onAuthChange).
+  // `undefined` until the start-up session check resolves, so that first answer always notifies.
+  const authListeners = new Set<() => void>();
+  let authUserId: string | null | undefined;
+  let markAuthResolved: () => void = () => undefined;
+  /** Resolves once the start-up session check has answered (signed in or guest). */
+  const authResolved = new Promise<void>((resolve) => { markAuthResolved = resolve; });
   const authControls = createAuthControls({
     onAuthChange: (state) => {
       if (state.user) social.connect();
       else social.disconnect();
       if (state.user) void academyProgress.syncWithAccount();
       else academyProgress.detachAccount();
+      markAuthResolved();
+      const userId = state.user?.id ?? null;
+      if (userId === authUserId) return;
+      authUserId = userId;
+      for (const listener of [...authListeners]) listener();
     },
     onViewStats: () => navigate({ type: "stats" }),
     onViewFriends: () => navigate({ type: "friends" }),
   });
-  const themeToggle = createThemeToggle(options.storage);
-  const soundToggle = createSoundToggle();
-
-  const globalControls = el("div", { className: "global-controls", attrs: { "aria-label": "Account and preferences" }, children: [soundToggle, themeToggle, authControls.trigger] });
-
   // Navigation shell (docs/navigation.md): one context handed to every screen as `shell`.
-  // Screens that render a shell header mark their root `data-shell`; for those,
-  // attachGlobalControls leaves the legacy fixed cluster off and the account trigger lives in
-  // `shell.controls` (which SiteHeader places on its right).
+  // The account trigger lives in `shell.controls`, which SiteHeader places on its right (GameBar
+  // and FocusBar screens reach sound, theme and account through their own menus instead).
   const shellControls = createShellControls({ storage: options.storage, account: authControls.trigger });
   const shell: ShellContext = {
     openSection: (section) => navigate(SECTION_ROUTES[section]),
@@ -125,6 +128,10 @@ export function createApp(options: AppOptions): App {
     controls: shellControls.element,
     confirmLeave: (message, confirmOptions) => shellConfirmDialog(message, confirmOptions),
     signedIn: () => Boolean(authControls.getUser()),
+    onAuthChange: (listener) => {
+      authListeners.add(listener);
+      return () => void authListeners.delete(listener);
+    },
     storage: options.storage,
   };
 
@@ -176,21 +183,6 @@ export function createApp(options: AppOptions): App {
     else navigate({ type: "landing" });
   }
 
-  function attachGlobalControls(): void {
-    if (activeScreen?.element.dataset.shell) {
-      // Shell screens carry their own controls in their header (or ⋯ menu).
-      globalControls.remove();
-      shellControls.adoptAccount();
-      options.root.append(authControls.panel);
-      return;
-    }
-    const gamePreferences = activeScreen?.element.querySelector("[data-game-preferences]");
-    // The immersive game has fixed contrast; the site theme remains available on other screens.
-    globalControls.replaceChildren(soundToggle, ...(gamePreferences ? [] : [themeToggle]), authControls.trigger);
-    (gamePreferences ?? options.root).append(globalControls);
-    options.root.append(authControls.panel);
-  }
-
   // Seeds currently being recorded — prevents concurrent double-fire (e.g. a seed-change flush
   // racing a navigate flush) within this page load.
   const recordingSeeds = new Set<string>();
@@ -232,14 +224,11 @@ export function createApp(options: AppOptions): App {
     if (stats) authControls.refreshStats(stats);
   }
 
-  attachGlobalControls();
-
-  function mount(screen: Screen, showGlobalControls = true): void {
+  function mount(screen: Screen): void {
     activeScreen?.destroy();
     activeScreen = screen;
     options.root.replaceChildren(screen.element, authControls.panel);
     options.root.scrollTop = 0;
-    if (showGlobalControls) attachGlobalControls();
   }
 
   // The You tab the next Stats screen opens on (Friends → "Achievements" lands there).
@@ -377,7 +366,9 @@ export function createApp(options: AppOptions): App {
   async function startDailyChallenge(): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Preparing the daily challenge…"));
-    const [{ createSoloGameScreen }, { createStreetViewCountryScreen }] = await Promise.all([import("../ui/screens/SoloGameScreen"), import("../ui/screens/StreetViewCountryScreen")]);
+    // The daily's result and per-round save are keyed by account, so wait for the session check
+    // (a cold ?view=daily-challenge link runs before it has answered).
+    const [{ createSoloGameScreen }, { createStreetViewCountryScreen }] = await Promise.all([import("../ui/screens/SoloGameScreen"), import("../ui/screens/StreetViewCountryScreen"), authResolved]);
     if (run !== navigationRun) return;
     const challenge = createDailyChallenge(options.countryIndex);
     const activeUser = authControls.getUser();
@@ -809,7 +800,7 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  async function startMultiplayer(joinCode?: string): Promise<void> {
+  async function startMultiplayer(joinCode?: string, quickCreate?: { readonly create: true; readonly inviteUserId?: string }): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading multiplayer...");
     mount(loading);
@@ -836,7 +827,9 @@ export function createApp(options: AppOptions): App {
         onHome: () => navigate({ type: "landing" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
+        storage: options.storage,
         ...(joinCode ? { initialJoinCode: joinCode } : {}),
+        ...(quickCreate ? { autoCreate: true, ...(quickCreate.inviteUserId ? { inviteUserId: quickCreate.inviteUserId } : {}) } : {}),
       }),
     );
   }
@@ -913,15 +906,25 @@ export function createApp(options: AppOptions): App {
   }
 
   /** Compete (also the legacy `leaderboard` route). Picking a board replaces the URL, it doesn't push. */
-  function startCompete(mode?: GameModeId, variant?: string): void {
+  function startCompete(mode?: GameModeId, variant?: string, tab?: "leaderboards"): void {
+    const boardRoute = (nextMode: GameModeId, nextVariant: string): AppRoute => ({ type: "compete", tab: "leaderboards", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) });
     mount(
       createCompeteScreen({
         shell,
         storage: options.storage,
         ...(mode ? { mode } : {}),
         ...(variant ? { variant } : {}),
-        onSelect: (nextMode, nextVariant) => replaceRoute({ type: "compete", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) }),
+        ...(tab ? { tab } : {}),
+        onSelect: (nextMode, nextVariant) => replaceRoute(boardRoute(nextMode, nextVariant)),
+        onTab: (nextTab, nextMode, nextVariant) => replaceRoute(nextTab === "leaderboards" ? boardRoute(nextMode, nextVariant) : { type: "compete" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
+        onCreateRoom: (request) => navigate({ type: "multiplayer", create: true, ...(request?.inviteUserId ? { invite: request.inviteUserId } : {}) }),
+        onJoinRoom: (code) => navigate({ type: "multiplayer", joinCode: code }),
+        onRejoinRoom: () => navigate({ type: "multiplayer" }),
+        onFriends: () => navigate({ type: "friends" }),
+        subscribeFriends: (listener) => social.subscribe((message: SocialServerMessage) => {
+          if (message.type !== "GAME_INVITE" && message.type !== "FRIEND_REQUEST") listener();
+        }),
       }),
     );
   }
@@ -943,7 +946,7 @@ export function createApp(options: AppOptions): App {
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
     if (route.type === "compete" || route.type === "leaderboard") {
-      startCompete(route.mode, route.variant);
+      startCompete(route.mode, route.variant, route.type === "compete" ? route.tab : route.mode ? "leaderboards" : undefined);
       return;
     }
     // `flag-gallery` is the legacy name for the Atlas (`?view=flags`).
@@ -977,7 +980,10 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "multiplayer") {
-      runNavigation(startMultiplayer(route.joinCode));
+      // A quick-create link makes one room; afterwards the entry is the plain lobby, so Back/Forward
+      // or a refresh (after leaving the room) never opens a second one.
+      if (route.create) replaceRoute({ type: "multiplayer" });
+      runNavigation(startMultiplayer(route.joinCode, route.create ? { create: true, ...(route.invite ? { inviteUserId: route.invite } : {}) } : undefined));
       return;
     }
     if (route.type === "stats") {
@@ -994,14 +1000,13 @@ export function createApp(options: AppOptions): App {
     }
 
     if (route.type === "friends") {
-      const currentUser = authControls.getUser();
       mount(createFriendsScreen({ shell,
         onOpenTab: (tab) => {
           pendingStatsTab = tab;
           navigate({ type: "stats" });
         },
         ...(route.username ? { initialUsername: route.username } : {}),
-        currentUsername: currentUser?.displayName ?? null,
+        getCurrentUsername: () => authControls.getUser()?.displayName ?? null,
         appOrigin: window.location.origin,
         subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
           if (message.type !== "GAME_INVITE") listener();

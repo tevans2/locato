@@ -206,13 +206,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
-    const { serverAccepted, rank } = await postTimedRun({
+    const posting = await postTimedRun({
       gameMode: playMode,
       variant: playMode === "puzzle" ? puzzleContinent : "",
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
-    return { isNewLocalBest, serverAccepted, rank };
+    return { isNewLocalBest, ...posting };
   }
 
   function renderTargetPrompt(): void {

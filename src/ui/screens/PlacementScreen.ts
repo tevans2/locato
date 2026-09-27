@@ -50,7 +50,7 @@ export function createPlacementScreen(options: PlacementScreenOptions): Screen {
   const length = options.length ?? PLACEMENT_LENGTH;
   const abort = new AbortController();
 
-  const root = el("section", { className: "lx placement-screen", attrs: { "data-phase": "intro", "aria-label": "Academy placement quiz" } });
+  const root = el("section", { className: "lx placement-screen", attrs: { "data-shell": "focus", "data-phase": "intro", "aria-label": "Academy placement quiz" } });
   const announcer = el("p", { className: "lx-sr-only", attrs: { "aria-live": "polite" } });
   const top = createLessonTopBar({ title: "Placement", exitLabel: "Leave placement", onExit: () => options.onDone() });
   const stageInner = el("div", { className: "lx-stage-inner" });

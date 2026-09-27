@@ -92,11 +92,6 @@
     padding-right: 0;
   }
 
-  .mode-controls {
-    width: 100%;
-    justify-items: stretch;
-  }
-
   .category-dropdown,
   .game-mode-dropdown {
     width: 100%;
@@ -116,8 +111,7 @@
     display: none;
   }
 
-  .game-mode-dropdown .category-dropdown-summary,
-  .daily-badge {
+  .game-mode-dropdown .category-dropdown-summary {
     min-height: 32px;
     padding-inline: 10px;
     border-radius: 999px;
@@ -140,11 +134,6 @@
     left: 0;
     right: 0;
     width: 100%;
-  }
-
-  .mode-select-row {
-    justify-content: stretch;
-    flex-direction: column;
   }
 
   /* Let the prompt and answer panel size to their content; the page scrolls instead of cramming. */
@@ -179,11 +168,6 @@
   .daily-retention-grid,
   .map-review-list {
     grid-template-columns: 1fr;
-  }
-
-  .country-guess-mode-card {
-    grid-column: 1 / -1;
-    justify-content: space-between;
   }
 
   .country-guess-form,
@@ -289,19 +273,6 @@
     overflow: hidden;
   }
 
-
-  body:not(:has(.landing-screen-shell)) .landing-return-action {
-    top: auto;
-    right: max(10px, env(safe-area-inset-right));
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    left: auto;
-    width: auto;
-    min-width: 0;
-    min-height: 38px;
-    padding: 0 12px;
-    font-size: 0.8rem;
-  }
-
   .screen-back-button {
     width: auto;
     min-width: 62px;
@@ -313,124 +284,6 @@
 
   .game-header-actions {
     display: block;
-  }
-
-  .game-header-actions > .nav-action:not(.mobile-nav-trigger) {
-    display: none;
-  }
-
-  .game-header-actions > .mobile-nav-trigger {
-    display: block;
-    width: 62px;
-    min-width: 0;
-    min-height: 30px;
-    padding: 0 8px;
-    border-color: rgba(232, 226, 211, 0.12);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--muted);
-    font-size: 0;
-    line-height: 1;
-    box-shadow: none;
-  }
-
-  .game-header-actions > .mobile-nav-trigger::after {
-    content: attr(data-mobile-label);
-    font-size: 0.7rem;
-    font-weight: 820;
-    letter-spacing: 0.01em;
-  }
-
-  .mobile-nav-sheet:not([hidden]) {
-    position: fixed;
-    top: max(44px, calc(env(safe-area-inset-top) + 40px));
-    right: 10px;
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    left: 10px;
-    z-index: 1000;
-    display: grid;
-    align-content: start;
-    gap: 12px;
-    overflow: auto;
-    padding: 14px;
-    border: 1px solid rgba(232, 226, 211, 0.14);
-    border-radius: 18px;
-    background:
-      var(--panel-grid),
-      linear-gradient(180deg, rgba(20, 27, 18, 0.98), rgba(8, 12, 8, 0.98));
-    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.035);
-    backdrop-filter: blur(14px);
-  }
-
-  .mobile-nav-sheet-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .mobile-nav-sheet-header strong {
-    font-size: 1rem;
-  }
-
-  .mobile-nav-close {
-    width: 34px;
-    min-width: 34px;
-    min-height: 34px;
-    padding: 0;
-    border-radius: 999px;
-  }
-
-  .mobile-nav-section {
-    display: grid;
-    gap: 7px;
-  }
-
-  .mobile-nav-section h2 {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .mobile-nav-item {
-    min-height: 46px;
-    text-align: left;
-    border-color: rgba(232, 226, 211, 0.12);
-    background: rgba(255, 255, 255, 0.035);
-  }
-
-  .mobile-nav-user-summary {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 46px;
-    padding: 8px 10px;
-    border: 1px solid rgba(184, 227, 109, 0.22);
-    border-radius: var(--radius-sm);
-    background: rgba(184, 227, 109, 0.065);
-  }
-
-  .mobile-nav-user-avatar {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--earth));
-    color: #10140f;
-    font-weight: 850;
-    flex: none;
-  }
-
-  .mobile-nav-user-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text);
-    font-weight: 800;
   }
 
   /* Multiplayer in-game: stack the round + scoreboard panels and let the view grow/scroll. */
@@ -495,12 +348,6 @@
   }
 }
 
-@media (max-width: 700px) {
-  .country-guess-category-dropdown {
-    justify-self: stretch;
-  }
-}
-
 @media (max-width: 900px) {
   .puzzle-map-panel {
     grid-template-columns: 1fr;
@@ -550,11 +397,6 @@
 
   .game-screen {
     gap: 6px;
-  }
-
-  .mode-description {
-    max-width: none;
-    text-align: left;
   }
 
   .play-layout,

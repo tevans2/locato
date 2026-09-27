@@ -285,12 +285,17 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
 
   const page = createSitePage(shell, { section: "you", id: "stats", className: "you-page", content: [heading.element, tabs.element, content, achievementsPanel] });
 
-  if (!shell.signedIn()) {
-    content.replaceChildren(signInPrompt(shell, "Sign in to see your stats", "Accuracy, best streaks, world-map times and multiplayer wins are saved to your account."));
-  } else {
+  // Re-run when the player signs in or out (or the start-up session check resolves after mount).
+  let statsRequest = 0;
+  function loadStats(): void {
+    const request = ++statsRequest;
+    if (!shell.signedIn()) {
+      content.replaceChildren(signInPrompt(shell, "Sign in to see your stats", "Accuracy, best streaks, world-map times and multiplayer wins are saved to your account."));
+      return;
+    }
     content.replaceChildren(el("p", { className: "stats-loading", text: "Loading stats…" }));
     void (options.fetchStats ?? fetchFullStats)().then((stats) => {
-      if (destroyed) return;
+      if (destroyed || request !== statsRequest) return;
       if (!stats) {
         content.replaceChildren(signInPrompt(shell, "Couldn't load your stats", "Check your connection, or sign in again to see them."));
         return;
@@ -298,12 +303,15 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
       buildStats(stats, content);
     });
   }
+  loadStats();
+  const unsubscribeAuth = shell.onAuthChange?.(loadStats);
   show();
 
   return {
     element: page.element,
     destroy: () => {
       destroyed = true;
+      unsubscribeAuth?.();
       page.destroy();
     },
   };

@@ -75,6 +75,11 @@ export interface ShellContext {
   readonly confirmLeave: (message: string, options?: ConfirmOptions) => Promise<boolean>;
   /** Whether a player is signed in right now (read it at the moment you need it). */
   readonly signedIn: () => boolean;
+  /**
+   * Call `listener` whenever the signed-in player changes, including when the start-up session
+   * check resolves (so a screen mounted before it can swap its guest view). Returns an unsubscribe.
+   */
+  readonly onAuthChange?: (listener: () => void) => () => void;
   /** App storage, for preference toggles rendered by the shell. */
   readonly storage?: Storage;
 }
@@ -89,8 +94,4 @@ export type ShellLayout = "site" | "game" | "focus";
 export function markShellScreen(element: HTMLElement, layout: ShellLayout): HTMLElement {
   element.dataset.shell = layout;
   return element;
-}
-
-export function sectionInfo(section: SiteSection): SiteSectionInfo {
-  return SITE_SECTIONS.find((item) => item.id === section) ?? SITE_SECTIONS[0]!;
 }
