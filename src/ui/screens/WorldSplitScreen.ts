@@ -1,4 +1,5 @@
 import { createMobileGameNav } from "../dom/mobileGameNav";
+import type { ShellContext } from "../shell/types";
 import {
   DEFAULT_WORLD_SPLIT_LINE,
   WORLD_SPLIT_MAX_ROUND_SCORE,
@@ -35,6 +36,8 @@ const MIN_DRAW_LENGTH = 24;
 const BEST_SCORE_KEY = "locato:worldsplit:best-score:v1";
 
 export interface WorldSplitScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly storage: Storage;
   readonly onGameModeChange: (mode: GameModeId) => void;

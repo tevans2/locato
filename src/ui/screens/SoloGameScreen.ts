@@ -1,4 +1,5 @@
 import type { AuthUser } from "../../core/auth";
+import type { ShellContext } from "../shell/types";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { matchesCapitalName } from "../../core/categories/matching";
@@ -42,6 +43,8 @@ export interface DailyPromptProgress {
 }
 
 export interface SoloGameScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly selectedGameMode: PromptGameModeId;

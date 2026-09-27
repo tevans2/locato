@@ -1,10 +1,13 @@
 import { fetchFullStats, type CategoryStats, type FullStats, type GameRecord } from "../../core/auth";
+import type { ShellContext } from "../shell/types";
 import { getCategory } from "../../core/categories";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface StatsScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly onHome: () => void;
   readonly onBack: () => void;
   readonly onDailyChallenge?: () => void;

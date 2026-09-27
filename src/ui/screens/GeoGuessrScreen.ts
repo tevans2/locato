@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { CountryIndex } from "../../core/countries";
 import { createGeoGuessrQueue, GEOGUESSR_MAX_GAME_SCORE, GEOGUESSR_MAX_ROUND_SCORE, GEOGUESSR_ROUND_LIMIT, scoreGeoGuessrGuess, type GeoGuessrGuessResult, type GeoGuessrLocation } from "../../core/geoguessr";
 import type { GameModeId } from "../../core/gameModes";
@@ -9,6 +10,8 @@ import { createGeoStreetView } from "../components/GeoStreetView";
 import { el } from "../dom/createElement";
 
 export interface GeoGuessrScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;

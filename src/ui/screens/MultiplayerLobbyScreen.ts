@@ -1,4 +1,5 @@
 import { MAX_CHAT_MESSAGE_LENGTH, type MultiplayerTransport, type PublicChatMessage, type PublicRoomState, type PublicRoundState, type RoundResult, type FinalResult, type ServerMessage, type TransportStatus } from "../../core/multiplayer";
+import type { ShellContext } from "../shell/types";
 import { gameModeOptions, type GameModeOption } from "../../core/gameModes";
 import { DEFAULT_FLAG_POOL, flagPoolLabel, normalizeFlagPool } from "../../core/flagPools";
 import { createMultiplayerMapTapGameView, type MapTapMultiplayerReveal } from "../components/MultiplayerMapTapGameView";
@@ -19,6 +20,8 @@ import { createEndGameModal } from "./MultiplayerEndGameModal";
 import { flashScreen, playCorrect, playRoundTaken, playTimeUp, playVictory, playWrong } from "../dom/sfx";
 
 export interface MultiplayerLobbyScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly createOnlineTransport: () => MultiplayerTransport;

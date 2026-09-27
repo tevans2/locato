@@ -1,4 +1,5 @@
 import { createMobileGameNav } from "../dom/mobileGameNav";
+import type { ShellContext } from "../shell/types";
 import type { Screen } from "../../app/router";
 import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
 import { describeMapTapSkill, difficultyForSkill, defaultMapTapSkill, readMapTapSkill, recordMapTapResult, saveMapTapSkill } from "../../core/maptap/skill";
@@ -10,6 +11,8 @@ import { createMapTapInfoOverlay } from "../components/MapTapInfoOverlay";
 import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface MapTapScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
   readonly onMultiplayer?: () => void;

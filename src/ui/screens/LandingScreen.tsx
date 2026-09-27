@@ -1,4 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
+import type { ShellContext } from "../shell/types";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -29,6 +30,8 @@ import type { Screen } from "../../app/router";
 import { currentTheme, LOCATO_THEME_EVENT, toggleTheme, type LocatoTheme } from "../theme";
 
 export interface LandingScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly onHome: () => void;
   readonly accountControl: HTMLElement;
   readonly onPlay: () => void;

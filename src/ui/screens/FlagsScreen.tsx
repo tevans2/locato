@@ -1,4 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
+import type { ShellContext } from "../shell/types";
 import { useMemo, useState } from "react";
 import { ArrowRight, ArrowUpRight, Flag } from "lucide-react";
 import type { Screen } from "../../app/router";
@@ -7,6 +8,8 @@ import { territoryFlags } from "../../core/territoryFlags";
 import { LandingAccount, LandingThemeSwitch } from "./LandingScreen";
 
 export interface FlagsScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly accountControl: HTMLElement;
   readonly storage?: Storage;

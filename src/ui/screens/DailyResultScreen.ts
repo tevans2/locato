@@ -1,4 +1,5 @@
 import { DAILY_MAX_SCORE, formatDailyTime } from "../../core/dailyChallenge";
+import type { ShellContext } from "../shell/types";
 import { fetchDailyLeaderboard, fetchDailySummary, type DailyChallengeResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
 import type { DailyResultSave } from "../../storage/dailySave";
@@ -7,6 +8,8 @@ import { el } from "../dom/createElement";
 import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface DailyResultScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly result: DailyResultSave;
   readonly storage: Storage;
   readonly onHome: () => void;

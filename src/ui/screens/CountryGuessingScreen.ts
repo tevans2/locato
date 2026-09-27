@@ -1,4 +1,5 @@
 import type { AuthUser } from "../../core/auth";
+import type { ShellContext } from "../shell/types";
 import { CONTINENTS, type Continent, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../../core/gameModes";
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
@@ -29,6 +30,8 @@ export interface WorldMapRunResult {
 }
 
 export interface CountryGuessingScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly storage: Storage;

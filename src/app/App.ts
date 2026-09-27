@@ -279,7 +279,7 @@ export function createApp(options: AppOptions): App {
 
   function mountDailyResult(result: DailyResultSave): void {
     mount(
-      createDailyResultScreen({
+      createDailyResultScreen({ shell,
         result,
         storage: options.storage,
         onHome: () => navigate({ type: "landing" }),
@@ -334,7 +334,7 @@ export function createApp(options: AppOptions): App {
     const engine = createEngine(promptCountryIndex, activeCategories, initialState);
 
     mount(
-      createSoloGameScreen({
+      createSoloGameScreen({ shell,
         countryIndex: promptCountryIndex,
         onOpenCountry: (code) => navigate({ type: "country-profile", code }),
         engine,
@@ -526,7 +526,7 @@ export function createApp(options: AppOptions): App {
       }
 
       mountDaily(
-        createStreetViewCountryScreen({
+        createStreetViewCountryScreen({ shell,
           countryIndex: options.countryIndex,
           ...dailyStageNav,
           dailyChallenge: {
@@ -555,7 +555,7 @@ export function createApp(options: AppOptions): App {
       if (run !== navigationRun) return;
 
       mountDaily(
-        createMapTapScreen({
+        createMapTapScreen({ shell,
           ...dailyStageNav,
           dailyChallenge: {
             date: challenge.date,
@@ -598,7 +598,7 @@ export function createApp(options: AppOptions): App {
     persistDaily("prompt", { ...promptProgress, engine: engine.getState() });
 
     mountDaily(
-      createSoloGameScreen({
+      createSoloGameScreen({ shell,
         countryIndex: options.countryIndex,
         engine,
         selectedGameMode: "flags",
@@ -704,7 +704,7 @@ export function createApp(options: AppOptions): App {
       }
 
       mount(
-        createCountryGuessingScreen({
+        createCountryGuessingScreen({ shell,
           countryIndex: options.countryIndex,
           worldCountryFeatures,
           storage: options.storage,
@@ -736,7 +736,7 @@ export function createApp(options: AppOptions): App {
     const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
     if (run !== navigationRun) return;
     mount(
-      createStreetViewCountryScreen({
+      createStreetViewCountryScreen({ shell,
         countryIndex: options.countryIndex,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
@@ -754,7 +754,7 @@ export function createApp(options: AppOptions): App {
     if (run !== navigationRun) return;
 
     mount(
-      createGeoGuessrScreen({
+      createGeoGuessrScreen({ shell,
         countryIndex: options.countryIndex,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
@@ -772,7 +772,7 @@ export function createApp(options: AppOptions): App {
     if (run !== navigationRun) return;
 
     mount(
-      createMapTapScreen({
+      createMapTapScreen({ shell,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -795,7 +795,7 @@ export function createApp(options: AppOptions): App {
       if (run !== navigationRun) return;
 
       mount(
-        screenModule.createWorldSplitScreen({
+        screenModule.createWorldSplitScreen({ shell,
           worldCountryFeatures,
           storage: options.storage,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
@@ -829,7 +829,7 @@ export function createApp(options: AppOptions): App {
     const { createMultiplayerLobbyScreen } = await import("../ui/screens/MultiplayerLobbyScreen");
     if (run !== navigationRun) return;
     mount(
-      createMultiplayerLobbyScreen({
+      createMultiplayerLobbyScreen({ shell,
         countryIndex: options.countryIndex,
         worldCountryFeatures,
         createOnlineTransport: createDefaultOnlineTransport,
@@ -849,7 +849,7 @@ export function createApp(options: AppOptions): App {
     mount(createLoadingScreen(route.type === "country-profile" ? "Opening the atlas…" : "Opening the Academy…"));
     const worldCountryFeatures = await loadWorldCountryFeatures();
     if (run !== navigationRun) return;
-    const shared = { countryIndex: options.countryIndex, worldCountryFeatures, progressStore: academyProgress };
+    const shared = { shell, countryIndex: options.countryIndex, worldCountryFeatures, progressStore: academyProgress };
     const openAcademy = (groupId?: string) => navigate({ type: "academy", ...(groupId ? { groupId } : {}) });
     // Leaving a lesson or placement pops back to the hub entry it was opened from (so browser Back
     // doesn't re-enter the finished lesson); the hub restores its own open group from that entry.
@@ -904,7 +904,7 @@ export function createApp(options: AppOptions): App {
 
   function startLeaderboard(mode?: GameModeId, variant?: string): void {
     mount(
-      createLeaderboardScreen({
+      createLeaderboardScreen({ shell,
         storage: options.storage,
         ...(mode ? { initialMode: mode } : {}),
         ...(variant ? { initialVariant: variant } : {}),
@@ -924,7 +924,7 @@ export function createApp(options: AppOptions): App {
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {
       mount(
-        createLandingScreen({
+        createLandingScreen({ shell,
           accountControl: authControls.trigger,
           onHome: () => navigate({ type: "landing" }),
           onPlay: () => navigate({ type: "solo-game", continueSaved: true }),
@@ -942,7 +942,7 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "flag-gallery") {
       mount(
-        createFlagsScreen({
+        createFlagsScreen({ shell,
           countryIndex: options.countryIndex,
           accountControl: authControls.trigger,
           storage: options.storage,
@@ -967,7 +967,7 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "atlas") {
-      const gallery = createFlagsScreen({
+      const gallery = createFlagsScreen({ shell,
         countryIndex: options.countryIndex,
         // The shell header shows the account control; the gallery's own top bar is hidden.
         accountControl: document.createElement("span"),
@@ -1014,14 +1014,14 @@ export function createApp(options: AppOptions): App {
       const run = navigationRun;
       mount(createLoadingScreen("Gathering your discoveries…"));
       runNavigation(leavingSolo.then(() => {
-        if (run === navigationRun) mount(createStatsScreen({ onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) }));
+        if (run === navigationRun) mount(createStatsScreen({ shell, onHome: () => navigate({ type: "landing" }), onBack: () => goBack(), onDailyChallenge: () => navigate({ type: "daily-challenge" }) }));
       }));
       return;
     }
 
     if (route.type === "friends") {
       const currentUser = authControls.getUser();
-      mount(createFriendsScreen({
+      mount(createFriendsScreen({ shell,
         onBack: () => goBack(),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         ...(route.username ? { initialUsername: route.username } : {}),

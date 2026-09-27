@@ -1,4 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
+import type { ShellContext } from "../shell/types";
 import type { GameModeId } from "../../core/gameModes";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
 import { submitCountryGuess } from "../../core/map";
@@ -11,6 +12,8 @@ import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileK
 import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface StreetViewCountryScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;

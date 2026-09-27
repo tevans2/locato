@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { AcademyProgressStore } from "../../app/academyProgress";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
@@ -42,6 +43,8 @@ import {
 import "../../styles/country-profile.css";
 
 export interface CountryProfileScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly progressStore: AcademyProgressStore;

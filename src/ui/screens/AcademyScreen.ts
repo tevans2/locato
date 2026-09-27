@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { AcademyProgressStore } from "../../app/academyProgress";
 import {
   ACADEMY_COUNTRY_CODES,
@@ -27,6 +28,8 @@ import { hubIcon } from "../components/academy/hubIcons";
 import "../../styles/academy.css";
 
 export interface AcademyScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly progressStore: AcademyProgressStore;

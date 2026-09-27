@@ -1,3 +1,4 @@
+import type { ShellContext } from "../shell/types";
 import {
   acceptFriendRequest,
   declineFriendRequest,
@@ -14,6 +15,8 @@ import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 
 export interface FriendsScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly onBack: () => void;
   readonly onDailyChallenge?: () => void;
   readonly initialUsername?: string;

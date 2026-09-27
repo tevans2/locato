@@ -1,4 +1,5 @@
 import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
+import type { ShellContext } from "../shell/types";
 import { CONTINENTS } from "../../core/countries";
 import { normalizeFlagPool, type FlagPool } from "../../core/flagPools";
 import { isTimerGameModeId, timerGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
@@ -9,6 +10,8 @@ import { el } from "../dom/createElement";
 import { createBrandLockup } from "../dom/createBrandLockup";
 
 export interface LeaderboardScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly initialMode?: GameModeId;
   readonly initialVariant?: string;
   readonly storage: Storage;
