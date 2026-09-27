@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "serve": "bun server/index.ts",
+    "seed": "bun scripts/seed-dev.ts",
+    "dev:seeded": "bun scripts/seed-dev.ts && bun server/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "sync:territory-flags": "node scripts/sync-territory-flags.mjs",
