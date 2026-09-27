@@ -64,11 +64,14 @@ export function createProfileLocator(options: ProfileLocatorOptions): ProfileLoc
   const neighbourSet = new Set(options.neighbourCodes);
   const selfCountry = countryIndex.byCode.get(profile.code);
 
+  // Set once the country's framing is known; the recentre button returns there after exploring.
+  let recenter: () => void = () => undefined;
   const view = createWorldMapView(options.features, countryIndex, {
     onCountryClick: (countryId: CountryId) => {
       const country = countryIndex.byId[countryId];
       if (country && country.code !== profile.code) options.onOpenCountry(country.code);
     },
+    recenter: { text: "Recentre", label: `Recentre the map on ${profile.name}`, onClick: () => recenter() },
   });
 
   for (const [countryId, path] of view.pathByCountryId) {
@@ -136,6 +139,7 @@ export function createProfileLocator(options: ProfileLocatorOptions): ProfileLoc
   // Small island nations get a wider window so the ocean around them gives some context.
   const minWidth = profile.borders.length === 0 && profile.areaKm2 < 30_000 ? 90 : MIN_VIEW_WIDTH;
   const target = frame ? viewForFrame(frame, VIEW_PADDING, minWidth) : null;
+  if (target) recenter = () => view.focusBounds(target, { animate: !prefersReducedMotion() });
   if (target) {
     if (prefersReducedMotion()) {
       view.focusBounds(target, { animate: false });
@@ -146,6 +150,12 @@ export function createProfileLocator(options: ProfileLocatorOptions): ProfileLoc
     }
   }
   scaleMarkers();
+
+  // Same cue as the lesson maps: beginners may not know they can zoom out to see where it is.
+  const tip = document.createElement("p");
+  tip.className = "cp-map-tip";
+  tip.textContent = exploreTip();
+  view.element.append(tip);
 
   const element = document.createElement("div");
   element.className = "cp-locator";
@@ -190,4 +200,10 @@ export function createFeatureSilhouette(feature: WorldCountryFeature, anchorLatL
   // A non-scaling stroke keeps specks of atoll visible at any size.
   svg.append(svgEl("path", { d, "vector-effect": "non-scaling-stroke" }));
   return svg;
+}
+
+/** How to explore a map, in the gesture this device actually uses. */
+export function exploreTip(): string {
+  const touch = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  return touch ? "Drag or pinch to look around" : "Drag or scroll to look around";
 }

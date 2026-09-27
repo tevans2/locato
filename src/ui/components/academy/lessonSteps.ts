@@ -2,6 +2,7 @@ import { checkTypedAnswer, groupForCountry, type AcademySkill } from "../../../c
 import type { CountryCode, CountryIndex } from "../../../core/countries";
 import { el } from "../../dom/createElement";
 import type { LessonMap } from "./lessonMap";
+import { exploreTip } from "./profileLocator";
 import {
   answerLabel,
   choicePromptTitle,
@@ -139,7 +140,7 @@ function promptMedia(ctx: StepContext, code: CountryCode, skill: AcademySkill): 
   return {
     media: figure,
     mount: () => {
-      figure.append(ctx.map.element, el("figcaption", { className: "lx-map-tip", text: "Drag or scroll to look around" }));
+      figure.append(ctx.map.element, el("figcaption", { className: "lx-map-tip", text: exploreTip() }));
       // Beginners often need to zoom out to work out where the highlighted country sits.
       ctx.map.setMode("explore");
       ctx.map.onCountryClick = null;
