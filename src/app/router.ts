@@ -5,7 +5,7 @@ export type AppRoute =
   | { readonly type: "landing" }
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool; readonly run?: "timed" }
   | { readonly type: "daily-challenge" }
-  | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed" }
+  | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed"; readonly continent?: string }
   | { readonly type: "streetview-country" }
   | { readonly type: "geoguessr" }
   | { readonly type: "map-tap" }
@@ -53,7 +53,11 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
       ...timed,
     };
   }
-  if (game && isWorldMapGameModeId(game)) return { type: "country-guessing", mode: game, ...timed };
+  if (game && isWorldMapGameModeId(game)) {
+    // Puzzle boards are per continent, so a timed puzzle link names the continent it's for.
+    const continent = params.get("continent")?.trim();
+    return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
+  }
   if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
   if (view === "academy") {
@@ -85,6 +89,7 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
   } else if (route.type === "country-guessing") {
     params.set("game", route.mode ?? "name-all");
     if (route.run === "timed") params.set("run", "timed");
+    if (route.continent) params.set("continent", route.continent);
   }
   else if (["map-tap", "worldsplit", "geoguessr", "streetview-country"].includes(route.type)) params.set("game", route.type);
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);

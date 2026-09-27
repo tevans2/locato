@@ -51,8 +51,12 @@ export interface ShellContext {
   readonly goHome: () => void;
   /** Browser Back. On a cold start (nothing to pop) opens `fallback`'s section home (default "play"). */
   readonly goBack: (fallback?: SiteSection) => void;
-  /** Start a mode. Practice resumes that mode's saved run; "timed" opens `&run=timed` (leaderboard modes only; others fall back to practice). */
-  readonly openGame: (mode: GameModeId, run?: RunType) => void;
+  /**
+   * Start a mode. Practice resumes that mode's saved run; "timed" opens `&run=timed` (leaderboard
+   * modes only; others fall back to practice). `variant` is the leaderboard variant: a flag set
+   * ("territories" / "both") for flags, or a continent for puzzle.
+   */
+  readonly openGame: (mode: GameModeId, run?: RunType, variant?: string) => void;
   /** Open the game picker sheet; choosing a game calls `openGame`. `current` is marked "Playing". */
   readonly openGamePicker: (options?: { readonly current?: GameModeId; readonly run?: RunType }) => void;
   /** Open a country's Atlas profile (`?country=xx`). */

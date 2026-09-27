@@ -40,6 +40,7 @@ describe("shareable game routes", () => {
     { type: "multiplayer" },
     { type: "compete" },
     { type: "compete", mode: "flags", variant: "timer" },
+    { type: "country-guessing", mode: "puzzle", run: "timed", continent: "Africa" },
     { type: "academy" },
     { type: "academy", groupId: "western-europe" },
     { type: "academy-lesson", lessonId: "review" },

@@ -2,7 +2,7 @@ import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
-import { createPromptCountryIndex, DEFAULT_FLAG_POOL, normalizeFlagPool, type FlagPool } from "../core/flagPools";
+import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloSave, createSoloSave, hydrateGameState, isSoloSaveResumable, readLatestSoloSave, readSoloSave, saveSoloGame } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
@@ -120,7 +120,7 @@ export function createApp(options: AppOptions): App {
       if ((historyState()?.idx ?? 0) > 0) window.history.back();
       else navigate(SECTION_ROUTES[fallback]);
     },
-    openGame: (mode, run = "practice") => openGame(mode, run),
+    openGame: (mode, run = "practice", variant) => openGame(mode, run, variant),
     openGamePicker: (picker) => {
       openGamePicker({
         ...(picker?.current ? { current: picker.current } : {}),
@@ -138,9 +138,14 @@ export function createApp(options: AppOptions): App {
   };
 
   /** Timed runs open `&run=timed` for leaderboard modes; everything else opens the mode's practice run. */
-  function openGame(mode: GameModeId, run: RunType): void {
+  function openGame(mode: GameModeId, run: RunType, variant?: string): void {
     if (run === "timed" && isLeaderboardMode(mode)) {
-      navigate(isPromptGameModeId(mode) ? { type: "solo-game", categoryIds: [mode], run: "timed" } : { type: "country-guessing", mode, run: "timed" });
+      if (isPromptGameModeId(mode)) {
+        const flagPool = mode === "flags" && isFlagPool(variant) ? { flagPool: variant } : {};
+        navigate({ type: "solo-game", categoryIds: [mode], run: "timed", ...flagPool });
+      } else if (isWorldMapGameModeId(mode)) {
+        navigate({ type: "country-guessing", mode, run: "timed", ...(mode === "puzzle" && variant ? { continent: variant } : {}) });
+      }
       return;
     }
     handleGameModeChange(mode);
