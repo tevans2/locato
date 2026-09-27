@@ -21,6 +21,7 @@ import type {
   StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardTimePlacement,
   Session,
   StoredUser,
   SubmitBestTimeInput,
@@ -238,6 +239,10 @@ export function createMemoryUserStore(): UserStore {
           .filter((entry) => entry.timeMs < row.timeMs || (entry.timeMs === row.timeMs && entry.achievedAt < row.achievedAt)).length + 1;
 
       return { rank, timeMs: row.timeMs };
+    },
+    getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement {
+      const board = [...bestTimes.values()].filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
+      return { rank: board.filter((entry) => entry.timeMs < timeMs).length + 1, total: board.length };
     },
     listUsers(query: AdminUserListQuery): AdminUserList {
       const needle = query.query?.toLowerCase() ?? null;

@@ -171,6 +171,13 @@ export interface UserLeaderboardRank {
   readonly timeMs: number;
 }
 
+/** Where a time would sit on a board: `rank` is 1 + the number of strictly faster best times. */
+export interface LeaderboardTimePlacement {
+  readonly rank: number;
+  /** Players with a time on this board. */
+  readonly total: number;
+}
+
 // Admin account controls. Never carries password hashes.
 export interface AdminUserSummary {
   readonly id: string;
@@ -303,6 +310,7 @@ export interface UserStore {
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
+  getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement;
   // Admin account controls.
   listUsers(query: AdminUserListQuery): AdminUserList;
   deleteUser(id: string): boolean;

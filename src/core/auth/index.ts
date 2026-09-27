@@ -134,6 +134,20 @@ export interface SubmitBestTimeInput {
 export interface SubmitBestTimeResponse {
   readonly accepted: boolean;
   readonly isPersonalBest: boolean;
+  /**
+   * The player's rank on this board after the submission (for their best time, which may be an
+   * earlier, faster run when `accepted` is false). Absent from servers older than Compete.
+   */
+  readonly rank?: number | null;
+  /** The player's best time on this board after the submission. */
+  readonly bestTimeMs?: number | null;
+}
+
+/** Where a time would place on a board: `rank` is 1 + the number of strictly faster best times. */
+export interface LeaderboardPlacement {
+  readonly rank: number;
+  /** Players with a time on this board right now. */
+  readonly total: number;
 }
 
 export interface PublicUser {
@@ -213,9 +227,9 @@ export async function signOut(): Promise<void> {
   await postJson("/auth/logout", {});
 }
 
-export async function fetchLeaderboard(mode: string, variant = "", limit = 50): Promise<LeaderboardResponse | null> {
+export async function fetchLeaderboard(mode: string, variant = "", limit = 50, offset = 0): Promise<LeaderboardResponse | null> {
   try {
-    const params = new URLSearchParams({ mode, variant, limit: String(limit) });
+    const params = new URLSearchParams({ mode, variant, limit: String(limit), ...(offset > 0 ? { offset: String(offset) } : {}) });
     const response = await fetch(`/api/leaderboard?${params.toString()}`);
     if (!response.ok) return null;
     return (await response.json()) as LeaderboardResponse;
@@ -229,6 +243,25 @@ export async function submitBestTime(input: SubmitBestTimeInput): Promise<Submit
     const response = await postJson("/api/leaderboard", input);
     if (!response.ok) return null;
     return (await response.json()) as SubmitBestTimeResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where `timeMs` would rank on a leaderboard (`mode` + `variant`: "" / "territories" / "both" for
+ * flags, a continent for puzzle). Works for guests too, so a timed results screen can say
+ * "that would be #12 of 340". Resolves null when offline or the input is rejected (times must be
+ * whole milliseconds between 5 s and 2 h).
+ */
+export async function fetchLeaderboardRank(mode: string, variant: string, timeMs: number): Promise<LeaderboardPlacement | null> {
+  if (!Number.isFinite(timeMs)) return null;
+  try {
+    const params = new URLSearchParams({ mode, variant, timeMs: String(Math.round(timeMs)) });
+    const response = await fetch(`/api/leaderboard/rank?${params.toString()}`);
+    if (!response.ok) return null;
+    const data = (await response.json()) as Partial<LeaderboardPlacement>;
+    return typeof data.rank === "number" && typeof data.total === "number" ? { rank: data.rank, total: data.total } : null;
   } catch {
     return null;
   }

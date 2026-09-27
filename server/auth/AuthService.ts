@@ -22,6 +22,7 @@ import type {
   SendFriendRequestResult,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardTimePlacement,
   PasswordHasher,
   Session,
   StoredUser,
@@ -286,6 +287,22 @@ export class AuthService {
 
   getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
     return this.store.getUserRank(userId, gameMode, variant);
+  }
+
+  /** Where `timeMs` would place on a board (for a results screen, signed in or not). */
+  getLeaderboardTimePlacement(query: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): LeaderboardTimePlacement | { error: string } {
+    const gameMode = typeof query.gameMode === "string" ? query.gameMode : "";
+    if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+
+    const variantRaw = typeof query.variant === "string" ? query.variant : "";
+    const variant = normalizeLeaderboardVariant(gameMode, variantRaw);
+    if (variant === null) return { error: "Invalid leaderboard variant." };
+
+    const timeMs = query.timeMs;
+    if (typeof timeMs !== "number" || !Number.isInteger(timeMs) || timeMs < MIN_TIME_MS || timeMs > MAX_TIME_MS) {
+      return { error: "Invalid completion time." };
+    }
+    return this.store.getTimePlacement(gameMode, variant, timeMs);
   }
 
   // --- Academy ---

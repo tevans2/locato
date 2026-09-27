@@ -27,6 +27,7 @@ import type {
   StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardTimePlacement,
   Session,
   StoredUser,
   SubmitBestTimeInput,
@@ -503,6 +504,17 @@ export class SqliteUserStore implements UserStore {
       .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
 
     return { rank: rankRow?.rank ?? 1, timeMs: row.timeMs };
+  }
+
+  getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement {
+    const row = this.db
+      .query<{ faster: number | null; total: number }>(
+        `SELECT SUM(CASE WHEN best_time_ms < ? THEN 1 ELSE 0 END) AS faster, COUNT(*) AS total
+         FROM mode_best_times
+         WHERE game_mode = ? AND variant = ?`,
+      )
+      .get(timeMs, gameMode, variant);
+    return { rank: (row?.faster ?? 0) + 1, total: row?.total ?? 0 };
   }
 
   listUsers(query: AdminUserListQuery): AdminUserList {
