@@ -8,11 +8,6 @@
     grid-template-rows: auto auto;
   }
 
-  .answer-panel {
-    max-height: none;
-    overflow: visible;
-  }
-
   .world-map-svg {
     min-height: clamp(300px, calc(100dvh - 310px), 620px);
   }
@@ -27,6 +22,13 @@
 
   .puzzle-piece-tray {
     max-height: clamp(320px, calc(100dvh - 310px), 620px);
+  }
+}
+/* Match the final single-column breakpoint so sidebars still scroll at 901–980px. */
+@media (max-width: 900px) {
+  .answer-panel {
+    max-height: none;
+    overflow: visible;
   }
 }
 @media (max-width: 1080px) {

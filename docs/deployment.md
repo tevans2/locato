@@ -27,6 +27,19 @@ GitHub Actions deploy on push (both run `npm test` then `npm run build` before d
 
 Manual deploy: `flyctl deploy --config fly.toml -a locato` (or `--config fly.staging.toml`).
 
+### Release gate: staging must deploy before main
+
+The `main-protect` ruleset (Settings → Rules) protects `main`:
+
+- Changes land only through a pull request (merge commits only); no direct pushes, force pushes, or deletion.
+- The PR's head commit must have a passing **Test, build, and deploy staging** check from GitHub Actions: that's the staging workflow job, which runs tests, deploys `locato-staging`, and then smoke-tests `/health`. In practice only `staging` → `main` PRs can carry that check.
+- The branch must be up to date with `main`. If GitHub asks you to update it, merge `main` into `staging`, which redeploys staging and re-runs the check on the new commit.
+- Repository admins can bypass the gate when merging a PR (GitHub records this); nobody can push to `main` directly.
+
+Flow: feature branch → PR into `staging` → staging deploys and goes green → PR `staging` → `main` → production deploys.
+
+A hotfix follows the same path, since the gate only waits for the staging deploy (a few minutes).
+
 ## Persistent volume
 
 SQLite lives on a Fly volume mounted at `/data`, with `DATABASE_PATH=/data/locato.db` set in each app's `[env]`. Create the volume **before the first deploy** of an app:

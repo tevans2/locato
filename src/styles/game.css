@@ -3261,6 +3261,10 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action {
 .flag-card,
 .answer-panel {
   position: relative;
+}
+
+/* Only the board clips its decoration; answer panels must retain scrolling. */
+.flag-card {
   overflow: hidden;
 }
 
