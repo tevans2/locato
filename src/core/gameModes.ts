@@ -92,6 +92,15 @@ export const mapTapGameModeOptions: readonly GameModeOption[] = [
 ];
 
 export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
+/** Timer modes that have a server leaderboard (server/leaderboard/validation.ts GAME_MODE_IDS). Flag colours has none. */
+export const LEADERBOARD_GAME_MODE_IDS = ["flags", "shapes", "codes", "capitals", "capital-recall", "name-all", "click-country", "spot-country", "puzzle"] as const satisfies readonly TimerGameModeId[];
+export type LeaderboardGameModeId = (typeof LEADERBOARD_GAME_MODE_IDS)[number];
+
+export function isLeaderboardGameModeId(id: string): id is LeaderboardGameModeId {
+  return (LEADERBOARD_GAME_MODE_IDS as readonly string[]).includes(id);
+}
+
+export const leaderboardGameModeOptions: readonly GameModeOption[] = timerGameModeOptions.filter((option) => isLeaderboardGameModeId(option.id));
 export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...worldSplitGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
 
 export function isPromptGameModeId(id: string): id is PromptGameModeId {

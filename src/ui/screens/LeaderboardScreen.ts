@@ -1,7 +1,7 @@
 import { fetchAuthState, fetchLeaderboard, submitBestTime, type AuthUser, type LeaderboardEntry } from "../../core/auth";
 import { CONTINENTS } from "../../core/countries";
 import { normalizeFlagPool, type FlagPool } from "../../core/flagPools";
-import { isTimerGameModeId, timerGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
+import { isLeaderboardGameModeId, leaderboardGameModeOptions, type GameModeId, type TimerGameModeId } from "../../core/gameModes";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
@@ -41,7 +41,8 @@ function renderRows(entries: readonly LeaderboardEntry[], currentUserId: string 
 
 export function createLeaderboardScreen(options: LeaderboardScreenOptions): Screen {
   const controller = new AbortController();
-  let selectedMode: TimerGameModeId = options.initialMode && isTimerGameModeId(options.initialMode) ? options.initialMode : "name-all";
+  // Only modes with a server board: e.g. arriving from a Flag colours game opens the Flags board instead of a 400.
+  let selectedMode: TimerGameModeId = options.initialMode && isLeaderboardGameModeId(options.initialMode) ? options.initialMode : options.initialMode === "flag-colors" ? "flags" : "name-all";
   let selectedPuzzleVariant = selectedMode === "puzzle" && CONTINENTS.includes(options.initialVariant as (typeof CONTINENTS)[number]) ? options.initialVariant! : "Africa";
   let selectedFlagVariant = selectedMode === "flags" && (options.initialVariant === "territories" || options.initialVariant === "both") ? options.initialVariant : "";
   let currentUser: AuthUser | null = null;
@@ -49,7 +50,7 @@ export function createLeaderboardScreen(options: LeaderboardScreenOptions): Scre
   const modeSelect = el("select", {
     className: "leaderboard-mode-select",
     attrs: { id: "leaderboard-mode", name: "leaderboardMode", "aria-label": "Leaderboard game mode" },
-    children: timerGameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
+    children: leaderboardGameModeOptions.map((mode) => el("option", { text: mode.label, attrs: { value: mode.id } })),
   });
   modeSelect.value = selectedMode;
 
