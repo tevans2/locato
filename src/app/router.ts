@@ -6,10 +6,11 @@ export type AppRoute =
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool; readonly run?: "timed" }
   | { readonly type: "daily-challenge" }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed"; readonly continent?: string }
-  | { readonly type: "streetview-country" }
-  | { readonly type: "geoguessr" }
-  | { readonly type: "map-tap" }
-  | { readonly type: "worldsplit" }
+  /** The score modes. `run: "timed"` is a ranked attempt (fixed length, posts its total to the board). */
+  | { readonly type: "streetview-country"; readonly run?: "timed" }
+  | { readonly type: "geoguessr"; readonly run?: "timed" }
+  | { readonly type: "map-tap"; readonly run?: "timed" }
+  | { readonly type: "worldsplit"; readonly run?: "timed" }
   /**
    * Compete › Multiplayer. `joinCode` joins that room (`?room=`); `create` opens straight into a
    * new room with the default settings (`?view=multiplayer&create=1`), optionally inviting one
@@ -66,7 +67,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     const continent = params.get("continent")?.trim();
     return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
   }
-  if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
+  if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game, ...timed };
   const view = params.get("view");
   if (view === "academy") {
     const lesson = params.get("lesson")?.trim();
@@ -107,7 +108,10 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     if (route.run === "timed") params.set("run", "timed");
     if (route.continent) params.set("continent", route.continent);
   }
-  else if (["map-tap", "worldsplit", "geoguessr", "streetview-country"].includes(route.type)) params.set("game", route.type);
+  else if (route.type === "map-tap" || route.type === "worldsplit" || route.type === "geoguessr" || route.type === "streetview-country") {
+    params.set("game", route.type);
+    if (route.run === "timed") params.set("run", "timed");
+  }
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
   else if (route.type === "multiplayer" && route.create) {
     params.set("view", "multiplayer");

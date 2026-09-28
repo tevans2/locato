@@ -1,5 +1,5 @@
 import type { Screen } from "../../app/router";
-import type { ShellContext } from "../shell/types";
+import type { RunType, ShellContext } from "../shell/types";
 import type { CountryIndex } from "../../core/countries";
 import { createGeoGuessrQueue, GEOGUESSR_MAX_GAME_SCORE, GEOGUESSR_MAX_ROUND_SCORE, GEOGUESSR_ROUND_LIMIT, scoreGeoGuessrGuess, type GeoGuessrGuessResult, type GeoGuessrLocation } from "../../core/geoguessr";
 import type { GameModeId } from "../../core/gameModes";
@@ -8,8 +8,9 @@ import { streetViewCountryRounds, type StreetViewCountryRound } from "../../core
 import { createGeoGuessMap, googleMapsJavaScriptApiKey } from "../components/GeoGuessMap";
 import { createGeoStreetView } from "../components/GeoStreetView";
 import { el } from "../dom/createElement";
-import { createResultsCard } from "../shell/ResultsCard";
+import { createResultsCard, type ResultsCardHandle } from "../shell/ResultsCard";
 import { createPracticeBar, createRunList, formatKm, formatNumber, insertIntoResults, recordLocalBest, runLeaveMessage, shareSquare, shellOrFallback } from "./practiceRun";
+import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 
 export const GEOGUESSR_BEST_RUN_KEY = "locato:geoguessr:best-run:v1";
 
@@ -23,6 +24,8 @@ export interface GeoGuessrScreenOptions {
   readonly onDailyChallenge: () => void;
   /** Keeps the local best for a five-round total. */
   readonly storage?: Storage;
+  /** "timed" (`&run=timed`): a ranked attempt of the standard five rounds; the total posts to the GeoGuessr board. */
+  readonly run?: RunType;
 }
 
 /** Injectable surfaces keep the full game flow testable without Google credentials. */
@@ -32,6 +35,8 @@ export interface GeoGuessrScreenServices {
   readonly loadLocations: (signal: AbortSignal) => Promise<GeoGuessrLocation[]>;
   /** False when no Google Maps key is configured: the screen shows a friendly "not set up" state. */
   readonly isConfigured: () => boolean;
+  /** Posts a ranked attempt's total (defaults to the leaderboard API). */
+  readonly postAttempt?: PostRankedAttempt;
 }
 
 type GameStatus = "loading" | "playing" | "result" | "complete" | "error" | "unconfigured";
@@ -91,6 +96,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   const controller = new AbortController();
   const shell = shellOrFallback(options.shell, options.onHome);
   const signal = controller.signal;
+  const ranked = options.run === "timed";
   const narrow = window.matchMedia("(max-width: 700px)");
   let locations: GeoGuessrLocation[] = [];
   let roundIndex = 0;
@@ -138,7 +144,11 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   const alternativeGames = el("div", {
     className: "geo-alt-games",
     attrs: { hidden: "true" },
-    children: [
+    children: ranked ? [
+      el("button", { className: "geo-button geo-primary", text: "Ranked MapTap", attrs: { type: "button" }, on: { click: () => shell.openGame("map-tap", "timed") } }),
+      el("button", { className: "geo-button geo-secondary", text: "Ranked Worldsplit", attrs: { type: "button" }, on: { click: () => shell.openGame("worldsplit", "timed") } }),
+      el("button", { className: "geo-button geo-secondary", text: "Back to Compete", attrs: { type: "button" }, on: { click: () => shell.openCompete("geoguessr") } }),
+    ] : [
       el("button", { className: "geo-button geo-primary", text: "Play MapTap", attrs: { type: "button" }, on: { click: () => shell.openGame("map-tap") } }),
       el("button", { className: "geo-button geo-secondary", text: "Play Worldsplit", attrs: { type: "button" }, on: { click: () => shell.openGame("worldsplit") } }),
       el("button", { className: "geo-button geo-secondary", text: "Try another game", attrs: { type: "button" }, on: { click: () => shell.openGamePicker({ current: "geoguessr" }) } }),
@@ -152,14 +162,21 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     void request.catch(() => { help.textContent = "Fullscreen is unavailable in this browser."; });
   };
-  const bar = createPracticeBar(element, shell, {
-    gameMode: "geoguessr",
-    leaveGuard: () => (status === "complete" ? null : runLeaveMessage(results.length, GEOGUESSR_ROUND_LIMIT, "rounds")),
-    extraMenuItems: [
-      ...(fullscreenEnabled ? [{ label: "Fullscreen", icon: "maximize" as const, onSelect: toggleFullscreen }] : []),
-      { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (services.isConfigured()) void loadGame(); } },
-    ],
-  });
+  const fullscreenItems = fullscreenEnabled ? [{ label: "Fullscreen", icon: "maximize" as const, onSelect: toggleFullscreen }] : [];
+  const bar = ranked
+    ? createRankedBar(element, shell, {
+        gameMode: "geoguessr",
+        inProgress: () => status !== "complete" && status !== "unconfigured",
+        extraMenuItems: fullscreenItems,
+      })
+    : createPracticeBar(element, shell, {
+        gameMode: "geoguessr",
+        leaveGuard: () => (status === "complete" ? null : runLeaveMessage(results.length, GEOGUESSR_ROUND_LIMIT, "rounds")),
+        extraMenuItems: [
+          ...fullscreenItems,
+          { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (services.isConfigured()) void loadGame(); } },
+        ],
+      });
   bar.element.classList.add("geo-gamebar");
   topbar.append(bar.element, session);
 
@@ -264,25 +281,44 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     const averageKm = results.reduce((sum, item) => sum + item.distanceKm, 0) / Math.max(1, results.length);
     const bestIndex = results.reduce((top, item, index) => (item.score > (results[top]?.score ?? -1) ? index : top), 0);
     const best = results[bestIndex];
-    const localBest = recordLocalBest(options.storage, GEOGUESSR_BEST_RUN_KEY, total);
     const ratio = total / GEOGUESSR_MAX_GAME_SCORE;
-    const card = createResultsCard(shell, {
-      kicker: "GeoGuessr · Practice",
-      title: localBest.isNew && localBest.previous > 0 ? "A new best trip!" : ratio >= 0.7 ? "World traveller" : ratio >= 0.4 ? "Well explored" : "Trip complete",
-      stats: [
-        { label: "Total score", value: formatNumber(total), note: `of ${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}` },
-        { label: "Average distance", value: formatDistance(averageKm) },
-        ...(best ? [{ label: "Best round", value: formatNumber(best.score), note: countryName(best.target) }] : []),
-      ],
-      missed: results.map((item) => ({ code: item.target.countryCode, name: countryName(item.target), flagSrc: `/assets/flags/${item.target.countryCode.toLowerCase()}.svg` })),
-      missedTitle: "Places you visited",
-      primary: { label: "Play again", onClick: () => { void loadGame(); } },
-      share: {
-        title: "Locato GeoGuessr",
-        text: `Locato GeoGuessr ${formatNumber(total)}/${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}\n${results.map((item) => shareSquare(item.score / GEOGUESSR_MAX_ROUND_SCORE)).join("")}\nlocato.quest`,
-      },
-      tone: ratio >= 0.4 ? "celebrate" : "neutral",
-    });
+    const shareText = `Locato GeoGuessr${ranked ? " (ranked)" : ""} ${formatNumber(total)}/${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}\n${results.map((item) => shareSquare(item.score / GEOGUESSR_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
+    const visited = results.map((item) => ({ code: item.target.countryCode, name: countryName(item.target), flagSrc: `/assets/flags/${item.target.countryCode.toLowerCase()}.svg` }));
+    const stats = [
+      { label: "Total score", value: formatNumber(total), note: `of ${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}` },
+      { label: "Average distance", value: formatDistance(averageKm) },
+      ...(best ? [{ label: "Best round", value: formatNumber(best.score), note: countryName(best.target) }] : []),
+    ];
+    const tone = ratio >= 0.4 ? "celebrate" : "neutral";
+    let card: ResultsCardHandle;
+    if (ranked) {
+      card = createRankedResults(shell, {
+        mode: "geoguessr",
+        title: ratio >= 0.7 ? "World traveller" : ratio >= 0.4 ? "Well explored" : "Attempt complete",
+        total,
+        stats,
+        missed: visited,
+        missedTitle: "Places you visited",
+        shareTitle: "Locato GeoGuessr",
+        shareText,
+        onTryAgain: () => { void loadGame(); },
+        posting: submitRankedAttempt({ shell, mode: "geoguessr", total, storage: options.storage ?? null, ...(services.postAttempt ? { post: services.postAttempt } : {}) }),
+        tone,
+      });
+    } else {
+      const localBest = recordLocalBest(options.storage, GEOGUESSR_BEST_RUN_KEY, total);
+      card = createResultsCard(shell, {
+        kicker: "GeoGuessr · Practice",
+        title: localBest.isNew && localBest.previous > 0 ? "A new best trip!" : ratio >= 0.7 ? "World traveller" : ratio >= 0.4 ? "Well explored" : "Trip complete",
+        stats,
+        missed: visited,
+        missedTitle: "Places you visited",
+        primary: { label: "Play again", onClick: () => { void loadGame(); } },
+        share: { title: "Locato GeoGuessr", text: shareText },
+        crossLink: rankedCrossLink(shell, "geoguessr"),
+        tone,
+      });
+    }
     // The pins review stays: each row re-reveals that round's pin and location on the map.
     const recap = createRunList("Review each round", results.map((item, index) => ({
       label: countryName(item.target),
@@ -305,6 +341,11 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   function showUnconfigured(): void {
     setPhase("unconfigured");
     map.setAcceptingGuesses(false);
+    if (ranked) {
+      errorTitle.textContent = "Ranked attempts need Street View — not available here";
+      loadingText.textContent = "GeoGuessr’s ranked attempt uses Google Street View, which isn’t set up on this copy of Locato. These ranked modes play right away:";
+      return;
+    }
     errorTitle.textContent = "Street View isn’t set up here";
     loadingText.textContent = "GeoGuessr needs Google Street View, which isn’t available on this copy of Locato. These play right away:";
   }

@@ -1,4 +1,4 @@
-import type { ShellContext } from "../shell/types";
+import type { RunType, ShellContext } from "../shell/types";
 import {
   DEFAULT_WORLD_SPLIT_LINE,
   WORLD_SPLIT_MAX_ROUND_SCORE,
@@ -25,10 +25,12 @@ import {
   type WorldMapPosition,
 } from "../../core/map";
 import type { GameModeId } from "../../core/gameModes";
+import { WORLD_SPLIT_ATTEMPT_ROUNDS } from "../../core/leaderboards";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createResultsCard } from "../shell/ResultsCard";
 import { createPracticeBar, createResultsStage, createRunList, formatNumber, insertIntoResults, recordLocalBest, runLeaveMessage, shareSquare, shellOrFallback } from "./practiceRun";
+import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MIN_DRAW_LENGTH = 24;
@@ -43,6 +45,13 @@ export interface WorldSplitScreenOptions {
   readonly onHome: () => void;
   readonly onDailyChallenge?: () => void;
   readonly onMultiplayer?: () => void;
+  /** "timed" (`&run=timed`): a ranked attempt of the standard rounds whose total posts to the Worldsplit board. */
+  readonly run?: RunType;
+}
+
+export interface WorldSplitScreenServices {
+  /** Posts a ranked attempt's total (defaults to the leaderboard API). */
+  readonly postAttempt?: PostRankedAttempt;
 }
 
 function createSvgElement<K extends keyof SVGElementTagNameMap>(tagName: K): SVGElementTagNameMap[K] {
@@ -84,8 +93,11 @@ function feedbackForScore(score: number): string {
   return "The population is more uneven than the map looks";
 }
 
-export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen {
+export function createWorldSplitScreen(options: WorldSplitScreenOptions, services: WorldSplitScreenServices = {}): Screen {
   const controller = new AbortController();
+  const ranked = options.run === "timed";
+  // The rounds are fixed and the same for everyone; a ranked attempt is the standard run.
+  const rounds = ranked ? WORLD_SPLIT_ROUNDS.slice(0, WORLD_SPLIT_ATTEMPT_ROUNDS) : WORLD_SPLIT_ROUNDS;
   const shell = shellOrFallback(options.shell, options.onHome);
   const countries = buildWorldSplitCountries(options.worldCountryFeatures);
   const countryByCode = new Map(countries.map((country) => [country.code, country]));
@@ -172,7 +184,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   const roundDetail = el("p", { className: "worldsplit-round-detail" });
   const progressLabel = el("span", { className: "worldsplit-progress-label" });
   const scoreLabel = el("strong", { className: "worldsplit-running-score", text: "0 pts" });
-  const progressDots = WORLD_SPLIT_ROUNDS.map(() => el("span", { className: "worldsplit-progress-dot" }));
+  const progressDots = rounds.map(() => el("span", { className: "worldsplit-progress-dot" }));
   const statusText = el("p", { className: "worldsplit-status", text: "Draw a line to make your split." });
 
   const sideAValue = el("strong", { className: "worldsplit-side-value", text: "?" });
@@ -233,7 +245,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   });
 
   function currentRound() {
-    return WORLD_SPLIT_ROUNDS[roundIndex]!;
+    return rounds[roundIndex]!;
   }
 
   function totalScore(): number {
@@ -241,7 +253,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   }
 
   function updateProgress(): void {
-    progressLabel.textContent = finished ? "Run complete" : `Round ${roundIndex + 1} of ${WORLD_SPLIT_ROUNDS.length}`;
+    progressLabel.textContent = finished ? "Run complete" : `Round ${roundIndex + 1} of ${rounds.length}`;
     scoreLabel.textContent = `${totalScore()} pts`;
     progressDots.forEach((dot, index) => {
       dot.classList.toggle("is-complete", index < scores.length);
@@ -303,7 +315,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
     finished = false;
     line = null;
     submittedResult = null;
-    roundEyebrow.textContent = `Worldsplit · ${round.label}`;
+    roundEyebrow.textContent = `Worldsplit${ranked ? " · Ranked" : ""} · ${round.label}`;
     roundTitle.textContent = round.prompt;
     roundDetail.textContent = round.detail;
     sideAValue.textContent = "?";
@@ -338,7 +350,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
     );
     lockButton.hidden = true;
     nextButton.hidden = false;
-    nextButton.textContent = roundIndex === WORLD_SPLIT_ROUNDS.length - 1 ? "See final score" : "Next round";
+    nextButton.textContent = roundIndex === rounds.length - 1 ? "See final score" : "Next round";
     setAdjustmentDisabled(true);
     resetLineButton.disabled = true;
     svg.classList.add("is-locked");
@@ -349,12 +361,40 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   function finishGame(): void {
     finished = true;
     const score = totalScore();
-    const maximum = WORLD_SPLIT_ROUNDS.length * WORLD_SPLIT_MAX_ROUND_SCORE;
-    const localBest = recordLocalBest(options.storage, BEST_SCORE_KEY, score);
+    const maximum = rounds.length * WORLD_SPLIT_MAX_ROUND_SCORE;
     const bestIndex = scores.reduce((top, roundScore, index) => (roundScore > (scores[top] ?? -1) ? index : top), 0);
-    const bestRound = WORLD_SPLIT_ROUNDS[bestIndex];
+    const bestRound = rounds[bestIndex];
     const ratio = score / maximum;
     updateProgress();
+    const shareText = `Locato Worldsplit${ranked ? " (ranked)" : ""} ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
+    const runList = createRunList("Your splits", scores.map((roundScore, index) => ({
+      label: rounds[index]!.label,
+      detail: rounds[index]!.prompt,
+      value: `${roundScore} pts`,
+      tone: roundScore >= 85 ? "good" : roundScore >= 50 ? "ok" : "miss",
+    })));
+
+    if (ranked) {
+      const rankedCard = createRankedResults(shell, {
+        mode: "worldsplit",
+        title: ratio >= 0.9 ? "You read the world at a glance" : ratio >= 0.7 ? "Strong population instinct" : "Attempt complete",
+        total: score,
+        stats: [
+          { label: "Total score", value: formatNumber(score), note: `of ${formatNumber(maximum)}` },
+          ...(bestRound ? [{ label: "Best round", value: formatNumber(scores[bestIndex] ?? 0), note: bestRound.label }] : []),
+        ],
+        shareTitle: "Locato Worldsplit",
+        shareText,
+        onTryAgain: playAgain,
+        posting: submitRankedAttempt({ shell, mode: "worldsplit", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) }),
+        tone: ratio >= 0.6 ? "celebrate" : "neutral",
+      });
+      insertIntoResults(rankedCard, runList);
+      resultsStage.show(rankedCard);
+      return;
+    }
+
+    const localBest = recordLocalBest(options.storage, BEST_SCORE_KEY, score);
 
     const card = createResultsCard(shell, {
       kicker: "Worldsplit · Practice",
@@ -366,24 +406,17 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
         { label: "Your best run", value: formatNumber(localBest.best), note: localBest.isNew ? "New best" : "On this device" },
       ],
       primary: { label: "Play again", onClick: playAgain },
-      share: {
-        title: "Locato Worldsplit",
-        text: `Locato Worldsplit ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`,
-      },
+      share: { title: "Locato Worldsplit", text: shareText },
+      crossLink: rankedCrossLink(shell, "worldsplit"),
       tone: ratio >= 0.6 ? "celebrate" : "neutral",
     });
-    insertIntoResults(card, createRunList("Your splits", scores.map((roundScore, index) => ({
-      label: WORLD_SPLIT_ROUNDS[index]!.label,
-      detail: WORLD_SPLIT_ROUNDS[index]!.prompt,
-      value: `${roundScore} pts`,
-      tone: roundScore >= 85 ? "good" : roundScore >= 50 ? "ok" : "miss",
-    }))));
+    insertIntoResults(card, runList);
     resultsStage.show(card);
   }
 
   function nextRound(): void {
     if (!submittedResult) return;
-    if (roundIndex >= WORLD_SPLIT_ROUNDS.length - 1) {
+    if (roundIndex >= rounds.length - 1) {
       finishGame();
       return;
     }
@@ -458,11 +491,13 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   const layout = el("main", { className: "worldsplit-layout", children: [mapShell, panel] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen worldsplit-screen gb-screen" });
-  const bar = createPracticeBar(element, shell, {
-    gameMode: "worldsplit",
-    leaveGuard: () => (finished ? null : runLeaveMessage(scores.length, WORLD_SPLIT_ROUNDS.length, "rounds")),
-    extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: playAgain }],
-  });
+  const bar = ranked
+    ? createRankedBar(element, shell, { gameMode: "worldsplit", inProgress: () => !finished })
+    : createPracticeBar(element, shell, {
+        gameMode: "worldsplit",
+        leaveGuard: () => (finished ? null : runLeaveMessage(scores.length, rounds.length, "rounds")),
+        extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: playAgain }],
+      });
   element.append(bar.element, layout, resultsStage.element);
 
   renderRound();

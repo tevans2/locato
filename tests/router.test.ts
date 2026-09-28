@@ -105,4 +105,17 @@ describe("shareable game routes", () => {
     expect(parse("/?game=puzzle&run=practice")).toEqual({ type: "country-guessing", mode: "puzzle" });
     expect(parse("/?game=flags&run=bogus")).toEqual({ type: "solo-game", categoryIds: ["flags"], continueSaved: false });
   });
+
+  it("carries a ranked attempt on the score modes' URLs (and on flag colours' timed run)", () => {
+    for (const mode of ["map-tap", "worldsplit", "geoguessr", "streetview-country"] as const) {
+      const ranked: AppRoute = { type: mode, run: "timed" };
+      expect(buildRouteUrl(ranked, { pathname: "/" })).toBe(`/?game=${mode}&run=timed`);
+      expect(parse(`/?game=${mode}&run=timed`)).toEqual(ranked);
+      expect(parse(`/?game=${mode}`)).toEqual({ type: mode });
+      expect(buildRouteUrl({ type: mode }, { pathname: "/" })).toBe(`/?game=${mode}`);
+    }
+    const flagColours: AppRoute = { type: "solo-game", categoryIds: ["flag-colors"], continueSaved: false, run: "timed" };
+    expect(buildRouteUrl(flagColours, { pathname: "/" })).toBe("/?game=flag-colors&run=timed");
+    expect(parse("/?game=flag-colors&run=timed")).toEqual(flagColours);
+  });
 });
