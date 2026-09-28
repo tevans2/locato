@@ -24,6 +24,7 @@ export interface StreetViewCountryScreenOptions {
 }
 
 type RoundStatus = "playing" | "won" | "lost";
+type DailyStreetViewResult = { readonly missed: boolean; readonly wrongGuesses: number };
 
 const ROUND_CACHE_TARGET_SIZE = 1;
 const STREETVIEW_PRELOAD_SLOT_COUNT = 1;
@@ -40,8 +41,7 @@ interface StreetViewPreloadSlot {
 }
 
 function googleMapsEmbedApiKey(): string {
-  const env = (import.meta as ImportMeta & { readonly env?: { readonly VITE_GOOGLE_MAPS_EMBED_API_KEY?: string } }).env;
-  return env?.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
+  return import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
 }
 
 function eligibleRounds(countryIndex: CountryIndex): readonly StreetViewCountryRound[] {
@@ -157,6 +157,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   let status: RoundStatus = "playing";
   let attemptIndex = 0;
   let round = options.dailyChallenge?.round ?? chooseRound(options.countryIndex);
+  let pendingDailyResult: DailyStreetViewResult | null = null;
   let dailyCompleted = false;
   let loadingRound = false;
   let activeStreetViewUrl = "";
@@ -304,6 +305,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
 
   function updateControls(): void {
     const attemptsUsed = attemptIndex + 1;
+    const dailyResultReady = pendingDailyResult !== null && !dailyCompleted;
     element.classList.toggle("is-streetview-fullscreen", streetViewFullscreen);
     fullscreenButton.textContent = streetViewFullscreen ? "Exit" : "Fullscreen";
     fullscreenButton.setAttribute("aria-pressed", String(streetViewFullscreen));
@@ -315,8 +317,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     input.disabled = status !== "playing" || !apiKey || loadingRound || dailyCompleted;
     restartButton.disabled = loadingRound || isDailyChallenge;
     revealButton.disabled = status !== "playing" || loadingRound || dailyCompleted;
-    nextRoundButton.hidden = isDailyChallenge || status === "playing";
-    nextRoundButton.textContent = loadingRound ? "Loading" : streetViewFullscreen ? "Next" : "Next round";
+    nextRoundButton.hidden = status === "playing" || (isDailyChallenge && !dailyResultReady);
+    nextRoundButton.disabled = loadingRound || (isDailyChallenge && !dailyResultReady);
+    nextRoundButton.textContent = loadingRound ? "Loading" : isDailyChallenge ? (streetViewFullscreen ? "Results" : "See results") : streetViewFullscreen ? "Next" : "Next round";
     roundResult.textContent = status === "won" ? `Correct — ${targetCountry().name}.` : status === "lost" ? `Answer — ${targetCountry().name}.` : "";
     missingKeyPanel.hidden = Boolean(apiKey);
     loadingOverlay.classList.toggle("is-active", showLoader);
@@ -415,7 +418,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     return urls;
   }
 
-  function chooseStreetViewPreloadSlot(url: string): StreetViewPreloadSlot {
+  function chooseStreetViewPreloadSlot(url: string): StreetViewPreloadSlot | null {
     const existing = findStreetViewPreloadSlot(url);
     if (existing) return existing;
 
@@ -423,7 +426,11 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     if (emptySlot) return emptySlot;
 
     const protectedUrls = protectedStreetViewUrls(url);
-    const reusableSlot = streetViewPreloadSlots.find((slot) => !protectedUrls.has(slot.url)) ?? streetViewPreloadSlots.find((slot) => !slot.ready) ?? streetViewPreloadSlots[streetViewPreloadSlots.length - 1]!;
+    // The visible round takes priority over future frames. Background preloads must wait
+    // rather than evicting the only slot while the visible round is still loading.
+    const reusableSlot = streetViewPreloadSlots.find((slot) => !protectedUrls.has(slot.url))
+      ?? (url === desiredStreetViewUrl ? streetViewPreloadSlots.find((slot) => slot.url !== desiredStreetViewUrl) : null);
+    if (!reusableSlot) return null;
     clearStreetViewPreloadSlot(reusableSlot, true);
     return reusableSlot;
   }
@@ -451,6 +458,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     if (!apiKey || !url || url === activeStreetViewUrl) return;
 
     const slot = chooseStreetViewPreloadSlot(url);
+    if (!slot) return;
     if (slot.url === url) {
       if (slot.ready && desiredStreetViewUrl === url) promoteStreetViewPreloadSlot(slot);
       return;
@@ -544,6 +552,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     guessedCountryIds.clear();
     status = "playing";
     attemptIndex = 0;
+    pendingDailyResult = null;
     input.value = "";
     render();
     if (message) showFeedback(feedback, message, tone);
@@ -592,10 +601,15 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     resetCurrentCountry(message, tone);
   }
 
-  function completeDailyStreetView(missed: boolean, wrongGuesses: number): void {
+  function queueDailyStreetViewResult(result: DailyStreetViewResult): void {
     if (!options.dailyChallenge || dailyCompleted) return;
+    pendingDailyResult = result;
+  }
+
+  function completeDailyStreetView(): void {
+    if (!options.dailyChallenge || dailyCompleted || !pendingDailyResult) return;
     dailyCompleted = true;
-    options.dailyChallenge.onComplete({ missed, wrongGuesses });
+    options.dailyChallenge.onComplete(pendingDailyResult);
   }
 
   function handleGuess(): void {
@@ -614,9 +628,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       const countryName = targetCountry().name;
       if (isDailyChallenge) {
         status = "won";
+        queueDailyStreetViewResult({ missed: false, wrongGuesses: attemptIndex });
         render();
         showFeedback(feedback, `Correct — ${countryName}.`, "good");
-        completeDailyStreetView(false, attemptIndex);
         return;
       }
       startNextRound(`Correct — ${countryName}. Next country loaded.`, "good");
@@ -624,10 +638,11 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     }
 
     if (attemptIndex >= maxAttempts - 1) {
+      const countryName = targetCountry().name;
       status = "lost";
+      queueDailyStreetViewResult({ missed: true, wrongGuesses: maxAttempts });
       render();
-      showFeedback(feedback, `Not ${guess.name}. No guesses left.`, "bad");
-      completeDailyStreetView(true, maxAttempts);
+      showFeedback(feedback, `Not ${guess.name}. Answer — ${countryName}.`, "bad");
       return;
     }
 
@@ -663,16 +678,26 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     },
     { signal: controller.signal },
   );
-  nextRoundButton.addEventListener("click", () => startNextRound(), { signal: controller.signal });
+  nextRoundButton.addEventListener(
+    "click",
+    () => {
+      if (isDailyChallenge) {
+        completeDailyStreetView();
+        return;
+      }
+      startNextRound();
+    },
+    { signal: controller.signal },
+  );
   restartButton.addEventListener("click", () => resetCurrentCountry("Fresh attempt. Guess the country from the first frame."), { signal: controller.signal });
   revealButton.addEventListener(
     "click",
     () => {
       if (loadingRound) return;
       status = "lost";
+      queueDailyStreetViewResult({ missed: true, wrongGuesses: attemptIndex });
       render();
       showFeedback(feedback, `Revealed: ${targetCountry().name}.`, "neutral");
-      completeDailyStreetView(true, attemptIndex);
     },
     { signal: controller.signal },
   );

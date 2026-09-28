@@ -45,7 +45,9 @@ function formatDistance(km: number | null): string {
 }
 
 function formatCategory(category: string): string {
-  if (category === "poi") return "point of interest";
+  if (category === "poi") return "natural wonder";
+  if (category === "mountain-range") return "mountain range";
+  if (category === "ocean") return "ocean or sea";
   return category;
 }
 

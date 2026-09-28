@@ -1,4 +1,6 @@
+import type { MapTapCategory } from "../maptap/types";
 import type { FlagPool } from "../flagPools";
+
 
 export type PlayerId = string;
 export type RoomCode = string;
@@ -29,7 +31,9 @@ export interface PublicRoundState {
 export interface PublicRoomSettings {
   readonly roundLimit: number;
   readonly roundDurationMs: number;
+  readonly mapTapCategories?: readonly MapTapCategory[];
   readonly flagPool?: FlagPool;
+
 }
 
 export interface PublicChatMessage {

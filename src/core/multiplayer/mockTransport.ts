@@ -1,6 +1,7 @@
 import type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
 import { filterProfanity } from "./profanity";
 import type { FinalResult, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState } from "./roomTypes";
+import { MAP_TAP_CATEGORIES } from "../maptap/locations";
 
 const HOST_PLAYER_ID = "host";
 const RIVAL_PLAYER_ID = "rival";
@@ -137,7 +138,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
         roundIndex = -1;
         assignedPlayerId = HOST_PLAYER_ID;
         room = lobbyRoom(message.categoryIds, message.playerName);
-        room = { ...room, settings: { roundLimit: message.roundLimit ?? DEMO_ROUNDS.length, roundDurationMs: message.roundDurationMs ?? DEMO_ROUND_MS } };
+        room = { ...room, settings: { roundLimit: message.roundLimit ?? DEMO_ROUNDS.length, roundDurationMs: message.roundDurationMs ?? DEMO_ROUND_MS, ...(message.categoryIds.length === 1 && message.categoryIds[0] === "map-tap" ? { mapTapCategories: message.mapTapCategories ?? MAP_TAP_CATEGORIES } : {}) } };
         assign(HOST_PLAYER_ID);
         emitSnapshot();
         return;
@@ -197,6 +198,7 @@ export function createMockMultiplayerTransport(): MultiplayerTransport {
           settings: {
             roundLimit: message.roundLimit ?? room.settings.roundLimit,
             roundDurationMs: message.roundDurationMs ?? room.settings.roundDurationMs,
+            ...(room.categoryIds.includes("map-tap") ? { mapTapCategories: message.mapTapCategories ?? room.settings.mapTapCategories ?? MAP_TAP_CATEGORIES } : {}),
           },
           players: room.players.map((player) => ({ ...player, ready: player.id === room.hostPlayerId ? player.ready : false })),
         };
