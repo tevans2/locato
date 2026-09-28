@@ -1,5 +1,5 @@
 import { fetchLeaderboardRank, submitBestTime } from "../auth";
-import type { TimerGameModeId } from "../gameModes";
+import { isLeaderboardMode, type TimerGameModeId } from "../gameModes";
 import { formatElapsedTime } from "./playTimer";
 
 export interface TimerLeaderboardResult {
@@ -23,6 +23,8 @@ export async function postTimedRun(input: {
   readonly timeMs: number;
   readonly isLoggedIn: boolean;
 }): Promise<TimedRunPosting> {
+  // Modes without a board (flag colours) have nothing to post to or rank against.
+  if (!isLeaderboardMode(input.gameMode)) return { serverAccepted: null, rank: null };
   if (!input.isLoggedIn) {
     const placement = await fetchLeaderboardRank(input.gameMode, input.variant, input.timeMs);
     return { serverAccepted: null, rank: placement?.rank ?? null };

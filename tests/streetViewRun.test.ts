@@ -107,7 +107,56 @@ describe("Street View country practice run", () => {
     expect(ui.$(".shell-focusbar .gb-daily-count")?.textContent).toBe("Round 10 of 10");
     await ui.ready();
     ui.guess(countryIndex.byCode.get(ui.currentCode())!.name);
+    // The result is queued: the answer stays up until the player asks for results.
+    expect(ui.onComplete).not.toHaveBeenCalled();
+    const next = ui.$<HTMLButtonElement>(".streetview-panel .actions .primary-action")!;
+    expect(next.hidden).toBe(false);
+    expect(next.textContent).toBe("See results");
+    next.click();
     expect(ui.onComplete).toHaveBeenCalledWith({ missed: false, wrongGuesses: 0 });
+    next.click();
+    expect(ui.onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("shows the daily answer after the last wrong guess and completes only on See results", async () => {
+    const ui = setup({ daily: true });
+    await ui.ready();
+    const code = ui.currentCode();
+    const next = ui.$<HTMLButtonElement>(".streetview-panel .actions .primary-action")!;
+    for (let n = 0; n < 3; n++) {
+      expect(next.hidden).toBe(true);
+      await ui.ready();
+      ui.guess(ui.wrongName(code, n));
+    }
+    const answer = countryIndex.byCode.get(code)!.name;
+    expect(ui.onComplete).not.toHaveBeenCalled();
+    expect(ui.$(".feedback")?.textContent).toBe(`Not ${ui.wrongName(code, 2)}. Answer — ${answer}.`);
+    expect(ui.$(".streetview-result")?.textContent).toBe(`Answer — ${answer}.`);
+    expect(ui.input.disabled).toBe(true);
+    // Fullscreen shortens the label.
+    ui.$<HTMLButtonElement>(".streetview-fullscreen-action")!.click();
+    expect(next.textContent).toBe("Results");
+    next.click();
+    expect(ui.onComplete).toHaveBeenCalledWith({ missed: true, wrongGuesses: 3 });
+  });
+
+  it("waits after Reveal in the daily and says Continue when later rounds remain", async () => {
+    const onComplete = vi.fn();
+    const dailyRound = streetViewCountryRounds.find((round) => round.frames.length === 3 && countryIndex.byCode.has(round.countryCode))!;
+    const screen = createStreetViewCountryScreen({
+      shell: stubShell(), countryIndex, onGameModeChange() {}, onHome() {}, onMultiplayer() {}, onDailyChallenge() {},
+      dailyChallenge: { date: "2026-09-27", round: dailyRound, onComplete, progress: { round: 4, total: 10 } },
+    }, services);
+    screens.push(screen);
+    document.body.append(screen.element);
+    const input = screen.element.querySelector<HTMLInputElement>("#streetview-guess-input")!;
+    await vi.waitFor(() => expect(input.disabled).toBe(false));
+    screen.element.querySelector<HTMLButtonElement>(".streetview-panel .actions .ghost-action:last-child")!.click();
+    expect(onComplete).not.toHaveBeenCalled();
+    const next = screen.element.querySelector<HTMLButtonElement>(".streetview-panel .actions .primary-action")!;
+    expect(next.textContent).toBe("Continue daily challenge");
+    next.click();
+    expect(onComplete).toHaveBeenCalledWith({ missed: true, wrongGuesses: 0 });
   });
 
   it("explains a missing Street View key inside the GameBar layout", () => {

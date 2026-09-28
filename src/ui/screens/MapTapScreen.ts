@@ -1,6 +1,6 @@
 import type { ShellContext } from "../shell/types";
 import type { Screen } from "../../app/router";
-import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
+import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_CATEGORY_OPTIONS, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_LOCATIONS, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
 import { describeMapTapSkill, difficultyForSkill, defaultMapTapSkill, readMapTapSkill, recordMapTapResult, saveMapTapSkill } from "../../core/maptap/skill";
 import type { GameModeId } from "../../core/gameModes";
 import { el } from "../dom/createElement";
@@ -54,13 +54,7 @@ export interface MapTapScreenServices {
   readonly fetchSummary: typeof fetchWikipediaSummary;
 }
 
-const CATEGORIES: readonly { readonly value: "" | MapTapCategory; readonly label: string }[] = [
-  { value: "", label: "All categories" },
-  { value: "city", label: "Cities" },
-  { value: "mountain", label: "Mountains" },
-  { value: "poi", label: "Points of interest" },
-  { value: "landmark", label: "Landmarks" },
-];
+const CATEGORIES = MAP_TAP_CATEGORY_OPTIONS;
 
 const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly label: string }[] = [
   { value: "", label: "All difficulties" },
@@ -69,9 +63,28 @@ const DIFFICULTIES: readonly { readonly value: "" | MapTapDifficulty; readonly l
   { value: "hard", label: "Hard" },
 ];
 
+const CATEGORY_LABELS: Record<MapTapCategory, string> = {
+  city: "City",
+  region: "Region",
+  mountain: "Mountain",
+  "mountain-range": "Mountain range",
+  ocean: "Ocean or sea",
+  poi: "Natural wonder",
+  landmark: "Landmark",
+};
+
 function formatCategory(category: MapTapCategory): string {
-  if (category === "poi") return "Point of interest";
-  return category.charAt(0).toUpperCase() + category.slice(1);
+  return CATEGORY_LABELS[category] ?? category;
+}
+
+/** Fisher–Yates copy, so a round tries the selected categories in a random order. */
+function shuffled<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  return copy;
 }
 
 function optionNodes<T extends string>(items: readonly { readonly value: T; readonly label: string }[]): readonly HTMLOptionElement[] {
@@ -97,9 +110,14 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   let dailyCompleted = false;
   let skill = options.storage ? readMapTapSkill(options.storage) : defaultMapTapSkill;
   let adaptiveRoundIndex = 0;
+  /** Bumped on every load and on going back to setup, so a stale fetch never lands. */
+  let loadSequence = 0;
   /** This practice run's scored targets (never more than MAP_TAP_RUN_LENGTH). */
   const runResults: MapTapGuessResult[] = [];
   let runFinished = false;
+  /** Practice opens on the category setup panel; the daily skips it (its target is fixed). */
+  let hasStarted = isDailyChallenge;
+  const selectedCategoryIds = new Set<MapTapCategory>(CATEGORIES.map((category) => category.value));
 
   const promptTarget = el("strong", { text: "Loading..." });
   const promptMeta = el("span", { className: "maptap-prompt-meta", text: "" });
@@ -118,11 +136,6 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   const resultPanel = el("section", { className: "maptap-result-panel", attrs: { hidden: "true" } });
   const newRoundButton = el("button", { className: "primary-action", text: "Next target", attrs: { type: "button" } });
   const resetButton = el("button", { className: "ghost-action maptap-reset", text: "Reset view", attrs: { type: "button" } });
-  const categorySelect = el("select", {
-    className: "maptap-filter-select",
-    attrs: { id: "maptap-category", name: "maptapCategory", "aria-label": "MapTap category" },
-    children: optionNodes(CATEGORIES),
-  });
   const difficultySelect = el("select", {
     className: "maptap-filter-select",
     attrs: { id: "maptap-difficulty", name: "maptapDifficulty", "aria-label": "MapTap difficulty" },
@@ -141,6 +154,29 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   });
   decayInput.value = String(MAP_TAP_DEFAULT_DECAY_KM);
 
+  // ---- Category setup (practice only) ---------------------------------------------------------
+  const startButton = el("button", { className: "primary-action maptap-start-action", text: "Start MapTap", attrs: { type: "button" } });
+  const toggleAllButton = el("button", { className: "ghost-action maptap-toggle-all", text: "Clear all", attrs: { type: "button" } });
+  const changeCategoriesButton = el("button", { className: "ghost-action maptap-change-categories", text: "Change categories", attrs: { type: "button" } });
+  const selectionSummary = el("p", { className: "maptap-selection-summary", attrs: { role: "status" } });
+  const activeCategoriesLabel = el("span", { className: "maptap-active-categories" });
+  const categoryInputs = new Map<MapTapCategory, HTMLInputElement>();
+  const categoryOptions = CATEGORIES.map((category) => {
+    const count = MAP_TAP_LOCATIONS.filter((location) => location.category === category.value).length;
+    const input = el("input", {
+      attrs: { type: "checkbox", name: "maptapCategories", value: category.value, checked: "", "aria-label": category.label },
+    });
+    categoryInputs.set(category.value, input);
+    return el("label", {
+      className: "maptap-category-option",
+      children: [
+        input,
+        el("span", { className: "maptap-category-copy", children: [el("strong", { text: category.label }), el("small", { text: category.description })] }),
+        el("span", { className: "maptap-category-count", text: String(count), attrs: { "aria-label": `${count} locations` } }),
+      ],
+    });
+  });
+
   const globe = services.createGlobe({
     signal: controller.signal,
     onGuess: (point) => {
@@ -150,8 +186,26 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
 
   const infoOverlay = services.createInfoOverlay();
 
-  function selectedCategory(): MapTapCategory | "" {
-    return categorySelect.value as MapTapCategory | "";
+  function selectedCategories(): readonly MapTapCategory[] {
+    return CATEGORIES.map((category) => category.value).filter((category) => selectedCategoryIds.has(category));
+  }
+
+  function selectionLabel(): string {
+    const categories = selectedCategories();
+    return categories.length === CATEGORIES.length
+      ? "All location types"
+      : categories.map((category) => CATEGORIES.find((item) => item.value === category)?.label ?? category).join(", ");
+  }
+
+  function updateCategorySetup(): void {
+    const categories = selectedCategories();
+    const locationCount = MAP_TAP_LOCATIONS.filter((location) => selectedCategoryIds.has(location.category)).length;
+    selectionSummary.textContent = categories.length === 0
+      ? "Choose at least one category to start."
+      : `${formatNumber(locationCount)} locations across ${categories.length} ${categories.length === 1 ? "category" : "categories"}`;
+    activeCategoriesLabel.textContent = selectionLabel();
+    startButton.disabled = categories.length === 0;
+    toggleAllButton.textContent = categories.length === CATEGORIES.length ? "Clear all" : "Select all";
   }
 
   function selectedDifficulty(): MapTapDifficulty | "" {
@@ -164,12 +218,9 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   }
 
   function setControlsDisabled(disabled: boolean): void {
-    // Filters change the *next* target; once a pin is revealed they wait for "Next target".
-    const lockFilters = disabled || isDailyChallenge || activeResult !== null;
-    categorySelect.disabled = lockFilters;
-    difficultySelect.disabled = lockFilters;
-    decayInput.disabled = lockFilters;
+    // Difficulty and score range live on the setup panel, so they're fixed for the whole run.
     newRoundButton.disabled = disabled;
+    changeCategoriesButton.disabled = disabled || isDailyChallenge;
     // Reset only recentres the globe before you pin. Once the answer is revealed it stays
     // disabled — re-pinning a revealed target would let players inflate their skill.
     resetButton.disabled = disabled || isDailyChallenge || activeResult !== null || isSubmitting;
@@ -215,7 +266,19 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     );
   }
 
+  /** One target from the selection: a random selected category each round (staging's rule), falling back to the others if that category has nothing at this difficulty. */
+  async function fetchSelectedTarget(difficulty: MapTapDifficulty | ""): Promise<MapTapRoundTarget | null> {
+    for (const category of shuffled(selectedCategories())) {
+      const target = await services.fetchRound({ category, difficulty }).catch(() => null);
+      if (controller.signal.aborted || !hasStarted) return null;
+      if (target) return target;
+    }
+    return null;
+  }
+
   async function loadRound(): Promise<void> {
+    if (!hasStarted) return;
+    const loadId = ++loadSequence;
     activeTarget = null;
     activeResult = null;
     isSubmitting = false;
@@ -235,8 +298,9 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     const adaptiveDifficulty = !isDailyChallenge && selectedDifficulty() === "" && options.storage
       ? difficultyForSkill(skill.level, adaptiveRoundIndex)
       : selectedDifficulty();
-    const target = options.dailyChallenge?.target ?? (await services.fetchRound({ category: selectedCategory(), difficulty: adaptiveDifficulty }).catch(() => null));
-    if (controller.signal.aborted) return;
+    const target = options.dailyChallenge?.target ?? (await fetchSelectedTarget(adaptiveDifficulty));
+    // Aborted, or the player went back to setup / restarted while this was in flight.
+    if (controller.signal.aborted || loadId !== loadSequence) return;
     isLoading = false;
 
     if (!target) {
@@ -278,6 +342,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
 
   async function submitGuess(point: MapTapClick): Promise<void> {
     if (!activeTarget || activeResult || isSubmitting || runFinished) return;
+    const guessSequence = loadSequence;
     isSubmitting = true;
     globe.setAcceptingGuesses(false);
     setControlsDisabled(true);
@@ -291,7 +356,8 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
           guessLng: point.lng,
           decayKm: selectedDecayKm(),
         }).catch(() => null);
-    if (controller.signal.aborted) return;
+    // Aborted, or the player went back to setup / restarted while the guess was checked.
+    if (controller.signal.aborted || guessSequence !== loadSequence) return;
 
     isSubmitting = false;
 
@@ -337,7 +403,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     const ratio = total / maximum;
 
     const card = createResultsCard(shell, {
-      kicker: "MapTap · Practice",
+      kicker: `MapTap · Practice · ${selectionLabel()}`,
       title: localBest.isNew && localBest.previous > 0 ? "A new best run!" : ratio >= 0.7 ? "Superb pinning" : ratio >= 0.45 ? "Solid run" : "Run complete",
       subtitle: `${MAP_TAP_RUN_LENGTH} targets, ${formatNumber(total)} of ${formatNumber(maximum)} points.`,
       stats: [
@@ -347,6 +413,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
         { label: "Your best run", value: formatNumber(localBest.best), note: localBest.isNew ? "New best" : "On this device" },
       ],
       primary: { label: "Play again", onClick: startRun },
+      secondary: [{ label: "Change categories", icon: "layout-grid", onClick: showSetup }],
       share: {
         title: "Locato MapTap",
         text: `Locato MapTap ${formatNumber(total)}/${formatNumber(maximum)}\n${runResults.map((item) => shareSquare(item.score / item.maxScore)).join("")}\nAverage ${formatKm(averageKm)} off\nlocato.quest`,
@@ -362,15 +429,76 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     resultsStage.show(card);
   }
 
+  /** A fresh 10-target run with the current selection ("Play again" keeps the same categories). */
   function startRun(): void {
+    if (!isDailyChallenge && selectedCategoryIds.size === 0) return;
+    hasStarted = true;
     runResults.splice(0);
     runFinished = false;
     resultsStage.hide();
+    setupPanel.hidden = true;
+    playPanel.hidden = false;
+    updateCategorySetup();
     void loadRound();
   }
 
-  categorySelect.addEventListener("change", () => void loadRound(), { signal: controller.signal });
-  difficultySelect.addEventListener("change", () => void loadRound(), { signal: controller.signal });
+  /** Back to the category setup. Discards any run in progress (callers confirm first). */
+  function showSetup(): void {
+    if (isDailyChallenge) return;
+    hasStarted = false;
+    loadSequence += 1;
+    runResults.splice(0);
+    runFinished = false;
+    activeTarget = null;
+    activeResult = null;
+    isSubmitting = false;
+    isLoading = false;
+    resultsStage.hide();
+    resultPanel.hidden = true;
+    resultPanel.replaceChildren();
+    infoOverlay.hide();
+    globe.reset();
+    globe.setAcceptingGuesses(false);
+    playPanel.hidden = true;
+    setupPanel.hidden = false;
+    renderRunProgress();
+    updateCategorySetup();
+    categoryInputs.values().next().value?.focus();
+  }
+
+  /** "Change categories" mid-run goes through the same guard as leaving: the run is discarded. */
+  async function requestSetup(): Promise<void> {
+    if (runInProgressMessage() && !(await shell.confirmLeave(
+      `You're ${runResults.length} of ${MAP_TAP_RUN_LENGTH} targets into this run. Changing categories discards it and the score isn't kept.`,
+      { title: "Change categories?", confirmLabel: "Discard run", cancelLabel: "Keep playing", tone: "danger" },
+    ))) return;
+    if (controller.signal.aborted) return;
+    showSetup();
+  }
+
+  function runInProgressMessage(): string | null {
+    if (!hasStarted || runFinished) return null;
+    return runLeaveMessage(runResults.length, MAP_TAP_RUN_LENGTH, "targets");
+  }
+
+  for (const [category, input] of categoryInputs) {
+    input.addEventListener("change", () => {
+      if (input.checked) selectedCategoryIds.add(category);
+      else selectedCategoryIds.delete(category);
+      updateCategorySetup();
+    }, { signal: controller.signal });
+  }
+  toggleAllButton.addEventListener("click", () => {
+    const shouldSelectAll = selectedCategoryIds.size !== CATEGORIES.length;
+    selectedCategoryIds.clear();
+    for (const [category, input] of categoryInputs) {
+      input.checked = shouldSelectAll;
+      if (shouldSelectAll) selectedCategoryIds.add(category);
+    }
+    updateCategorySetup();
+  }, { signal: controller.signal });
+  startButton.addEventListener("click", startRun, { signal: controller.signal });
+  changeCategoriesButton.addEventListener("click", () => void requestSetup(), { signal: controller.signal });
   resetButton.addEventListener("click", () => {
     if (activeResult || isSubmitting || isLoading) return;
     if (!activeTarget) { void loadRound(); return; }
@@ -392,29 +520,48 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     void loadRound();
   }, { signal: controller.signal });
 
+  const setupPanel = el("section", {
+    className: "maptap-setup",
+    attrs: { "aria-label": "MapTap setup", ...(isDailyChallenge ? { hidden: "true" } : {}) },
+    children: [
+      el("div", {
+        className: "maptap-setup-heading",
+        children: [
+          el("span", { className: "eyebrow", text: "MapTap setup" }),
+          el("h1", { text: "What do you want to find?" }),
+          el("p", { text: `Pick one category or mix several. Each of the ${MAP_TAP_RUN_LENGTH} targets is drawn from your selection.` }),
+        ],
+      }),
+      el("fieldset", { className: "maptap-category-grid", children: [el("legend", { text: "Location categories" }), ...categoryOptions] }),
+      el("div", { className: "maptap-setup-toolbar", children: [selectionSummary, toggleAllButton] }),
+      el("div", {
+        className: "maptap-setup-options",
+        children: [
+          el("label", { children: [el("span", { className: "stat-label", text: "Difficulty" }), difficultySelect] }),
+          el("label", { children: [el("span", { className: "stat-label", text: "Score range" }), decayInput] }),
+        ],
+      }),
+      startButton,
+    ],
+  });
+  const playPanel = el("div", {
+    className: "maptap-play-panel",
+    attrs: isDailyChallenge ? {} : { hidden: "true" },
+    children: [
+      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · MapTap" : "MapTap" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta] }),
+      runProgress,
+      statusText,
+      el("div", { className: "maptap-current-selection", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [el("span", { className: "stat-label", text: "Playing" }), activeCategoriesLabel] }),
+      el("div", { className: "maptap-actions", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [resetButton, changeCategoriesButton] }),
+      resultPanel,
+    ],
+  });
+
   const layout = el("section", {
     className: "maptap-layout",
     children: [
       el("div", { className: "maptap-map-panel", children: [globe.element, infoOverlay.element] }),
-      el("aside", {
-        className: "maptap-sidebar",
-        children: [
-          el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · MapTap" : "MapTap" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta] }),
-          runProgress,
-          statusText,
-          el("div", {
-            className: "maptap-filters",
-            attrs: isDailyChallenge ? { hidden: "true" } : {},
-            children: [
-              el("label", { children: [el("span", { className: "stat-label", text: "Category" }), categorySelect] }),
-              el("label", { children: [el("span", { className: "stat-label", text: "Difficulty" }), difficultySelect] }),
-              el("label", { children: [el("span", { className: "stat-label", text: "Scoring" }), decayInput] }),
-            ],
-          }),
-          el("div", { className: "maptap-actions", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [resetButton] }),
-          resultPanel,
-        ],
-      }),
+      el("aside", { className: "maptap-sidebar", children: [setupPanel, playPanel] }),
     ],
   });
   const resultsStage = createResultsStage(layout);
@@ -428,13 +575,17 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
       })
     : createPracticeBar(element, shell, {
         gameMode: "map-tap",
-        leaveGuard: () => (runFinished ? null : runLeaveMessage(runResults.length, MAP_TAP_RUN_LENGTH, "targets")),
-        extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: startRun }],
+        leaveGuard: runInProgressMessage,
+        extraMenuItems: [
+          { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (hasStarted) startRun(); } },
+          { label: "Change categories", icon: "layout-grid", onSelect: () => void requestSetup() },
+        ],
       });
   element.append(bar.element, layout, resultsStage.element);
 
+  updateCategorySetup();
   renderRunProgress();
-  void loadRound();
+  if (isDailyChallenge) void loadRound();
 
   return {
     element,

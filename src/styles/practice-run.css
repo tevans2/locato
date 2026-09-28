@@ -149,6 +149,17 @@
 .maptap-run-dot.is-done { background: var(--route); box-shadow: none; }
 .maptap-run-dot.is-strong { background: var(--good); }
 
+/* Setup panel: seven category rows overflow the sidebar, so keep "Start MapTap" in reach. */
+.maptap-setup .maptap-start-action { position: sticky; bottom: 0; z-index: 1; box-shadow: 0 -14px 14px -2px var(--surface); }
+.maptap-setup .maptap-category-option { border-color: var(--border); background: var(--surface); }
+.maptap-setup .maptap-category-option:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); background: var(--surface-soft); }
+.maptap-setup .maptap-category-option:has(input:checked) { border-color: color-mix(in srgb, var(--brand) 60%, var(--border)); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); }
+.maptap-setup .maptap-category-count { background: var(--surface-soft); }
+.maptap-play-panel .maptap-current-selection { border-color: var(--border); background: var(--bg-elevated); }
+.maptap-setup .maptap-setup-toolbar .maptap-selection-summary { flex: 1 1 auto; min-width: 0; }
+.maptap-setup .maptap-setup-toolbar .maptap-toggle-all { flex: 0 0 auto; width: auto; min-width: 0; white-space: nowrap; }
+.maptap-play-panel .maptap-actions > button { flex: 1 1 auto; padding-inline: 12px; font-size: 0.88rem; white-space: nowrap; }
+
 /* ---------- Worldsplit ---------- */
 
 #app > .worldsplit-screen.gb-screen[data-shell] { height: 100dvh; min-height: 0; }

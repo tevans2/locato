@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMapTapScreen, MAP_TAP_BEST_RUN_KEY, MAP_TAP_RUN_LENGTH } from "../src/ui/screens/MapTapScreen";
 import type { MapTapGlobeOptions } from "../src/ui/components/MapTapGlobe";
-import type { MapTapGuessResult, MapTapLocation } from "../src/core/maptap";
+import { MAP_TAP_CATEGORY_OPTIONS, type MapTapCategory, type MapTapGuessResult, type MapTapLocation } from "../src/core/maptap";
 import type { ShellContext } from "../src/ui/shell/types";
 
 const screens: ReturnType<typeof createMapTapScreen>[] = [];
@@ -14,7 +14,7 @@ function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
 
 const target = (i: number): MapTapLocation => ({ id: `t${i}`, name: `Target ${i}`, category: "city", lat: i, lng: i, difficulty: "easy", wikiSlug: `T${i}` });
 
-function setup(options: { daily?: boolean; shell?: Partial<ShellContext> } = {}) {
+function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?: boolean } = {}) {
   let guess: (point: { lat: number; lng: number }) => void = () => {};
   let round = 0;
   const globe = { element: document.createElement("div"), reset: vi.fn(), reveal: vi.fn(), setAcceptingGuesses: vi.fn() };
@@ -23,6 +23,10 @@ function setup(options: { daily?: boolean; shell?: Partial<ShellContext> } = {})
     return { target: target(index), guess: { lat: 0, lng: 0 }, distanceKm: 100 * (index + 1), score: 1000 + index * 100, maxScore: 5000, decayKm: 1000, toleranceKm: 25 };
   });
   const onComplete = vi.fn();
+  const fetchRound = vi.fn(async (filters: { category?: MapTapCategory | ""; difficulty?: string } = {}) => {
+    const t = target(round++);
+    return { id: t.id, name: t.name, category: filters.category || t.category, difficulty: t.difficulty };
+  });
   const screen = createMapTapScreen({
     shell: stubShell(options.shell),
     storage: localStorage,
@@ -32,15 +36,19 @@ function setup(options: { daily?: boolean; shell?: Partial<ShellContext> } = {})
   }, {
     createGlobe: (o: MapTapGlobeOptions) => { guess = o.onGuess; return globe; },
     createInfoOverlay: () => ({ element: document.createElement("div"), show: vi.fn(), hide: vi.fn() }),
-    fetchRound: vi.fn(async () => { const t = target(round++); return { id: t.id, name: t.name, category: t.category, difficulty: t.difficulty }; }),
+    fetchRound,
     validateGuess,
     fetchSummary: vi.fn(async () => null),
   });
   screens.push(screen);
   document.body.append(screen.element);
   const $ = <T extends Element = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector);
+  const $$ = (selector: string) => screen.element.querySelectorAll(selector);
   const ready = () => vi.waitFor(() => expect($(".maptap-status")?.textContent).not.toContain("Loading"));
-  return { screen, globe, validateGuess, onComplete, $, ready, pin: async () => { guess({ lat: 1, lng: 1 }); await vi.waitFor(() => expect($(".maptap-result-panel")?.hidden).toBe(false)); } };
+  const start = () => $<HTMLButtonElement>(".maptap-start-action")!.click();
+  // Practice opens on the category setup; most tests just want a run going.
+  if (!options.daily && options.start !== false) start();
+  return { screen, globe, validateGuess, fetchRound, onComplete, $, $$, ready, start, pin: async () => { guess({ lat: 1, lng: 1 }); await vi.waitFor(() => expect($(".maptap-result-panel")?.hidden).toBe(false)); } };
 }
 
 describe("MapTap practice run", () => {
@@ -119,5 +127,98 @@ describe("MapTap practice run", () => {
     expect(next.textContent).toBe("Continue daily challenge");
     next.click();
     expect(ui.onComplete).toHaveBeenCalledOnce();
+  });
+});
+
+describe("MapTap category setup", () => {
+  const check = (ui: ReturnType<typeof setup>, category: MapTapCategory, checked: boolean) => {
+    const input = ui.$<HTMLInputElement>(`.maptap-category-option input[value="${category}"]`)!;
+    input.checked = checked;
+    input.dispatchEvent(new Event("change"));
+  };
+
+  it("opens on the setup panel and only starts a run from it", async () => {
+    const ui = setup({ start: false });
+    expect(ui.$(".maptap-setup")?.hidden).toBe(false);
+    expect(ui.$(".maptap-play-panel")?.hidden).toBe(true);
+    expect(ui.$$(".maptap-category-option")).toHaveLength(MAP_TAP_CATEGORY_OPTIONS.length);
+    expect(ui.fetchRound).not.toHaveBeenCalled();
+
+    ui.$<HTMLButtonElement>(".maptap-toggle-all")!.click();
+    expect(ui.$(".maptap-selection-summary")?.textContent).toBe("Choose at least one category to start.");
+    expect(ui.$<HTMLButtonElement>(".maptap-start-action")?.disabled).toBe(true);
+    expect(ui.$(".maptap-toggle-all")?.textContent).toBe("Select all");
+  });
+
+  it("starts a 10-target run that only draws from the selected categories", async () => {
+    const ui = setup({ start: false });
+    ui.$<HTMLButtonElement>(".maptap-toggle-all")!.click();
+    check(ui, "ocean", true);
+    check(ui, "mountain-range", true);
+    expect(ui.$(".maptap-selection-summary")?.textContent).toMatch(/locations across 2 categories$/);
+    ui.start();
+    expect(ui.$(".maptap-setup")?.hidden).toBe(true);
+    expect(ui.$(".maptap-play-panel")?.hidden).toBe(false);
+    expect(ui.$(".maptap-active-categories")?.textContent).toBe("Mountain ranges, Oceans & seas");
+
+    for (let i = 0; i < MAP_TAP_RUN_LENGTH; i++) {
+      await ui.ready();
+      expect(ui.$(".maptap-prompt-meta")?.textContent).toMatch(/^(Ocean or sea|Mountain range) · /);
+      await ui.pin();
+      ui.$<HTMLButtonElement>(".maptap-result-panel .primary-action")!.click();
+    }
+    const categories = new Set(ui.fetchRound.mock.calls.map(([filters]) => filters?.category));
+    expect([...categories].sort()).toEqual(["mountain-range", "ocean"]);
+
+    // Play again keeps the same selection; the results card also offers changing it.
+    const stage = ui.$(".gb-results-stage")!;
+    expect(stage.hidden).toBe(false);
+    expect(stage.textContent).toContain("Change categories");
+    ui.fetchRound.mockClear();
+    stage.querySelector<HTMLButtonElement>(".shell-results-primary")!.click();
+    await ui.ready();
+    expect(ui.$(".maptap-setup")?.hidden).toBe(true);
+    expect(ui.$(".maptap-run-label")?.textContent).toBe("Target 1 of 10");
+    expect(["mountain-range", "ocean"]).toContain(ui.fetchRound.mock.calls[0]?.[0]?.category);
+  });
+
+  it("confirms before Change categories discards a run in progress", async () => {
+    const confirmLeave = vi.fn(async (_message: string) => false);
+    const ui = setup({ shell: { confirmLeave } });
+    await ui.ready();
+    // Nothing scored yet: straight back to setup, no prompt.
+    ui.$<HTMLButtonElement>(".maptap-change-categories")!.click();
+    await vi.waitFor(() => expect(ui.$(".maptap-setup")?.hidden).toBe(false));
+    expect(confirmLeave).not.toHaveBeenCalled();
+
+    ui.start();
+    await ui.ready();
+    await ui.pin();
+    ui.$<HTMLButtonElement>(".maptap-result-panel .primary-action")!.click();
+    await ui.ready();
+    ui.$<HTMLButtonElement>(".maptap-change-categories")!.click();
+    await vi.waitFor(() => expect(confirmLeave).toHaveBeenCalledOnce());
+    expect(String(confirmLeave.mock.calls[0]?.[0])).toContain("1 of 10 targets");
+    expect(String(confirmLeave.mock.calls[0]?.[0])).toContain("discards");
+    // Declined: the run carries on.
+    expect(ui.$(".maptap-play-panel")?.hidden).toBe(false);
+    expect(ui.$(".maptap-run-label")?.textContent).toBe("Target 2 of 10");
+
+    confirmLeave.mockResolvedValueOnce(true);
+    ui.$<HTMLButtonElement>(".maptap-change-categories")!.click();
+    await vi.waitFor(() => expect(ui.$(".maptap-setup")?.hidden).toBe(false));
+    ui.start();
+    await ui.ready();
+    expect(ui.$(".maptap-run-label")?.textContent).toBe("Target 1 of 10");
+    expect(ui.$(".maptap-run-total")?.textContent).toBe("0");
+  });
+
+  it("skips setup in the daily challenge", async () => {
+    const ui = setup({ daily: true });
+    await ui.ready();
+    expect(ui.$(".maptap-setup")?.hidden).toBe(true);
+    expect(ui.$(".maptap-play-panel")?.hidden).toBe(false);
+    expect(ui.$(".maptap-current-selection")?.hidden).toBe(true);
+    expect(ui.fetchRound).not.toHaveBeenCalled();
   });
 });

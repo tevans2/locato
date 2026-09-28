@@ -1,5 +1,6 @@
 import { createSeededRandom, shuffle } from "../../src/core/game";
-import { MAP_TAP_LOCATIONS } from "../../src/core/maptap/locations";
+import { MAP_TAP_LOCATIONS, resolveMapTapCategories } from "../../src/core/maptap/locations";
+import type { MapTapCategory } from "../../src/core/maptap/types";
 import { scoreMapTapGuess, MAP_TAP_DEFAULT_DECAY_KM } from "../../src/core/maptap/distance";
 import { filterProfanity } from "../../src/core/multiplayer/profanity";
 import type { FinalResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
@@ -50,6 +51,7 @@ export class MapTapRoom {
   roundLimit: number;
   roundDurationMs: number;
   readonly resultDisplayMs: number;
+  private mapTapCategories: readonly MapTapCategory[];
 
   private hostPlayerId: PlayerId;
   private status: RoomStatus = "lobby";
@@ -75,13 +77,15 @@ export class MapTapRoom {
     roundLimit?: number;
     roundDurationMs?: number;
     resultDisplayMs?: number;
+    mapTapCategories?: readonly MapTapCategory[];
   }) {
     this.code = options.code;
     this.seed = options.seed;
     this.maxPlayers = options.maxPlayers ?? DEFAULT_MAPTAP_MAX_PLAYERS;
     this.roundDurationMs = options.roundDurationMs ?? DEFAULT_MAPTAP_ROUND_DURATION_MS;
     this.resultDisplayMs = options.resultDisplayMs ?? DEFAULT_MAPTAP_RESULT_DISPLAY_MS;
-    this.roundLimit = Math.min(options.roundLimit ?? DEFAULT_MAPTAP_ROUND_LIMIT, MAP_TAP_LOCATIONS.length);
+    this.mapTapCategories = resolveMapTapCategories(options.mapTapCategories);
+    this.roundLimit = Math.min(options.roundLimit ?? DEFAULT_MAPTAP_ROUND_LIMIT, this.eligibleLocationCount());
     this.hostPlayerId = options.hostPlayerId;
     this.locationQueue = this.buildQueue(options.seed);
     this.players.set(options.hostPlayerId, createPlayer(options.hostPlayerId, options.hostName));
@@ -111,7 +115,7 @@ export class MapTapRoom {
       roomCode: this.code,
       hostPlayerId: this.hostPlayerId,
       categoryIds: ["map-tap"],
-      settings: { roundLimit: this.roundLimit, roundDurationMs: this.roundDurationMs },
+      settings: { roundLimit: this.roundLimit, roundDurationMs: this.roundDurationMs, mapTapCategories: this.mapTapCategories },
       status: this.status,
       players: [...this.players.values()].map(toPublicPlayer),
       round: this.publicRound,
@@ -198,12 +202,15 @@ export class MapTapRoom {
     return ok([this.snapshotMessage()]);
   }
 
-  updateOptions(playerId: PlayerId, options: { readonly roundLimit?: number; readonly roundDurationMs?: number }, now: number): RoomResult {
+  updateOptions(playerId: PlayerId, options: { readonly roundLimit?: number; readonly roundDurationMs?: number; readonly mapTapCategories?: readonly MapTapCategory[] }, now: number): RoomResult {
     this.touch(now);
     if (playerId !== this.hostPlayerId) return fail("not-host", "Only the room host can change room settings.");
     if (this.status !== "lobby") return fail("game-started", "Room settings can only change in the lobby.");
-    if (options.roundLimit !== undefined) this.roundLimit = Math.min(options.roundLimit, MAP_TAP_LOCATIONS.length);
+    if (options.mapTapCategories !== undefined) this.mapTapCategories = resolveMapTapCategories(options.mapTapCategories);
+    if (options.roundLimit !== undefined) this.roundLimit = options.roundLimit;
+    this.roundLimit = Math.min(this.roundLimit, this.eligibleLocationCount());
     if (options.roundDurationMs !== undefined) this.roundDurationMs = options.roundDurationMs;
+    this.locationQueue = this.buildQueue(`${this.seed}:settings:${now}`);
     for (const [id, player] of this.players) {
       if (id !== this.hostPlayerId) this.players.set(id, { ...player, ready: false });
     }
@@ -280,8 +287,14 @@ export class MapTapRoom {
   }
 
   private buildQueue(seed: string): number[] {
-    const indices = MAP_TAP_LOCATIONS.map((_, i) => i);
+    const selected = new Set(this.mapTapCategories);
+    const indices = MAP_TAP_LOCATIONS.map((location, i) => selected.has(location.category) ? i : -1).filter((index) => index >= 0);
     return shuffle(indices, createSeededRandom(seed));
+  }
+
+  private eligibleLocationCount(): number {
+    const selected = new Set(this.mapTapCategories);
+    return MAP_TAP_LOCATIONS.filter((location) => selected.has(location.category)).length;
   }
 
   private connectedPlayerIds(): readonly PlayerId[] {
