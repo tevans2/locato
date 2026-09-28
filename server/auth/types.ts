@@ -274,6 +274,12 @@ export interface CreateSessionInput {
   readonly createdAt: number;
 }
 
+// Academy training progress as stored: the validated AcademyProgress JSON plus its merged updatedAt.
+export interface StoredAcademyProgress {
+  readonly progress: string;
+  readonly updatedAt: number;
+}
+
 export interface UserStore {
   createUser(input: CreateUserInput): StoredUser;
   findUserByEmail(email: string): StoredUser | null;
@@ -307,7 +313,8 @@ export interface UserStore {
   listUserBestTimes(userId: string): readonly AdminBestTime[];
   deleteBestTime(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;
-  // Clears game history, per-category stats, and aggregates; leaderboards and dailies are untouched.
+  // Clears game history, per-category stats, and aggregates; leaderboards, dailies and Academy
+  // progress are untouched.
   resetUserStats(userId: string): void;
   getAdminTotals(now: number): AdminTotals;
   listActivitySince(since: number): AdminActivityRows;
@@ -324,6 +331,9 @@ export interface UserStore {
   areFriends(a: string, b: string): boolean;
   friendIds(userId: string): readonly string[];
   searchUsers(query: string, excludeId: string, limit: number): readonly PublicUser[];
+  // Academy (training) progress, one JSON blob per user; deleted with the user.
+  getAcademyProgress(userId: string): StoredAcademyProgress | null;
+  saveAcademyProgress(userId: string, progress: string, updatedAt: number): void;
 }
 
 export interface PasswordHasher {

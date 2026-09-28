@@ -2,6 +2,7 @@ import type { CountryId, CountryIndex } from "../../core/countries";
 import {
   MAP_VIEWBOX_HEIGHT,
   MAP_VIEWBOX_WIDTH,
+  mainLandmassBounds,
   projectWorldMapPosition,
   type ProjectedPoint,
   type WorldCountryFeature,
@@ -60,6 +61,8 @@ interface PinchState {
 
 export interface WorldMapViewOptions {
   readonly onCountryClick?: (countryId: CountryId) => void;
+  /** Replace the Reset button (which shows the whole world) with a custom recentre action. */
+  readonly recenter?: { readonly text: string; readonly label: string; readonly onClick: () => void };
 }
 
 export interface WorldMapView {
@@ -67,6 +70,8 @@ export interface WorldMapView {
   readonly pathByCountryId: ReadonlyMap<CountryId, SVGPathElement>;
   readonly missingDotByCountryId: ReadonlyMap<CountryId, SVGCircleElement>;
   readonly focusCountry: (countryId: CountryId, options?: { readonly animate?: boolean }) => void;
+  /** Fit an arbitrary map-space rectangle (e.g. a region or continent), keeping the map's aspect ratio. */
+  readonly focusBounds: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }, options?: { readonly animate?: boolean }) => void;
   readonly resetView: (options?: { readonly animate?: boolean }) => void;
   readonly showCountryLabel: (countryId: CountryId | null) => void;
 }
@@ -159,29 +164,6 @@ function countryCenter(feature: WorldCountryFeature): ProjectedPoint | null {
 
   const points = outerRing.map(projectWorldMapPosition);
   return ringCentroid(points) ?? centerOfBounds(points);
-}
-
-function featureProjectedPoints(feature: WorldCountryFeature): ProjectedPoint[] {
-  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
-  return polygons.flatMap((polygon) => polygon.flatMap((ring) => ring.map(projectWorldMapPosition)));
-}
-
-function boundsForPoints(points: readonly ProjectedPoint[]): ViewBoxState | null {
-  if (points.length === 0) return null;
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const [x, y] of points) {
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-
-  return { x: minX, y: minY, width: Math.max(0.001, maxX - minX), height: Math.max(0.001, maxY - minY) };
 }
 
 function createButton(text: string, label: string): HTMLButtonElement {
@@ -305,7 +287,8 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
     if (country) {
       const center = countryCenter(feature);
-      const bounds = boundsForPoints(featureProjectedPoints(feature));
+      // Frame the home landmass: France without French Guiana, the US without Alaska and Hawaii.
+      const bounds = mainLandmassBounds(feature);
       path.dataset.countryId = String(country.id);
       pathByCountryId.set(country.id, path);
       if (bounds) boundsByCountryId.set(country.id, bounds);
@@ -336,7 +319,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   const zoomInButton = createButton("+", "Zoom in");
   const zoomOutButton = createButton("−", "Zoom out");
-  const resetViewButton = createButton("Reset", "Reset map zoom and position");
+  const resetViewButton = options.recenter ? createButton(options.recenter.text, options.recenter.label) : createButton("Reset", "Reset map zoom and position");
   const controls = document.createElement("div");
   controls.className = "world-map-controls";
   controls.append(zoomInButton, zoomOutButton, resetViewButton);
@@ -400,6 +383,17 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
     const bounds = boundsByCountryId.get(countryId);
     if (!bounds) return;
     moveToViewBox(focusViewBoxForBounds(bounds), options.animate ?? true);
+  }
+
+  function focusBounds(bounds: ViewBoxState, options: { readonly animate?: boolean } = {}): void {
+    const aspect = VIEWBOX_HEIGHT / VIEWBOX_WIDTH;
+    const width = Math.max(bounds.width, bounds.height / aspect);
+    moveToViewBox({
+      x: bounds.x + bounds.width / 2 - width / 2,
+      y: bounds.y + bounds.height / 2 - (width * aspect) / 2,
+      width,
+      height: width * aspect,
+    }, options.animate ?? true);
   }
 
   function resetView(options: { readonly animate?: boolean } = {}): void {
@@ -576,13 +570,13 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
   svg.addEventListener("dblclick", resetViewBox);
   zoomInButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_IN_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
   zoomOutButton.addEventListener("click", () => setViewBox(zoomAround(svg, viewBox, ZOOM_OUT_FACTOR, svg.getBoundingClientRect().left + svg.clientWidth / 2, svg.getBoundingClientRect().top + svg.clientHeight / 2)));
-  resetViewButton.addEventListener("click", resetViewBox);
+  resetViewButton.addEventListener("click", options.recenter?.onClick ?? resetViewBox);
 
   const element = document.createElement("div");
   element.className = "world-map-panel";
   element.append(svg, controls, countryLabel);
 
-  return { element, pathByCountryId, missingDotByCountryId, focusCountry, resetView, showCountryLabel };
+  return { element, pathByCountryId, missingDotByCountryId, focusCountry, focusBounds, resetView, showCountryLabel };
 }
 
 export function setWorldMapMissingMarkersVisible(view: WorldMapView, visible: boolean): void {

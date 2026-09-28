@@ -7,6 +7,9 @@ import {
   isLeaderboardGameMode,
   normalizeLeaderboardVariant,
 } from "../leaderboard/validation";
+import { mergeAcademyProgress } from "../academy/merge";
+import { validateAcademyProgress } from "../academy/validation";
+import type { AcademyProgress } from "../../src/core/academy/types";
 import type {
   AuthUser,
   DailyChallengeResult,
@@ -69,6 +72,12 @@ function previousDailyDate(date: string, daysBack: number): string {
 
 const SUBMIT_RATE_LIMIT = 10;
 const SUBMIT_RATE_WINDOW_MS = 60_000;
+// Academy sync fires after lessons and on sign-in from each device, so it gets more headroom.
+const ACADEMY_SYNC_RATE_LIMIT = 30;
+
+export type AcademySyncOutcome =
+  | { readonly ok: true; readonly progress: AcademyProgress; readonly cards: number }
+  | { readonly ok: false; readonly status: number; readonly error: string };
 
 export class AuthService {
   private readonly clock: () => number;
@@ -279,6 +288,32 @@ export class AuthService {
     return this.store.getUserRank(userId, gameMode, variant);
   }
 
+  // --- Academy ---
+
+  getAcademyProgress(userId: string): AcademyProgress | null {
+    const stored = this.store.getAcademyProgress(userId);
+    if (!stored) return null;
+    try {
+      // Re-validate on the way out so a corrupt or legacy row can't reach the client.
+      const parsed = validateAcademyProgress(JSON.parse(stored.progress), this.clock());
+      return parsed.ok ? parsed.progress : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Validates an upload, merges it with the account copy (never a blind overwrite), stores and
+  // returns the merged result.
+  syncAcademyProgress(userId: string, input: unknown): AcademySyncOutcome {
+    if (!this.allowSubmit(`academy:${userId}`, ACADEMY_SYNC_RATE_LIMIT)) return { ok: false, status: 429, error: "Too many sync requests. Try again shortly." };
+    const incoming = validateAcademyProgress(input, this.clock());
+    if (!incoming.ok) return { ok: false, status: 400, error: incoming.error };
+    const current = this.getAcademyProgress(userId);
+    const merged = current ? mergeAcademyProgress(current, incoming.progress) : incoming.progress;
+    this.store.saveAcademyProgress(userId, JSON.stringify(merged), merged.updatedAt);
+    return { ok: true, progress: merged, cards: Object.keys(merged.cards).length };
+  }
+
   // --- Friends ---
 
   // Send a friend request to a user identified by username. Returns the store result, or
@@ -335,10 +370,10 @@ export class AuthService {
     return handle ? this.store.findUserByUsername(handle)?.id ?? null : null;
   }
 
-  private allowSubmit(userId: string): boolean {
+  private allowSubmit(userId: string, limit = SUBMIT_RATE_LIMIT): boolean {
     const now = this.clock();
     const recent = (this.submitTimestamps.get(userId) ?? []).filter((timestamp) => now - timestamp < SUBMIT_RATE_WINDOW_MS);
-    if (recent.length >= SUBMIT_RATE_LIMIT) return false;
+    if (recent.length >= limit) return false;
     recent.push(now);
     this.submitTimestamps.set(userId, recent);
     return true;

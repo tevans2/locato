@@ -475,6 +475,30 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   background: transparent;
 }
 
+/* A short answer panel squashes grid rows to their min-height; keep the feedback (and its
+   "Learn about X" link) whole and let the panel scroll rather than overlap the actions. */
+.answer-panel {
+  overflow-y: auto;
+}
+
+.answer-panel .feedback {
+  min-height: auto;
+}
+
+.feedback .feedback-action {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--brand);
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .answer-panel .solo-action-grid,
 .country-guess-panel .actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));

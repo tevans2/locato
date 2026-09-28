@@ -10,6 +10,7 @@ import {
   Eye,
   Flag,
   Globe,
+  GraduationCap,
   Hash,
   MapPin,
   MousePointerClick,
@@ -21,6 +22,8 @@ import {
   Users,
 } from "lucide-react";
 import { readSoloSave } from "../../storage/localSave";
+import { readAcademyProgress } from "../../storage/academySave";
+import { academyLevel } from "../../core/academy/mastery";
 import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
 import { currentTheme, LOCATO_THEME_EVENT, toggleTheme, type LocatoTheme } from "../theme";
@@ -34,6 +37,7 @@ export interface LandingScreenOptions {
   readonly onFlags: () => void;
   readonly onLeaderboard: () => void;
   readonly onMultiplayer: () => void;
+  readonly onAcademy: () => void;
   readonly storage?: Storage;
 }
 
@@ -204,6 +208,20 @@ function LandingGamePicker(options: LandingScreenOptions) {
   </section>;
 }
 
+function LandingAcademyBanner({ onAcademy, storage }: Pick<LandingScreenOptions, "onAcademy" | "storage">) {
+  const progress = readAcademyProgress(storage);
+  const started = progress.placementCompletedAt !== null || Object.keys(progress.cards).length > 0;
+  const rank = academyLevel(progress);
+  return <section className="landing-academy" aria-labelledby="landing-academy-title">
+    <span className="landing-academy-icon" aria-hidden="true"><GraduationCap size={24} strokeWidth={1.5} /></span>
+    <div className="landing-academy-copy">
+      <h2 id="landing-academy-title">{started ? `Academy · ${rank.level.title}` : "New to geography? Start in the Academy."}</h2>
+      <p>{started ? `${rank.mastered} of ${COUNTRY_COUNT} countries mastered. Pick up where you left off.` : "Take a two-minute placement quiz, then learn the world one region at a time — at your own pace."}</p>
+    </div>
+    <button type="button" className="lp-btn lp-btn-primary landing-academy-cta" data-testid="button-academy" onClick={onAcademy}>{started ? "Continue training" : "Find your level"}<ArrowRight size={17} /></button>
+  </section>;
+}
+
 function LandingHome(options: LandingScreenOptions) {
   const totalModes = MODE_GROUPS.reduce((total, group) => total + group.modes.length, 0);
   const [filter, setFilter] = useState("all");
@@ -224,6 +242,7 @@ function LandingHome(options: LandingScreenOptions) {
         </button>
         <div className="landing-nav-links">
           <a href="#games">Explore games</a>
+          <button type="button" onClick={options.onAcademy}>Academy</button>
           <button type="button" onClick={options.onFlags}>Flags</button>
           <button type="button" onClick={options.onDailyChallenge}>Daily challenge</button>
           <button type="button" onClick={options.onMultiplayer}>With friends <ArrowUpRight size={13} /></button>
@@ -237,6 +256,8 @@ function LandingHome(options: LandingScreenOptions) {
 
       <div className="landing-scroll">
         <LandingGamePicker {...options} />
+
+        <LandingAcademyBanner {...options} />
 
         <section className="landing-facts" aria-label="Locato at a glance">
           <span><Globe size={19} strokeWidth={1.4} /><strong>{COUNTRY_COUNT}</strong> countries</span>
@@ -264,6 +285,7 @@ function LandingHome(options: LandingScreenOptions) {
         <footer className="landing-footer">
           <span className="brand-name">locato<span className="brand-period">.</span></span>
           <nav className="landing-footer-links" aria-label="More links">
+            <button type="button" className="landing-text-link" onClick={options.onAcademy}>Academy</button>
             <button type="button" className="landing-text-link" onClick={options.onFlags}>Flags</button>
             <button type="button" className="landing-text-link" onClick={options.onDailyChallenge}>Daily challenge</button>
             <button type="button" className="landing-text-link" onClick={options.onMultiplayer}>Multiplayer</button>

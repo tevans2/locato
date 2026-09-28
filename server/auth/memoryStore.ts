@@ -18,6 +18,7 @@ import type {
   PublicUser,
   SendFriendRequestResult,
   GameResult,
+  StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
   Session,
@@ -46,6 +47,7 @@ export function createMemoryUserStore(): UserStore {
   const friendships = new Map<string, { low: string; high: string; status: "pending" | "accepted"; requestedBy: string; createdAt: number }>();
   const events: AdminEvent[] = [];
   let nextEventId = 1;
+  const academyProgress = new Map<string, StoredAcademyProgress>();
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -272,6 +274,7 @@ export function createMemoryUserStore(): UserStore {
       categoryStats.delete(id);
       gameRecords.delete(id);
       for (const [key, f] of friendships) if (f.low === id || f.high === id) friendships.delete(key);
+      academyProgress.delete(id);
       return true;
     },
     deleteUserSessions(userId: string): number {
@@ -423,6 +426,10 @@ export function createMemoryUserStore(): UserStore {
         .sort((a, b) => a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()))
         .slice(0, limit)
         .map((u) => ({ id: u.id, username: u.displayName, avatarEmoji: u.avatarEmoji }));
+    },
+    getAcademyProgress: (userId) => academyProgress.get(userId) ?? null,
+    saveAcademyProgress(userId: string, progress: string, updatedAt: number): void {
+      academyProgress.set(userId, { progress, updatedAt });
     },
   };
 }

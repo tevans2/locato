@@ -14,7 +14,11 @@ export type AppRoute =
   | { readonly type: "stats" }
   | { readonly type: "flag-gallery" }
   | { readonly type: "friends"; readonly username?: string }
-  | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string };
+  | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string }
+  | { readonly type: "academy"; readonly groupId?: string }
+  | { readonly type: "academy-lesson"; readonly lessonId: string }
+  | { readonly type: "academy-placement" }
+  | { readonly type: "country-profile"; readonly code: string };
 
 export interface Screen {
   readonly element: HTMLElement;
@@ -26,6 +30,8 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   const params = new URLSearchParams(location.search);
   const room = params.get("room")?.trim();
   if (room) return { type: "multiplayer", joinCode: room };
+  const country = params.get("country")?.trim();
+  if (country && /^[a-z]{2}$/i.test(country)) return { type: "country-profile", code: country.toUpperCase() };
   const friend = params.get("friend")?.trim();
   if (friend) return { type: "friends", username: friend };
   const game = params.get("game");
@@ -42,6 +48,13 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   if (game && isWorldMapGameModeId(game)) return { type: "country-guessing", mode: game };
   if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
+  if (view === "academy") {
+    const lesson = params.get("lesson")?.trim();
+    if (lesson === "placement") return { type: "academy-placement" };
+    if (lesson && /^[A-Za-z0-9:-]{1,64}$/.test(lesson)) return { type: "academy-lesson", lessonId: lesson };
+    const group = params.get("group")?.trim();
+    return { type: "academy", ...(group && /^[a-z0-9-]{1,64}$/.test(group) ? { groupId: group } : {}) };
+  }
   if (view === "flags") return { type: "flag-gallery" };
   if (view === "daily-challenge" || view === "stats" || view === "friends" || view === "multiplayer") return { type: view };
   if (view === "leaderboard") {
@@ -64,6 +77,13 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
   else if (["map-tap", "worldsplit", "geoguessr", "streetview-country"].includes(route.type)) params.set("game", route.type);
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
   else if (route.type === "friends" && route.username) params.set("friend", route.username);
+  else if (route.type === "country-profile") params.set("country", route.code.toLowerCase());
+  else if (route.type === "academy" || route.type === "academy-lesson" || route.type === "academy-placement") {
+    params.set("view", "academy");
+    if (route.type === "academy" && route.groupId) params.set("group", route.groupId);
+    if (route.type === "academy-lesson") params.set("lesson", route.lessonId);
+    if (route.type === "academy-placement") params.set("lesson", "placement");
+  }
   else if (route.type !== "landing") {
     params.set("view", route.type === "flag-gallery" ? "flags" : route.type);
     if (route.type === "leaderboard") {

@@ -24,6 +24,7 @@ import type {
   PublicUser,
   SendFriendRequestResult,
   GameResult,
+  StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
   Session,
@@ -174,6 +175,12 @@ function migrate(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS admin_events_time ON admin_events(time);
     CREATE INDEX IF NOT EXISTS admin_events_action ON admin_events(action);
+
+    CREATE TABLE IF NOT EXISTS academy_progress (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      progress TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Additive migrations: columns added after initial schema deployment.
@@ -526,7 +533,7 @@ export class SqliteUserStore implements UserStore {
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
-  // user_stats, and mode_best_times.
+  // user_stats, mode_best_times, and academy_progress.
   deleteUser(id: string): boolean {
     if (!this.findUserById(id)) return false;
     this.db.query("DELETE FROM users WHERE id = ?").run(id);
@@ -701,5 +708,18 @@ export class SqliteUserStore implements UserStore {
        WHERE display_name LIKE ? COLLATE NOCASE AND id != ?
        ORDER BY display_name COLLATE NOCASE LIMIT ?`,
     ).all(`%${query}%`, excludeId, limit);
+  }
+
+  getAcademyProgress(userId: string): StoredAcademyProgress | null {
+    return this.db.query<StoredAcademyProgress>("SELECT progress, updated_at AS updatedAt FROM academy_progress WHERE user_id = ?").get(userId);
+  }
+
+  saveAcademyProgress(userId: string, progress: string, updatedAt: number): void {
+    this.db
+      .query(
+        `INSERT INTO academy_progress (user_id, progress, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET progress = excluded.progress, updated_at = excluded.updated_at`,
+      )
+      .run(userId, progress, updatedAt);
   }
 }

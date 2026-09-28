@@ -25,7 +25,7 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .lp-btn-primary:hover { color: var(--on-brand); background: var(--brand-hover); border-color: var(--brand-hover); box-shadow: 0 5px 16px #203e301a; }
 .lp-btn-quiet { border-color: transparent; }
 .landing-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; scroll-behavior: smooth; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
-.landing-hero,.landing-facts,.landing-catalog,.landing-footer { width: min(1320px, calc(100% - 96px)); margin-inline: auto; }
+.landing-hero,.landing-academy,.landing-facts,.landing-catalog,.landing-footer { width: min(1320px, calc(100% - 96px)); margin-inline: auto; }
 .landing-facts { display: flex; align-items: center; gap: 28px; min-height: 83px; border-block: 1px solid var(--border); }
 .landing-facts > span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .69rem; white-space: nowrap; }
 .landing-facts svg { margin-right: 7px; color: var(--brand); }
@@ -57,8 +57,15 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .landing-skip-link { position: fixed; top: 10px; left: 10px; z-index: 999; transform: translateY(-200%); padding: 12px 20px; border-radius: 6px; background: var(--brand); color: var(--on-brand); }.landing-skip-link:focus { transform: none; }
 .landing-root :is(button,a):focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 :root[data-theme="dark"] .landing-topbar .brand-logo { filter: invert(1); }
+/* Academy invitation: sits between the game picker and the facts strip. */
+.landing-academy { display: flex; align-items: center; gap: 22px; margin-block: 8px 40px; padding: 22px 26px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: linear-gradient(120deg, var(--accent-soft), var(--surface) 70%); }
+.landing-academy-icon { display: grid; flex: none; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: var(--on-brand); background: var(--brand); }
+.landing-academy-copy { flex: 1; min-width: 0; }
+.landing-academy-copy h2 { margin: 0 0 4px; color: var(--text); font-family: var(--font-editorial); font-size: 1.28rem; font-weight: 600; letter-spacing: -0.01em; }
+.landing-academy-copy p { margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.5; }
+.landing-academy-cta { flex: none; gap: 10px; }
 @media(max-width: 1120px) {
-  .landing-topbar,.landing-hero,.landing-facts,.landing-catalog,.landing-footer { width: calc(100% - 64px); }
+  .landing-topbar,.landing-hero,.landing-academy,.landing-facts,.landing-catalog,.landing-footer { width: calc(100% - 64px); }
   .landing-nav-links { gap: 18px; }.landing-topbar-actions { gap: 12px; }.landing-theme-switch .theme-switch-label { display: none; }
   .landing-facts { gap: 24px; }.landing-facts > span { flex: 1; }
   .landing-mode-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -67,7 +74,8 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
   .landing-nav-links { display: none; }.landing-topbar { min-height: 75px; }
 }
 @media(max-width: 640px) {
-  .landing-topbar,.landing-hero,.landing-facts,.landing-catalog,.landing-footer { width: calc(100% - 40px); }
+  .landing-academy { flex-wrap: wrap; gap: 14px; padding: 18px; }.landing-academy-cta { width: 100%; justify-content: center; }
+  .landing-topbar,.landing-hero,.landing-academy,.landing-facts,.landing-catalog,.landing-footer { width: calc(100% - 40px); }
   .landing-topbar { min-height: 70px; gap: 10px; }.landing-topbar .brand-name { font-size: 24px; }.landing-topbar .brand-logo { width: 25px; height: 25px; }.landing-topbar-actions { gap: 10px; }.landing-nav-play { display: none; }
   .landing-account .auth-trigger { max-width: 120px; font-size: .75rem; }
   .landing-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; padding-block: 23px; min-height: 0; }.landing-facts > span { white-space: normal; flex-wrap: wrap; gap: 4px; font-size: .62rem; }.landing-facts svg { width: 16px; margin-right: 4px; }.landing-facts > span:nth-child(3) { grid-column: 1/-1; }
