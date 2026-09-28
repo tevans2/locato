@@ -78,34 +78,6 @@
 
 /* Global sound toggle — matches the fixed header strip next to the theme switch. */
 
-body:not(:has(.landing-screen-shell)) .global-sound-switch {
-  position: fixed;
-  z-index: 111;
-  top: 21px;
-  right: 196px;
-  /* Fixed elements ignore the flow layout — without this the mobile `button { width: 100% }`
-     rule stretches the toggle across the viewport and shoves it off-screen. */
-  width: auto;
-  min-height: 34px;
-  padding: 0 11px;
-  border: 0;
-  border-right: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-}
-
-@media (max-width: 700px) {
-  body:not(:has(.landing-screen-shell)) .global-sound-switch {
-    top: 13px;
-    right: 124px;
-    min-height: 32px;
-    padding: 0 8px;
-    font-size: 0.62rem;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .sfx-flash.is-good,
   .sfx-flash.is-bad {

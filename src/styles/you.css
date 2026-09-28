@@ -1,0 +1,153 @@
+/* You → Stats · Friends · Achievements. Scoped under .you-page (#stats / #friends). */
+
+#app .you-page .you-heading { padding-bottom: 18px; }
+
+/* ---------- Sub-navigation ---------- */
+
+#app .you-tabs {
+  display: flex;
+  gap: 26px;
+  margin-bottom: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+}
+
+#app .you-tabs::-webkit-scrollbar { display: none; }
+
+#app .you-tab {
+  position: relative;
+  flex: none;
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  transform: none;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+#app .you-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+}
+
+#app .you-tab:hover { color: var(--text); background: none; border: 0; box-shadow: none; }
+#app .you-tab[aria-current="page"] { color: var(--text); font-weight: 800; }
+#app .you-tab[aria-current="page"]::after { background: var(--brand); }
+#app .you-tab:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+#app .you-panel[hidden] { display: none; }
+
+/* The stats blocks were laid out for a standalone page; here the shell column sets the width. */
+#app .you-page .stats-content { width: 100%; max-width: none; margin: 0; padding: 0; }
+
+#app .you-page .friends-body {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 18px;
+}
+
+#app .you-page .friends-body > :is(.friend-link-hint, .friend-profile-panel, .you-guest) { grid-column: 1 / -1; }
+#app .you-page .friends-body > .friend-section:first-of-type { grid-column: 1 / -1; }
+
+@media (max-width: 760px) {
+  #app .you-page .friends-body { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Guest state ---------- */
+
+#app .you-guest {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, var(--accent-soft), var(--surface) 70%);
+}
+
+#app .you-guest-title { margin: 0; font-family: var(--font-editorial); font-size: 1.5rem; font-weight: 500; letter-spacing: -0.02em; }
+#app .you-guest .shell-btn { width: auto; }
+#app .you-guest-copy { margin: 0 0 6px; max-width: 56ch; color: var(--muted); line-height: 1.55; }
+
+/* ---------- Achievements ---------- */
+
+#app .you-achievements { display: grid; gap: 22px; }
+
+#app .you-achievements-summary { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 20px; }
+#app .you-achievements-count { margin: 0; color: var(--muted); font-size: 0.95rem; font-weight: 650; }
+#app .you-achievements-count strong { color: var(--text); font-family: var(--font-editorial); font-size: 2rem; font-weight: 500; }
+#app .you-achievements-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-soft); }
+#app .you-achievements-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+#app .you-achievements-note { grid-column: 1 / -1; margin: 0; color: var(--subtle); font-size: 0.78rem; }
+
+#app .you-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#app .you-achievement {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+#app .you-achievement-seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--on-brand);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+#app .you-achievement.is-unlocked { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
+#app .you-achievement.is-unlocked .you-achievement-seal { border: 0; background: var(--brand); }
+#app .you-achievement-copy { min-width: 0; display: grid; gap: 4px; }
+#app .you-achievement-copy strong { font-size: 0.95rem; font-weight: 780; }
+#app .you-achievement-copy > span { color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+#app .you-achievement-copy > .you-achievement-state { margin-top: 2px; color: var(--brand); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+#app .you-achievement.is-locked .you-achievement-copy strong { color: var(--muted); }
+#app .you-achievement.is-locked .you-achievement-state { color: var(--subtle); }
+
+@media (max-width: 700px) {
+  #app .you-tabs { gap: 22px; margin-bottom: 20px; }
+  #app .you-guest { padding: 20px; }
+  #app .you-achievements-summary { grid-template-columns: minmax(0, 1fr); }
+  #app .you-achievement-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

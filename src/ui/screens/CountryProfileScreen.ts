@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { AcademyProgressStore } from "../../app/academyProgress";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
@@ -24,7 +25,7 @@ import {
   type CountryProfile,
 } from "../../core/countries/profiles";
 import { el } from "../dom/createElement";
-import { createBrandLockup } from "../dom/createBrandLockup";
+import { createSiteHeader, markShellScreen, type SiteHeaderHandle } from "../shell";
 import { profileIcon, type ProfileIconName } from "../components/academy/profileIcons";
 import { createProfileSearch, type ProfileSearch } from "../components/academy/profileSearch";
 import { createFeatureSilhouette, createProfileLocator, type ProfileLocator } from "../components/academy/profileLocator";
@@ -42,6 +43,8 @@ import {
 import "../../styles/country-profile.css";
 
 export interface CountryProfileScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly progressStore: AcademyProgressStore;
@@ -55,6 +58,8 @@ export interface CountryProfileScreenOptions {
   readonly onFlipCountry?: (code: string) => void;
   readonly onStartLesson: (lessonId: string) => void;
   readonly onOpenAcademy: (groupId?: string) => void;
+  /** The breadcrumb's "Atlas" (the country index). */
+  readonly onOpenAtlas?: () => void;
 }
 
 const SKILL_LABELS: Readonly<Record<AcademySkill, string>> = {
@@ -202,27 +207,25 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
   const next = index >= 0 ? ordered[(index + 1) % ordered.length]! : null;
   const flip = (code: string): void => (options.onFlipCountry ?? options.onOpenCountry)(code);
 
-  const topbar = el("header", {
-    className: "cp-topbar",
+  // Site header (Learn) + breadcrumb "Learn › Atlas › <Country>".
+  const siteHeader: SiteHeaderHandle | null = options.shell ? createSiteHeader(options.shell, { section: "learn" }) : null;
+  const crumbSep = (): HTMLElement => el("span", { className: "cp-crumb-sep", text: "›", attrs: { "aria-hidden": "true" } });
+  const crumbs = el("nav", {
+    className: "cp-crumbs",
+    attrs: { "aria-label": "Breadcrumb" },
     children: [
-      createBrandLockup(options.onHome),
-      el("nav", {
-        className: "cp-crumbs",
-        attrs: { "aria-label": "Breadcrumb" },
-        children: [
-          button("cp-crumb", [text("Academy")], () => options.onOpenAcademy()),
-          el("span", { className: "cp-crumb-sep", text: "/", attrs: { "aria-hidden": "true" } }),
-          el("span", { className: "cp-crumb is-current", text: "Atlas", attrs: { "aria-current": "page" } }),
-        ],
-      }),
-      button("ghost-action cp-back", [profileIcon("arrowLeft"), el("span", { className: "cp-back-label", text: "Back" })], options.onBack, { "aria-label": "Go back" }),
+      button("cp-crumb", [text("Learn")], () => (options.shell ? options.shell.openSection("learn") : options.onOpenAcademy())),
+      crumbSep(),
+      button("cp-crumb", [text("Atlas")], () => (options.onOpenAtlas ?? options.onBack)()),
+      crumbSep(),
+      el("span", { className: "cp-crumb is-current", text: profile?.name ?? "Not found", attrs: { "aria-current": "page" } }),
     ],
   });
 
   const atlasBar = el("div", {
     className: "cp-atlasbar",
     children: [
-      el("p", { className: "cp-atlasbar-title", children: [profileIcon("compass"), el("span", { text: `The atlas · ${PROFILE_COUNTRY_COUNT} countries` })] }),
+      crumbs,
       searchPicker(),
       ...(prev && next
         ? [
@@ -245,8 +248,9 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
     className: `country-profile-screen${profile ? "" : " is-not-found"}`,
     attrs: {
       id: "country-profile", "aria-label": profile ? `${profile.name} country profile` : "Country not found" },
-    children: [topbar, atlasBar, page],
+    children: [...(siteHeader ? [siteHeader.element] : []), atlasBar, page],
   });
+  if (siteHeader) markShellScreen(element, "site");
 
   let locator: ProfileLocator | null = null;
 
@@ -732,6 +736,7 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
       for (const cleanup of cleanups.splice(0)) cleanup();
       for (const search of searches) search.destroy();
       locator?.destroy();
+      siteHeader?.destroy();
       document.title = previousTitle;
     },
   };

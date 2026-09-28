@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { AcademyProgressStore } from "../../app/academyProgress";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
@@ -22,6 +23,8 @@ import { createChoiceStep, type StepAnswer, type StepView } from "../components/
 import "../../styles/academy-lesson.css";
 
 export interface PlacementScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly progressStore: AcademyProgressStore;
@@ -47,7 +50,7 @@ export function createPlacementScreen(options: PlacementScreenOptions): Screen {
   const length = options.length ?? PLACEMENT_LENGTH;
   const abort = new AbortController();
 
-  const root = el("section", { className: "lx placement-screen", attrs: { "data-phase": "intro", "aria-label": "Academy placement quiz" } });
+  const root = el("section", { className: "lx placement-screen", attrs: { "data-shell": "focus", "data-phase": "intro", "aria-label": "Academy placement quiz" } });
   const announcer = el("p", { className: "lx-sr-only", attrs: { "aria-live": "polite" } });
   const top = createLessonTopBar({ title: "Placement", exitLabel: "Leave placement", onExit: () => options.onDone() });
   const stageInner = el("div", { className: "lx-stage-inner" });

@@ -5,41 +5,7 @@
   overflow-y: auto;
 }
 
-.stats-header {
-  width: min(900px, 100%);
-  margin-inline: auto;
-  padding: 16px 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid rgba(217, 217, 214, 0.08);
-  padding-bottom: 14px;
-}
-
-.stats-header-title {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.stats-header h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  letter-spacing: 0;
-}
-
 .screen-back-button {
-  flex: none;
-}
-
-.screen-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
   flex: none;
 }
 
@@ -234,19 +200,6 @@
 @media (max-width: 700px) {
   .stats-screen {
     min-height: 0;
-  }
-
-  .stats-header {
-    padding: 4px 0 0;
-  }
-
-  .stats-header .brand-logo {
-    width: 22px;
-    height: 22px;
-  }
-
-  .stats-header h1 {
-    font-size: 1.05rem;
   }
 
   .screen-back-button {

@@ -90,14 +90,37 @@
 
 /* ---------- Header ---------- */
 
+#academy .academy-body {
+  width: min(var(--shell-max, 1320px), calc(100% - 2 * var(--shell-gutter, 0px)));
+  margin: 0 auto;
+}
+
 #academy .academy-header {
-  min-height: 64px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
-  padding: 0 var(--floating-controls-clearance) 14px 0;
+  justify-content: space-between;
+  gap: 12px 18px;
+  padding: clamp(22px, 3.5vw, 34px) 0 16px;
   border-bottom: 1px solid var(--border-strong);
 }
+
+#academy .academy-atlas-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 750;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+#academy .academy-atlas-link:hover { border-color: var(--brand); background: var(--accent-soft); }
+#academy .academy-atlas-link .academy-icon { width: 15px; height: 15px; color: var(--brand); }
 
 #academy .academy-icon-button {
   width: 40px;
@@ -117,18 +140,17 @@
 #academy .academy-header-title {
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 14px;
-  padding-left: 18px;
-  border-left: 1px solid var(--border);
+  gap: 6px 16px;
 }
 
 #academy .academy-header-title h1 {
   font-family: var(--font-editorial);
-  font-size: 1.7rem;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  font-size: clamp(2.1rem, 4.4vw, 3rem);
+  font-weight: 430;
+  letter-spacing: -0.04em;
+  line-height: 1.04;
 }
 
 #academy .academy-header-title p {
@@ -1152,15 +1174,9 @@
 @keyframes academy-sheet-in { from { transform: translateY(40%); opacity: 0; } }
 
 @media (max-width: 700px) {
-  #academy .academy-header {
-    min-height: 0;
-    padding: 50px 0 12px;
-    gap: 12px;
-  }
-
-  #academy .academy-header .brand-lockup { display: none; }
-  #academy .academy-header-title { display: grid; gap: 3px; padding-left: 0; border-left: 0; }
-  #academy .academy-header-title h1 { font-size: 1.6rem; }
+  #academy .academy-header { padding: 20px 0 12px; gap: 12px; }
+  #academy .academy-header-title { display: grid; gap: 3px; }
+  #academy .academy-header-title h1 { font-size: 2rem; }
   #academy .academy-header-title p { font-size: 0.8rem; }
 
   #academy .academy-main { gap: 44px; padding-top: 14px; }

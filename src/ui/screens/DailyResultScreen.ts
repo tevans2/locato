@@ -1,29 +1,29 @@
 import { DAILY_MAX_SCORE, formatDailyTime } from "../../core/dailyChallenge";
+import type { ShellContext } from "../shell/types";
 import { fetchDailyLeaderboard, fetchDailySummary, type DailyChallengeResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
-import { createBrandLockup } from "../dom/createBrandLockup";
+import { createSitePage } from "../shell/SiteHeader";
+import { shareResult } from "../shell/ResultsCard";
+import { shellIcon } from "../shell/icons";
+import "../../styles/daily-result.css";
 
 export interface DailyResultScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell: ShellContext;
   readonly result: DailyResultSave;
   readonly storage: Storage;
-  readonly onHome: () => void;
-  readonly onBackToSolo: () => void;
-  readonly onDailyChallenge: () => void;
-  readonly onMultiplayer: () => void;
 }
 
 export function createDailyResultScreen(options: DailyResultScreenOptions): Screen {
   let destroyed = false;
   const { result } = options;
   const achievementResult = recordDailyAchievement(options.storage, result.date);
-  const copyButton = el("button", { className: "primary-action", text: "Copy share text", attrs: { type: "button" } });
-  const backButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
-  const topBackButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
-  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge" } });
-  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
+  const shareLabel = el("span", { text: "Share" });
+  const shareButton = el("button", { className: "shell-btn shell-btn-primary", attrs: { type: "button", "data-action": "share" }, children: [shellIcon("share-2", 17, 2), shareLabel] });
+  const homeButton = el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "button", "data-action": "home" }, children: [el("span", { text: "Back to games" }), shellIcon("arrow-right", 17, 2)] });
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
   const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
   const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
@@ -136,33 +136,25 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     );
   }
 
-  copyButton.addEventListener("click", () => {
-    void navigator.clipboard?.writeText(result.shareText);
-    copyButton.textContent = "Copied";
-    window.setTimeout(() => {
-      copyButton.textContent = "Copy share text";
-    }, 1400);
+  shareButton.addEventListener("click", () => {
+    void shareResult({ text: result.shareText, title: "Locato daily challenge" }).then((outcome) => {
+      if (destroyed || outcome === "shared") return;
+      shareLabel.textContent = outcome === "copied" ? "Copied" : "Couldn't share";
+      window.setTimeout(() => { shareLabel.textContent = "Share"; }, 1600);
+    });
   });
-  backButton.addEventListener("click", options.onBackToSolo);
-  topBackButton.addEventListener("click", options.onBackToSolo);
-  dailyButton.addEventListener("click", options.onDailyChallenge);
-  multiplayerButton.addEventListener("click", options.onMultiplayer);
+  homeButton.addEventListener("click", () => options.shell.goHome());
 
-  const element = el("section", {
-    className: "game-screen daily-result-screen",
-    children: [
-      el("header", {
-        className: "game-header",
-        children: [
-          createBrandLockup(options.onHome),
-          el("div", { className: "game-header-actions", children: [dailyButton, topBackButton, multiplayerButton] }),
-        ],
-      }),
+  const page = createSitePage(options.shell, {
+    section: "daily",
+    id: "daily-result",
+    className: "daily-result-screen",
+    content: [
       el("div", {
         className: "daily-result-panel",
         children: [
-          el("p", { className: "eyebrow", text: `Daily Challenge ${result.date}` }),
-          el("h1", { text: `${result.score}/${DAILY_MAX_SCORE}` }),
+          el("p", { className: "daily-result-kicker", text: `Daily challenge · ${result.date}` }),
+          el("h1", { className: "daily-result-score", children: [el("strong", { text: String(result.score) }), el("span", { text: `/${DAILY_MAX_SCORE}` })] }),
           el("div", {
             className: "daily-result-stats",
             children: [
@@ -171,16 +163,17 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
               el("article", { children: [el("span", { text: "Daily streak" }), el("strong", { text: String(achievementResult.streak) })] }),
             ],
           }),
-          achievementList(achievementResult.unlocked),
+          el("div", { className: "daily-result-actions", children: [shareButton, homeButton] }),
           share,
           el("div", { className: "daily-legend", children: [el("span", { text: "🟩 correct without hint" }), el("span", { text: "🟨 correct with hint" }), el("span", { text: "🟥 missed or skipped" })] }),
+          achievementList(achievementResult.unlocked),
           leaderboardPanel,
           retentionPanel,
-          el("div", { className: "actions", children: [copyButton, backButton] }),
         ],
       }),
     ],
   });
+  const element = page.element;
 
   void fetchDailySummary(result.date).then((summary) => {
     if (!destroyed) renderSummary(summary);
@@ -193,6 +186,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     element,
     destroy: () => {
       destroyed = true;
+      page.destroy();
     },
   };
 }

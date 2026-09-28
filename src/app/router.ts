@@ -3,18 +3,32 @@ import { isPromptGameModeId, isWorldMapGameModeId, type GameModeId, type WorldMa
 
 export type AppRoute =
   | { readonly type: "landing" }
-  | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool }
+  | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool; readonly run?: "timed" }
   | { readonly type: "daily-challenge" }
-  | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId }
+  | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed"; readonly continent?: string }
   | { readonly type: "streetview-country" }
   | { readonly type: "geoguessr" }
   | { readonly type: "map-tap" }
   | { readonly type: "worldsplit" }
-  | { readonly type: "multiplayer"; readonly joinCode?: string }
+  /**
+   * Compete › Multiplayer. `joinCode` joins that room (`?room=`); `create` opens straight into a
+   * new room with the default settings (`?view=multiplayer&create=1`), optionally inviting one
+   * friend by user id once it exists (`&invite=`).
+   */
+  | { readonly type: "multiplayer"; readonly joinCode?: string; readonly create?: true; readonly invite?: string }
   | { readonly type: "stats" }
+  /** Legacy: `?view=flags` now parses to `atlas`. Kept while App still renders the old gallery. */
   | { readonly type: "flag-gallery" }
+  /** Learn → Atlas: the index of every country (`?view=atlas`). */
+  | { readonly type: "atlas" }
   | { readonly type: "friends"; readonly username?: string }
+  /** Legacy: `?view=leaderboard` now parses to `compete`. Kept while App still renders the old screen. */
   | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string }
+  /**
+   * Compete (`?view=compete[&tab=leaderboards][&mode=&variant=]`). Opens on the Multiplayer tab;
+   * `tab: "leaderboards"` (or any `mode`) opens the solo timed-run boards.
+   */
+  | { readonly type: "compete"; readonly tab?: "leaderboards"; readonly mode?: GameModeId; readonly variant?: string }
   | { readonly type: "academy"; readonly groupId?: string }
   | { readonly type: "academy-lesson"; readonly lessonId: string }
   | { readonly type: "academy-placement" }
@@ -35,6 +49,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   const friend = params.get("friend")?.trim();
   if (friend) return { type: "friends", username: friend };
   const game = params.get("game");
+  const timed = params.get("run") === "timed" ? ({ run: "timed" } as const) : {};
   if (game && isPromptGameModeId(game)) {
     const categories = params.get("categories")?.split(",").filter(isPromptGameModeId);
     const flagPool = params.get("flagPool");
@@ -43,9 +58,14 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
       categoryIds: categories?.length ? categories : [game],
       continueSaved: params.get("resume") === "1",
       ...(isFlagPool(flagPool) ? { flagPool } : {}),
+      ...timed,
     };
   }
-  if (game && isWorldMapGameModeId(game)) return { type: "country-guessing", mode: game };
+  if (game && isWorldMapGameModeId(game)) {
+    // Puzzle boards are per continent, so a timed puzzle link names the continent it's for.
+    const continent = params.get("continent")?.trim();
+    return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
+  }
   if (game === "map-tap" || game === "worldsplit" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
   if (view === "academy") {
@@ -55,13 +75,20 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     const group = params.get("group")?.trim();
     return { type: "academy", ...(group && /^[a-z0-9-]{1,64}$/.test(group) ? { groupId: group } : {}) };
   }
-  if (view === "flags") return { type: "flag-gallery" };
-  if (view === "daily-challenge" || view === "stats" || view === "friends" || view === "multiplayer") return { type: view };
-  if (view === "leaderboard") {
+  if (view === "flags" || view === "atlas") return { type: "atlas" };
+  if (view === "multiplayer") {
+    if (params.get("create") !== "1") return { type: "multiplayer" };
+    const invite = params.get("invite")?.trim();
+    return { type: "multiplayer", create: true, ...(invite && /^[A-Za-z0-9_-]{1,64}$/.test(invite) ? { invite } : {}) };
+  }
+  if (view === "daily-challenge" || view === "stats" || view === "friends") return { type: view };
+  if (view === "compete" || view === "leaderboard") {
     const mode = params.get("mode");
     const validMode = mode && (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || ["worldsplit", "map-tap", "geoguessr", "streetview-country"].includes(mode));
     const variant = params.get("variant");
-    return { type: "leaderboard", ...(validMode ? { mode: mode as GameModeId } : {}), ...(variant ? { variant } : {}) };
+    // The old `?view=leaderboard` page was the boards, so it lands on the Leaderboards tab.
+    const tab = params.get("tab") === "leaderboards" || view === "leaderboard" ? ({ tab: "leaderboards" } as const) : {};
+    return { type: "compete", ...tab, ...(validMode ? { mode: mode as GameModeId } : {}), ...(variant ? { variant } : {}) };
   }
   return null;
 }
@@ -72,10 +99,21 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     params.set("game", route.categoryIds?.find(isPromptGameModeId) ?? "flags");
     if (route.categoryIds && route.categoryIds.length > 1) params.set("categories", route.categoryIds.join(","));
     if (route.flagPool) params.set("flagPool", route.flagPool);
-    params.set("resume", "1");
-  } else if (route.type === "country-guessing") params.set("game", route.mode ?? "name-all");
+    // Practice runs resume their per-mode save anyway; the flag stays for old links. Timed runs never resume.
+    if (route.run !== "timed") params.set("resume", "1");
+    if (route.run === "timed") params.set("run", "timed");
+  } else if (route.type === "country-guessing") {
+    params.set("game", route.mode ?? "name-all");
+    if (route.run === "timed") params.set("run", "timed");
+    if (route.continent) params.set("continent", route.continent);
+  }
   else if (["map-tap", "worldsplit", "geoguessr", "streetview-country"].includes(route.type)) params.set("game", route.type);
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
+  else if (route.type === "multiplayer" && route.create) {
+    params.set("view", "multiplayer");
+    params.set("create", "1");
+    if (route.invite) params.set("invite", route.invite);
+  }
   else if (route.type === "friends" && route.username) params.set("friend", route.username);
   else if (route.type === "country-profile") params.set("country", route.code.toLowerCase());
   else if (route.type === "academy" || route.type === "academy-lesson" || route.type === "academy-placement") {
@@ -85,8 +123,9 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     if (route.type === "academy-placement") params.set("lesson", "placement");
   }
   else if (route.type !== "landing") {
-    params.set("view", route.type === "flag-gallery" ? "flags" : route.type);
-    if (route.type === "leaderboard") {
+    params.set("view", route.type === "flag-gallery" ? "atlas" : route.type === "leaderboard" ? "compete" : route.type);
+    if (route.type === "leaderboard" || route.type === "compete") {
+      if (route.type === "compete" && route.tab === "leaderboards") params.set("tab", "leaderboards");
       if (route.mode) params.set("mode", route.mode);
       if (route.variant) params.set("variant", route.variant);
     }

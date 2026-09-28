@@ -3,11 +3,6 @@
   min-height: 0;
 }
 
-.geoguessr-header {
-  position: relative;
-  z-index: 30;
-}
-
 .geoguessr-stage {
   position: relative;
   flex: 1 1 auto;
@@ -257,13 +252,6 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
 }
 
 @media (max-width: 700px) {
-  .geoguessr-header .game-mode-dropdown {
-    max-width: 190px;
-  }
-
-  .geoguessr-header .game-header-actions {
-    display: none;
-  }
 
   .geoguessr-stage {
     border-radius: 16px;

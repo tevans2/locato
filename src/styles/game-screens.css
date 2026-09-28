@@ -1,0 +1,103 @@
+/*
+ * Prompt (SoloGameScreen) and world-map (CountryGuessingScreen) screens on the navigation
+ * shell: GameBar / FocusBar on top, the results card in place of the play surface when a run
+ * ends. Everything is scoped to `.game-screen[data-shell]` so other screens that share
+ * game.css / responsive.css are untouched.
+ */
+
+/* The app root drops its padding for shell screens; these screens bring the page gutter back. */
+#app > .game-screen[data-shell]:is(.solo-game-screen, .country-guess-screen, .daily-game-screen):not(.is-map-fullscreen) {
+  width: min(var(--app-shell-max-width), 100%);
+  height: 100dvh;
+  margin-inline: auto;
+  padding: 0 var(--shell-gutter) clamp(12px, 2dvh, 22px);
+}
+
+.game-screen[data-shell] > .shell-gamebar,
+.game-screen[data-shell] > .shell-focusbar {
+  flex: none;
+  margin-bottom: 14px;
+}
+
+/* ---- Results replace the play surface ---- */
+.game-screen[data-shell] > .game-results-host[hidden] { display: none; }
+.game-screen[data-shell][data-phase="results"] { overflow-y: auto; }
+.game-screen[data-shell][data-phase="results"] > .play-layout,
+.game-screen[data-shell][data-phase="results"] > .country-guess-layout { display: none; }
+.game-screen[data-shell] > .game-results-host {
+  flex: none;
+  padding: clamp(8px, 3vw, 28px) 0 40px;
+}
+
+/* The daily round label sits beside the focus bar's progress. */
+.game-screen[data-shell] .daily-round-label {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Timed-puzzle continent (the picker is hidden: the board is per continent). */
+.game-screen[data-shell] .puzzle-continent-locked { display: block; }
+
+/* "See results" after reviewing a given-up run on the map. */
+.game-screen[data-shell] .game-show-results[hidden] { display: none; }
+.game-screen[data-shell] .game-show-results { width: 100%; }
+
+/* Found / remaining score line on the world-map panel. */
+.game-screen[data-shell] .country-guess-score {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 700px) {
+  #app > .game-screen[data-shell]:is(.solo-game-screen, .country-guess-screen, .daily-game-screen):not(.is-map-fullscreen) {
+    height: auto;
+    min-height: 100dvh;
+    padding: 0 max(12px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .game-screen[data-shell] > .shell-gamebar,
+  .game-screen[data-shell] > .shell-focusbar { margin-bottom: 8px; }
+
+  /* Phones: the score row stays out of the Details fold, so keep it to one compact line. */
+  .game-screen[data-shell] .answer-panel > .stats-panel {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .game-screen[data-shell] .answer-panel > .country-guess-score {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-screen[data-shell] .answer-panel > .stats-panel .stat-card {
+    min-height: 0;
+    padding: 6px 8px;
+    gap: 0;
+  }
+  .game-screen[data-shell] .answer-panel > .stats-panel .stat-label { font-size: 0.6rem; }
+  .game-screen[data-shell] .answer-panel > .stats-panel .stat-value { font-size: 0.98rem; }
+  .game-screen[data-shell] .answer-panel > .stats-panel .progress-card { display: none; }
+
+  /* Keyboard open on a practice run: give the prompt the room (a timed run keeps its clock). */
+  .game-screen[data-shell].is-mobile-typing.is-practice-run > .shell-gamebar { display: none; }
+  .game-screen[data-shell].is-mobile-typing .answer-panel > .stats-panel { display: none; }
+}
+
+/* Phones, typing on a timed world-map run: the map pins to the top (responsive.css), so the
+   GameBar with the clock pins above it instead of scrolling away. */
+@media (max-width: 700px) {
+  .country-guess-screen[data-shell].is-mobile-typing.is-timed-run > .shell-gamebar {
+    position: fixed;
+    top: 0;
+    right: max(12px, env(safe-area-inset-right));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 125;
+    min-height: 0;
+    padding: max(4px, env(safe-area-inset-top)) 0 4px;
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  .country-guess-screen[data-shell].is-mobile-typing.is-timed-run :is(.world-map-panel, .world-globe-panel) {
+    top: calc(max(4px, env(safe-area-inset-top)) + 58px);
+    height: clamp(200px, calc(100svh - max(var(--keyboard-offset, 0px), 38vh) - 144px), 380px);
+    min-height: 200px;
+  }
+}

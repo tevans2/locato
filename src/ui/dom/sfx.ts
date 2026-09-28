@@ -151,29 +151,3 @@ export function flashScreen(tone: FlashTone): void {
   void flashElement.offsetWidth;
   flashElement.classList.add(tone === "good" ? "is-good" : "is-bad");
 }
-
-/** Toggle button styled to sit beside the global theme switch in the app header. */
-export function createSoundToggle(): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "global-sound-switch theme-switch";
-
-  const label = document.createElement("span");
-  label.className = "theme-switch-label sfx-toggle-label";
-  button.append(label);
-
-  const sync = (): void => {
-    label.textContent = enabled ? "Sound on" : "Sound off";
-    button.setAttribute("aria-pressed", String(enabled));
-    button.setAttribute("aria-label", enabled ? "Disable sound effects" : "Enable sound effects");
-  };
-
-  button.addEventListener("click", () => {
-    setSoundEnabled(!enabled);
-    sync();
-    if (enabled) playCorrect(); // audible confirmation the cue channel is live
-  });
-  window.addEventListener(SOUND_CHANGE_EVENT, sync);
-  sync();
-  return button;
-}

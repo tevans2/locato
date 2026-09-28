@@ -1,4 +1,4 @@
-import { createMobileGameNav } from "../dom/mobileGameNav";
+import type { ShellContext } from "../shell/types";
 import {
   DEFAULT_WORLD_SPLIT_LINE,
   WORLD_SPLIT_MAX_ROUND_SCORE,
@@ -26,15 +26,17 @@ import {
 } from "../../core/map";
 import type { GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
-import { createBrandLockup } from "../dom/createBrandLockup";
 import { el } from "../dom/createElement";
-import { createGameModeDropdown } from "../dom/gameModeDropdown";
+import { createResultsCard } from "../shell/ResultsCard";
+import { createPracticeBar, createResultsStage, createRunList, formatNumber, insertIntoResults, recordLocalBest, runLeaveMessage, shareSquare, shellOrFallback } from "./practiceRun";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MIN_DRAW_LENGTH = 24;
 const BEST_SCORE_KEY = "locato:worldsplit:best-score:v1";
 
 export interface WorldSplitScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly storage: Storage;
   readonly onGameModeChange: (mode: GameModeId) => void;
@@ -82,14 +84,9 @@ function feedbackForScore(score: number): string {
   return "The population is more uneven than the map looks";
 }
 
-function readBestScore(storage: Storage): number {
-  const value = Number.parseInt(storage.getItem(BEST_SCORE_KEY) ?? "0", 10);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
 export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen {
   const controller = new AbortController();
-  const mobileNav = createMobileGameNav(options, controller.signal);
+  const shell = shellOrFallback(options.shell, options.onHome);
   const countries = buildWorldSplitCountries(options.worldCountryFeatures);
   const countryByCode = new Map(countries.map((country) => [country.code, country]));
   const pathByCode = new Map<string, SVGPathElement>();
@@ -100,18 +97,6 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   let activePointerId: number | null = null;
   let dragStart: ProjectedPoint | null = null;
   let finished = false;
-
-  const gameModeDropdown = createGameModeDropdown({
-    selectedMode: "worldsplit",
-    signal: controller.signal,
-    name: "worldsplit-game-mode",
-    onChange: options.onGameModeChange,
-  });
-
-  const dailyButton = el("button", { className: "nav-action", text: "Daily challenge", attrs: { type: "button" } });
-  const multiplayerButton = el("button", { className: "nav-action", text: "Multiplayer", attrs: { type: "button" } });
-  dailyButton.hidden = !options.onDailyChallenge;
-  multiplayerButton.hidden = !options.onMultiplayer;
 
   const svg = createSvgElement("svg");
   svg.classList.add("worldsplit-map");
@@ -226,10 +211,6 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   lockButton.disabled = true;
   const nextButton = el("button", { className: "primary-action worldsplit-primary", text: "Next round", attrs: { type: "button" } });
   nextButton.hidden = true;
-  const copyButton = el("button", { className: "ghost-action worldsplit-copy", text: "Copy result", attrs: { type: "button" } });
-  copyButton.hidden = true;
-  const playAgainButton = el("button", { className: "primary-action worldsplit-primary", text: "Play again", attrs: { type: "button" } });
-  playAgainButton.hidden = true;
 
   const resultCallout = el("div", { className: "worldsplit-result-callout" });
   resultCallout.hidden = true;
@@ -246,7 +227,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
       sideCards,
       resultCallout,
       adjustControls,
-      el("div", { className: "worldsplit-panel-actions", children: [lockButton, nextButton, playAgainButton, copyButton] }),
+      el("div", { className: "worldsplit-panel-actions", children: [lockButton, nextButton] }),
       el("p", { className: "worldsplit-data-note", text: "Population weights use rounded 2024 estimates so every round stays reproducible." }),
     ],
   });
@@ -335,8 +316,6 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
     sideCards.hidden = false;
     lockButton.hidden = false;
     nextButton.hidden = true;
-    playAgainButton.hidden = true;
-    copyButton.hidden = true;
     setAdjustmentDisabled(false);
     svg.classList.remove("is-locked");
     updateProgress();
@@ -371,27 +350,35 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
     finished = true;
     const score = totalScore();
     const maximum = WORLD_SPLIT_ROUNDS.length * WORLD_SPLIT_MAX_ROUND_SCORE;
-    const previousBest = readBestScore(options.storage);
-    const best = Math.max(previousBest, score);
-    options.storage.setItem(BEST_SCORE_KEY, String(best));
-    const newBest = score > previousBest;
-
-    roundEyebrow.textContent = "Worldsplit complete";
-    roundTitle.textContent = `${score} / ${maximum}`;
-    roundDetail.textContent = newBest ? "New personal best. Your population instinct is sharp." : `Personal best: ${best} points.`;
-    statusText.textContent = score >= 450 ? "You can read population patterns at a glance." : score >= 350 ? "A strong run across five different maps." : "Every line teaches you where people really live.";
-    sideCards.hidden = true;
-    resultCallout.hidden = false;
-    resultCallout.replaceChildren(
-      el("strong", { text: newBest ? "New best score" : "Run summary" }),
-      el("span", { text: scores.map((roundScore, index) => `${WORLD_SPLIT_ROUNDS[index]!.label}: ${roundScore}`).join(" · ") }),
-    );
-    adjustControls.hidden = true;
-    lockButton.hidden = true;
-    nextButton.hidden = true;
-    playAgainButton.hidden = false;
-    copyButton.hidden = false;
+    const localBest = recordLocalBest(options.storage, BEST_SCORE_KEY, score);
+    const bestIndex = scores.reduce((top, roundScore, index) => (roundScore > (scores[top] ?? -1) ? index : top), 0);
+    const bestRound = WORLD_SPLIT_ROUNDS[bestIndex];
+    const ratio = score / maximum;
     updateProgress();
+
+    const card = createResultsCard(shell, {
+      kicker: "Worldsplit · Practice",
+      title: localBest.isNew && localBest.previous > 0 ? "A new best split!" : ratio >= 0.9 ? "You read the world at a glance" : ratio >= 0.7 ? "Strong population instinct" : "Run complete",
+      subtitle: score >= 450 ? "You can read population patterns at a glance." : score >= 350 ? "A strong run across five different maps." : "Every line teaches you where people really live.",
+      stats: [
+        { label: "Total score", value: formatNumber(score), note: `of ${formatNumber(maximum)}` },
+        ...(bestRound ? [{ label: "Best round", value: formatNumber(scores[bestIndex] ?? 0), note: bestRound.label }] : []),
+        { label: "Your best run", value: formatNumber(localBest.best), note: localBest.isNew ? "New best" : "On this device" },
+      ],
+      primary: { label: "Play again", onClick: playAgain },
+      share: {
+        title: "Locato Worldsplit",
+        text: `Locato Worldsplit ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`,
+      },
+      tone: ratio >= 0.6 ? "celebrate" : "neutral",
+    });
+    insertIntoResults(card, createRunList("Your splits", scores.map((roundScore, index) => ({
+      label: WORLD_SPLIT_ROUNDS[index]!.label,
+      detail: WORLD_SPLIT_ROUNDS[index]!.prompt,
+      value: `${roundScore} pts`,
+      tone: roundScore >= 85 ? "good" : roundScore >= 50 ? "ok" : "miss",
+    }))));
+    resultsStage.show(card);
   }
 
   function nextRound(): void {
@@ -407,6 +394,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   function playAgain(): void {
     scores.splice(0, scores.length);
     roundIndex = 0;
+    resultsStage.hide();
     renderRound();
   }
 
@@ -467,38 +455,23 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions): Screen
   }, { signal: controller.signal });
   lockButton.addEventListener("click", submitRound, { signal: controller.signal });
   nextButton.addEventListener("click", nextRound, { signal: controller.signal });
-  playAgainButton.addEventListener("click", playAgain, { signal: controller.signal });
-  copyButton.addEventListener("click", () => {
-    const maximum = WORLD_SPLIT_ROUNDS.length * WORLD_SPLIT_MAX_ROUND_SCORE;
-    const text = `Worldsplit ${totalScore()}/${maximum}\n${scores.map((score) => score >= 90 ? "🟩" : score >= 70 ? "🟨" : score >= 50 ? "🟧" : "⬜").join("")}\nlocato.quest`;
-    void navigator.clipboard?.writeText(text).then(() => {
-      copyButton.textContent = "Copied";
-      window.setTimeout(() => { copyButton.textContent = "Copy result"; }, 1600);
-    }).catch(() => {
-      copyButton.textContent = "Copy unavailable";
-    });
-  }, { signal: controller.signal });
-  dailyButton.addEventListener("click", () => options.onDailyChallenge?.(), { signal: controller.signal });
-  multiplayerButton.addEventListener("click", () => options.onMultiplayer?.(), { signal: controller.signal });
-
-  const element = el("section", {
-    className: "game-screen worldsplit-screen",
-    children: [
-      el("header", {
-        className: "game-header",
-        children: [
-          el("div", { className: "game-header-left", children: [createBrandLockup(options.onHome), gameModeDropdown.element] }),
-          el("div", { className: "game-header-actions", children: [dailyButton, multiplayerButton, mobileNav.button, mobileNav.sheet] }),
-        ],
-      }),
-      el("main", { className: "worldsplit-layout", children: [mapShell, panel] }),
-    ],
+  const layout = el("main", { className: "worldsplit-layout", children: [mapShell, panel] });
+  const resultsStage = createResultsStage(layout);
+  const element = el("section", { className: "game-screen worldsplit-screen gb-screen" });
+  const bar = createPracticeBar(element, shell, {
+    gameMode: "worldsplit",
+    leaveGuard: () => (finished ? null : runLeaveMessage(scores.length, WORLD_SPLIT_ROUNDS.length, "rounds")),
+    extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: playAgain }],
   });
+  element.append(bar.element, layout, resultsStage.element);
 
   renderRound();
 
   return {
     element,
-    destroy: () => controller.abort(),
+    destroy: () => {
+      controller.abort();
+      bar.destroy();
+    },
   };
 }

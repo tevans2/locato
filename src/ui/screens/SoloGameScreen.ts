@@ -1,20 +1,20 @@
 import type { AuthUser } from "../../core/auth";
+import type { RunType, ShellContext } from "../shell/types";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getCategory } from "../../core/categories";
 import { matchesCapitalName } from "../../core/categories/matching";
-import { scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
 import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
-import { isPromptGameModeId, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
+import { getGameModeOption, isLeaderboardMode, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
 import type { WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
-import { formatTimerCompletionSuffix, submitTimerToLeaderboard } from "../../core/timer/leaderboardSync";
-import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer, type PlayTimerMode } from "../../core/timer/playTimer";
+import { formatTimerCompletionSuffix, postTimedRun } from "../../core/timer/leaderboardSync";
+import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer } from "../../core/timer/playTimer";
 import { recordSoloAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
 import { createFlagPoolSelector } from "../dom/flagPoolSelector";
-import { createGameModeDropdown } from "../dom/gameModeDropdown";
 import { el } from "../dom/createElement";
 import { createAtlasView, setAtlasOpen, updateAtlasView, type AtlasView } from "../dom/renderAtlas";
 import { appendFeedbackAction, createFeedbackView, hideFeedback, showFeedback, type FeedbackView } from "../dom/renderFeedback";
@@ -25,26 +25,51 @@ import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { createWorldMapView, setWorldMapTargetCountry, updateWorldMapView, type WorldMapView } from "../dom/renderWorldMap";
 import { createCapitalRecallMapView, type CapitalRecallMapView } from "../dom/renderCapitalRecallMap";
 import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, isTouchKeyboardViewport, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
-import { createMobileMenu } from "../dom/mobileMenu";
-import { createBrandLockup } from "../dom/createBrandLockup";
+import { confirmDialog } from "../shell/confirmDialog";
+import { createFocusBar, type FocusBarHandle } from "../shell/FocusBar";
+import "../../styles/game-screens.css";
+import { createGameBar, type GameBarHandle } from "../shell/GameBar";
+import { markShellScreen } from "../shell/types";
+import { createRunResults, formatRunTime, formatTimeSpent, hideResultsIn, showResultsIn, type TimedPostOutcome } from "./gameResults";
+
+/** Answered prompts after which Restart asks before wiping the run. */
+export const RESTART_CONFIRM_THRESHOLD = 5;
+
+export interface DailyPromptProgress {
+  readonly score: number;
+  readonly hintsUsed: number;
+  readonly marks: readonly DailyRoundMark[];
+  /** Penalties already taken on the round in progress. */
+  readonly roundHintsUsed: number;
+  readonly roundWrongGuesses: number;
+}
 
 export interface SoloGameScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
   readonly selectedGameMode: PromptGameModeId;
+  /**
+   * From the route: "timed" runs show the clock in the GameBar and post to the leaderboard
+   * (leaderboard modes only); everything else is a practice run with no clock.
+   */
+  readonly run?: RunType;
   readonly flagPool?: FlagPool;
   readonly onFlagPoolChange?: (flagPool: FlagPool) => void;
   readonly storage: Storage;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onStateChange: (state: GameState) => void;
   readonly onReset: () => void;
-  readonly onHome: () => void;
-  readonly onMultiplayer: () => void;
-  readonly onDailyChallenge: () => void;
+  /** Legacy header callbacks: the GameBar / FocusBar navigate through `shell` now. */
+  readonly onHome?: () => void;
+  readonly onMultiplayer?: () => void;
+  readonly onDailyChallenge?: () => void;
+  /** The daily's ✕ (App says the daily is saved). */
   readonly onExitDailyChallenge?: () => void;
   readonly onViewStats?: () => void;
   readonly onViewFriends?: () => void;
-  readonly onLeaderboard: () => void;
+  readonly onLeaderboard?: () => void;
   /** Open a country's Academy profile; offered after a skip or reveal so misses become lessons. */
   readonly onOpenCountry?: (code: string) => void;
   readonly getAuthUser: () => AuthUser | null;
@@ -53,6 +78,12 @@ export interface SoloGameScreenOptions {
   readonly dailyChallenge?: {
     readonly date: string;
     readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[] }) => void;
+    /** Progress restored from a saved daily (the engine carries the matching state). */
+    readonly initialProgress?: DailyPromptProgress;
+    /** Called after every answer, hint or wrong guess so the daily can be saved and resumed. */
+    readonly onProgress?: (progress: DailyPromptProgress) => void;
+    /** Rounds across every daily stage (default DAILY_COUNTRY_COUNT); the prompt stage is first. */
+    readonly totalRounds?: number;
   };
 }
 
@@ -83,11 +114,12 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const activeFlagPool = options.flagPool ?? DEFAULT_FLAG_POOL;
   const initialState = engine.getState();
   const countries = visibleCountries(countryIndex, initialState);
-  const dailyMarks: DailyRoundMark[] = [];
-  let dailyHintsUsed = 0;
-  let dailyRoundHintsUsed = 0;
-  let dailyRoundWrongGuesses = 0;
-  let dailyScore = 0;
+  const restoredDaily = options.dailyChallenge?.initialProgress;
+  const dailyMarks: DailyRoundMark[] = [...(restoredDaily?.marks ?? [])];
+  let dailyHintsUsed = restoredDaily?.hintsUsed ?? 0;
+  let dailyRoundHintsUsed = restoredDaily?.roundHintsUsed ?? 0;
+  let dailyRoundWrongGuesses = restoredDaily?.roundWrongGuesses ?? 0;
+  let dailyScore = restoredDaily?.score ?? 0;
   let dailyCompleted = false;
   let soloHintsUsed = 0;
   const stats = createStatsView();
@@ -110,45 +142,12 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     text: "Free play",
     attrs: { type: "button", "aria-pressed": "false", title: "Pick any country on the map and name its capital — no prompts" },
   });
-  const multiplayerButton = el("button", { className: "ghost-action nav-action", text: "Multiplayer", attrs: { type: "button", "data-mobile-label": "Multi", "aria-label": "Open multiplayer" } });
-  const dailyButton = el("button", { className: "ghost-action nav-action daily-action", text: "Daily Challenge", attrs: { type: "button", "data-mobile-label": "Daily", "aria-label": "Open daily challenge", ...(isDailyChallenge ? { disabled: "" } : {}) } });
-  const exitDailyButton = el("button", { className: "ghost-action nav-action", text: "Back to modes", attrs: { type: "button", "data-mobile-label": "Modes", "aria-label": "Back to game modes" } });
-  const leaderboardButton = el("button", { className: "ghost-action nav-action", text: "Leaderboards", attrs: { type: "button", "data-mobile-label": "Ranks", "aria-label": "Open leaderboards" } });
-  const mobileDailyNavButton = el("button", { className: "mobile-nav-item", text: isDailyChallenge ? "Back to modes" : "Daily Challenge", attrs: { type: "button" } });
-  const mobileLeaderboardNavButton = el("button", { className: "mobile-nav-item", text: "Leaderboards", attrs: { type: "button" } });
-  const mobileMultiplayerNavButton = el("button", { className: "mobile-nav-item", text: "Multiplayer", attrs: { type: "button" } });
-  const mobileUserAvatar = el("span", { className: "mobile-nav-user-avatar", text: "?" });
-  const mobileUserName = el("span", { className: "mobile-nav-user-name", text: "Guest" });
-  const mobileUserSummary = el("div", { className: "mobile-nav-user-summary", children: [mobileUserAvatar, mobileUserName] });
-  const mobileStatsNavButton = el("button", { className: "mobile-nav-item", text: "Stats", attrs: { type: "button" } });
-  const mobileFriendsNavButton = el("button", { className: "mobile-nav-item", text: "Friends", attrs: { type: "button" } });
-  const mobileSignInNavButton = el("button", { className: "mobile-nav-item", text: "Sign in", attrs: { type: "button" } });
-  const mobileSignOutNavButton = el("button", { className: "mobile-nav-item", text: "Sign out", attrs: { type: "button" } });
-  const mobileUserMenuItems = [mobileUserSummary, mobileStatsNavButton, mobileFriendsNavButton, mobileSignInNavButton, mobileSignOutNavButton];
-  const mobileMenu = createMobileMenu(
-    "Menu",
-    [
-      { title: "Play", items: [mobileDailyNavButton] },
-      { title: "Compete", items: [mobileLeaderboardNavButton, mobileMultiplayerNavButton] },
-      { title: "You", items: mobileUserMenuItems },
-    ],
-    controller.signal,
-  );
-
-  function updateMobileUserMenu(): void {
-    const user = options.authControls?.getUser() ?? null;
-    const signedIn = user !== null;
-    mobileUserSummary.hidden = !signedIn;
-    mobileStatsNavButton.hidden = !signedIn || !options.onViewStats;
-    mobileFriendsNavButton.hidden = !signedIn || !options.onViewFriends;
-    mobileSignOutNavButton.hidden = !signedIn;
-    mobileSignInNavButton.hidden = signedIn || !options.authControls;
-    if (user) {
-      mobileUserAvatar.textContent = user.avatarEmoji ?? user.displayName.charAt(0).toUpperCase();
-      mobileUserName.textContent = user.displayName;
-    }
-  }
-  updateMobileUserMenu();
+  const shell = options.shell;
+  // A timed run needs a leaderboard mode and never applies to the daily.
+  const timed = !isDailyChallenge && options.run === "timed" && isLeaderboardMode(options.selectedGameMode);
+  const runType: RunType = timed ? "timed" : "practice";
+  const leaderboardVariant = options.selectedGameMode === "flags" && activeFlagPool !== "countries" ? activeFlagPool : "";
+  if (timed) resetButton.textContent = "Restart run";
   const mobileHintButton = el("button", { className: "mobile-hint-action", text: "Hint", attrs: { type: "button", "aria-label": "Get a hint" } });
   const mobileSkipButton = el("button", { className: "mobile-pass-action", text: "Pass", attrs: { type: "button", "aria-label": "Reveal this answer" } });
   const mobileExtrasToggle = el("button", { className: "mobile-extras-toggle", text: "Details", attrs: { type: "button", "aria-expanded": "false" } });
@@ -161,31 +160,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     attrs: { hidden: "true", "aria-live": "polite", "aria-label": "Hint" },
     children: [el("div", { className: "hint-popover-copy", children: [hintPopoverTitle, hintPopoverMessage] }), hintPopoverClose],
   });
-  const timerModeSelect = el("select", {
-    className: "country-guess-timer-select",
-    attrs: { id: "solo-timer-mode", name: "timerMode", "aria-label": "Solo timer mode" },
-    children: [
-      el("option", { text: "Practice", attrs: { value: "off" } }),
-      el("option", { text: "Timer", attrs: { value: "count-up" } }),
-    ],
-  });
-  const timerElapsed = el("strong", { className: "stat-value", text: "—" });
+  // Timed runs: the live clock sits in the GameBar pill; the panel keeps previous / best.
+  const clockValue = el("span", { className: "game-run-clock-value", text: formatElapsedTime(0), attrs: { "aria-label": "Elapsed time" } });
   const timerLast = el("strong", { className: "stat-value", text: "—" });
   const timerBest = el("strong", { className: "stat-value", text: "—" });
   const achievementPanel = el("section", { className: "achievement-panel compact", attrs: { hidden: "true" } });
-  const timerPanel = el("div", {
-    className: "stats-panel country-guess-stats solo-timer-stats",
-    children: [
-      el("div", {
-        className: "stat-card country-guess-mode-card",
-        children: [el("label", { className: "stat-label", text: "Mode", attrs: { for: "solo-timer-mode" } }), timerModeSelect],
-      }),
-      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Time" }), timerElapsed] }),
-      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Previous" }), timerLast] }),
-      el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
-    ],
-  });
-  const flagPoolSelector = !isDailyChallenge && options.selectedGameMode === "flags" && options.onFlagPoolChange
+  const timerPanel = timed
+    ? el("div", {
+        className: "stats-panel country-guess-stats solo-timer-stats timer-is-active",
+        children: [
+          el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Previous" }), timerLast] }),
+          el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Best" }), timerBest] }),
+        ],
+      })
+    : null;
+  const resultsHost = el("div", { className: "game-results-host", attrs: { hidden: "" } });
+  // Countries passed or revealed this run (plus the engine's skipped set on a resumed run).
+  const missedCountryIds = new Set<CountryId>(initialState.skippedCountryIds);
+  const flagPoolSelector = !isDailyChallenge && !timed && options.selectedGameMode === "flags" && options.onFlagPoolChange
     ? createFlagPoolSelector({
         value: activeFlagPool,
         signal: controller.signal,
@@ -255,16 +247,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   }
 
   function renderTimer(): void {
-    timerModeSelect.value = playTimer.mode;
-    timerPanel.classList.toggle("timer-is-active", playTimer.mode === "count-up");
-    timerElapsed.textContent = playTimer.mode === "count-up" ? formatElapsedTime(playTimer.currentElapsedMs()) : "—";
+    if (!timed) return;
+    clockValue.textContent = formatElapsedTime(playTimer.currentElapsedMs());
     timerLast.textContent = formatStoredTime(playTimer.readLast());
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
   function offerCountryProfile(country: Country): void {
-    if (isDailyChallenge || !options.onOpenCountry || !ACADEMY_COUNTRY_CODES.includes(country.code)) return;
-    const openCountry = options.onOpenCountry;
+    const openCountry = options.onOpenCountry ?? shell?.openCountry;
+    if (isDailyChallenge || !openCountry || !ACADEMY_COUNTRY_CODES.includes(country.code)) return;
     appendFeedbackAction(views.feedback, `Learn about ${country.name} →`, () => openCountry(country.code));
   }
 
@@ -272,15 +263,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     return options.selectedGameMode === "capital-recall" ? country.capital : country.name;
   }
 
-  async function finishTimerRun(finalTimeMs: number): Promise<{ readonly isNewLocalBest: boolean; readonly serverAccepted: boolean | null }> {
+  async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
-    const serverAccepted = await submitTimerToLeaderboard({
+    const posting = await postTimedRun({
       gameMode: options.selectedGameMode,
-      variant: options.selectedGameMode === "flags" && activeFlagPool !== "countries" ? activeFlagPool : "",
+      variant: leaderboardVariant,
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
     });
-    return { isNewLocalBest, serverAccepted };
+    return { isNewLocalBest, ...posting };
   }
 
   function applyEvents(events: readonly GameEvent[]): void {
@@ -305,6 +296,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         revealAnswerArmed = false;
         hideHintPopover();
         const skipped = countryIndex.byId[event.previousCountryId];
+        missedCountryIds.add(event.previousCountryId);
         // Daily passes reveal the answer separately; elsewhere, name what was skipped so the miss teaches something.
         showFeedback(views.feedback, skipped && !isDailyChallenge ? `Skipped — that was ${answerLabelFor(skipped)}. It can return later.` : "Skipped. Streak reset — this prompt can return later.", "neutral");
         if (skipped) offerCountryProfile(skipped);
@@ -322,6 +314,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       if (event.type === "ANSWER_REVEALED") {
         revealAnswerArmed = false;
         const country = countryIndex.byId[event.countryId];
+        missedCountryIds.add(event.countryId);
         if (country) {
           if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
           showHintPopover("Answer", answerLabelFor(country));
@@ -346,35 +339,66 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             guessedCountryIds: state.guessedCountryIds,
           }));
         }
-        if (playTimer.mode === "count-up") {
+        if (isDailyChallenge) continue;
+        if (timed) {
           const finalTimeMs = playTimer.stop();
-          void finishTimerRun(finalTimeMs).then((result) => {
-            showFeedback(
-              views.feedback,
-              `Complete. Every prompt solved in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`,
-              "good",
-            );
+          const posting = finishTimerRun(finalTimeMs);
+          void posting.then((result) => {
+            showFeedback(views.feedback, `Complete. Every prompt solved in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`, "good");
           });
+          showRunResults(posting, finalTimeMs);
         } else {
-          showFeedback(
-            views.feedback,
-            "Complete. Every prompt in this mix has been solved. Switch to Timer mode to post a time to the leaderboard.",
-            "good",
-          );
+          showFeedback(views.feedback, "Complete. Every prompt in this mix has been solved.", "good");
+          showRunResults();
         }
       }
     }
   }
 
-  const gameModeDropdown = createGameModeDropdown({
-    selectedMode: options.selectedGameMode,
-    signal: controller.signal,
-    onChange: (gameMode) => {
-      if (isPromptGameModeId(gameMode) && gameMode === engine.getState().categoryIds[0] && engine.getState().categoryIds.length === 1) return;
-      options.onGameModeChange(gameMode);
-    },
-  });
-
+  /** The end-of-run card (docs/navigation.md: every run ends on a results screen). */
+  function showRunResults(posting?: Promise<TimedPostOutcome>, finalTimeMs?: number): void {
+    if (!shell || isDailyChallenge) return;
+    const state = engine.getState();
+    const answered = state.correctAnswers + state.wrongAnswers;
+    const accuracy = answered > 0 ? `${Math.round((state.correctAnswers / answered) * 100)}%` : "—";
+    const spentMs = Math.max(0, (state.endedAt ?? Date.now()) - (state.startedAt ?? Date.now()));
+    const missed = [...missedCountryIds].map((id) => countryIndex.byId[id]).filter((country): country is Country => Boolean(country));
+    const label = getGameModeOption(options.selectedGameMode).label;
+    const card = createRunResults(shell, {
+      mode: options.selectedGameMode,
+      run: runType,
+      variant: leaderboardVariant,
+      title: timed ? formatRunTime(finalTimeMs ?? 0) : missed.length === 0 ? "Clean sweep" : "Run complete",
+      ...(timed
+        ? {}
+        : { subtitle: `You worked through all ${state.poolCountryIds.length} prompts${missed.length === 0 ? " without a single pass" : ` and passed on ${missed.length}`}.` }),
+      stats: timed
+        ? [
+            // The title is the final time, so the stats carry the context around it.
+            { label: "Your best", value: formatStoredTime(playTimer.readBest()) },
+            { label: "Accuracy", value: accuracy },
+            { label: "Best streak", value: String(state.bestStreak) },
+          ]
+        : [
+            { label: "Score", value: String(state.score) },
+            { label: "Accuracy", value: accuracy },
+            { label: "Best streak", value: String(state.bestStreak) },
+            { label: "Time spent", value: formatTimeSpent(spentMs) },
+          ],
+      missed,
+      ...(missed.length > 0 ? { missedTitle: "Passed or revealed" } : {}),
+      onPlayAgain: () => {
+        missedCountryIds.clear();
+        hideResultsIn(element, resultsHost);
+        resetRun(timed ? "New timed run. The clock starts on your first correct answer." : "Fresh run started.");
+      },
+      shareText: timed
+        ? `I cleared ${label} on Locato in ${formatRunTime(finalTimeMs ?? 0)} (timed run).`
+        : `I cleared ${label} on Locato — ${state.score} points, ${accuracy} accuracy.`,
+      ...(posting ? { posting } : {}),
+    });
+    showResultsIn(element, resultsHost, card);
+  }
 
   const form = el("form", {
     className: "guess-form",
@@ -470,6 +494,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     options.onReset();
     playTimer.reset();
     soloHintsUsed = 0;
+    missedCountryIds.clear();
+    hideResultsIn(element, resultsHost);
     dispatchAndRender(engine.dispatch({ type: "RESET_GAME", now: Date.now() }));
     showFeedback(feedback, message, "neutral");
   }
@@ -481,7 +507,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const content = current && category ? category.prompt(current) : null;
     const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
     if (dailyMap) dailyMap.element.classList.toggle("is-click-country-mode", content?.kind === "map-click" && state.status === "playing");
-    freePlayToggle.hidden = capitalRecallMap === null;
+    freePlayToggle.hidden = capitalRecallMap === null || timed;
     guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
     input.placeholder = isCapitalRecallMode
       ? "e.g. Tokyo, Abuja, Brasília..."
@@ -588,6 +614,10 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       input.value = "";
     }
     if (engine.getState().status === "playing" && shouldAutoFocusTextInput()) input.focus();
+    if (isDailyChallenge && events.length > 0) {
+      options.dailyChallenge?.onProgress?.({ score: dailyScore, hintsUsed: dailyHintsUsed, marks: [...dailyMarks], roundHintsUsed: dailyRoundHintsUsed, roundWrongGuesses: dailyRoundWrongGuesses });
+    }
+    if (isDailyChallenge) renderDailyProgress();
     if (isDailyChallenge) completeDailyIfNeeded(events);
   }
 
@@ -717,38 +747,23 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   skipButton.addEventListener("click", skipRound, { signal: controller.signal });
   mobileSkipButton.addEventListener("click", skipRound, { signal: controller.signal });
   hintPopoverClose.addEventListener("click", hideHintPopover, { signal: controller.signal });
-  resetButton.addEventListener(
-    "click",
-    () => {
-      dismissKeyboardIfTouchInput(input);
-      resetRun(playTimer.mode === "count-up" ? "Timer reset. Start with your first correct answer." : "Fresh run started.");
-    },
-    { signal: controller.signal },
-  );
+  /** Ask before wiping a run with real progress; short runs reset straight away. */
+  async function confirmWipeRun(message: string, confirmLabel: string): Promise<boolean> {
+    const state = engine.getState();
+    const answered = state.guessedCountryIds.size + state.skippedCountryIds.size;
+    if (state.status === "complete" || answered < RESTART_CONFIRM_THRESHOLD) return true;
+    return confirmDialog(`${message} You've answered ${answered} so far — this run will be lost.`, { confirmLabel, cancelLabel: "Keep playing", tone: "danger" });
+  }
+
+  function restartFromMenu(): void {
+    dismissKeyboardIfTouchInput(input);
+    void confirmWipeRun(timed ? "Restart this timed run?" : "Start a fresh run?", "Restart").then((confirmed) => {
+      if (!confirmed || controller.signal.aborted) return;
+      resetRun(timed ? "Timer reset. The clock starts on your first correct answer." : "Fresh run started.");
+    });
+  }
+  resetButton.addEventListener("click", restartFromMenu, { signal: controller.signal });
   freePlayToggle.addEventListener("click", () => setFreePlayEnabled(!freePlayEnabled), { signal: controller.signal });
-  timerModeSelect.addEventListener(
-    "change",
-    () => {
-      const nextMode: PlayTimerMode = timerModeSelect.value === "count-up" ? "count-up" : "off";
-      playTimer.setMode(nextMode);
-      dismissKeyboardIfTouchInput(input);
-      resetRun(nextMode === "count-up" ? "Timer mode ready. The clock starts on your first correct answer." : "Practice mode ready.");
-    },
-    { signal: controller.signal },
-  );
-  multiplayerButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
-  mobileDailyNavButton.addEventListener("click", () => (isDailyChallenge ? options.onExitDailyChallenge?.() : options.onDailyChallenge()), { signal: controller.signal });
-  mobileLeaderboardNavButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
-  mobileMultiplayerNavButton.addEventListener("click", options.onMultiplayer, { signal: controller.signal });
-  mobileStatsNavButton.addEventListener("click", () => options.onViewStats?.(), { signal: controller.signal });
-  mobileFriendsNavButton.addEventListener("click", () => options.onViewFriends?.(), { signal: controller.signal });
-  mobileSignInNavButton.addEventListener("click", () => options.authControls?.openPanel(), { signal: controller.signal });
-  mobileSignOutNavButton.addEventListener("click", () => void options.authControls?.signOut(), { signal: controller.signal });
-  mobileMenu.button.addEventListener("pointerdown", updateMobileUserMenu, { signal: controller.signal });
-  mobileMenu.button.addEventListener("click", updateMobileUserMenu, { signal: controller.signal, capture: true });
-  dailyButton.addEventListener("click", options.onDailyChallenge, { signal: controller.signal });
-  exitDailyButton.addEventListener("click", () => options.onExitDailyChallenge?.(), { signal: controller.signal });
-  leaderboardButton.addEventListener("click", options.onLeaderboard, { signal: controller.signal });
 
   mobileExtrasToggle.addEventListener(
     "click",
@@ -777,33 +792,67 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   );
 
   updateAtlasView(atlas, countries, initialState.guessedCountryIds);
-  const logo = createBrandLockup(options.onHome);
 
   atlas.openButton.addEventListener("click", () => setAtlasOpen(atlas, true), { signal: controller.signal });
   atlas.closeButton.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
   atlas.overlay.addEventListener("click", () => setAtlasOpen(atlas, false), { signal: controller.signal });
 
+  // Phones: the feedback line (with its "Learn about X →" link) and the score stay visible;
+  // only the secondary tools fold into Details.
   mobileExtrasPanel.replaceChildren(
-    timerPanel,
-    stats.element,
-    feedback.element,
+    ...(timerPanel ? [timerPanel] : []),
     achievementPanel,
-    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton, ...(isDailyChallenge ? [exitDailyButton] : [resetButton]), atlas.element] }),
+    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
   );
 
+  /** A timed run is "in progress" from the first answer until it completes. */
+  function timedRunInProgress(): boolean {
+    const state = engine.getState();
+    return timed && state.status === "playing" && (state.attempts > 0 || state.guessedCountryIds.size > 0 || playTimer.currentElapsedMs() > 0);
+  }
+
+  let gameBar: GameBarHandle | null = null;
+  let focusBar: FocusBarHandle | null = null;
+  const dailyTotalRounds = options.dailyChallenge?.totalRounds ?? DAILY_COUNTRY_COUNT;
+  const dailyRoundLabel = el("span", { className: "daily-round-label" });
+  function renderDailyProgress(): void {
+    if (!focusBar) return;
+    const done = Math.min(dailyMarks.length, dailyTotalRounds);
+    const round = Math.min(done + 1, dailyTotalRounds);
+    dailyRoundLabel.textContent = `Round ${round} of ${dailyTotalRounds}`;
+    focusBar.setProgress(done / dailyTotalRounds, `Round ${round} of ${dailyTotalRounds}`);
+  }
+  if (isDailyChallenge) {
+    focusBar = createFocusBar({
+      // App's exit says "Your daily progress is saved — resume any time today".
+      onClose: () => (options.onExitDailyChallenge ?? (() => shell?.openSection("daily")))(),
+      closeLabel: "Leave the daily challenge (progress is saved)",
+      title: "Daily challenge",
+      progress: 0,
+      progressLabel: "Daily challenge progress",
+      trailing: dailyRoundLabel,
+    });
+    renderDailyProgress();
+  } else if (shell) {
+    gameBar = createGameBar(shell, {
+      gameMode: options.selectedGameMode,
+      run: runType,
+      ...(timed ? { clock: clockValue } : {}),
+      // A cold timed link backs out to its own board rather than the Compete landing tab.
+      onBack: () => shell.goBack(timed ? () => shell.openCompete(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
+      backLabel: timed ? "Back to Compete" : "Back",
+      onHowToPlay: () => showHintPopover("How to play", getGameModeOption(options.selectedGameMode).description),
+      extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: restartFromMenu }],
+      leaveGuard: () => (timedRunInProgress() ? "This timed run is still going — it won't be posted." : null),
+    });
+  }
+
   const element = el("section", {
-    className: isDailyChallenge ? "game-screen daily-game-screen" : "game-screen",
+    className: isDailyChallenge ? "game-screen daily-game-screen" : `game-screen solo-game-screen is-${runType}-run`,
+    attrs: { "data-run": isDailyChallenge ? "daily" : runType, "data-mode": options.selectedGameMode },
     children: [
-      el("header", {
-        className: "game-header",
-        children: [
-          el("div", { className: "game-header-left", children: [logo, isDailyChallenge ? el("div", { className: "daily-badge", text: `Daily ${options.dailyChallenge?.date ?? ""}` }) : gameModeDropdown.element] }),
-          el("div", {
-            className: "game-header-actions",
-            children: [dailyButton, leaderboardButton, multiplayerButton, mobileMenu.button, mobileMenu.sheet, ...(options.authControls ? [options.authControls.trigger] : [])],
-          }),
-        ],
-      }),
+      ...(focusBar ? [focusBar.element] : gameBar ? [gameBar.element] : []),
+      resultsHost,
       el("div", {
         className: "play-layout",
         children: [
@@ -813,6 +862,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
             children: [
               el("div", { className: "panel-title has-freeplay-toggle", children: [el("h2", { text: "Name the place" }), freePlayToggle] }),
               form,
+              feedback.element,
+              stats.element,
               ...(flagPoolSelector ? [flagPoolSelector.element] : []),
               hintPopover,
               mobileExtrasToggle,
@@ -823,15 +874,21 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }),
     ],
   });
+  markShellScreen(element, isDailyChallenge ? "focus" : "game");
 
   bindKeyboardAwareInput(element, input, controller.signal);
+  if (timed) playTimer.setMode("count-up");
   render();
   if (initialState.lastResult?.message) showFeedback(feedback, initialState.lastResult.message, "neutral");
+  else if (timed) showFeedback(feedback, "Timed run. The clock starts on your first correct answer.", "neutral");
+  // A resumed run that had already finished opens on its results.
+  if (!isDailyChallenge && initialState.status === "complete") showRunResults();
 
   return {
     element,
     destroy: () => {
       playTimer.destroy();
+      gameBar?.destroy();
       controller.abort();
     },
   };

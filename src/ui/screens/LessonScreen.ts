@@ -1,4 +1,5 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { AcademyProgressStore } from "../../app/academyProgress";
 import type { CountryCode, CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
@@ -31,6 +32,7 @@ import {
 } from "../../core/academy";
 import { createRandomSeed, createSeededRandom } from "../../core/game/random";
 import { el } from "../dom/createElement";
+import { confirmDialog } from "../shell/confirmDialog";
 import { bindKeyboardAwareInput } from "../dom/mobileKeyboard";
 import { playCorrect, playRoundTaken, playVictory } from "../dom/sfx";
 import { createCompletionView, createLessonTopBar, createMessageView, type CompletionAction } from "../components/academy/lessonChrome";
@@ -49,6 +51,8 @@ import {
 import "../../styles/academy-lesson.css";
 
 export interface LessonScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly progressStore: AcademyProgressStore;
@@ -102,7 +106,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   const random = options.random ?? createSeededRandom(createRandomSeed());
   const now = options.now ?? (() => Date.now());
   const abort = new AbortController();
-  const root = el("section", { className: "lx lesson-screen", attrs: { "data-phase": "loading", "aria-label": "Academy lesson" } });
+  const root = el("section", { className: "lx lesson-screen", attrs: { "data-shell": "focus", "data-phase": "loading", "aria-label": "Academy lesson" } });
   const announcer = el("p", { className: "lx-sr-only", attrs: { "aria-live": "polite" } });
 
   const startProgress = progressStore.get();
@@ -186,7 +190,25 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   let meetTotal = lesson.steps.filter((step) => step.kind === "meet").length;
   let meetSeen = 0;
 
-  let top = createLessonTopBar({ title: lesson.title, onExit: exit });
+  // Answers are saved as they're given, but the place in the lesson isn't: ask before leaving
+  // mid-lesson. data-leave-confirm lets app-level exits (Home, invites) ask the same question.
+  const LEAVE_MESSAGE = "Leave this lesson? Your answers so far are saved.";
+  const midLesson = (): boolean => phase !== "complete" && session.attempts.length > 0;
+  const syncLeaveGuard = (): void => {
+    if (midLesson()) root.dataset.leaveConfirm = LEAVE_MESSAGE;
+    else delete root.dataset.leaveConfirm;
+  };
+  const leaveLesson = (): void => {
+    if (!midLesson()) {
+      exit();
+      return;
+    }
+    void confirmDialog(LEAVE_MESSAGE, { confirmLabel: "Leave", cancelLabel: "Stay" }).then((leave) => {
+      if (leave && !abort.signal.aborted) exit();
+    });
+  };
+
+  let top = createLessonTopBar({ title: lesson.title, onExit: leaveLesson });
   const stageInner = el("div", { className: "lx-stage-inner" });
   const stage = el("main", { className: "lx-stage", children: [stageInner] });
   const footerInner = el("div", { className: "lx-footer-inner" });
@@ -322,6 +344,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     phase = "feedback";
     root.dataset.phase = "feedback";
     session = answerStep(session, answer.correct, ease);
+    syncLeaveGuard();
     const attempt = session.attempts.at(-1);
     // Every round is real practice, mistakes review included: a first answer per card reaches spaced repetition.
     if (attempt) {
@@ -356,7 +379,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
     bestStreak = 0;
     meetTotal = 0;
     meetSeen = 0;
-    top = createLessonTopBar({ title: lesson.title, onExit: exit });
+    top = createLessonTopBar({ title: lesson.title, onExit: leaveLesson });
     layoutPlayer();
     showStep();
   }
@@ -364,6 +387,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   function finish(): void {
     phase = "complete";
     root.dataset.phase = "complete";
+    syncLeaveGuard();
     delete root.dataset.stepKind;
     tray.hide();
     const progress = progressStore.get();

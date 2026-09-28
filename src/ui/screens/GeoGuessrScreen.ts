@@ -1,19 +1,28 @@
 import type { Screen } from "../../app/router";
+import type { ShellContext } from "../shell/types";
 import type { CountryIndex } from "../../core/countries";
 import { createGeoGuessrQueue, GEOGUESSR_MAX_GAME_SCORE, GEOGUESSR_MAX_ROUND_SCORE, GEOGUESSR_ROUND_LIMIT, scoreGeoGuessrGuess, type GeoGuessrGuessResult, type GeoGuessrLocation } from "../../core/geoguessr";
 import type { GameModeId } from "../../core/gameModes";
 import type { LngLatPoint } from "../../core/maptap/distance";
 import { streetViewCountryRounds, type StreetViewCountryRound } from "../../core/streetview";
-import { createGeoGuessMap } from "../components/GeoGuessMap";
+import { createGeoGuessMap, googleMapsJavaScriptApiKey } from "../components/GeoGuessMap";
 import { createGeoStreetView } from "../components/GeoStreetView";
 import { el } from "../dom/createElement";
+import { createResultsCard } from "../shell/ResultsCard";
+import { createPracticeBar, createRunList, formatKm, formatNumber, insertIntoResults, recordLocalBest, runLeaveMessage, shareSquare, shellOrFallback } from "./practiceRun";
+
+export const GEOGUESSR_BEST_RUN_KEY = "locato:geoguessr:best-run:v1";
 
 export interface GeoGuessrScreenOptions {
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
+  /** Keeps the local best for a five-round total. */
+  readonly storage?: Storage;
 }
 
 /** Injectable surfaces keep the full game flow testable without Google credentials. */
@@ -21,9 +30,11 @@ export interface GeoGuessrScreenServices {
   readonly createMap: typeof createGeoGuessMap;
   readonly createPanorama: typeof createGeoStreetView;
   readonly loadLocations: (signal: AbortSignal) => Promise<GeoGuessrLocation[]>;
+  /** False when no Google Maps key is configured: the screen shows a friendly "not set up" state. */
+  readonly isConfigured: () => boolean;
 }
 
-type GameStatus = "loading" | "playing" | "result" | "complete" | "error";
+type GameStatus = "loading" | "playing" | "result" | "complete" | "error" | "unconfigured";
 type MapSize = "collapsed" | "compact" | "expanded";
 
 function icon(name: "back" | "pin" | "expand" | "collapse" | "reset" | "settings" | "arrow" | "map" | "close"): SVGSVGElement {
@@ -66,15 +77,19 @@ async function fetchLocations(signal: AbortSignal): Promise<GeoGuessrLocation[]>
   } catch { return []; }
 }
 function fallbackLocations(): GeoGuessrLocation[] { return createGeoGuessrQueue(`solo:${Date.now()}:${Math.random()}`, GEOGUESSR_ROUND_LIMIT, streetViewCountryRounds); }
-function formatDistance(distanceKm: number): string {
-  if (distanceKm < 1) return `${Math.round(distanceKm * 1000).toLocaleString()} m`;
-  if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
-  return `${Math.round(distanceKm).toLocaleString()} km`;
-}
+const formatDistance = formatKm;
 
 export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides: Partial<GeoGuessrScreenServices> = {}): Screen {
-  const services: GeoGuessrScreenServices = { createMap: createGeoGuessMap, createPanorama: createGeoStreetView, loadLocations: fetchLocations, ...overrides };
+  const services: GeoGuessrScreenServices = {
+    createMap: createGeoGuessMap,
+    createPanorama: createGeoStreetView,
+    loadLocations: fetchLocations,
+    // An injected panorama (tests, previews) brings its own imagery.
+    isConfigured: () => overrides.createPanorama !== undefined || Boolean(googleMapsJavaScriptApiKey()),
+    ...overrides,
+  };
   const controller = new AbortController();
+  const shell = shellOrFallback(options.shell, options.onHome);
   const signal = controller.signal;
   const narrow = window.matchMedia("(max-width: 700px)");
   let locations: GeoGuessrLocation[] = [];
@@ -90,19 +105,9 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   const roundLabel = el("strong", { text: "01", className: "geo-round-number" });
   const scoreLabel = el("strong", { text: "0", className: "geo-total-score" });
   const steps = el("ol", { className: "geo-round-steps", attrs: { "aria-label": "Round progress" }, children: Array.from({ length: GEOGUESSR_ROUND_LIMIT }, (_, i) => el("li", { text: String(i + 1), attrs: { "aria-label": `Round ${i + 1}` } })) });
-  const homeButton = action("All games", "back", "geo-home");
-  homeButton.append(el("img", { attrs: { src: "/logo.svg", alt: "", width: "23", height: "23" } }), el("span", { text: "locato." }));
-  const menu = el("details", { className: "geo-menu" });
-  const menuSummary = el("summary", { attrs: { "aria-label": "Game options", title: "Game options" }, children: [icon("settings")] });
-  const fullScreenButton = action("Enter fullscreen", "expand");
-  const dailyButton = el("button", { className: "geo-button geo-menu-link", text: "Daily challenge", attrs: { type: "button" }, on: { click: options.onDailyChallenge } });
-  const multiplayerButton = el("button", { className: "geo-button geo-menu-link", text: "Multiplayer", attrs: { type: "button" }, on: { click: options.onMultiplayer } });
-  menu.append(menuSummary, el("div", { className: "geo-menu-content", children: [el("span", { className: "geo-label", text: "Game options" }), dailyButton, multiplayerButton, el("div", { attrs: { "data-game-preferences": "" } })] }));
-  const topbar = el("header", { className: "geo-topbar", children: [
-    el("div", { className: "geo-identity", children: [homeButton, el("span", { className: "geo-mode-name", text: "GeoGuessr" })] }),
-    el("div", { className: "geo-session", children: [el("div", { className: "geo-round", children: [el("span", { className: "geo-label", text: "Round" }), roundLabel, el("span", { className: "geo-round-limit", text: "/ 05" })] }), steps, el("div", { className: "geo-score", children: [scoreLabel, el("span", { text: "pts", className: "geo-label" })] })] }),
-    el("div", { className: "geo-top-actions", children: [fullScreenButton, menu] }),
-  ] });
+  const session = el("div", { className: "geo-session", children: [el("div", { className: "geo-round", children: [el("span", { className: "geo-label", text: "Round" }), roundLabel, el("span", { className: "geo-round-limit", text: "/ 05" })] }), steps, el("div", { className: "geo-score", children: [scoreLabel, el("span", { text: "pts", className: "geo-label" })] })] });
+  const fullscreenEnabled = typeof document !== "undefined" && document.fullscreenEnabled === true;
+  const topbar = el("div", { className: "geo-topbar" });
 
   const pinStatus = el("span", { className: "geo-pin-status", text: "Place a pin" });
   const mapTitle = el("strong", { text: "Your guess" });
@@ -129,25 +134,49 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   const loadingText = el("p", { text: "Loading Street View…" });
   const errorTitle = el("h1", { text: "Loading your location", attrs: { tabindex: "-1" } });
   const retryButton = el("button", { className: "geo-button geo-primary", text: "Try again", attrs: { type: "button", hidden: "true" } });
-  const exitButton = el("button", { className: "geo-button geo-secondary", text: "All games", attrs: { type: "button", hidden: "true" }, on: { click: options.onHome } });
-  const loadingPanel = el("section", { className: "geo-loading-panel", attrs: { role: "status" }, children: [el("div", { className: "geo-loading-icon", children: [icon("pin")] }), errorTitle, loadingText, el("div", { className: "geo-loading-actions", children: [retryButton, exitButton] })] });
+  const exitButton = el("button", { className: "geo-button geo-secondary", text: "Try another game", attrs: { type: "button", hidden: "true" }, on: { click: () => shell.openGamePicker({ current: "geoguessr" }) } });
+  const alternativeGames = el("div", {
+    className: "geo-alt-games",
+    attrs: { hidden: "true" },
+    children: [
+      el("button", { className: "geo-button geo-primary", text: "Play MapTap", attrs: { type: "button" }, on: { click: () => shell.openGame("map-tap") } }),
+      el("button", { className: "geo-button geo-secondary", text: "Play Worldsplit", attrs: { type: "button" }, on: { click: () => shell.openGame("worldsplit") } }),
+      el("button", { className: "geo-button geo-secondary", text: "Try another game", attrs: { type: "button" }, on: { click: () => shell.openGamePicker({ current: "geoguessr" }) } }),
+    ],
+  });
+  const loadingPanel = el("section", { className: "geo-loading-panel", attrs: { role: "status" }, children: [el("div", { className: "geo-loading-icon", children: [icon("pin")] }), errorTitle, loadingText, el("div", { className: "geo-loading-actions", children: [retryButton, exitButton] }), alternativeGames] });
   const resultPanel = el("section", { className: "geo-result-card", attrs: { hidden: "true", "aria-label": "Round result" } });
   const mapLegend = el("div", { className: "geo-map-legend", children: [el("span", { className: "geo-legend-guess", text: "Your pin" }), el("span", { className: "geo-legend-target", text: "Actual location" })] });
   const element = el("section", { className: "game-screen geoguessr-screen", attrs: { "data-phase": "loading" }, children: [panorama.element, el("div", { className: "geo-vignette", attrs: { "aria-hidden": "true" } }), loadingPanel, topbar, bottomTools, mapDock, mapReveal, resultPanel, mapLegend] });
+  const toggleFullscreen = (): void => {
+    const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    void request.catch(() => { help.textContent = "Fullscreen is unavailable in this browser."; });
+  };
+  const bar = createPracticeBar(element, shell, {
+    gameMode: "geoguessr",
+    leaveGuard: () => (status === "complete" ? null : runLeaveMessage(results.length, GEOGUESSR_ROUND_LIMIT, "rounds")),
+    extraMenuItems: [
+      ...(fullscreenEnabled ? [{ label: "Fullscreen", icon: "maximize" as const, onSelect: toggleFullscreen }] : []),
+      { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (services.isConfigured()) void loadGame(); } },
+    ],
+  });
+  bar.element.classList.add("geo-gamebar");
+  topbar.append(bar.element, session);
 
   const totalScore = () => results.reduce((sum, item) => sum + item.score, 0);
   const countryName = (location: GeoGuessrLocation) => options.countryIndex.byCode.get(location.countryCode)?.name ?? location.countryCode;
   function setPhase(next: GameStatus): void {
     status = next;
     element.dataset.phase = next;
-    loadingPanel.hidden = next !== "loading" && next !== "error";
+    loadingPanel.hidden = next !== "loading" && next !== "error" && next !== "unconfigured";
     retryButton.hidden = next !== "error";
     exitButton.hidden = next !== "error";
+    alternativeGames.hidden = next !== "unconfigured";
     resultPanel.hidden = next !== "result" && next !== "complete";
     resultPanel.setAttribute("aria-label", next === "complete" ? "Game results" : "Round result");
     mapReveal.disabled = next !== "playing";
     resetButton.disabled = next !== "playing";
-    mapDock.inert = next === "loading" || next === "error" || (next === "playing" && mapSize === "collapsed");
+    mapDock.inert = next === "loading" || next === "error" || next === "unconfigured" || (next === "playing" && mapSize === "collapsed");
   }
   function setMapSize(next: MapSize): void {
     mapSize = next;
@@ -156,12 +185,12 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     mapExpand.setAttribute("aria-label", next === "expanded" ? "Reduce guess map" : "Expand guess map");
     mapExpand.title = next === "expanded" ? "Reduce guess map" : "Expand guess map";
     mapExpand.replaceChildren(icon(next === "expanded" ? "collapse" : "expand"));
-    mapDock.inert = status === "loading" || status === "error" || (status === "playing" && next === "collapsed");
+    mapDock.inert = status === "loading" || status === "error" || status === "unconfigured" || (status === "playing" && next === "collapsed");
     if (next !== "collapsed") requestAnimationFrame(() => { if (!signal.aborted) map.resize(); });
   }
   function updateHud(): void {
     roundLabel.textContent = String(roundIndex + 1).padStart(2, "0");
-    scoreLabel.textContent = totalScore().toLocaleString();
+    scoreLabel.textContent = formatNumber(totalScore());
     [...steps.children].forEach((step, i) => {
       step.classList.toggle("is-done", i < results.length);
       step.classList.toggle("is-current", i === roundIndex && status !== "complete");
@@ -225,26 +254,62 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     const nextButton = el("button", { className: "geo-button geo-primary", attrs: { type: "button" }, children: [el("span", { text: roundIndex === GEOGUESSR_ROUND_LIMIT - 1 ? "See final score" : "Next round" }), icon("arrow")], on: { click: nextRound } });
     resultPanel.replaceChildren(el("span", { className: "geo-label", text: `Round ${roundIndex + 1} result` }), el("img", { className: "geo-result-flag", attrs: { src: `/assets/flags/${location.countryCode.toLowerCase()}.svg`, alt: "", width: "44", height: "30" } }), heading,
       el("div", { className: "geo-result-distance", children: [el("strong", { text: formatDistance(result.distanceKm) }), el("span", { text: "from the location" })] }),
-      el("div", { className: "geo-round-points", children: [el("strong", { text: `+${result.score.toLocaleString()}` }), el("span", { text: `/ ${GEOGUESSR_MAX_ROUND_SCORE.toLocaleString()} pts` })] }), progress, nextButton);
+      el("div", { className: "geo-round-points", children: [el("strong", { text: `+${formatNumber(result.score)}` }), el("span", { text: `/ ${formatNumber(GEOGUESSR_MAX_ROUND_SCORE)} pts` })] }), progress, nextButton);
     heading.focus();
   }
   function showFinal(): void {
     setPhase("complete");
     updateHud();
-    const heading = el("h2", { text: "Your results", attrs: { tabindex: "-1" } });
-    const recap = el("ol", { className: "geo-recap", attrs: { "aria-label": "Review each round" } });
-    results.forEach((result, index) => {
-      const button = el("button", { className: "geo-button geo-recap-row", attrs: { type: "button", "aria-pressed": String(index === roundIndex), "aria-label": `Review round ${index + 1}: ${countryName(result.target)}` }, children: [el("span", { className: "geo-recap-number", text: String(index + 1).padStart(2, "0") }), el("span", { children: [el("strong", { text: countryName(result.target) }), el("small", { text: formatDistance(result.distanceKm) })] }), el("strong", { text: result.score.toLocaleString() })], on: { click: () => {
-        for (const child of recap.querySelectorAll("button")) child.setAttribute("aria-pressed", String(child === button));
-        revealResult(result, index);
-      } } });
-      recap.append(el("li", { children: [button] }));
+    const total = totalScore();
+    const averageKm = results.reduce((sum, item) => sum + item.distanceKm, 0) / Math.max(1, results.length);
+    const bestIndex = results.reduce((top, item, index) => (item.score > (results[top]?.score ?? -1) ? index : top), 0);
+    const best = results[bestIndex];
+    const localBest = recordLocalBest(options.storage, GEOGUESSR_BEST_RUN_KEY, total);
+    const ratio = total / GEOGUESSR_MAX_GAME_SCORE;
+    const card = createResultsCard(shell, {
+      kicker: "GeoGuessr · Practice",
+      title: localBest.isNew && localBest.previous > 0 ? "A new best trip!" : ratio >= 0.7 ? "World traveller" : ratio >= 0.4 ? "Well explored" : "Trip complete",
+      stats: [
+        { label: "Total score", value: formatNumber(total), note: `of ${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}` },
+        { label: "Average distance", value: formatDistance(averageKm) },
+        ...(best ? [{ label: "Best round", value: formatNumber(best.score), note: countryName(best.target) }] : []),
+      ],
+      missed: results.map((item) => ({ code: item.target.countryCode, name: countryName(item.target), flagSrc: `/assets/flags/${item.target.countryCode.toLowerCase()}.svg` })),
+      missedTitle: "Places you visited",
+      primary: { label: "Play again", onClick: () => { void loadGame(); } },
+      share: {
+        title: "Locato GeoGuessr",
+        text: `Locato GeoGuessr ${formatNumber(total)}/${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}\n${results.map((item) => shareSquare(item.score / GEOGUESSR_MAX_ROUND_SCORE)).join("")}\nlocato.quest`,
+      },
+      tone: ratio >= 0.4 ? "celebrate" : "neutral",
     });
-    resultPanel.replaceChildren(el("span", { className: "geo-label", text: "Game complete" }), heading, el("div", { className: "geo-final-score", children: [el("strong", { text: totalScore().toLocaleString() }), el("span", { text: `/ ${GEOGUESSR_MAX_GAME_SCORE.toLocaleString()} pts` })] }), recap,
-      el("button", { className: "geo-button geo-primary", attrs: { type: "button" }, children: [el("span", { text: "Play again" }), icon("arrow")], on: { click: () => { void loadGame(); } } }));
-    heading.focus();
+    // The pins review stays: each row re-reveals that round's pin and location on the map.
+    const recap = createRunList("Review each round", results.map((item, index) => ({
+      label: countryName(item.target),
+      detail: formatDistance(item.distanceKm),
+      value: formatNumber(item.score),
+      tone: item.score / GEOGUESSR_MAX_ROUND_SCORE >= 0.7 ? "good" : item.score / GEOGUESSR_MAX_ROUND_SCORE >= 0.3 ? "ok" : "miss",
+      ariaLabel: `Review round ${index + 1}: ${countryName(item.target)}`,
+      pressed: index === roundIndex,
+      onClick: () => {
+        const rows = [...recap.querySelectorAll<HTMLButtonElement>(".gb-run-row")];
+        rows.forEach((row, rowIndex) => row.setAttribute("aria-pressed", String(rowIndex === index)));
+        revealResult(item, index);
+      },
+    })), "geo-recap");
+    recap.querySelectorAll(".gb-run-row").forEach((row) => row.classList.add("geo-recap-row"));
+    insertIntoResults(card, recap);
+    resultPanel.replaceChildren(card.element);
+    card.focus();
+  }
+  function showUnconfigured(): void {
+    setPhase("unconfigured");
+    map.setAcceptingGuesses(false);
+    errorTitle.textContent = "Street View isn’t set up here";
+    loadingText.textContent = "GeoGuessr needs Google Street View, which isn’t available on this copy of Locato. These play right away:";
   }
   async function loadGame(): Promise<void> {
+    if (!services.isConfigured()) { showUnconfigured(); return; }
     const id = ++requestId;
     setPhase("loading");
     results = [];
@@ -261,27 +326,14 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     } catch { if (!signal.aborted && id === requestId) showError(); }
   }
 
-  homeButton.addEventListener("click", options.onHome, { signal });
   retryButton.addEventListener("click", () => retry(), { signal });
   submitButton.addEventListener("click", submitGuess, { signal });
   resetButton.addEventListener("click", panorama.reset, { signal });
   mapReveal.addEventListener("click", () => { setMapSize(narrow.matches ? "expanded" : "compact"); mapExpand.focus(); }, { signal });
   mapExpand.addEventListener("click", () => setMapSize(mapSize === "expanded" ? "compact" : "expanded"), { signal });
   mapCollapse.addEventListener("click", () => { setMapSize("collapsed"); mapReveal.focus(); }, { signal });
-  fullScreenButton.hidden = !document.fullscreenEnabled;
-  fullScreenButton.addEventListener("click", () => {
-    const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-    void request.catch(() => { help.textContent = "Fullscreen is unavailable in this browser."; });
-  }, { signal });
-  document.addEventListener("fullscreenchange", () => {
-    const label = document.fullscreenElement ? "Exit fullscreen" : "Enter fullscreen";
-    fullScreenButton.setAttribute("aria-label", label);
-    fullScreenButton.title = label;
-  }, { signal });
   narrow.addEventListener("change", () => { if (status === "playing") setMapSize(narrow.matches ? "collapsed" : "compact"); }, { signal });
-  document.addEventListener("pointerdown", (event) => { if (!menu.contains(event.target as Node)) menu.open = false; }, { signal });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && menu.open) { menu.open = false; menuSummary.focus(); return; }
     if (event.altKey || event.ctrlKey || event.metaKey || (event.target instanceof HTMLElement && event.target.closest("input,textarea,select,[contenteditable='true']"))) return;
     if (status !== "playing") return;
     if (event.key.toLowerCase() === "m") {
@@ -293,5 +345,5 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   }, { signal });
   setMapSize(mapSize);
   void loadGame();
-  return { element, destroy: () => { controller.abort(); map.destroy(); panorama.destroy(); } };
+  return { element, destroy: () => { controller.abort(); bar.destroy(); map.destroy(); panorama.destroy(); } };
 }

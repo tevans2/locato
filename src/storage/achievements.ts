@@ -32,9 +32,9 @@ interface MutableAchievementState {
 }
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
-  { id: "daily-first", title: "Daily foothold", description: "Complete a Daily Challenge." },
-  { id: "daily-streak-3", title: "Three-day trail", description: "Complete three Daily Challenges in a row." },
-  { id: "daily-streak-7", title: "Week on the map", description: "Complete seven Daily Challenges in a row." },
+  { id: "daily-first", title: "Daily foothold", description: "Complete a daily challenge." },
+  { id: "daily-streak-3", title: "Three-day trail", description: "Complete three daily challenges in a row." },
+  { id: "daily-streak-7", title: "Week on the map", description: "Complete seven daily challenges in a row." },
   { id: "solo-perfect", title: "Clean passport", description: "Complete a solo prompt run without a wrong answer." },
   { id: "solo-streak-25", title: "Hot hand", description: "Reach a 25-answer solo streak." },
   { id: "world-first", title: "World tour", description: "Complete any world-map mode." },

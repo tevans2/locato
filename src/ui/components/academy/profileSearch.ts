@@ -20,7 +20,7 @@ export interface ProfileSearch {
   readonly destroy: () => void;
 }
 
-interface SearchEntry {
+export interface SearchEntry {
   readonly profile: CountryProfile;
   readonly name: string;
   readonly aliases: readonly string[];
@@ -44,7 +44,7 @@ export function normalizeSearch(value: string): string {
 
 let searchIdCounter = 0;
 
-function buildEntries(profiles: readonly CountryProfile[], countryIndex: CountryIndex): readonly SearchEntry[] {
+export function buildSearchEntries(profiles: readonly CountryProfile[], countryIndex: CountryIndex): readonly SearchEntry[] {
   return profiles.map((profile) => {
     const country = countryIndex.byCode.get(profile.code);
     const aliases = new Set([...(country?.aliases ?? []), profile.commonName, profile.officialName, profile.code, profile.cca3].map(normalizeSearch));
@@ -99,7 +99,7 @@ function aliasLabel(entry: SearchEntry, query: string): string | null {
 }
 
 export function createProfileSearch(options: ProfileSearchOptions): ProfileSearch {
-  const entries = buildEntries(options.profiles, options.countryIndex);
+  const entries = buildSearchEntries(options.profiles, options.countryIndex);
   const limit = options.maxResults ?? 8;
   const id = `cp-search-${++searchIdCounter}`;
   const listId = `${id}-list`;

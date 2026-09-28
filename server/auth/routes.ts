@@ -309,7 +309,21 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const result = service.submitBestTime(user.id, body);
     if ("error" in result) return json({ error: result.error }, 400);
     log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, timeMs: body.timeMs, accepted: result.accepted });
-    return json(result);
+    // `rank` / `bestTimeMs` describe the player's standing on the board after this submission
+    // (their best, which may be an earlier, faster time). Added fields; older clients ignore them.
+    const standing = service.getUserLeaderboardRank(user.id, String(body.gameMode), typeof body.variant === "string" ? body.variant : "");
+    return json({ ...result, rank: standing?.rank ?? null, bestTimeMs: standing?.timeMs ?? null });
+  }
+
+  if (pathname === "/api/leaderboard/rank" && method === "GET") {
+    const timeParam = url.searchParams.get("timeMs");
+    const placement = service.getLeaderboardTimePlacement({
+      gameMode: url.searchParams.get("mode") ?? "",
+      variant: url.searchParams.get("variant") ?? "",
+      timeMs: timeParam !== null && /^\d{1,10}$/.test(timeParam) ? Number(timeParam) : null,
+    });
+    if ("error" in placement) return json({ error: placement.error }, 400);
+    return json(placement);
   }
 
   if (pathname === "/api/academy" && method === "GET") {

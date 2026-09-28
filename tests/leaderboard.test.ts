@@ -125,4 +125,36 @@ describe("leaderboard", () => {
     expect(data.entries[0]?.displayName).toBe("ace");
     expect(data.currentUser.rank).toBe(1);
   });
+  it("returns the player's rank with a submission and places any time on a board", async () => {
+    const { service } = createService();
+    const first = await route(service, jsonRequest("/auth/register", "POST", { email: "a@b.com", password: "supersecret", displayName: "ace" }));
+    const second = await route(service, jsonRequest("/auth/register", "POST", { email: "b@b.com", password: "supersecret", displayName: "bee" }));
+    const aceToken = tokenFrom(first!);
+    const beeToken = tokenFrom(second!);
+
+    await route(service, jsonRequest("/api/leaderboard", "POST", { gameMode: "puzzle", variant: "Europe", timeMs: 40_000 }, aceToken));
+    const submit = await route(service, jsonRequest("/api/leaderboard", "POST", { gameMode: "puzzle", variant: "Europe", timeMs: 60_000 }, beeToken));
+    expect(await submit!.json()).toEqual({ accepted: true, isPersonalBest: true, rank: 2, bestTimeMs: 60_000 });
+
+    // A slower run is not accepted, but the response still reports the standing of the best.
+    const slower = await route(service, jsonRequest("/api/leaderboard", "POST", { gameMode: "puzzle", variant: "Europe", timeMs: 90_000 }, beeToken));
+    expect(await slower!.json()).toEqual({ accepted: false, isPersonalBest: false, rank: 2, bestTimeMs: 60_000 });
+
+    const placement = async (query: string) => {
+      const response = await route(service, jsonRequest(`/api/leaderboard/rank?${query}`, "GET"));
+      return { status: response!.status, body: (await response!.json()) as unknown };
+    };
+    expect(await placement("mode=puzzle&variant=Europe&timeMs=30000")).toEqual({ status: 200, body: { rank: 1, total: 2 } });
+    expect(await placement("mode=puzzle&variant=Europe&timeMs=50000")).toEqual({ status: 200, body: { rank: 2, total: 2 } });
+    expect(await placement("mode=puzzle&variant=Europe&timeMs=60000")).toEqual({ status: 200, body: { rank: 2, total: 2 } });
+    expect(await placement("mode=puzzle&variant=Europe&timeMs=99000")).toEqual({ status: 200, body: { rank: 3, total: 2 } });
+    expect(await placement("mode=flags&variant=&timeMs=99000")).toEqual({ status: 200, body: { rank: 1, total: 0 } });
+
+    expect((await placement("mode=puzzle&variant=Atlantis&timeMs=50000")).status).toBe(400);
+    expect((await placement("mode=flag-colors&variant=&timeMs=50000")).status).toBe(400);
+    expect((await placement("mode=puzzle&variant=Europe&timeMs=12.5")).status).toBe(400);
+    expect((await placement("mode=puzzle&variant=Europe&timeMs=-4")).status).toBe(400);
+    expect((await placement("mode=puzzle&variant=Europe")).status).toBe(400);
+    expect((await placement("mode=puzzle&variant=Europe&timeMs=100")).status).toBe(400);
+  });
 });
