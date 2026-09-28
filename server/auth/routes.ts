@@ -6,6 +6,7 @@ import { NOOP_SOCIAL, type SocialBridge } from "../../src/core/social/socialProt
 import { logEvent } from "../admin/events";
 import { handleAdminRoutes, type AdminRouteContext } from "../admin/routes";
 import { MAX_ACADEMY_PAYLOAD_BYTES } from "../academy/validation";
+import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 
 const MAX_STAT_VALUE = 1_000_000;
@@ -283,8 +284,9 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
   if (pathname === "/api/leaderboard" && method === "GET") {
     const gameMode = url.searchParams.get("mode") ?? "";
     const variant = url.searchParams.get("variant") ?? "";
-    const limit = Number(url.searchParams.get("limit"));
-    const offset = Number(url.searchParams.get("offset"));
+    // An absent limit/offset means the default (Number(null) would be 0, i.e. a one-row page).
+    const limit = url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : Number.NaN;
+    const offset = url.searchParams.has("offset") ? Number(url.searchParams.get("offset")) : Number.NaN;
     const result = service.getLeaderboard({
       gameMode,
       variant,
@@ -294,11 +296,8 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if ("error" in result) return json({ error: result.error }, 400);
 
     const user = service.authenticate(readSessionToken(request));
-    const currentUser =
-      user === null
-        ? null
-        : service.getUserLeaderboardRank(user.id, gameMode, variant === "" ? "" : variant);
-    return json({ entries: result.entries, currentUser });
+    const currentUser = user === null ? null : service.getUserLeaderboardRank(user.id, gameMode, variant);
+    return json({ metric: result.metric, entries: result.entries, currentUser });
   }
 
   if (pathname === "/api/leaderboard" && method === "POST") {
@@ -306,21 +305,31 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const result = service.submitBestTime(user.id, body);
+    const result = service.submitLeaderboardAttempt(user.id, body);
     if ("error" in result) return json({ error: result.error }, 400);
-    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, timeMs: body.timeMs, accepted: result.accepted });
-    // `rank` / `bestTimeMs` describe the player's standing on the board after this submission
-    // (their best, which may be an earlier, faster time). Added fields; older clients ignore them.
-    const standing = service.getUserLeaderboardRank(user.id, String(body.gameMode), typeof body.variant === "string" ? body.variant : "");
-    return json({ ...result, rank: standing?.rank ?? null, bestTimeMs: standing?.timeMs ?? null });
+    const gameMode = String(body.gameMode);
+    const variant = typeof body.variant === "string" ? body.variant : "";
+    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, ...(body.score !== undefined ? { score: body.score } : { timeMs: body.timeMs }), accepted: result.accepted });
+    // `rank` / `bestTimeMs` (time boards) or `bestScore` (score boards) describe the player's
+    // standing after this submission (their best, which may be an earlier attempt).
+    const standing = service.getUserLeaderboardRank(user.id, gameMode, variant);
+    if (leaderboardMetric(gameMode) === "score") {
+      return json({ ...result, rank: standing?.rank ?? null, bestScore: standing && "score" in standing ? standing.score : null });
+    }
+    return json({ ...result, rank: standing?.rank ?? null, bestTimeMs: standing && "timeMs" in standing ? standing.timeMs : null });
   }
 
   if (pathname === "/api/leaderboard/rank" && method === "GET") {
-    const timeParam = url.searchParams.get("timeMs");
+    const numberParam = (name: string): number | null | undefined => {
+      const raw = url.searchParams.get(name);
+      if (raw === null) return undefined;
+      return /^\d{1,10}$/.test(raw) ? Number(raw) : null;
+    };
     const placement = service.getLeaderboardTimePlacement({
       gameMode: url.searchParams.get("mode") ?? "",
       variant: url.searchParams.get("variant") ?? "",
-      timeMs: timeParam !== null && /^\d{1,10}$/.test(timeParam) ? Number(timeParam) : null,
+      timeMs: numberParam("timeMs"),
+      score: numberParam("score"),
     });
     if ("error" in placement) return json({ error: placement.error }, 400);
     return json(placement);

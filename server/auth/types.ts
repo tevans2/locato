@@ -159,6 +159,28 @@ export interface LeaderboardEntry {
   readonly achievedAt: number;
 }
 
+// Score boards (highest score wins; ties go to whoever got there first).
+export interface SubmitBestScoreInput {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
+export interface LeaderboardScoreEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
+export interface UserLeaderboardScoreRank {
+  readonly rank: number;
+  readonly score: number;
+}
+
 export interface LeaderboardQuery {
   readonly gameMode: string;
   readonly variant: string;
@@ -206,6 +228,13 @@ export interface AdminBestTime {
   readonly achievedAt: number;
 }
 
+export interface AdminBestScore {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
 // Raw activity rows since a cutoff; the service aggregates them into the overview.
 export interface AdminActivityRows {
   readonly signups: readonly { readonly userId: string; readonly at: number }[];
@@ -219,6 +248,7 @@ export interface AdminTotals {
   readonly games: number;
   readonly dailies: number;
   readonly bestTimes: number;
+  readonly bestScores: number;
   readonly activeSessions: number;
   readonly friendships: number;
 }
@@ -311,6 +341,12 @@ export interface UserStore {
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
   getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement;
+  // Score boards: one best (highest) score per user per mode + variant.
+  submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult;
+  getScoreLeaderboard(query: LeaderboardQuery): readonly LeaderboardScoreEntry[];
+  getUserScoreRank(userId: string, gameMode: string, variant: string): UserLeaderboardScoreRank | null;
+  /** `rank` is 1 + the number of strictly higher best scores. */
+  getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement;
   // Admin account controls.
   listUsers(query: AdminUserListQuery): AdminUserList;
   deleteUser(id: string): boolean;
@@ -320,6 +356,8 @@ export interface UserStore {
   listUserProviders(userId: string): readonly string[];
   listUserBestTimes(userId: string): readonly AdminBestTime[];
   deleteBestTime(userId: string, gameMode: string, variant: string): boolean;
+  listUserBestScores(userId: string): readonly AdminBestScore[];
+  deleteBestScore(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;
   // Clears game history, per-category stats, and aggregates; leaderboards, dailies and Academy
   // progress are untouched.

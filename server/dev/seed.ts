@@ -15,7 +15,7 @@ import { createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_HINT_PENALTY, DAILY_MA
 import { validateAcademyProgress } from "../academy/validation";
 import { normalizeUsername } from "../auth/AuthService";
 import { createSessionToken, createUserId } from "../auth/tokens";
-import { CONTINENTS, MAX_TIME_MS, MIN_TIME_MS, normalizeLeaderboardVariant, type LeaderboardGameMode } from "../leaderboard/validation";
+import { CONTINENTS, MAX_TIME_MS, MIN_TIME_MS, leaderboardModeConfig, normalizeLeaderboardVariant, type LeaderboardGameMode } from "../leaderboard/validation";
 import type { AdminEventInput, DailyChallengeResult, DailyRoundMark, GameResult, PasswordHasher, StoredUser, UserStore } from "../auth/types";
 
 export const SEED_EMAIL_DOMAIN = "seed.locato.test";
@@ -187,6 +187,7 @@ export const SEED_BOARDS: readonly BoardSpec[] = [
   { gameMode: "flags", variant: "", fastMs: min(1, 30), slowMs: min(8), popularity: 0.95 },
   { gameMode: "flags", variant: "territories", fastMs: min(0, 50), slowMs: min(4), popularity: 0.45 },
   { gameMode: "flags", variant: "both", fastMs: min(2, 30), slowMs: min(11), popularity: 0.4 },
+  { gameMode: "flag-colors", variant: "", fastMs: min(3), slowMs: min(14), popularity: 0.45 },
   { gameMode: "shapes", variant: "", fastMs: min(2, 30), slowMs: min(12), popularity: 0.7 },
   { gameMode: "codes", variant: "", fastMs: min(1, 15), slowMs: min(6), popularity: 0.55 },
   { gameMode: "capitals", variant: "", fastMs: min(2), slowMs: min(9), popularity: 0.85 },
@@ -197,12 +198,44 @@ export const SEED_BOARDS: readonly BoardSpec[] = [
   ...CONTINENTS.map((continent): BoardSpec => ({ gameMode: "puzzle", variant: continent, fastMs: PUZZLE_RANGES[continent][0], slowMs: PUZZLE_RANGES[continent][1], popularity: continent === "Europe" || continent === "Africa" ? 0.65 : 0.45 })),
 ];
 
+interface ScoreBoardSpec {
+  readonly gameMode: LeaderboardGameMode;
+  readonly variant: string;
+  /** Share of the board's maxScore the best and the weakest regulars reach. */
+  readonly bestShare: number;
+  readonly worstShare: number;
+  readonly popularity: number;
+}
+
+// Score boards (highest first). Shares keep every seeded total under the board's maxScore.
+export const SEED_SCORE_BOARDS: readonly ScoreBoardSpec[] = [
+  { gameMode: "map-tap", variant: "", bestShare: 0.88, worstShare: 0.3, popularity: 0.6 },
+  { gameMode: "worldsplit", variant: "", bestShare: 0.96, worstShare: 0.5, popularity: 0.45 },
+  { gameMode: "geoguessr", variant: "", bestShare: 0.9, worstShare: 0.25, popularity: 0.65 },
+  { gameMode: "streetview-country", variant: "", bestShare: 1, worstShare: 0.3, popularity: 0.55 },
+];
+
 const boardLabel = (board: { gameMode: string; variant: string }) => (board.variant ? `${board.gameMode}:${board.variant}` : board.gameMode);
 
 // The tester sits on most boards mid-table, skips a couple, and is top 5 on one so medals + "you" show.
 const TESTER_SKIPS = new Set(["flags:territories", "puzzle:Oceania"]);
 const TESTER_PODIUM_BOARD = "capitals";
 const TESTER_PODIUM_RANK = 3;
+// ...and on one score board too.
+const TESTER_SCORE_PODIUM_BOARD = "geoguessr";
+
+function seedMaxScore(board: ScoreBoardSpec): number {
+  const maxScore = leaderboardModeConfig(board.gameMode)?.maxScore;
+  if (maxScore === undefined) throw new Error(`Seed board ${boardLabel(board)} is not a score board`);
+  return maxScore;
+}
+
+function boardScore(rng: Rng, board: ScoreBoardSpec, skill: number): number {
+  const maxScore = seedMaxScore(board);
+  const position = clamp01(skill * 0.8 + rng() * 0.3) ** 1.25;
+  const share = board.bestShare - (board.bestShare - board.worstShare) * position;
+  return Math.min(maxScore, Math.max(0, Math.round(maxScore * share)));
+}
 
 function boardTime(rng: Rng, board: BoardSpec, skill: number): number {
   const position = clamp01(skill * 0.8 + rng() * 0.3) ** 1.25;
@@ -426,6 +459,7 @@ export interface SeedSummary {
   readonly refreshedUsers: number;
   readonly skippedUsernames: readonly string[];
   readonly bestTimes: number;
+  readonly bestScores: number;
   readonly boards: readonly { readonly board: string; readonly entries: number }[];
   readonly dailyResults: number;
   readonly dailyToday: number;
@@ -468,6 +502,7 @@ export function findSeedUsers(store: UserStore): StoredUser[] {
 function clearSeedData(store: UserStore, user: StoredUser, seedIds: ReadonlySet<string>, keepSessions: boolean): void {
   store.resetUserStats(user.id);
   for (const row of store.listUserBestTimes(user.id)) store.deleteBestTime(user.id, row.gameMode, row.variant);
+  for (const row of store.listUserBestScores(user.id)) store.deleteBestScore(user.id, row.gameMode, row.variant);
   for (const result of store.listDailyResults(user.id, 10_000)) store.deleteDailyResult(user.id, result.date);
   if (!keepSessions) store.deleteUserSessions(user.id);
   // Only friendships between two seed accounts; a real account's friend links are left alone.
@@ -492,6 +527,7 @@ export async function seedDevData(options: SeedOptions): Promise<SeedSummary> {
   let refreshedUsers = 0;
   const skippedUsernames: string[] = [];
   let bestTimes = 0;
+  let bestScores = 0;
   let dailyResults = 0;
   let dailyToday = 0;
   let games = 0;
@@ -570,6 +606,37 @@ export async function seedDevData(options: SeedOptions): Promise<SeedSummary> {
       for (const entry of entrants) {
         const result = store.submitBestTime(entry.user.id, { gameMode: board.gameMode, variant: board.variant, timeMs: entry.timeMs, achievedAt: entry.achievedAt });
         if (result.accepted) bestTimes += 1;
+      }
+      boardCounts.set(label, entrants.length);
+    }
+
+    for (const board of SEED_SCORE_BOARDS) {
+      const label = boardLabel(board);
+      if (normalizeLeaderboardVariant(board.gameMode, board.variant) !== board.variant) throw new Error(`Invalid seed board ${label}`);
+      const maxScore = seedMaxScore(board);
+      const rng = rngFor(seed, `board:${label}`);
+      const entrants: { user: StoredUser; score: number; achievedAt: number }[] = [];
+      for (const { spec, user } of others) {
+        // The too-good-to-be-true player posts a perfect MapTap, so admin has a score to flag.
+        const suspicious = spec.username === SUSPICIOUS_PLAYER;
+        const joins = suspicious ? board.gameMode === "map-tap" : rng() < board.popularity * (0.4 + spec.activity * 0.6);
+        const score = suspicious ? maxScore : boardScore(rng, board, spec.skill);
+        const daysAgo = intBetween(rng, 0, Math.min(spec.createdDaysAgo, 90));
+        if (joins) entrants.push({ user, score, achievedAt: momentOn(rng, now, daysAgo) });
+      }
+      if (!TESTER_SKIPS.has(label)) {
+        let score = boardScore(rng, board, testerEntry.spec.skill);
+        if (label === TESTER_SCORE_PODIUM_BOARD) {
+          const sorted = entrants.map((e) => e.score).sort((a, b) => b - a);
+          const higher = sorted[TESTER_PODIUM_RANK - 2] ?? maxScore;
+          const lower = sorted[TESTER_PODIUM_RANK - 1] ?? Math.max(0, higher - 1_000);
+          score = Math.floor((higher + lower) / 2);
+        }
+        entrants.push({ user: testerEntry.user, score, achievedAt: momentOn(rng, now, intBetween(rng, 0, 20)) });
+      }
+      for (const entry of entrants) {
+        const result = store.submitBestScore(entry.user.id, { gameMode: board.gameMode, variant: board.variant, score: entry.score, achievedAt: entry.achievedAt });
+        if (result.accepted) bestScores += 1;
       }
       boardCounts.set(label, entrants.length);
     }
@@ -654,10 +721,10 @@ export async function seedDevData(options: SeedOptions): Promise<SeedSummary> {
 
     // Summary for the tester.
     const friendRequests = store.listFriendRequests(testerId);
-    const ranks = SEED_BOARDS.flatMap((board) => {
-      const rank = store.getUserRank(testerId, board.gameMode, board.variant);
-      return rank ? [{ board: boardLabel(board), rank: rank.rank, of: boardCounts.get(boardLabel(board)) ?? 0 }] : [];
-    });
+    const ranks = [
+      ...SEED_BOARDS.map((board) => ({ board, rank: store.getUserRank(testerId, board.gameMode, board.variant) })),
+      ...SEED_SCORE_BOARDS.map((board) => ({ board, rank: store.getUserScoreRank(testerId, board.gameMode, board.variant) })),
+    ].flatMap(({ board, rank }) => (rank ? [{ board: boardLabel(board), rank: rank.rank, of: boardCounts.get(boardLabel(board)) ?? 0 }] : []));
     const dailyDates = store.listDailyResults(testerId, DAILY_DAYS).map((r) => r.date);
     tester = {
       id: testerId,
@@ -679,6 +746,7 @@ export async function seedDevData(options: SeedOptions): Promise<SeedSummary> {
     refreshedUsers,
     skippedUsernames,
     bestTimes,
+    bestScores,
     boards: [...boardCounts.entries()].map(([board, entries]) => ({ board, entries })),
     dailyResults,
     dailyToday,

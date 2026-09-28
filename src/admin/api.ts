@@ -1,8 +1,8 @@
-import type { AdminDailyEntry, AdminOverview, AdminUserDetail } from "../../server/admin/AdminService";
+import type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminUserDetail } from "../../server/admin/AdminService";
 import type { AdminEvent, AdminUserList, AuthUser, LeaderboardEntry, PublicUser } from "../../server/auth/types";
 import type { AdminRoomSummary } from "../../server/rooms/RoomManager";
 
-export type { AdminDailyEntry, AdminOverview, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
+export type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
 
 const TOKEN_KEY = "locato.admin.token";
 

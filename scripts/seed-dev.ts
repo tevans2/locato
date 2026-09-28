@@ -64,7 +64,7 @@ const summary = await seedDevData({
 });
 
 const count = (table: string) => (db.query(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
-const tables = ["users", "sessions", "game_records", "mode_best_times", "daily_challenge_results", "friendships", "academy_progress", "admin_events"];
+const tables = ["users", "sessions", "game_records", "mode_best_times", "mode_best_scores", "daily_challenge_results", "friendships", "academy_progress", "admin_events"];
 
 console.log(`\nLocato dev seed (seed=${summary.seed}) → ${safety.path}  [${Math.round(performance.now() - started)} ms]`);
 if (summary.removedUsers > 0) console.log(`  removed ${summary.removedUsers} previous seed account(s)`);
@@ -73,7 +73,7 @@ if (args.includes("--clean")) {
   process.exit(0);
 }
 console.log(`  accounts: ${summary.createdUsers} created, ${summary.refreshedUsers} refreshed${summary.skippedUsernames.length ? `, skipped ${summary.skippedUsernames.join(", ")}` : ""}`);
-console.log(`  best times: ${summary.bestTimes} across ${summary.boards.length} boards (${summary.boards.map((b) => `${b.board} ${b.entries}`).join(", ")})`);
+console.log(`  best times: ${summary.bestTimes}, best scores: ${summary.bestScores} across ${summary.boards.length} boards (${summary.boards.map((b) => `${b.board} ${b.entries}`).join(", ")})`);
 console.log(`  dailies: ${summary.dailyResults} over 14 days (${summary.dailyToday} today) · games: ${summary.games} · sessions: ${summary.sessions}`);
 console.log(`  tester friends: ${summary.friends.accepted} accepted, ${summary.friends.incoming} incoming, ${summary.friends.outgoing} outgoing`);
 console.log(`  academy: ${summary.academyCards} cards, ${summary.academyDue} due now · admin events: ${summary.eventsSkipped ? "already seeded, kept" : `${summary.events} added`}`);

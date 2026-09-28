@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
-import type { AdminClient, AdminDailyEntry, LeaderboardEntry } from "../api";
-import { formatDateTime, formatDuration, modeName, todayUtc } from "../format";
+import type { AdminClient, AdminDailyEntry, AdminLeaderboardEntry } from "../api";
+import { formatBoardValue, formatDateTime, formatDuration, modeName, todayUtc } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
 import type { ActionHelpers } from "./Users";
 
-type Meta = { modes: { id: string; variants: string[] }[] };
-type BoardEntry = LeaderboardEntry & { suspicious: boolean };
+type Meta = { modes: { id: string; metric: "time" | "score"; variants: string[] }[] };
+type BoardEntry = AdminLeaderboardEntry;
 
 function shiftDate(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -86,19 +86,21 @@ function BestTimes({ client, onOpenUser, helpers }: { client: AdminClient; onOpe
   }, [mode, variants, variant]);
 
   const board = useResource(
-    () => client.get<{ entries: BoardEntry[] }>(`/leaderboards?${new URLSearchParams({ mode, variant, limit: "200" })}`),
+    () => client.get<{ metric: "time" | "score"; entries: BoardEntry[] }>(`/leaderboards?${new URLSearchParams({ mode, variant, limit: "200" })}`),
     [client, mode, variant],
   );
   const flagged = board.data?.entries.filter((e) => e.suspicious).length ?? 0;
+  const isScore = board.data?.metric === "score";
+  const noun = isScore ? "score" : "time";
 
   return (
     <Panel
-      title="Best-time leaderboards"
+      title="Leaderboards"
       subtitle={board.data ? `${board.data.entries.length} entr${board.data.entries.length === 1 ? "y" : "ies"}${flagged ? ` · ${flagged} suspicious` : ""}` : " "}
       actions={
         <div className="adm-filters is-tight">
           <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Game mode">
-            {(meta.data?.modes ?? [{ id: "flags", variants: [""] }]).map((m) => <option key={m.id} value={m.id}>{modeName(m.id)}</option>)}
+            {(meta.data?.modes ?? [{ id: "flags", metric: "time", variants: [""] }]).map((m) => <option key={m.id} value={m.id}>{modeName(m.id)}</option>)}
           </select>
           {variants.length > 1 && (
             <select value={variant} onChange={(e) => setVariant(e.target.value)} aria-label="Variant">
@@ -110,24 +112,24 @@ function BestTimes({ client, onOpenUser, helpers }: { client: AdminClient; onOpe
       flush
     >
       {board.error && <ErrorNote message={board.error} onRetry={board.refresh} />}
-      {!board.data ? <Loading /> : board.data.entries.length === 0 ? <Empty>No times on this leaderboard yet.</Empty> : (
+      {!board.data ? <Loading /> : board.data.entries.length === 0 ? <Empty>No {noun}s on this leaderboard yet.</Empty> : (
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th className="num">#</th><th>Player</th><th className="num">Time</th><th>Set</th><th /></tr></thead>
+            <thead><tr><th className="num">#</th><th>Player</th><th className="num">{isScore ? "Score" : "Time"}</th><th>Set</th><th /></tr></thead>
             <tbody>
               {board.data.entries.map((entry) => (
                 <tr key={entry.userId} className={entry.suspicious ? "is-flagged" : undefined}>
                   <td className="num">{entry.rank}</td>
                   <td><button type="button" className="adm-link-btn" onClick={() => onOpenUser(entry.userId)}>{entry.avatarEmoji ? `${entry.avatarEmoji} ` : ""}{entry.displayName}</button></td>
-                  <td className="num">{formatDuration(entry.timeMs)} {entry.suspicious && <Badge tone="bad">suspicious</Badge>}</td>
+                  <td className="num">{formatBoardValue(entry)} {entry.suspicious && <Badge tone="bad">suspicious</Badge>}</td>
                   <td>{formatDateTime(entry.achievedAt)}</td>
                   <td className="num">
-                    <button type="button" className="adm-icon-btn" aria-label={`Remove ${entry.displayName}'s time`} onClick={() => helpers.confirm({
-                      title: "Remove leaderboard time?",
-                      body: <p>Removes <strong>{entry.displayName}</strong>'s {modeName(mode)}{variant ? ` (${variant})` : ""} time of {formatDuration(entry.timeMs)}.</p>,
+                    <button type="button" className="adm-icon-btn" aria-label={`Remove ${entry.displayName}'s ${noun}`} onClick={() => helpers.confirm({
+                      title: `Remove leaderboard ${noun}?`,
+                      body: <p>Removes <strong>{entry.displayName}</strong>'s {modeName(mode)}{variant ? ` (${variant})` : ""} {noun} of {formatBoardValue(entry)}.</p>,
                       confirmLabel: "Remove",
                       tone: "danger",
-                      run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(entry.userId)}?${new URLSearchParams({ mode, variant })}`); helpers.notify("Leaderboard time removed."); board.refresh(); },
+                      run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(entry.userId)}?${new URLSearchParams({ mode, variant })}`); helpers.notify(`Leaderboard ${noun} removed.`); board.refresh(); },
                     })}><Trash2 size={14} /></button>
                   </td>
                 </tr>

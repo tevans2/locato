@@ -1,4 +1,5 @@
 import { soloPromptCategories } from "./categories";
+import { LEADERBOARD_MODES } from "./leaderboards";
 
 export type PromptGameModeId = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "capital-recall";
 export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" | "puzzle";
@@ -145,7 +146,7 @@ export interface GameModeCatalogueEntry {
   /** One short line (under ~50 characters). */
   readonly blurb: string;
   readonly icon: GameModeIcon;
-  /** Has a Compete leaderboard, so it can be played as a timed run. */
+  /** Has a Compete leaderboard (every mode does; see src/core/leaderboards.ts for how it ranks). */
   readonly leaderboard: boolean;
 }
 
@@ -156,9 +157,9 @@ export interface GameModeGroup {
   readonly modes: readonly GameModeCatalogueEntry[];
 }
 
-/** Mirrors server/leaderboard/validation.ts GAME_MODE_IDS (a test keeps the two in sync). */
-export const LEADERBOARD_GAME_MODE_IDS = ["flags", "shapes", "codes", "capitals", "capital-recall", "name-all", "click-country", "spot-country", "puzzle"] as const;
-export type LeaderboardGameModeId = (typeof LEADERBOARD_GAME_MODE_IDS)[number];
+/** Every mode with a board, from src/core/leaderboards.ts (the server validates against the same table). */
+export const LEADERBOARD_GAME_MODE_IDS: readonly GameModeId[] = LEADERBOARD_MODES.map((config) => config.mode);
+export type LeaderboardGameModeId = GameModeId;
 
 export function isLeaderboardMode(id: string): id is LeaderboardGameModeId {
   return (LEADERBOARD_GAME_MODE_IDS as readonly string[]).includes(id);

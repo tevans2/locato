@@ -1,6 +1,8 @@
 // Client-side auth module. Talks to the server's /auth/* and /api/* endpoints via fetch.
 // No cookies are accessed from JS — they are HttpOnly and sent automatically by the browser.
 
+import { leaderboardConfig, type LeaderboardMetric } from "../leaderboards";
+
 export interface AuthUser {
   readonly id: string;
   readonly email: string;
@@ -116,19 +118,32 @@ export interface LeaderboardEntry {
   readonly userId: string;
   readonly displayName: string;
   readonly avatarEmoji: string | null;
-  readonly timeMs: number;
+  /** Time boards: the best completed run (lower is better). */
+  readonly timeMs?: number;
+  /** Score boards: the best total from one attempt (higher is better). */
+  readonly score?: number;
   readonly achievedAt: number;
 }
 
 export interface LeaderboardResponse {
+  /** How the board ranks: "time" (fastest first) or "score" (highest first). */
+  readonly metric: LeaderboardMetric;
   readonly entries: readonly LeaderboardEntry[];
-  readonly currentUser: { readonly rank: number; readonly timeMs: number } | null;
+  readonly currentUser: { readonly rank: number; readonly timeMs?: number; readonly score?: number } | null;
 }
 
 export interface SubmitBestTimeInput {
   readonly gameMode: string;
   readonly variant?: string;
   readonly timeMs: number;
+}
+
+/** One attempt for any board: `timeMs` for time boards, `score` for score boards. */
+export interface LeaderboardAttemptInput {
+  readonly gameMode: string;
+  readonly variant?: string;
+  readonly timeMs?: number;
+  readonly score?: number;
 }
 
 export interface SubmitBestTimeResponse {
@@ -139,8 +154,10 @@ export interface SubmitBestTimeResponse {
    * earlier, faster run when `accepted` is false). Absent from servers older than Compete.
    */
   readonly rank?: number | null;
-  /** The player's best time on this board after the submission. */
+  /** Time boards: the player's best time on this board after the submission. */
   readonly bestTimeMs?: number | null;
+  /** Score boards: the player's best score on this board after the submission. */
+  readonly bestScore?: number | null;
 }
 
 /** Where a time would place on a board: `rank` is 1 + the number of strictly faster best times. */
@@ -232,15 +249,25 @@ export async function fetchLeaderboard(mode: string, variant = "", limit = 50, o
     const params = new URLSearchParams({ mode, variant, limit: String(limit), ...(offset > 0 ? { offset: String(offset) } : {}) });
     const response = await fetch(`/api/leaderboard?${params.toString()}`);
     if (!response.ok) return null;
-    return (await response.json()) as LeaderboardResponse;
+    const data = (await response.json()) as Omit<LeaderboardResponse, "metric"> & { metric?: LeaderboardMetric };
+    // Servers from before score boards omit `metric`; every board they served was a time board.
+    return { ...data, metric: data.metric ?? leaderboardConfig(mode)?.metric ?? "time" };
   } catch {
     return null;
   }
 }
 
-export async function submitBestTime(input: SubmitBestTimeInput): Promise<SubmitBestTimeResponse | null> {
+/**
+ * Post one attempt to a board. Send `timeMs` for time boards and `score` for score boards (see
+ * src/core/leaderboards.ts); the server keeps only the player's best. Resolves null when offline
+ * or the attempt is rejected.
+ */
+export async function submitLeaderboardAttempt(input: LeaderboardAttemptInput): Promise<SubmitBestTimeResponse | null> {
+  const body: Record<string, unknown> = { gameMode: input.gameMode, variant: input.variant ?? "" };
+  if (input.score !== undefined) body.score = Math.round(input.score);
+  if (input.timeMs !== undefined) body.timeMs = Math.round(input.timeMs);
   try {
-    const response = await postJson("/api/leaderboard", input);
+    const response = await postJson("/api/leaderboard", body);
     if (!response.ok) return null;
     return (await response.json()) as SubmitBestTimeResponse;
   } catch {
@@ -248,16 +275,23 @@ export async function submitBestTime(input: SubmitBestTimeInput): Promise<Submit
   }
 }
 
+/** Post a finished timed run (time boards). Kept for existing callers; see submitLeaderboardAttempt. */
+export async function submitBestTime(input: SubmitBestTimeInput): Promise<SubmitBestTimeResponse | null> {
+  return submitLeaderboardAttempt(input);
+}
+
 /**
- * Where `timeMs` would rank on a leaderboard (`mode` + `variant`: "" / "territories" / "both" for
- * flags, a continent for puzzle). Works for guests too, so a timed results screen can say
+ * Where `value` would rank on a leaderboard (`mode` + `variant`: "" / "territories" / "both" for
+ * flags, a continent for puzzle). `value` is a time in ms on time boards and a score on score
+ * boards (picked from the mode's metric). Works for guests too, so a results screen can say
  * "that would be #12 of 340". Resolves null when offline or the input is rejected (times must be
- * whole milliseconds between 5 s and 2 h).
+ * whole milliseconds between 5 s and 2 h; scores whole numbers from 0 to the board's max).
  */
-export async function fetchLeaderboardRank(mode: string, variant: string, timeMs: number): Promise<LeaderboardPlacement | null> {
-  if (!Number.isFinite(timeMs)) return null;
+export async function fetchLeaderboardRank(mode: string, variant: string, value: number): Promise<LeaderboardPlacement | null> {
+  if (!Number.isFinite(value)) return null;
+  const param = leaderboardConfig(mode)?.metric === "score" ? "score" : "timeMs";
   try {
-    const params = new URLSearchParams({ mode, variant, timeMs: String(Math.round(timeMs)) });
+    const params = new URLSearchParams({ mode, variant, [param]: String(Math.round(value)) });
     const response = await fetch(`/api/leaderboard/rank?${params.toString()}`);
     if (!response.ok) return null;
     const data = (await response.json()) as Partial<LeaderboardPlacement>;
