@@ -551,274 +551,6 @@
 #compete .compete-step-copy strong { font-size: 0.9rem; font-weight: 780; }
 #compete .compete-step-copy span { color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
 
-/* ---------- Leaderboards: solo timed attempt ---------- */
-
-#compete .compete-lb-intro {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 16px;
-  margin-bottom: 18px;
-}
-
-#compete .compete-lb-lede { max-width: 72ch; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
-#compete .compete-lb-lede strong { color: var(--text); font-weight: 800; }
-
-@media (prefers-reduced-motion: reduce) {
-  #compete .compete-tabpanel,
-  #compete .compete-mp-art-bar::before,
-  #compete .compete-live-dot::after,
-  #compete .compete-online-skeleton span { animation: none; }
-}
-
-/* ---------- Guest banner ---------- */
-
-#compete .compete-banner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 26px;
-  padding: 14px 14px 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--brand) 32%, var(--border));
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--accent) 26%, transparent), transparent 60%),
-    var(--surface);
-}
-
-#compete .compete-banner[hidden] { display: none; }
-
-#compete .compete-banner-icon {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--brand);
-}
-
-#compete .compete-banner-copy { flex: 1 1 auto; min-width: 0; display: grid; gap: 3px; }
-#compete .compete-banner-copy strong { font-size: 0.98rem; font-weight: 780; }
-#compete .compete-banner-copy span { color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
-#compete .compete-banner-action { min-height: 42px; flex: none; }
-
-/* ---------- Layout ---------- */
-
-#compete .compete-layout {
-  display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
-  align-items: start;
-  gap: clamp(22px, 3vw, 40px);
-}
-
-/* ---------- Rail ---------- */
-
-#compete .compete-rail {
-  position: sticky;
-  top: calc(var(--shell-bar-h) + 18px);
-  display: grid;
-  gap: 22px;
-}
-
-#compete .compete-rail-label {
-  margin: 0 0 8px 12px;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-#compete .compete-rail-list { display: grid; gap: 2px; }
-
-#compete .compete-rail-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: var(--text);
-  text-align: left;
-  transition: background 140ms ease, border-color 140ms ease;
-}
-
-#compete .compete-rail-item:hover { background: var(--surface-soft); }
-
-#compete .compete-rail-item.is-selected {
-  border-color: color-mix(in srgb, var(--brand) 38%, var(--border));
-  background: var(--surface);
-  box-shadow: var(--shadow-panel);
-}
-
-#compete .compete-rail-icon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  border-radius: 10px;
-  background: var(--shell-tile-clues);
-  color: var(--shell-tile-ink-clues);
-}
-
-#compete [data-group="map"] .compete-rail-icon,
-#compete .compete-rail-item[data-group="map"] .compete-rail-icon { background: var(--shell-tile-map); color: var(--shell-tile-ink-map); }
-
-#compete .compete-rail-copy { min-width: 0; display: grid; gap: 2px; }
-
-#compete .compete-rail-name {
-  overflow: hidden;
-  font-size: 0.9rem;
-  font-weight: 740;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#compete .compete-rail-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 18px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
-}
-
-#compete .compete-rail-time { color: var(--text); font-weight: 700; }
-#compete .compete-rail-empty { color: var(--subtle); }
-
-#compete .compete-rail-rank {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--brand);
-  font-size: 0.7rem;
-  font-weight: 800;
-}
-
-/* ---------- Panel ---------- */
-
-#compete .compete-panel { min-width: 0; display: grid; gap: 22px; }
-
-#compete .compete-panel-head {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  gap: 18px;
-  padding: clamp(20px, 3vw, 30px);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--accent) 30%, transparent), transparent 46%),
-    var(--surface);
-  box-shadow: var(--shadow-panel);
-}
-
-#compete .compete-panel[data-group="map"] .compete-panel-head {
-  background:
-    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--sea) 70%, transparent), transparent 48%),
-    var(--surface);
-}
-
-#compete .compete-panel-intro { display: grid; gap: 8px; max-width: 62ch; }
-
-#compete .compete-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--brand);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-#compete .compete-panel[data-group="map"] .compete-eyebrow { color: var(--earth); }
-
-#compete .compete-title {
-  font-family: var(--font-editorial);
-  font-size: clamp(1.8rem, 3.4vw, 2.5rem);
-  font-weight: 440;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
-  outline: none;
-}
-
-#compete .compete-rules { color: var(--text); font-size: 1.02rem; line-height: 1.5; }
-
-#compete .compete-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-#compete .compete-facts li { display: inline-flex; align-items: center; gap: 7px; }
-#compete .compete-facts .shell-icon { color: var(--brand); }
-
-#compete .compete-variants { display: grid; gap: 8px; }
-#compete .compete-variants[hidden] { display: none; }
-
-#compete .compete-variants-label {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-#compete .compete-segments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-#compete .compete-segment {
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.84rem;
-  font-weight: 700;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
-}
-
-#compete .compete-segment:hover { border-color: var(--text); }
-
-#compete .compete-segment.is-selected {
-  border-color: var(--brand);
-  background: var(--brand);
-  color: var(--on-brand);
-}
-
-#compete .compete-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-
-#compete .compete-start {
-  min-height: 56px;
-  padding: 0 28px;
-  border-radius: 14px;
-  font-size: 1rem;
-}
-
-#compete .compete-practise { min-height: 56px; border-radius: 14px; }
-
-#compete .compete-panel-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
-  align-items: start;
-  gap: 18px;
-}
-
-#compete .compete-side { display: grid; gap: 18px; }
-
 /* ---------- Cards ---------- */
 
 #compete .compete-card {
@@ -839,50 +571,6 @@
 
 #compete .compete-card-title { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
 #compete .compete-board-caption { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
-
-/* ---------- Board ---------- */
-
-#compete .compete-board-list { display: grid; gap: 4px; }
-#compete .compete-board-list[hidden] { display: none; }
-
-#compete .compete-row {
-  display: grid;
-  grid-template-columns: 34px 34px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 50px;
-  padding: 6px 12px 6px 8px;
-  border-radius: 12px;
-}
-
-#compete .compete-row:nth-child(odd):not(.is-you):not(.is-podium) { background: color-mix(in srgb, var(--surface-soft) 55%, transparent); }
-
-#compete .compete-row-rank {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  justify-self: center;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-#compete .compete-row.is-rank-1 { background: var(--compete-gold-soft); }
-#compete .compete-row.is-rank-2 { background: var(--compete-silver-soft); }
-#compete .compete-row.is-rank-3 { background: var(--compete-bronze-soft); }
-#compete .compete-row.is-rank-1 .compete-row-rank { background: var(--compete-gold); color: #fffdf3; }
-#compete .compete-row.is-rank-2 .compete-row-rank { background: var(--compete-silver); color: #fffdf3; }
-#compete .compete-row.is-rank-3 .compete-row-rank { background: var(--compete-bronze); color: #fffdf3; }
-:root[data-theme="dark"] #compete .compete-row.is-podium .compete-row-rank { color: #1a2119; }
-
-#compete .compete-row.is-you {
-  background: var(--compete-you);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 55%, transparent);
-}
-
 #compete .compete-avatar {
   width: 34px;
   height: 34px;
@@ -896,133 +584,10 @@
 }
 
 #compete .compete-avatar.is-emoji { font-size: 1.2rem; }
-
-#compete .compete-row-name { min-width: 0; display: flex; align-items: center; gap: 8px; }
-
-#compete .compete-row-display {
-  overflow: hidden;
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#compete .compete-you {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--brand);
-  color: var(--on-brand);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-#compete .compete-row-time {
-  font-size: 0.95rem;
-  font-weight: 780;
-  font-variant-numeric: tabular-nums;
-}
-
-#compete .compete-row-gap {
-  padding: 2px 0;
-  color: var(--subtle);
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  text-align: center;
-}
-
-#compete .compete-more { width: 100%; min-height: 42px; margin-top: 12px; }
-#compete .compete-more[hidden] { display: none; }
-
-#compete .compete-board-state[hidden] { display: none; }
-
-#compete .compete-skeleton { display: grid; gap: 6px; }
-
-#compete .compete-skeleton-row {
-  height: 50px;
-  border-radius: 12px;
-  background: linear-gradient(90deg, var(--surface-soft) 0%, color-mix(in srgb, var(--surface-soft) 40%, var(--surface)) 50%, var(--surface-soft) 100%) 0 0 / 200% 100%;
-  animation: compete-shimmer 1.3s ease-in-out infinite;
-}
-
-#compete .compete-skeleton-row:nth-child(n + 4) { opacity: 0.6; }
-
 @keyframes compete-shimmer {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  #compete .compete-skeleton-row { animation: none; }
-}
-
-#compete .compete-empty {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 34px 16px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 14px;
-  color: var(--muted);
-  font-size: 0.88rem;
-  text-align: center;
-}
-
-#compete .compete-empty strong { color: var(--text); font-size: 1rem; }
-#compete .compete-empty-icon { color: var(--compete-gold); margin-bottom: 4px; }
-#compete .compete-empty.is-error { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
-#compete .compete-retry { min-height: 40px; margin-top: 8px; }
-
-/* ---------- Your best ---------- */
-
-#compete .compete-best-body { display: grid; gap: 14px; }
-#compete .compete-stats { display: grid; gap: 10px; }
-
-#compete .compete-stat {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
-  gap: 2px 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--surface-soft);
-}
-
-#compete .compete-stat-label {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-#compete .compete-stat-value {
-  font-family: var(--font-editorial);
-  font-size: 1.7rem;
-  font-weight: 460;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-#compete .compete-stat-extra { color: var(--brand); font-size: 0.82rem; font-weight: 800; }
-#compete .compete-post { width: 100%; min-height: 44px; white-space: normal; text-align: center; }
-#compete .compete-best-hint,
-#compete .compete-best-note { color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
-#compete .compete-best-note { color: var(--text); font-weight: 650; }
-
-/* ---------- Cross-links between the two ways to compete ---------- */
-
-#compete .compete-cross {
-  display: grid;
-  gap: 8px;
-  background:
-    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--compete-live-soft) 90%, transparent), transparent 62%),
-    var(--surface);
-}
-
 #compete .compete-cross-icon {
   width: 40px;
   height: 40px;
@@ -1034,11 +599,7 @@
   color: var(--compete-live);
 }
 
-#compete .compete-cross .compete-cross-icon { margin-bottom: 4px; }
 #compete .compete-cross-icon.is-solo { background: var(--compete-gold-soft); color: var(--compete-gold); }
-#compete .compete-cross p { color: var(--muted); font-size: 0.86rem; line-height: 1.5; }
-#compete .compete-cross-action { justify-self: start; min-height: 42px; margin-top: 6px; }
-
 #compete .compete-cross-band {
   width: 100%;
   display: flex;
@@ -1062,57 +623,537 @@
 #compete .compete-cross-copy strong { font-size: 0.98rem; font-weight: 780; }
 #compete .compete-cross-copy span { color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
 
+/* ---------- Leaderboards: mode picker ---------- */
+
+#compete .compete-lb { display: grid; gap: 18px; }
+
+#compete .compete-modes {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-soft);
+}
+
+#compete .compete-modes-group {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+#compete .compete-modes-group + .compete-modes-group { padding-top: 8px; border-top: 1px solid var(--border); }
+
+#compete .compete-modes-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#compete .compete-modes-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+#compete .compete-mode {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 3px 12px 3px 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.83rem;
+  font-weight: 720;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+#compete .compete-mode:hover { border-color: var(--border-strong); box-shadow: 0 4px 12px rgba(25, 35, 31, 0.06); }
+
+#compete .compete-mode-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 999px;
+  background: var(--shell-tile-clues);
+  color: var(--shell-tile-ink-clues);
+  transition: background 140ms ease, color 140ms ease;
+}
+
+#compete .compete-mode[data-group="map"] .compete-mode-icon { background: var(--shell-tile-map); color: var(--shell-tile-ink-map); }
+#compete .compete-mode[data-group="street-view"] .compete-mode-icon { background: var(--shell-tile-street); color: var(--shell-tile-ink-street); }
+
+#compete .compete-mode.is-selected {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--brand) 26%, transparent);
+}
+
+#compete .compete-mode.is-selected .compete-mode-icon {
+  background: color-mix(in srgb, var(--on-brand) 18%, transparent);
+  color: var(--on-brand);
+}
+
+/* ---------- Leaderboards: the board ---------- */
+
+#compete .compete-board {
+  --compete-board-pad: clamp(18px, 3vw, 32px);
+  --compete-pin-bottom: 14px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+#compete .compete-board-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px 28px;
+  padding: var(--compete-board-pad) var(--compete-board-pad) 18px;
+  border-radius: 26px 26px 0 0;
+  background:
+    radial-gradient(90% 140% at 100% 0, color-mix(in srgb, var(--accent) 26%, transparent), transparent 55%),
+    var(--surface);
+}
+
+#compete .compete-board[data-group="map"] .compete-board-head {
+  background: radial-gradient(90% 140% at 100% 0, color-mix(in srgb, var(--sea) 70%, transparent), transparent 55%), var(--surface);
+}
+
+#compete .compete-board[data-group="street-view"] .compete-board-head {
+  background: radial-gradient(90% 140% at 100% 0, color-mix(in srgb, var(--route-soft) 95%, transparent), transparent 55%), var(--surface);
+}
+
+#compete .compete-board-intro { min-width: 0; display: flex; align-items: flex-start; gap: 18px; }
+
+#compete .compete-board-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 4px;
+  border-radius: 16px;
+  background: var(--shell-tile-clues);
+  color: var(--shell-tile-ink-clues);
+}
+
+#compete .compete-board[data-group="map"] .compete-board-icon { background: var(--shell-tile-map); color: var(--shell-tile-ink-map); }
+#compete .compete-board[data-group="street-view"] .compete-board-icon { background: var(--shell-tile-street); color: var(--shell-tile-ink-street); }
+
+#compete .compete-board-copy { min-width: 0; display: grid; gap: 6px; }
+
+#compete .compete-eyebrow {
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#compete .compete-board[data-group="map"] .compete-eyebrow { color: var(--earth); }
+#compete .compete-board[data-group="street-view"] .compete-eyebrow { color: var(--route); }
+
+#compete .compete-title {
+  font-family: var(--font-editorial);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 420;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  outline: none;
+}
+
+#compete .compete-attempt { max-width: 60ch; color: var(--muted); font-size: 1rem; line-height: 1.5; }
+
+#compete .compete-standing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#compete .compete-standing[hidden] { display: none; }
+#compete .compete-standing strong { color: var(--text); font-weight: 800; }
+
+#compete .compete-standing-rank {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+#compete .compete-guest-note { padding: 0; font-size: 0.86rem; }
+
+/* The one call to action */
+#compete .compete-cta { display: grid; justify-items: center; gap: 8px; padding-top: 8px; }
+
+#compete .compete-cta .compete-play {
+  min-height: 58px;
+  gap: 10px;
+  padding: 0 28px 0 22px;
+  border-radius: 16px;
+  font-size: 1.04rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--brand) 30%, transparent);
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+#compete .compete-cta .compete-play:hover { transform: translateY(-1px); box-shadow: 0 16px 30px color-mix(in srgb, var(--brand) 36%, transparent); }
+#compete .compete-play-icon { display: grid; place-items: center; }
+#compete .compete-practise { justify-self: center; padding: 2px 0; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+#compete .compete-practise:hover { color: var(--text); }
+
+/* Variant pills */
+#compete .compete-variants {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 0 var(--compete-board-pad) 18px;
+}
+
+#compete .compete-variants[hidden] { display: none; }
+
+#compete .compete-variants-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#compete .compete-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+#compete .compete-segment {
+  flex: none;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+#compete .compete-segment:hover { color: var(--text); }
+
+#compete .compete-segment.is-selected {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(25, 35, 31, 0.12), 0 0 0 1px var(--border);
+}
+
+/* Body */
+#compete .compete-board-body {
+  display: grid;
+  gap: 6px;
+  padding: 0 var(--compete-board-pad) var(--compete-board-pad);
+}
+
+#compete .compete-board-body::before {
+  content: "";
+  height: 1px;
+  margin: 0 calc(-1 * var(--compete-board-pad)) 10px;
+  background: var(--border);
+}
+
+/* Podium: visual order 2 · 1 · 3 */
+#compete .compete-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 230px));
+  justify-content: center;
+  align-items: end;
+  gap: 12px;
+  margin: 6px 0 12px;
+  padding: 18px 12px 0;
+  border-radius: 20px;
+  background:
+    radial-gradient(60% 80% at 50% 100%, color-mix(in srgb, var(--compete-gold-soft) 90%, transparent), transparent 70%),
+    var(--panel-grid);
+}
+
+#compete .compete-podium[hidden] { display: none; }
+
+#compete .compete-podium-step {
+  --medal: var(--compete-gold);
+  --medal-soft: var(--compete-gold-soft);
+  --step-h: 92px;
+  --avatar: 76px;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  animation: compete-rise 420ms var(--shell-ease) both;
+}
+
+#compete .compete-podium-step.is-rank-1 { order: 2; }
+#compete .compete-podium-step.is-rank-2 { --medal: var(--compete-silver); --medal-soft: var(--compete-silver-soft); --step-h: 66px; --avatar: 60px; order: 1; animation-delay: 80ms; }
+#compete .compete-podium-step.is-rank-3 { --medal: var(--compete-bronze); --medal-soft: var(--compete-bronze-soft); --step-h: 48px; --avatar: 60px; order: 3; animation-delay: 140ms; }
+
+#compete .compete-podium-avatar {
+  width: var(--avatar);
+  height: var(--avatar);
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--medal);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: calc(var(--avatar) * 0.38);
+  font-weight: 800;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--medal) 18%, transparent), 0 10px 22px color-mix(in srgb, var(--medal) 22%, transparent);
+}
+
+#compete .compete-podium-avatar.is-emoji { font-size: calc(var(--avatar) * 0.5); }
+#compete .compete-podium-avatar.is-open { border-style: dashed; color: var(--subtle); box-shadow: none; background: transparent; }
+
+#compete .compete-podium-name {
+  max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.95rem;
+  font-weight: 780;
+}
+
+#compete .compete-podium-step.is-open .compete-podium-name { color: var(--subtle); font-weight: 650; }
+#compete .compete-podium-display { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#compete .compete-podium-value {
+  font-family: var(--font-editorial);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+  font-weight: 460;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+#compete .compete-podium-step.is-rank-1 .compete-podium-value { font-size: clamp(1.45rem, 3vw, 2.05rem); }
+
+#compete .compete-podium-block {
+  width: 100%;
+  height: var(--step-h);
+  display: grid;
+  place-items: start center;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, var(--medal-soft), color-mix(in srgb, var(--medal-soft) 30%, transparent));
+  box-shadow: inset 0 3px 0 var(--medal);
+}
+
+#compete .compete-podium-rank {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--medal);
+  color: #fffdf3;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+:root[data-theme="dark"] #compete .compete-podium-rank { color: #1a2119; }
+#compete .compete-podium-step.is-open .compete-podium-rank { background: var(--surface-soft); color: var(--subtle); }
+#compete .compete-podium-step.is-open .compete-podium-block { background: color-mix(in srgb, var(--surface-soft) 50%, transparent); box-shadow: inset 0 2px 0 var(--border-strong); }
+#compete .compete-podium-step.is-you .compete-podium-block { background: linear-gradient(180deg, var(--compete-you), color-mix(in srgb, var(--compete-you) 30%, transparent)); }
+
+@keyframes compete-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Rows (rank 4 and below) */
+#compete .compete-board-columns,
+#compete .compete-row {
+  display: grid;
+  grid-template-columns: 44px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+#compete .compete-board-columns {
+  padding: 4px 14px 4px 6px;
+  color: var(--subtle);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#compete .compete-board-columns[hidden] { display: none; }
+#compete .compete-columns-max { display: none; }
+#compete .compete-board-columns span:nth-child(1) { text-align: center; }
+#compete .compete-board-columns span:nth-child(2) { grid-column: 2 / 4; }
+#compete .compete-board-columns span:nth-child(3) { text-align: right; }
+
+#compete .compete-board-list { display: grid; }
+#compete .compete-board-list[hidden] { display: none; }
+
+#compete .compete-row {
+  min-height: 56px;
+  padding: 6px 14px 6px 6px;
+  border-bottom: 1px solid var(--border);
+  transition: background 120ms ease;
+}
+
+#compete .compete-row:hover { background: color-mix(in srgb, var(--surface-soft) 70%, transparent); }
+
+#compete .compete-row-rank {
+  justify-self: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+#compete .compete-row .compete-avatar { width: 36px; height: 36px; }
+
+#compete .compete-row-name { min-width: 0; display: flex; align-items: center; gap: 8px; }
+#compete .compete-row-display { overflow: hidden; font-size: 0.96rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+
+#compete .compete-you {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#compete .compete-row-value { font-size: 1.02rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+#compete .compete-value-max { color: var(--subtle); font-size: 0.78em; font-weight: 650; }
+#compete .compete-podium-value .compete-value-max { font-family: var(--font-sans); font-size: 0.5em; letter-spacing: 0; }
+
+#compete .compete-row.is-you {
+  border-bottom-color: transparent;
+  border-radius: 14px;
+  background: var(--compete-you);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+#compete .compete-row.is-you .compete-row-rank { color: var(--text); }
+
+/* Your row, pinned to the bottom of the screen while the board scrolls past. */
+#compete .compete-row.is-pinned {
+  position: sticky;
+  bottom: var(--compete-pin-bottom);
+  z-index: 2;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 55%, transparent), 0 10px 28px rgba(25, 35, 31, 0.16);
+}
+
+#compete .compete-row-gap {
+  padding: 4px 0;
+  color: var(--subtle);
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+#compete .compete-more { justify-self: center; min-height: 42px; margin-top: 12px; padding: 0 22px; }
+#compete .compete-more[hidden] { display: none; }
+
+/* States */
+#compete .compete-board-state[hidden] { display: none; }
+#compete .compete-skeleton { display: grid; gap: 8px; }
+
+#compete .compete-skeleton-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+#compete .compete-skeleton-podium span,
+#compete .compete-skeleton-row {
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--surface-soft) 0%, color-mix(in srgb, var(--surface-soft) 40%, var(--surface)) 50%, var(--surface-soft) 100%) 0 0 / 200% 100%;
+  animation: compete-shimmer 1.3s ease-in-out infinite;
+}
+
+#compete .compete-skeleton-podium span { height: 150px; }
+#compete .compete-skeleton-podium span:nth-child(1) { height: 124px; }
+#compete .compete-skeleton-podium span:nth-child(3) { height: 106px; }
+#compete .compete-skeleton-row { height: 52px; }
+#compete .compete-skeleton-row:nth-child(n + 4) { opacity: 0.6; }
+
+#compete .compete-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+#compete .compete-empty strong { color: var(--text); font-size: 1.05rem; }
+
+#compete .compete-empty-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: var(--compete-gold-soft);
+  color: var(--compete-gold);
+}
+
+#compete .compete-empty.is-error { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+#compete .compete-retry { min-height: 40px; margin-top: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #compete .compete-tabpanel,
+  #compete .compete-mp-art-bar::before,
+  #compete .compete-live-dot::after,
+  #compete .compete-online-skeleton span,
+  #compete .compete-skeleton-podium span,
+  #compete .compete-skeleton-row,
+  #compete .compete-podium-step { animation: none; }
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1100px) {
   #compete .compete-mp-grid { grid-template-columns: minmax(0, 1fr); }
   #compete .compete-mp-side { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
-  #compete .compete-panel-body { grid-template-columns: minmax(0, 1fr); }
-  #compete .compete-side { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
-}
-
-@media (max-width: 860px) {
-  #compete .compete-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-
-  /* The rail becomes one horizontal chip scroller (it scrolls; the page never does). */
-  #compete .compete-rail {
-    position: static;
-    display: flex;
-    gap: 8px;
-    margin: 0 calc(-1 * var(--shell-gutter));
-    padding: 2px var(--shell-gutter) 8px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-padding-inline: var(--shell-gutter);
-    scrollbar-width: none;
-  }
-
-  #compete .compete-rail::-webkit-scrollbar { display: none; }
-  #compete .compete-rail-group { display: contents; }
-  #compete .compete-rail-label { display: none; }
-  #compete .compete-rail-list { display: flex; gap: 8px; }
-  #compete .compete-rail-list li { flex: none; }
-
-  #compete .compete-rail-item {
-    width: auto;
-    gap: 8px;
-    padding: 5px 14px 5px 5px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-  }
-
-  #compete .compete-rail-item.is-selected {
-    border-color: var(--brand);
-    background: var(--brand);
-    color: var(--on-brand);
-    box-shadow: none;
-  }
-
-  #compete .compete-rail-icon { width: 32px; height: 32px; border-radius: 999px; }
-  #compete .compete-rail-icon .shell-icon { width: 17px; height: 17px; }
-  #compete .compete-rail-name { font-size: 0.84rem; }
-  #compete .compete-rail-meta { display: none; }
 }
 
 @media (max-width: 860px) {
@@ -1127,6 +1168,31 @@
   #compete .compete-or::before,
   #compete .compete-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
   #compete .compete-or span { width: auto; height: auto; border: 0; background: none; }
+
+  /* The mode picker becomes one sideways scroller (it scrolls; the page never does). */
+  #compete .compete-modes {
+    display: flex;
+    gap: 14px;
+    margin: 0 calc(-1 * var(--shell-gutter));
+    padding: 2px var(--shell-gutter) 6px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--shell-gutter);
+    scrollbar-width: none;
+  }
+
+  #compete .compete-modes::-webkit-scrollbar { display: none; }
+  #compete .compete-modes-group { flex: none; display: flex; align-items: center; gap: 6px; }
+  #compete .compete-modes-group + .compete-modes-group { padding: 0 0 0 14px; border-top: 0; border-left: 1px solid var(--border); }
+  #compete .compete-modes-label { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.58rem; letter-spacing: 0.12em; }
+  #compete .compete-modes-list { flex-wrap: nowrap; }
+
+  #compete .compete-board-head { grid-template-columns: minmax(0, 1fr); }
+  #compete .compete-cta { justify-items: stretch; padding-top: 0; }
+  #compete .compete-cta .compete-play { width: 100%; }
 }
 
 @media (max-width: 700px) {
@@ -1145,26 +1211,59 @@
   #compete .compete-rejoin { flex-wrap: wrap; }
   #compete .compete-rejoin-action { width: 100%; }
   #compete .compete-cross-band { margin-top: 16px; padding: 14px 16px; gap: 12px; }
-  #compete .compete-lb-intro { margin-bottom: 14px; }
-
-  #compete .compete-banner { flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
-  #compete .compete-banner-copy { flex-basis: calc(100% - 58px); }
-  #compete .compete-banner-action { width: 100%; }
-
-  #compete .compete-panel-head { border-radius: 18px; }
-  #compete .compete-facts { display: grid; gap: 6px; }
-  #compete .compete-segments { flex-wrap: nowrap; overflow-x: auto; margin-right: -20px; padding-right: 20px; scrollbar-width: none; }
-  #compete .compete-segments::-webkit-scrollbar { display: none; }
-  #compete .compete-segment { flex: none; }
-  #compete .compete-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
-  #compete .compete-start,
-  #compete .compete-practise { width: 100%; }
-  #compete .compete-practise { min-height: 48px; }
-
   #compete .compete-card { padding: 14px; border-radius: 16px; }
-  #compete .compete-row { grid-template-columns: 30px 30px minmax(0, 1fr) auto; gap: 10px; padding: 6px 10px 6px 6px; }
-  #compete .compete-avatar { width: 30px; height: 30px; }
-  /* Your best goes above the (long) board on phones; the live-match link stays below it. */
-  #compete .compete-side { display: contents; }
-  #compete .compete-best { order: -1; }
+
+  /* Leaderboards: the call to action sits just above the TabBar, always in reach. */
+  #compete .compete-lb { gap: 12px; padding-bottom: 76px; animation-name: compete-fade-in; }
+  #compete .compete-board { --compete-board-pad: 16px; --compete-pin-bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 80px); border-radius: 22px; }
+  #compete .compete-board-head { gap: 12px; padding-top: 20px; border-radius: 22px 22px 0 0; }
+  #compete .compete-board-intro { gap: 12px; }
+  #compete .compete-board-icon { width: 44px; height: 44px; border-radius: 13px; margin-top: 2px; }
+  #compete .compete-board-icon .shell-icon { width: 21px; height: 21px; }
+  #compete .compete-title { font-size: 2.1rem; }
+  #compete .compete-attempt { font-size: 0.92rem; }
+  #compete .compete-practise { justify-self: start; }
+
+  #compete .compete-cta .compete-play {
+    position: fixed;
+    left: var(--shell-gutter);
+    right: var(--shell-gutter);
+    bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 10px);
+    z-index: 85;
+    width: auto;
+    min-height: 54px;
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--brand) 38%, transparent), 0 0 0 5px color-mix(in srgb, var(--bg) 70%, transparent);
+  }
+
+  #compete .compete-variants { display: grid; gap: 8px; }
+  #compete .compete-segments { width: max-content; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #compete .compete-segments::-webkit-scrollbar { display: none; }
+
+  #compete .compete-podium { gap: 6px; padding: 14px 4px 0; }
+  #compete .compete-podium-step { --avatar: 58px; --step-h: 70px; }
+  #compete .compete-podium-step.is-rank-2,
+  #compete .compete-podium-step.is-rank-3 { --avatar: 46px; }
+  #compete .compete-podium-step.is-rank-2 { --step-h: 50px; }
+  #compete .compete-podium-step.is-rank-3 { --step-h: 36px; }
+  #compete .compete-podium-name { font-size: 0.82rem; }
+  #compete .compete-podium-name .compete-you { display: none; }
+  #compete .compete-podium-value { font-size: 1.1rem; }
+  #compete .compete-podium-step.is-rank-1 .compete-podium-value { font-size: 1.3rem; }
+  #compete .compete-podium-value .compete-value-max { display: block; font-size: 0.6em; }
+  #compete .compete-podium-rank { width: 26px; height: 26px; font-size: 0.8rem; }
+
+  #compete .compete-board-columns,
+  #compete .compete-row { grid-template-columns: 32px 32px minmax(0, 1fr) auto; gap: 10px; }
+  #compete .compete-row { min-height: 52px; padding: 6px 10px 6px 4px; }
+  #compete .compete-board-columns { padding: 4px 10px 4px 4px; }
+  #compete .compete-row .compete-avatar { width: 32px; height: 32px; }
+  #compete .compete-row-display { font-size: 0.9rem; }
+  #compete .compete-row-value { font-size: 0.94rem; }
+  #compete .compete-row-value .compete-value-max { display: none; }
+  #compete .compete-columns-max { display: inline; letter-spacing: 0.04em; }
+}
+
+@keyframes compete-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

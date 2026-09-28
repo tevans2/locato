@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchLeaderboardRank, submitBestTime } from "../src/core/auth";
+import { GAME_MODE_GROUPS } from "../src/core/gameModes";
+import { LEADERBOARD_MODES, leaderboardConfig } from "../src/core/leaderboards";
 import { timerKeysForMode } from "../src/core/timer/keys";
 import { COMPETE_PAGE_SIZE, createCompeteScreen, type CompeteScreenOptions } from "../src/ui/screens/CompeteScreen";
 import type { ShellContext } from "../src/ui/shell/types";
@@ -25,12 +27,22 @@ function makeShell(signedIn = false): ShellContext & { readonly calls: string[] 
   };
 }
 
-function entries(count: number, start = 1, you?: number) {
+function timeEntries(count: number, start = 1, you?: number) {
   return Array.from({ length: count }, (_, index) => {
     const rank = start + index;
     return { rank, userId: rank === you ? ME.id : `u${rank}`, displayName: rank === you ? ME.displayName : `Player ${rank}`, avatarEmoji: null, timeMs: 60_000 + rank * 1000, achievedAt: rank };
   });
 }
+
+function scoreEntries(count: number, start = 1) {
+  return Array.from({ length: count }, (_, index) => {
+    const rank = start + index;
+    return { rank, userId: `u${rank}`, displayName: `Player ${rank}`, avatarEmoji: "🐼", score: 25_000 - rank * 1000, achievedAt: rank };
+  });
+}
+
+/** Mode order in the shell's catalogue (Clues, Map, Street View). */
+const GAME_ORDER: string[] = GAME_MODE_GROUPS.flatMap((group) => group.modes.map((mode) => mode.id));
 
 interface FetchSetup {
   readonly signedIn?: boolean;
@@ -85,16 +97,18 @@ afterEach(() => {
 });
 
 describe("Compete screen: Leaderboards tab", () => {
-  it("lists the nine leaderboard modes grouped as Clues and Map", async () => {
+  it("offers all 14 modes grouped Clues, Map and Street View", async () => {
     mockFetch();
     mount({ shell: makeShell(), tab: "leaderboards" });
     await flush();
-    const groups = [...document.querySelectorAll(".compete-rail-group")];
-    expect(groups.map((group) => group.querySelector("h2")?.textContent)).toEqual(["Clues", "Map"]);
-    const modes = [...document.querySelectorAll<HTMLElement>(".compete-rail-item")].map((item) => item.dataset.mode);
-    expect(modes).toEqual(["flags", "shapes", "codes", "capitals", "capital-recall", "name-all", "click-country", "spot-country", "puzzle"]);
-    expect(q(".compete-rail-item[data-mode='flags']")?.getAttribute("aria-pressed")).toBe("true");
+    const groups = [...document.querySelectorAll<HTMLElement>(".compete-modes-group")];
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Clues", "Map", "Street View"]);
+    const modes = [...document.querySelectorAll<HTMLElement>(".compete-mode")].map((item) => item.dataset.mode);
+    expect(modes).toEqual(LEADERBOARD_MODES.map((config) => config.mode).sort((a, b) => GAME_ORDER.indexOf(a) - GAME_ORDER.indexOf(b)));
+    expect(modes).toHaveLength(14);
+    expect(q(".compete-mode[data-mode='flags']")?.getAttribute("aria-pressed")).toBe("true");
     expect(q(".compete-title")?.textContent).toBe("Flags");
+    expect(q(".compete-attempt")?.textContent).toBe(leaderboardConfig("flags")!.attempt);
   });
 
   it("selecting a mode reports it for a URL replace and reloads the board", async () => {
@@ -102,7 +116,7 @@ describe("Compete screen: Leaderboards tab", () => {
     const onSelect = vi.fn();
     mount({ shell: makeShell(), tab: "leaderboards", onSelect });
     await flush();
-    q<HTMLButtonElement>(".compete-rail-item[data-mode='puzzle']")!.click();
+    q<HTMLButtonElement>(".compete-mode[data-mode='puzzle']")!.click();
     expect(onSelect).toHaveBeenLastCalledWith("puzzle", "Africa");
     expect(q(".compete-title")?.textContent).toBe("Puzzle");
     q<HTMLButtonElement>(".compete-segment[data-variant='Europe']")!.click();
@@ -113,96 +127,135 @@ describe("Compete screen: Leaderboards tab", () => {
     expect(last.searchParams.get("variant")).toBe("Europe");
   });
 
-  it("starts a timed run with the selected variant, and practice without one", async () => {
+  it("shows variant pills only for modes with variants", async () => {
+    mockFetch();
+    mount({ shell: makeShell(), mode: "flags" });
+    await flush();
+    expect([...document.querySelectorAll<HTMLElement>(".compete-segment")].map((pill) => pill.textContent)).toEqual(["Countries", "Territories", "Both"]);
+    for (const mode of ["shapes", "map-tap", "geoguessr", "worldsplit"]) {
+      q<HTMLButtonElement>(`.compete-mode[data-mode='${mode}']`)!.click();
+      expect(q<HTMLElement>(".compete-variants")!.hidden).toBe(true);
+      expect(document.querySelectorAll(".compete-segment")).toHaveLength(0);
+    }
+    q<HTMLButtonElement>(".compete-mode[data-mode='puzzle']")!.click();
+    expect(q<HTMLElement>(".compete-variants")!.hidden).toBe(false);
+    expect(document.querySelectorAll(".compete-segment")).toHaveLength(6);
+  });
+
+  it("labels the call to action per metric and starts a ranked attempt with the variant", async () => {
     mockFetch();
     const shell = makeShell();
     mount({ shell, mode: "flags", variant: "territories" });
     await flush();
+    const play = q<HTMLButtonElement>(".compete-play")!;
+    expect(play.textContent).toBe("Start a timed run");
     expect(q(".compete-segment[data-variant='territories']")?.getAttribute("aria-checked")).toBe("true");
-    q<HTMLButtonElement>(".compete-start")!.click();
+    play.click();
     q<HTMLButtonElement>(".compete-segment[data-variant='']")!.click();
-    q<HTMLButtonElement>(".compete-start")!.click();
+    play.click();
+    q<HTMLButtonElement>(".compete-mode[data-mode='map-tap']")!.click();
+    expect(play.textContent).toBe("Play a ranked attempt");
+    expect(q(".compete-eyebrow")?.textContent).toBe("Map · Highest score wins");
+    play.click();
+    q<HTMLButtonElement>(".compete-mode[data-mode='streetview-country']")!.click();
+    expect(play.textContent).toBe("Play a ranked attempt");
+    play.click();
     q<HTMLButtonElement>(".compete-practise")!.click();
-    expect(shell.calls).toEqual(["game:flags:timed:territories", "game:flags:timed:", "game:flags:practice:"]);
+    expect(shell.calls).toEqual(["game:flags:timed:territories", "game:flags:timed:", "game:map-tap:timed:", "game:streetview-country:timed:", "game:streetview-country:practice:"]);
   });
 
-  it("shows guests a sign-in banner that opens the account panel", async () => {
-    mockFetch();
-    const shell = makeShell(false);
-    window.localStorage.setItem(timerKeysForMode("codes").best, "83400");
-    mount({ shell, mode: "codes" });
+  it("renders a time board as times, with a podium for the top three", async () => {
+    mockFetch({ board: () => ({ metric: "time", entries: timeEntries(6), currentUser: null }) });
+    mount({ shell: makeShell(), mode: "capitals" });
     await flush();
-    const banner = q(".compete-banner")!;
-    expect(banner.hidden).toBe(false);
-    expect(banner.textContent).toContain("Sign in to post your times");
-    banner.querySelector<HTMLButtonElement>("button")!.click();
-    expect(shell.calls).toContain("account");
-    // The local best is shown and can be posted after signing in.
-    expect(q(".compete-best")?.textContent).toContain("1:23.4");
-    expect(q(".compete-rail-item[data-mode='codes'] .compete-rail-time")?.textContent).toBe("1:23.4");
-    expect(q(".compete-post")?.textContent).toBe("Sign in to post it");
+    const podium = [...document.querySelectorAll<HTMLElement>(".compete-podium-step")];
+    expect(podium.map((step) => step.dataset.rank)).toEqual(["1", "2", "3"]);
+    expect(podium[0]!.querySelector(".compete-podium-value")?.textContent).toBe("1:01.0");
+    const rows = [...document.querySelectorAll<HTMLElement>(".compete-row")];
+    expect(rows.map((item) => item.dataset.rank)).toEqual(["4", "5", "6"]);
+    expect(rows[0]!.querySelector(".compete-row-value")?.textContent).toBe("1:04.0");
+    expect(q(".compete-board-columns")?.textContent).toContain("Time");
   });
 
-  it("renders the board with your row highlighted and loads more on demand", async () => {
+  it("renders a score board as points out of the maximum", async () => {
+    const { requests } = mockFetch({ board: () => ({ metric: "score", entries: scoreEntries(5), currentUser: null }) });
+    mount({ shell: makeShell(), mode: "geoguessr" });
+    await flush();
+    expect(requests.find((url) => url.pathname === "/api/leaderboard")?.searchParams.get("mode")).toBe("geoguessr");
+    expect(q(".compete-podium-step.is-rank-1 .compete-podium-value")?.textContent).toBe("24,000 / 25,000");
+    expect(q(".compete-row[data-rank='4'] .compete-row-value")?.textContent).toBe("21,000 / 25,000");
+    expect(q(".compete-board-columns")?.textContent).toContain("Score");
+    expect(q(".compete-board")?.dataset.metric).toBe("score");
+  });
+
+  it("highlights your row, shows your standing in the header, and loads more on demand", async () => {
     const { requests } = mockFetch({
       signedIn: true,
       board: (url) => {
         const offset = Number(url.searchParams.get("offset") ?? 0);
-        const limit = Number(url.searchParams.get("limit"));
-        if (limit === 1) return { entries: entries(1), currentUser: null };
         return offset === 0
-          ? { entries: entries(COMPETE_PAGE_SIZE, 1, 3), currentUser: { rank: 3, timeMs: 63_000 } }
-          : { entries: entries(5, offset + 1), currentUser: { rank: 3, timeMs: 63_000 } };
+          ? { metric: "time", entries: timeEntries(COMPETE_PAGE_SIZE, 1, 7), currentUser: { rank: 7, timeMs: 67_000 } }
+          : { metric: "time", entries: timeEntries(5, offset + 1), currentUser: { rank: 7, timeMs: 67_000 } };
       },
     });
     mount({ shell: makeShell(true), mode: "name-all" });
     await flush();
-    expect(q<HTMLElement>(".compete-banner")!.hidden).toBe(true);
-    const rows = document.querySelectorAll(".compete-row");
-    expect(rows).toHaveLength(COMPETE_PAGE_SIZE);
+    expect(q(".compete-guest-note")).toBeNull();
     const you = q(".compete-row.is-you")!;
-    expect(you.dataset.rank).toBe("3");
+    expect(you.dataset.rank).toBe("7");
     expect(you.textContent).toContain("You");
-    expect(q(".compete-row.is-rank-1")).not.toBeNull();
-    expect(q(".compete-best")?.textContent).toContain("Rank #3");
-    expect(q(".compete-rail-item[data-mode='name-all'] .compete-rail-rank")?.textContent).toBe("#3");
+    expect(q(".compete-standing")?.textContent).toBe("#7Your best 1:07.0");
+    expect(document.querySelectorAll(".compete-podium-step")).toHaveLength(3);
+    expect(document.querySelectorAll(".compete-row")).toHaveLength(COMPETE_PAGE_SIZE - 3);
 
     const more = q<HTMLButtonElement>(".compete-more")!;
     expect(more.hidden).toBe(false);
     more.click();
     await flush();
-    expect(document.querySelectorAll(".compete-row")).toHaveLength(COMPETE_PAGE_SIZE + 5);
+    expect(document.querySelectorAll(".compete-row")).toHaveLength(COMPETE_PAGE_SIZE + 2);
     expect(more.hidden).toBe(true);
     expect(requests.some((url) => url.searchParams.get("offset") === String(COMPETE_PAGE_SIZE))).toBe(true);
   });
 
   it("pins your row under the board when you rank below the rows shown", async () => {
-    mockFetch({ signedIn: true, board: () => ({ entries: entries(3), currentUser: { rank: 57, timeMs: 240_000 } }) });
-    mount({ shell: makeShell(true), mode: "capitals" });
+    mockFetch({ signedIn: true, board: () => ({ metric: "score", entries: scoreEntries(5), currentUser: { rank: 57, score: 9_100 } }) });
+    mount({ shell: makeShell(true), mode: "map-tap" });
     await flush();
     const you = q(".compete-row.is-you")!;
     expect(you.dataset.rank).toBe("57");
+    expect(you.classList.contains("is-pinned")).toBe(true);
+    expect(you.querySelector(".compete-row-value")?.textContent).toBe("9,100 / 50,000");
     expect(q(".compete-row-gap")).not.toBeNull();
+    expect(q(".compete-standing")?.textContent).toContain("9,100");
   });
 
-  it("offers to post a faster saved best and reloads the board", async () => {
-    const { fetchMock } = mockFetch({ signedIn: true, board: () => ({ entries: entries(2), currentUser: null }) });
-    window.localStorage.setItem(timerKeysForMode("shapes").best, "61000");
+  it("marks you on the podium when you're in the top three", async () => {
+    mockFetch({ signedIn: true, board: () => ({ metric: "time", entries: timeEntries(4, 1, 2), currentUser: { rank: 2, timeMs: 62_000 } }) });
     mount({ shell: makeShell(true), mode: "shapes" });
     await flush();
-    const post = q<HTMLButtonElement>(".compete-post")!;
-    expect(post.textContent).toBe("Post saved best (1:01.0)");
-    post.click();
+    expect(q(".compete-podium-step.is-you")?.getAttribute("data-rank")).toBe("2");
+    expect(q(".compete-row-gap")).toBeNull();
+  });
+
+  it("shows guests a slim sign-in note and their best on this device", async () => {
+    mockFetch();
+    const shell = makeShell(false);
+    window.localStorage.setItem(timerKeysForMode("codes").best, "83400");
+    mount({ shell, mode: "codes" });
     await flush();
-    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST")!;
-    expect(JSON.parse(String(postCall[1]!.body))).toEqual({ gameMode: "shapes", variant: "", timeMs: 61000 });
-    expect(q(".compete-best")?.textContent).toContain("Posted to the leaderboard.");
+    const note = q<HTMLButtonElement>(".compete-guest-note")!;
+    expect(note.textContent).toBe("Sign in to post your scores");
+    expect(q(".compete-standing")?.textContent).toContain("1:23.4");
+    note.click();
+    expect(shell.calls).toContain("account");
+    expect(q(".compete-banner")).toBeNull();
+    expect(q(".compete-best")).toBeNull();
   });
 
   it("shows empty and error states, and retries", async () => {
     let fail = true;
-    mockFetch({ board: () => (fail ? null : { entries: [], currentUser: null }) });
-    mount({ shell: makeShell(), tab: "leaderboards" });
+    mockFetch({ board: () => (fail ? null : { metric: "score", entries: [], currentUser: null }) });
+    mount({ shell: makeShell(), mode: "worldsplit" });
     await flush();
     expect(q(".compete-board")?.dataset.state).toBe("error");
     expect(q(".compete-board-state")?.textContent).toContain("Couldn't load the leaderboard");
@@ -210,18 +263,7 @@ describe("Compete screen: Leaderboards tab", () => {
     q<HTMLButtonElement>(".compete-retry")!.click();
     await flush();
     expect(q(".compete-board")?.dataset.state).toBe("empty");
-    expect(q(".compete-board-state")?.textContent).toContain("No times on this board yet");
-  });
-
-  it("labels the panel a solo timed attempt and links across to a live match", async () => {
-    mockFetch();
-    const onTab = vi.fn();
-    mount({ shell: makeShell(), mode: "capitals", onTab });
-    await flush();
-    expect(q(".compete-eyebrow")?.textContent).toBe("Clues · Solo timed attempt");
-    q<HTMLButtonElement>(".compete-cross [data-go-tab='multiplayer']")!.click();
-    expect(onTab).toHaveBeenLastCalledWith("multiplayer", "capitals", "");
-    expect(q<HTMLElement>("#compete-panel-multiplayer")!.hidden).toBe(false);
+    expect(q(".compete-board-state")?.textContent).toContain("No scores on this board yet");
   });
 });
 
@@ -234,7 +276,7 @@ describe("Compete screen: tabs", () => {
     mount({ shell: makeShell(), onTab, onCreateRoom: vi.fn() });
     await flush();
     const tabs = [...document.querySelectorAll<HTMLElement>("[role='tab']")];
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["MultiplayerLive match with friendsLive", "LeaderboardsSolo timed attempt"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["MultiplayerLive match with friendsLive", "LeaderboardsSolo ranked attempts"]);
     expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual(["true", "false"]);
     expect(q<HTMLElement>("#compete-panel-multiplayer")!.hidden).toBe(false);
     expect(q<HTMLElement>("#compete-panel-leaderboards")!.hidden).toBe(true);
