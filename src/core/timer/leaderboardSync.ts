@@ -1,5 +1,5 @@
 import { submitBestTime } from "../auth";
-import type { TimerGameModeId } from "../gameModes";
+import { isLeaderboardGameModeId, type TimerGameModeId } from "../gameModes";
 import { formatElapsedTime } from "./playTimer";
 
 export interface TimerLeaderboardResult {
@@ -13,7 +13,8 @@ export async function submitTimerToLeaderboard(input: {
   readonly timeMs: number;
   readonly isLoggedIn: boolean;
 }): Promise<boolean | null> {
-  if (!input.isLoggedIn) return null;
+  // Modes without a board (flag colours) have nothing to post to; null keeps the completion note quiet.
+  if (!input.isLoggedIn || !isLeaderboardGameModeId(input.gameMode)) return null;
   const result = await submitBestTime({
     gameMode: input.gameMode,
     variant: input.variant,
