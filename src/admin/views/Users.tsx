@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Eraser, LogOut, Pencil, RotateCcw, Search, Trash2, X } from "lucide-react";
 import type { AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../api";
-import { formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
+import { formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
 import { EventRow } from "./Events";
 
@@ -193,29 +193,32 @@ function UserDrawer({ client, id, onClose, onChanged, helpers }: { client: Admin
             </section>
 
             <section className="adm-section">
-              <h3>Leaderboard times</h3>
-              {d.bestTimes.length === 0 ? <Empty>No leaderboard times.</Empty> : (
+              <h3>Leaderboard bests</h3>
+              {d.bestTimes.length + (d.bestScores?.length ?? 0) === 0 ? <Empty>No leaderboard entries.</Empty> : (
                 <div className="adm-table-wrap">
                   <table className="adm-table">
-                    <thead><tr><th>Mode</th><th>Variant</th><th className="num">Time</th><th>Set</th><th /></tr></thead>
+                    <thead><tr><th>Mode</th><th>Variant</th><th className="num">Best</th><th>Set</th><th /></tr></thead>
                     <tbody>
-                      {d.bestTimes.map((row) => (
-                        <tr key={`${row.gameMode}:${row.variant}`}>
-                          <td>{modeName(row.gameMode)}</td>
-                          <td>{row.variant || "Default"}</td>
-                          <td className="num">{formatDuration(row.timeMs)} {row.suspicious && <Badge tone="bad" title="Faster than any plausible run">suspicious</Badge>}</td>
-                          <td>{formatDateTime(row.achievedAt)}</td>
-                          <td className="num">
-                            <button type="button" className="adm-icon-btn" aria-label={`Remove ${row.gameMode} time`} onClick={() => helpers.confirm({
-                              title: "Remove leaderboard time?",
-                              body: <p>Removes {d.user.displayName}'s {modeName(row.gameMode)}{row.variant ? ` (${row.variant})` : ""} time of {formatDuration(row.timeMs)}.</p>,
-                              confirmLabel: "Remove",
-                              tone: "danger",
-                              run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(id)}?${new URLSearchParams({ mode: row.gameMode, variant: row.variant })}`); helpers.notify("Leaderboard time removed."); afterChange(); },
-                            })}><Trash2 size={14} /></button>
-                          </td>
-                        </tr>
-                      ))}
+                      {[...d.bestTimes, ...(d.bestScores ?? [])].map((row) => {
+                        const noun = "score" in row ? "score" : "time";
+                        return (
+                          <tr key={`${row.gameMode}:${row.variant}`}>
+                            <td>{modeName(row.gameMode)}</td>
+                            <td>{row.variant || "Default"}</td>
+                            <td className="num">{formatBoardValue(row)} {row.suspicious && <Badge tone="bad" title={noun === "score" ? "A perfect total" : "Faster than any plausible run"}>suspicious</Badge>}</td>
+                            <td>{formatDateTime(row.achievedAt)}</td>
+                            <td className="num">
+                              <button type="button" className="adm-icon-btn" aria-label={`Remove ${row.gameMode} ${noun}`} onClick={() => helpers.confirm({
+                                title: `Remove leaderboard ${noun}?`,
+                                body: <p>Removes {d.user.displayName}'s {modeName(row.gameMode)}{row.variant ? ` (${row.variant})` : ""} {noun} of {formatBoardValue(row)}.</p>,
+                                confirmLabel: "Remove",
+                                tone: "danger",
+                                run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(id)}?${new URLSearchParams({ mode: row.gameMode, variant: row.variant })}`); helpers.notify(`Leaderboard ${noun} removed.`); afterChange(); },
+                              })}><Trash2 size={14} /></button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

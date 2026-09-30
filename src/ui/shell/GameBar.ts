@@ -1,4 +1,5 @@
 import { gameModeCatalogueEntry, gameModeGroupOf, type GameModeId } from "../../core/gameModes";
+import { leaderboardConfig } from "../../core/leaderboards";
 import { el } from "../dom/createElement";
 import { createPreferenceMenuItems } from "./controls";
 import { openGamePicker } from "./GamePicker";
@@ -42,9 +43,9 @@ export interface GameBarHandle {
   readonly destroy: () => void;
 }
 
-async function guarded(ctx: ShellContext, guard: GameBarOptions["leaveGuard"], action: () => void): Promise<void> {
+async function guarded(ctx: ShellContext, guard: GameBarOptions["leaveGuard"], action: () => void, title = "Leave this run?"): Promise<void> {
   const message = guard?.() ?? null;
-  if (message && !(await ctx.confirmLeave(message, { title: "Leave this run?", confirmLabel: "Leave", cancelLabel: "Keep playing", tone: "danger" }))) return;
+  if (message && !(await ctx.confirmLeave(message, { title, confirmLabel: "Leave", cancelLabel: "Keep playing", tone: "danger" }))) return;
   action();
 }
 
@@ -59,13 +60,17 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
   const mode = gameModeCatalogueEntry(options.gameMode);
   const group = gameModeGroupOf(options.gameMode);
   const timed = options.run === "timed";
+  // Score boards (MapTap, Worldsplit, GeoGuessr, Street View country) have no clock: their
+  // "timed" run is a fixed-length ranked attempt, shown to players as "Ranked".
+  const ranked = timed && leaderboardConfig(options.gameMode)?.metric === "score";
+  const leaveTitle = ranked ? "Ranked attempt in progress" : "Leave this run?";
 
   const back = el("button", {
     className: "shell-icon-btn shell-gamebar-back",
     attrs: { type: "button", "aria-label": options.backLabel ?? "Back", title: options.backLabel ?? "Back" },
     children: [shellIcon("arrow-left", 20, 2)],
   });
-  back.addEventListener("click", () => void guarded(ctx, options.leaveGuard, options.onBack), { signal });
+  back.addEventListener("click", () => void guarded(ctx, options.leaveGuard, options.onBack, leaveTitle), { signal });
 
   const switcher = el("button", {
     className: "shell-switcher",
@@ -88,7 +93,7 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
       onClose: () => switcher.setAttribute("aria-expanded", "false"),
       onPick: (next, run) => {
         if (next === options.gameMode && run === options.run) return;
-        void guarded(ctx, options.leaveGuard, () => ctx.openGame(next, run));
+        void guarded(ctx, options.leaveGuard, () => ctx.openGame(next, run), leaveTitle);
       },
     });
   }, { signal });
@@ -97,10 +102,14 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
   const clockSlot = el("span", { className: "shell-run-clock" });
   const pill = el("span", {
     className: `shell-run-pill is-${options.run}`,
-    attrs: { "data-run": options.run, title: timed ? "Timed run — posts to the leaderboard" : "Practice — no clock, nothing is posted" },
+    attrs: {
+      "data-run": options.run,
+      ...(ranked ? { "data-ranked": "true" } : {}),
+      title: ranked ? "Ranked attempt — your total posts to the leaderboard" : timed ? "Timed run — posts to the leaderboard" : "Practice — no clock, nothing is posted",
+    },
     children: [
-      timed ? shellIcon("timer", 15, 2.1) : el("span", { className: "shell-run-dot", attrs: { "aria-hidden": "true" } }),
-      el("span", { className: "shell-run-label", text: timed ? "Timed" : "Practice" }),
+      ranked ? shellIcon("trophy", 15, 2.1) : timed ? shellIcon("timer", 15, 2.1) : el("span", { className: "shell-run-dot", attrs: { "aria-hidden": "true" } }),
+      el("span", { className: "shell-run-label", text: ranked ? "Ranked" : timed ? "Timed" : "Practice" }),
       clockSlot,
     ],
   });
@@ -132,7 +141,7 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
   const preferenceRows = createPreferenceMenuItems(ctx.storage, signal);
   const accountRow = menuRow(ctx.signedIn() ? "Account" : "Sign in", "user-round", () => ctx.openAccount());
   const sectionRows = SITE_SECTIONS.map((section) =>
-    menuRow(section.label, section.icon, () => void guarded(ctx, options.leaveGuard, () => ctx.openSection(section.id as SiteSection)), { "data-section": section.id }),
+    menuRow(section.label, section.icon, () => void guarded(ctx, options.leaveGuard, () => ctx.openSection(section.id as SiteSection), leaveTitle), { "data-section": section.id }),
   );
 
   const sep = (): HTMLElement => el("div", { className: "shell-menu-sep", attrs: { role: "separator" } });

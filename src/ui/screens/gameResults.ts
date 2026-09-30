@@ -1,7 +1,8 @@
 import type { Country } from "../../core/countries";
 import { gameModeCatalogueEntry, isLeaderboardMode, type TimerGameModeId } from "../../core/gameModes";
+import type { LeaderboardMetric } from "../../core/leaderboards";
 import { formatElapsedTime } from "../../core/timer/playTimer";
-import { createResultsCard, type ResultsAction, type ResultsMissedCountry, type ResultsStat } from "../shell/ResultsCard";
+import { createResultsCard, type ResultsAction, type ResultsCardHandle, type ResultsMissedCountry, type ResultsStat } from "../shell/ResultsCard";
 import type { RunType, ShellContext } from "../shell/types";
 
 /** Most countries a results card lists; the rest are summarised ("+N more"). */
@@ -42,17 +43,60 @@ export interface RunResultsHandle {
   readonly focus: () => void;
 }
 
-/** One line for the leaderboard submission of a finished timed run. */
-export function timedPostingLine(outcome: TimedPostOutcome): string {
+/**
+ * One line for the leaderboard submission of a finished ranked attempt: a timed run on a time
+ * board (the default) or a fixed-length attempt's total on a score board.
+ */
+export function timedPostingLine(outcome: TimedPostOutcome, metric: LeaderboardMetric = "time"): string {
   const best = outcome.isNewLocalBest ? "New personal best. " : "";
   const rank = outcome.rank ?? null;
+  const noun = metric === "score" ? "score" : "time";
   if (outcome.serverAccepted === null) {
     const place = rank ? `That would place #${rank} on the board. ` : "";
-    return `${best}${place}Sign in to post your time to the leaderboard — your best is kept on this device.`;
+    return metric === "score"
+      ? `${best}${place}Sign in to post your score to the leaderboard.`
+      : `${best}${place}Sign in to post your time to the leaderboard — your best is kept on this device.`;
   }
-  if (outcome.failed) return `${best}Couldn't post this time — it's saved on this device; post it from Compete later.`;
+  if (outcome.failed) {
+    return metric === "score"
+      ? `${best}Couldn't post this score — check your connection, then try another attempt.`
+      : `${best}Couldn't post this ${noun} — it's saved on this device; post it from Compete later.`;
+  }
   if (outcome.serverAccepted) return `${best}Posted to the leaderboard${rank ? ` — you're #${rank}` : ""}.`;
-  return `${best}Saved on this device — your posted best is still faster${rank ? ` (you're #${rank})` : ""}.`;
+  return metric === "score"
+    ? `${best}Your posted best is still higher${rank ? ` — you're #${rank}` : ""}.`
+    : `${best}Saved on this device — your posted best is still faster${rank ? ` (you're #${rank})` : ""}.`;
+}
+
+/**
+ * Fill in a results card's subtitle with the submission outcome once `posting` resolves, and add
+ * "Sign in to post" for guests. Shared by timed runs and score-board ranked attempts.
+ */
+export function attachPostingOutcome(
+  shell: ShellContext,
+  card: ResultsCardHandle,
+  posting: Promise<TimedPostOutcome>,
+  options: { readonly subtitle?: string; readonly metric?: LeaderboardMetric } = {},
+): void {
+  const metric = options.metric ?? "time";
+  const sub = card.element.querySelector<HTMLElement>(".shell-results-sub");
+  void posting.then(
+    (outcome) => {
+      if (sub) sub.textContent = [options.subtitle, timedPostingLine(outcome, metric)].filter(Boolean).join(" ");
+      card.element.dataset.posted = outcome.serverAccepted === null ? "guest" : String(outcome.serverAccepted);
+      if (outcome.serverAccepted === null && !card.element.querySelector(".game-results-signin")) {
+        const signIn = document.createElement("button");
+        signIn.type = "button";
+        signIn.className = "shell-btn shell-btn-quiet game-results-signin";
+        signIn.textContent = "Sign in to post";
+        signIn.addEventListener("click", () => shell.openAccount());
+        card.element.querySelector(".shell-results-secondary")?.prepend(signIn);
+      }
+    },
+    () => {
+      if (sub) sub.textContent = metric === "score" ? "Couldn't reach the leaderboard — this score wasn't posted." : "Couldn't reach the leaderboard — your time is kept on this device.";
+    },
+  );
 }
 
 function missedChips(countries: readonly Country[]): ResultsMissedCountry[] {
@@ -97,26 +141,7 @@ export function createRunResults(shell: ShellContext, input: RunResultsInput): R
   card.element.classList.add("game-run-results");
   card.element.dataset.run = input.run;
 
-  if (input.posting) {
-    const sub = card.element.querySelector<HTMLElement>(".shell-results-sub");
-    void input.posting.then(
-      (outcome) => {
-        if (sub) sub.textContent = [input.subtitle, timedPostingLine(outcome)].filter(Boolean).join(" ");
-        card.element.dataset.posted = outcome.serverAccepted === null ? "guest" : String(outcome.serverAccepted);
-        if (outcome.serverAccepted === null && !card.element.querySelector(".game-results-signin")) {
-          const signIn = document.createElement("button");
-          signIn.type = "button";
-          signIn.className = "shell-btn shell-btn-quiet game-results-signin";
-          signIn.textContent = "Sign in to post";
-          signIn.addEventListener("click", () => shell.openAccount());
-          card.element.querySelector(".shell-results-secondary")?.prepend(signIn);
-        }
-      },
-      () => {
-        if (sub) sub.textContent = "Couldn't reach the leaderboard — your time is kept on this device.";
-      },
-    );
-  }
+  if (input.posting) attachPostingOutcome(shell, card, input.posting, input.subtitle ? { subtitle: input.subtitle } : {});
   return card;
 }
 

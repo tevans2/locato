@@ -4,6 +4,8 @@ import { createStreetViewCountryScreen, STREETVIEW_RUN_LENGTH } from "../src/ui/
 import { indexCountries, rawCountries } from "../src/core/countries";
 import { streetViewCountryRounds } from "../src/core/streetview";
 import type { ShellContext } from "../src/ui/shell/types";
+import { STREET_VIEW_ATTEMPT_COUNTRIES, streetViewCountryPoints } from "../src/core/leaderboards";
+import { RANKED_LEAVE_MESSAGE, type PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
 
 const countryIndex = indexCountries(rawCountries);
 const screens: ReturnType<typeof createStreetViewCountryScreen>[] = [];
@@ -21,7 +23,7 @@ const services = {
   loadTimeoutMs: 0,
 };
 
-function setup(options: { shell?: Partial<ShellContext>; daily?: boolean } = {}) {
+function setup(options: { shell?: Partial<ShellContext>; daily?: boolean; ranked?: boolean; postAttempt?: PostRankedAttempt; apiKey?: string } = {}) {
   const onComplete = vi.fn();
   const dailyRound = streetViewCountryRounds.find((round) => round.frames.length === 3 && countryIndex.byCode.has(round.countryCode))!;
   const screen = createStreetViewCountryScreen({
@@ -31,8 +33,9 @@ function setup(options: { shell?: Partial<ShellContext>; daily?: boolean } = {})
     onHome: vi.fn(),
     onMultiplayer() {},
     onDailyChallenge() {},
+    ...(options.ranked ? { run: "timed" as const } : {}),
     ...(options.daily ? { dailyChallenge: { date: "2026-09-27", round: dailyRound, onComplete, progress: { round: 10, total: 10 } } } : {}),
-  }, services);
+  }, { ...services, ...(options.postAttempt ? { postAttempt: options.postAttempt } : {}), ...(options.apiKey !== undefined ? { apiKey: options.apiKey } : {}) });
   screens.push(screen);
   document.body.append(screen.element);
   const $ = <T extends Element = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector);
@@ -168,5 +171,81 @@ describe("Street View country practice run", () => {
     expect(screen.element.querySelector<HTMLElement>(".streetview-panel")?.hidden).toBe(true);
     screen.element.querySelector<HTMLButtonElement>(".streetview-missing-actions .primary-action")!.click();
     expect(openGame).toHaveBeenCalledWith("flags");
+  });
+});
+
+describe("Street View country ranked attempt", () => {
+  it("scores 3/2/1/0 points per country", () => {
+    expect([1, 2, 3, null].map(streetViewCountryPoints)).toEqual([3, 2, 1, 0]);
+  });
+
+  it("plays five countries for points and posts the total with the results actions", async () => {
+    const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: true, rank: 5 }));
+    const openCompete = vi.fn();
+    const openGame = vi.fn();
+    const ui = setup({ ranked: true, postAttempt, shell: { openCompete, openGame, signedIn: () => true } });
+    expect(ui.$(".shell-run-pill .shell-run-label")?.textContent).toBe("Ranked");
+    expect(ui.$(".streetview-rules")?.textContent).toContain("3 / 2 / 1 points");
+
+    // Country 1: first guess (3). Country 2: second guess (2). Country 3: third guess (1).
+    for (let wrong = 0; wrong < 3; wrong++) {
+      await ui.ready();
+      const code = ui.currentCode();
+      for (let n = 0; n < wrong; n++) { ui.guess(ui.wrongName(code, n)); await ui.ready(); }
+      ui.guess(countryIndex.byCode.get(code)!.name);
+    }
+    await ui.ready();
+    expect(ui.$(".streetview-points")?.textContent).toBe("6");
+    // Country 4: revealed (0). Country 5: first guess (3).
+    ui.$<HTMLButtonElement>(".streetview-panel .actions .ghost-action:last-child")!.click();
+    ui.$<HTMLButtonElement>(".streetview-panel .actions .primary-action")!.click();
+    await ui.ready();
+    ui.guess(countryIndex.byCode.get(ui.currentCode())!.name);
+
+    const stage = ui.$(".gb-results-stage")!;
+    await vi.waitFor(() => expect(stage.hidden).toBe(false));
+    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("Street View country · Ranked attempt");
+    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("9");
+    expect([...stage.querySelectorAll(".gb-run-value")].map((node) => node.textContent)).toEqual(["+3", "+2", "+1", "+0", "+3"]);
+    expect(postAttempt).toHaveBeenCalledWith({ gameMode: "streetview-country", variant: "", value: 9, isLoggedIn: true });
+    await vi.waitFor(() => expect(stage.querySelector(".shell-results-sub")?.textContent).toBe("Posted to the leaderboard — you're #5."));
+    expect(stage.querySelector(".shell-results-primary")?.textContent).toBe("Try again");
+    [...stage.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
+    expect(openCompete).toHaveBeenCalledWith("streetview-country");
+    stage.querySelector<HTMLButtonElement>(".shell-results-cross")!.click();
+    expect(openGame).toHaveBeenCalledWith("streetview-country", "practice");
+    expect(STREET_VIEW_ATTEMPT_COUNTRIES).toBe(5);
+  });
+
+  it("asks before leaving and has no Restart in the menu", async () => {
+    const confirmLeave = vi.fn(async () => false);
+    const ui = setup({ ranked: true, shell: { confirmLeave } });
+    ui.$<HTMLButtonElement>(".shell-gamebar-more")!.click();
+    expect(ui.$(".shell-menu")?.textContent).not.toContain("Restart run");
+    ui.$<HTMLButtonElement>(".shell-gamebar-back")!.click();
+    await vi.waitFor(() => expect(confirmLeave).toHaveBeenCalledWith(RANKED_LEAVE_MESSAGE, expect.anything()));
+  });
+
+  it("explains that ranked attempts need Street View when no key is configured", () => {
+    const openGame = vi.fn();
+    const ui = setup({ ranked: true, apiKey: "", shell: { openGame } });
+    const panel = ui.$(".streetview-missing-key")!;
+    expect(panel.hidden).toBe(false);
+    expect(panel.querySelector("strong")?.textContent).toBe("Ranked attempts need Street View — not available here");
+    panel.querySelector<HTMLButtonElement>(".primary-action")!.click();
+    expect(openGame).toHaveBeenCalledWith("map-tap", "timed");
+  });
+
+  it("practice results cross-link to a ranked attempt", async () => {
+    const openCompete = vi.fn();
+    const ui = setup({ shell: { openCompete } });
+    for (let i = 0; i < STREETVIEW_RUN_LENGTH; i++) {
+      await ui.ready();
+      ui.guess(countryIndex.byCode.get(ui.currentCode())!.name);
+    }
+    const cross = ui.$<HTMLButtonElement>(".gb-results-stage .shell-results-cross")!;
+    expect(cross.textContent).toBe("Play a ranked attempt");
+    cross.click();
+    expect(openCompete).toHaveBeenCalledWith("streetview-country");
   });
 });

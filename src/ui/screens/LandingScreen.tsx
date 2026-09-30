@@ -15,6 +15,7 @@ import {
   MousePointerClick,
   Orbit,
   Palette,
+  Plane,
   Puzzle,
   RotateCcw,
   Shapes,
@@ -61,11 +62,12 @@ const MODE_ICONS: Readonly<Record<GameModeId, LucideIcon>> = {
   puzzle: Puzzle,
   "map-tap": Orbit,
   worldsplit: Split,
+  flyover: Plane,
   geoguessr: MapPin,
   "streetview-country": Binoculars,
 };
 
-const MODE_BADGES: Partial<Record<GameModeId, string>> = { flags: "Start here", worldsplit: "New", geoguessr: "New" };
+const MODE_BADGES: Partial<Record<GameModeId, string>> = { flags: "Start here", worldsplit: "New", flyover: "New", geoguessr: "New" };
 
 const COUNTRY_COUNT = 196;
 const DAY_MS = 86_400_000;
@@ -83,6 +85,7 @@ const MODE_PREVIEW_PROMPTS: Record<GameModeId, string> = {
   puzzle: "Put the countries back in place.",
   "map-tap": "Find the landmark. Place your pin.",
   worldsplit: "Draw a line. Split the population 50/50.",
+  flyover: "Steer the plane. Fly over the country.",
   geoguessr: "Explore a street. Pin your location.",
   "streetview-country": "Use the street clues to name the country.",
 };
@@ -144,6 +147,7 @@ function ModePreviewArtwork({ mode }: { readonly mode: GameModeId }) {
   if (mode === "codes" || mode === "capitals" || mode === "capital-recall") return <span className={`picker-clue ${mode === "codes" ? "is-code" : ""}`}>{mode === "codes" ? "ITA" : mode === "capitals" ? "Rome" : "Italy"}</span>;
   return <div className={`picker-globe is-${mode}`}>
     <img src="/assets/landing/atlas-globe.svg" alt="" width="320" height="320" />
+    {mode === "flyover" ? <span className="picker-flyover-plane"><Plane size={34} strokeWidth={1.5} /></span> : null}
     {mode === "worldsplit" ? <span className="picker-split-line"><span>50</span><span>50</span></span> : null}
     {mode === "map-tap" || mode === "geoguessr" || mode === "streetview-country" ? <span className="picker-map-pin"><MapPin size={32} strokeWidth={1.5} /></span> : null}
   </div>;

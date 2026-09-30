@@ -5,6 +5,9 @@ import { indexCountries, rawCountries } from "../src/core/countries";
 import type { GeoGuessMapOptions } from "../src/ui/components/GeoGuessMap";
 import type { LngLatPoint } from "../src/core/maptap/distance";
 import type { ShellContext } from "../src/ui/shell/types";
+import { GEOGUESSR_ROUND_LIMIT } from "../src/core/geoguessr";
+import { GEOGUESSR_ATTEMPT_ROUNDS } from "../src/core/leaderboards";
+import { RANKED_LEAVE_MESSAGE, type PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
 
 const locations = ["IT", "JP", "ZA", "BR", "CA"].map((countryCode, i) => ({ countryCode, lat: i, lng: i, heading: 0, label: "Round" }));
 const screens: ReturnType<typeof createGeoGuessrScreen>[] = [];
@@ -100,5 +103,58 @@ describe("GeoGuessr play surface", () => {
     await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     screen.destroy(); finish({ lat: 0, lng: 0 }); await Promise.resolve();
     expect(screen.element.dataset.phase).toBe("loading");
+  });
+});
+
+describe("GeoGuessr ranked attempt", () => {
+  async function ranked(shellOverrides: Partial<ShellContext> = {}, postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 9 }))) {
+    let choose: (point: LngLatPoint) => void = () => {};
+    const map = { element: document.createElement("div"), reset: vi.fn(), reveal: vi.fn(), setAcceptingGuesses: vi.fn(), resize: vi.fn(), destroy: vi.fn() };
+    const panorama = { element: document.createElement("div"), show: vi.fn(async (p: LngLatPoint) => p), reset: vi.fn(), destroy: vi.fn() };
+    const shell = { ...stubShell(), openCompete: vi.fn(), openGame: vi.fn(), confirmLeave: vi.fn(async () => false), ...shellOverrides };
+    const screen = createGeoGuessrScreen({ shell, run: "timed", countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, {
+      createMap: (options: GeoGuessMapOptions) => { choose = options.onGuessChange; return map; }, createPanorama: () => panorama, loadLocations: async () => locations, postAttempt,
+    });
+    screens.push(screen); document.body.append(screen.element);
+    await vi.waitFor(() => expect(screen.element.dataset.phase).toBe("playing"));
+    const click = (selector: string) => screen.element.querySelector<HTMLButtonElement>(selector)!.click();
+    return { screen, shell, postAttempt, choose: (p: LngLatPoint) => choose(p), click };
+  }
+
+  it("plays the standard five rounds under a Ranked pill and posts the total", async () => {
+    const ui = await ranked();
+    expect(GEOGUESSR_ROUND_LIMIT).toBe(GEOGUESSR_ATTEMPT_ROUNDS);
+    expect(ui.screen.element.querySelector(".shell-run-pill .shell-run-label")?.textContent).toBe("Ranked");
+    ui.screen.element.querySelector<HTMLButtonElement>(".shell-gamebar-more")!.click();
+    expect(ui.screen.element.querySelector(".shell-menu")?.textContent).not.toContain("Restart run");
+    for (const p of locations) {
+      ui.choose(p); ui.click(".geo-lock"); ui.click(".geo-result-card .geo-primary");
+      await vi.waitFor(() => expect(ui.screen.element.dataset.phase).toBe(p === locations.at(-1) ? "complete" : "playing"));
+    }
+    const card = ui.screen.element.querySelector(".geo-result-card .shell-results")!;
+    expect(card.querySelector(".shell-results-kicker")?.textContent).toBe("GeoGuessr · Ranked attempt");
+    expect(ui.postAttempt).toHaveBeenCalledWith({ gameMode: "geoguessr", variant: "", value: 25_000, isLoggedIn: false });
+    await vi.waitFor(() => expect(card.querySelector(".shell-results-sub")?.textContent).toContain("That would place #9"));
+    expect(card.querySelector(".shell-results-primary")?.textContent).toBe("Try again");
+    [...card.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
+    expect(ui.shell.openCompete).toHaveBeenCalledWith("geoguessr");
+    card.querySelector<HTMLButtonElement>(".shell-results-cross")!.click();
+    expect(ui.shell.openGame).toHaveBeenCalledWith("geoguessr", "practice");
+  });
+
+  it("asks before leaving an attempt", async () => {
+    const ui = await ranked();
+    ui.click(".shell-gamebar-back");
+    await vi.waitFor(() => expect(ui.shell.confirmLeave).toHaveBeenCalledWith(RANKED_LEAVE_MESSAGE, expect.anything()));
+  });
+
+  it("explains that ranked attempts need Street View when it isn't configured", () => {
+    const openGame = vi.fn();
+    const screen = createGeoGuessrScreen({ shell: { ...stubShell(), openGame }, run: "timed", countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, { isConfigured: () => false, createMap: () => ({ element: document.createElement("div"), reset() {}, reveal() {}, resize() {}, destroy() {}, setAcceptingGuesses() {} }) });
+    screens.push(screen);
+    expect(screen.element.dataset.phase).toBe("unconfigured");
+    expect(screen.element.querySelector(".geo-loading-panel h1")?.textContent).toBe("Ranked attempts need Street View — not available here");
+    screen.element.querySelector<HTMLButtonElement>(".geo-alt-games .geo-primary")!.click();
+    expect(openGame).toHaveBeenCalledWith("map-tap", "timed");
   });
 });

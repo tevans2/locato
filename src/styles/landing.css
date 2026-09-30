@@ -63,6 +63,7 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .picker-split-line { position: absolute; top: 50%; left: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 2px; background: var(--route); transform: rotate(-25deg); }
 .picker-split-line > span { padding: 5px; background: var(--surface); color: var(--text); font-size: .75rem; font-variant-numeric: tabular-nums; }
 .picker-map-pin { position: absolute; top: 30%; left: 56%; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); color: var(--brand); }
+.picker-flyover-plane { position: absolute; top: 34%; left: 34%; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--route); transform: rotate(20deg); box-shadow: -34px 22px 0 -24px color-mix(in srgb, var(--route) 45%, transparent), -62px 38px 0 -25px color-mix(in srgb, var(--route) 25%, transparent); }
 .mode-preview-info { min-height: 96px; padding: 20px 24px 18px; border-top: 1px solid var(--border); }
 .mode-preview-info h2 { margin: 0 0 7px; font-family: var(--font-sans); font-size: 1.15rem; font-weight: 750; letter-spacing: -.025em; }
 .mode-preview-info p { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.6; }

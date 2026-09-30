@@ -87,11 +87,29 @@ describe("SoloGameScreen practice vs timed", () => {
     expect(root.querySelector("select")).toBeNull();
   });
 
-  it("a mode without a leaderboard stays practice even when asked for timed", () => {
+  it("flag colours has a time board, so it plays timed with the clock in the pill", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ rank: 3, total: 9 }), { status: 200 })));
     const index = indexCountries(countries);
     const engine = createGameEngine({ countryIndex: index, categoryIds: ["flag-colors"], seed: "fc", now: 1 });
-    const { root } = setup({ run: "timed", engine, selectedGameMode: "flag-colors" });
-    expect(root.dataset.run).toBe("practice");
+    const { root, shell } = setup({ run: "timed", engine, selectedGameMode: "flag-colors", countryIndex: index });
+    expect(root.dataset.run).toBe("timed");
+    const pill = root.querySelector(".shell-run-pill")!;
+    expect(pill.getAttribute("data-run")).toBe("timed");
+    expect(pill.querySelector(".shell-run-label")?.textContent).toBe("Timed");
+    expect(pill.querySelector(".game-run-clock-value")).not.toBeNull();
+    for (let i = 0; i < 2; i++) {
+      const current = index.byId[engine.getState().currentCountryId!]!;
+      root.querySelector<HTMLInputElement>("#guess-input")!.value = current.name;
+      root.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    }
+    const card = root.querySelector(".shell-results")!;
+    expect(card.querySelector(".shell-results-kicker")?.textContent).toMatch(/· Solo timed run$/);
+    expect(card.textContent).toContain("View leaderboard");
+    await vi.waitFor(() => expect(card.querySelector(".shell-results-sub")?.textContent).toContain("Sign in to post"));
+    card.querySelector<HTMLButtonElement>(".shell-results-cross")!.click();
+    expect(shell.calls).toContain("game:flag-colors:practice");
+    expect(card.querySelector(".shell-results-sub")?.textContent).toContain("That would place #3");
+    vi.unstubAllGlobals();
   });
 
   it("practice completion shows the results card with Play again and the timed cross-link", () => {

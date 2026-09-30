@@ -1,9 +1,10 @@
 import { normalizeUsername } from "../auth/AuthService";
-import { FLAG_POOLS } from "../../src/core/flagPools";
 import type { AcademyProgress } from "../../src/core/academy/types";
-import { CONTINENTS, GAME_MODE_IDS, isLeaderboardGameMode, normalizeLeaderboardVariant } from "../leaderboard/validation";
+import { LEADERBOARD_MODES, type LeaderboardMetric } from "../../src/core/leaderboards";
+import { isLeaderboardGameMode, leaderboardMetric, leaderboardModeConfig, normalizeLeaderboardVariant } from "../leaderboard/validation";
 import type { AdminRoomSummary, RoomManagerStats } from "../rooms/RoomManager";
 import type {
+  AdminBestScore,
   AdminBestTime,
   AdminEvent,
   AdminEventLevel,
@@ -15,6 +16,7 @@ import type {
   DailyChallengeResult,
   GameRecord,
   LeaderboardEntry,
+  LeaderboardScoreEntry,
   PublicUser,
   StoredUser,
   UserStats,
@@ -32,6 +34,17 @@ const TOP_PLAYERS = 8;
 // under 1.5s a round, and a sub-10s best time is faster than any real run we've seen.
 export const SUSPICIOUS_DAILY_MS = 15_000;
 export const SUSPICIOUS_BEST_TIME_MS = 10_000;
+// A perfect total on a distance-scored board (MapTap, GeoGuessr) means every pin was dead on.
+const SUSPICIOUS_PERFECT_SCORE_MIN = 1_000;
+
+function isSuspiciousScore(gameMode: string, score: number): boolean {
+  const maxScore = leaderboardModeConfig(gameMode)?.maxScore;
+  return maxScore !== undefined && maxScore >= SUSPICIOUS_PERFECT_SCORE_MIN && score >= maxScore;
+}
+
+export type AdminLeaderboardEntry =
+  | (LeaderboardEntry & { readonly suspicious: boolean })
+  | (LeaderboardScoreEntry & { readonly suspicious: boolean });
 
 export interface AdminRoomsBridge {
   listRooms(): readonly AdminRoomSummary[];
@@ -94,6 +107,7 @@ export interface AdminUserDetail {
   readonly recentGames: readonly GameRecord[];
   readonly dailies: readonly DailyChallengeResult[];
   readonly bestTimes: readonly (AdminBestTime & { readonly suspicious: boolean })[];
+  readonly bestScores: readonly (AdminBestScore & { readonly suspicious: boolean })[];
   readonly sessions: readonly AdminSessionInfo[];
   readonly friends: readonly PublicUser[];
   readonly friendRequests: { readonly incoming: number; readonly outgoing: number };
@@ -235,6 +249,7 @@ export class AdminService {
       recentGames,
       dailies: this.store.listDailyResults(id, 60),
       bestTimes: this.store.listUserBestTimes(id).map((row) => ({ ...row, suspicious: row.timeMs < SUSPICIOUS_BEST_TIME_MS })),
+      bestScores: this.store.listUserBestScores(id).map((row) => ({ ...row, suspicious: isSuspiciousScore(row.gameMode, row.score) })),
       sessions: this.store.listUserSessions(id, now),
       friends: this.store.listFriends(id),
       friendRequests: { incoming: requests.incoming.length, outgoing: requests.outgoing.length },
@@ -294,26 +309,37 @@ export class AdminService {
 
   // --- Leaderboards ---
 
-  leaderboardMeta(): { readonly modes: readonly { readonly id: string; readonly variants: readonly string[] }[] } {
+  leaderboardMeta(): { readonly modes: readonly { readonly id: string; readonly metric: LeaderboardMetric; readonly variants: readonly string[]; readonly maxScore?: number }[] } {
     return {
-      modes: GAME_MODE_IDS.map((id) => ({
-        id,
-        variants: id === "puzzle" ? [...CONTINENTS] : id === "flags" ? ["", ...FLAG_POOLS.filter((pool) => normalizeLeaderboardVariant("flags", pool) !== null)] : [""],
+      modes: LEADERBOARD_MODES.map((config) => ({
+        id: config.mode,
+        metric: config.metric,
+        variants: [...config.variants],
+        ...(config.maxScore !== undefined ? { maxScore: config.maxScore } : {}),
       })),
     };
   }
 
-  leaderboard(query: { mode?: unknown; variant?: unknown; limit?: unknown }): AdminResult<readonly (LeaderboardEntry & { readonly suspicious: boolean })[]> {
+  leaderboard(query: { mode?: unknown; variant?: unknown; limit?: unknown }): AdminResult<{ readonly metric: LeaderboardMetric; readonly entries: readonly AdminLeaderboardEntry[] }> {
     const mode = typeof query.mode === "string" ? query.mode : "";
     if (!isLeaderboardGameMode(mode)) return fail(400, "Invalid game mode.");
     const variant = normalizeLeaderboardVariant(mode, typeof query.variant === "string" ? query.variant : "");
     if (variant === null) return fail(400, "Invalid leaderboard variant.");
-    const entries = this.store.getLeaderboard({ gameMode: mode, variant, limit: clampInt(query.limit, 100, 1, 500), offset: 0 });
-    return { ok: true, value: entries.map((entry) => ({ ...entry, suspicious: entry.timeMs < SUSPICIOUS_BEST_TIME_MS })) };
+    const boardQuery = { gameMode: mode, variant, limit: clampInt(query.limit, 100, 1, 500), offset: 0 };
+    if (leaderboardMetric(mode) === "score") {
+      const entries = this.store.getScoreLeaderboard(boardQuery);
+      return { ok: true, value: { metric: "score", entries: entries.map((entry) => ({ ...entry, suspicious: isSuspiciousScore(mode, entry.score) })) } };
+    }
+    const entries = this.store.getLeaderboard(boardQuery);
+    return { ok: true, value: { metric: "time", entries: entries.map((entry) => ({ ...entry, suspicious: entry.timeMs < SUSPICIOUS_BEST_TIME_MS })) } };
   }
 
+  /** Remove one board entry (a best time or a best score, by the mode's metric). */
   deleteBestTime(userId: string, mode: string, variant: string): boolean {
-    return this.store.deleteBestTime(userId, mode, variant);
+    const metric = leaderboardMetric(mode);
+    if (metric === "score") return this.store.deleteBestScore(userId, mode, variant);
+    if (metric === "time") return this.store.deleteBestTime(userId, mode, variant);
+    return false;
   }
 
   daily(date: string): readonly AdminDailyEntry[] {

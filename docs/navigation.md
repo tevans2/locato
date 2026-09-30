@@ -19,7 +19,7 @@ shell components (`src/ui/shell/`) and every screen build against.
 ### Compete: Multiplayer vs Leaderboards
 
 Compete opens on two tabs, and the words keep them apart: **Multiplayer · Live match with friends**
-and **Leaderboards · Solo timed attempt**. Multiplayer is the default and the most prominent.
+and **Leaderboards · Solo ranked attempts**. Multiplayer is the default and the most prominent.
 
 - **Multiplayer** (`?view=compete`): "Create a room" opens the lobby straight into a new room with
   the default settings (`?view=multiplayer&create=1`, replaced by `?view=multiplayer` once it
@@ -27,9 +27,22 @@ and **Leaderboards · Solo timed attempt**. Multiplayer is the default and the m
   **Invite** (creates a room, then invites them: `&invite=<userId>`); "Pick modes, rounds and timer
   first" opens the full setup. Guests can play: they pick a name (remembered on the device).
   A tab still seated in a room gets "Back to room".
-- **Leaderboards** (`?view=compete&tab=leaderboards`): the modes, boards, your best and Start timed
-  run. Any `&mode=` (old board links, "Try it timed →") also opens this tab. Switching tab or board
-  replaces the URL. Boards are fetched only once this tab is shown.
+- **Leaderboards** (`?view=compete&tab=leaderboards[&mode=&variant=]`): the board is the page.
+  A mode picker across the top covers **all 14 modes** (grouped Clues / Map / Street View; a
+  sideways chip scroller on phones), variant pills appear only for modes that have them (flag set
+  for Flags, continent for Puzzle), then the board: a podium for the top 3, ranked rows below,
+  your row highlighted (and pinned to the bottom while you scroll when you rank below the rows
+  shown), "Show more" for the next page, and loading / empty / error / offline states. Boards
+  follow `src/core/leaderboards.ts`: **time** boards (fastest wins, shown as m:ss.t) and **score**
+  boards (highest wins, shown as points out of the attempt's maximum, e.g. "38,420 / 50,000").
+  The board header has the mode, one line describing an attempt, your rank and best in a slim
+  line, and **one call to action**: "Start a timed run" (time boards) or "Play a ranked attempt"
+  (score boards), which opens the game as a ranked attempt (`openGame(mode, "timed", variant)`);
+  a small "or practise first" sits under it. On phones the button is fixed just above the
+  TabBar. Guests get a slim "Sign in to post your scores" link (plus their best on this device
+  for time modes), not a banner. Any `&mode=` (old board links, "Try it timed →") also opens this
+  tab. Switching tab, mode or variant replaces the URL. Boards are fetched only once this tab is
+  shown.
 - The lobby's heading reads **Compete › Multiplayer**.
 
 ### Practice vs timed
@@ -37,10 +50,12 @@ and **Leaderboards · Solo timed attempt**. Multiplayer is the default and the m
 Practice and competition are separate places, not a dropdown inside a game.
 
 - **Play** always starts a practice run: no clock, hints and passes are free, nothing is posted.
-- **Compete** lists every leaderboard mode. Picking one shows its board and your best, and **Start
-  timed run** opens the game in timed mode (`&run=timed` on the game URL). A timed run shows the
-  clock prominently, cannot switch to practice mid-run, and ends on a results screen that submits
-  the time and shows your rank. Guests are told to sign in to post (their best is kept locally).
+- **Compete** lists every mode's board. Picking one shows its board, and the board's call to
+  action opens the game as a ranked attempt (`&run=timed` on the game URL). Time modes show the
+  clock prominently; score modes show "Ranked" and play the fixed-length attempt described on the
+  board. A ranked attempt cannot switch to practice mid-run, and ends on a results screen that
+  submits the time or score and shows your rank. Guests are told to sign in to post (time bests
+  are kept locally).
 - A practice run offers "Try it timed →" (to that mode in Compete) on its results screen, and a
   timed run offers "Practise this mode" back.
 

@@ -1,4 +1,5 @@
 import { GAME_MODE_GROUPS, type GameModeCatalogueEntry, type GameModeId } from "../../core/gameModes";
+import { leaderboardConfig } from "../../core/leaderboards";
 import { el } from "../dom/createElement";
 import { shellIcon } from "./icons";
 import { shellLayer, trapOverlay } from "./layer";
@@ -45,11 +46,13 @@ function modeRow(mode: GameModeCatalogueEntry, options: GamePickerOptions, pick:
   });
   const children: HTMLElement[] = [practice];
   if (mode.leaderboard) {
+    // Score boards play a fixed-length ranked attempt (no clock); time boards a timed run.
+    const ranked = leaderboardConfig(mode.id)?.metric === "score";
     children.push(
       el("button", {
         className: `shell-picker-timed${isCurrent && options.currentRun === "timed" ? " is-current" : ""}`,
-        attrs: { type: "button", "data-mode": mode.id, "data-run": "timed", "aria-label": `${mode.label} — timed run`, title: "Timed run · posts to the leaderboard" },
-        children: [shellIcon("timer", 15, 2), el("span", { text: "Timed" })],
+        attrs: { type: "button", "data-mode": mode.id, "data-run": "timed", "aria-label": `${mode.label} — ${ranked ? "ranked attempt" : "timed run"}`, title: ranked ? "Ranked attempt · posts to the leaderboard" : "Timed run · posts to the leaderboard" },
+        children: [shellIcon(ranked ? "trophy" : "timer", 15, 2), el("span", { text: ranked ? "Ranked" : "Timed" })],
         on: { click: () => pick(mode.id, "timed") },
       }),
     );

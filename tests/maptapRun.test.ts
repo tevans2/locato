@@ -4,6 +4,8 @@ import { createMapTapScreen, MAP_TAP_BEST_RUN_KEY, MAP_TAP_RUN_LENGTH } from "..
 import type { MapTapGlobeOptions } from "../src/ui/components/MapTapGlobe";
 import { MAP_TAP_CATEGORY_OPTIONS, type MapTapCategory, type MapTapGuessResult, type MapTapLocation } from "../src/core/maptap";
 import type { ShellContext } from "../src/ui/shell/types";
+import { MAP_TAP_ATTEMPT_TARGETS } from "../src/core/leaderboards";
+import { RANKED_LEAVE_MESSAGE, type PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
 
 const screens: ReturnType<typeof createMapTapScreen>[] = [];
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
@@ -14,7 +16,7 @@ function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
 
 const target = (i: number): MapTapLocation => ({ id: `t${i}`, name: `Target ${i}`, category: "city", lat: i, lng: i, difficulty: "easy", wikiSlug: `T${i}` });
 
-function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?: boolean } = {}) {
+function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?: boolean; ranked?: boolean; postAttempt?: PostRankedAttempt } = {}) {
   let guess: (point: { lat: number; lng: number }) => void = () => {};
   let round = 0;
   const globe = { element: document.createElement("div"), reset: vi.fn(), reveal: vi.fn(), setAcceptingGuesses: vi.fn() };
@@ -32,6 +34,7 @@ function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?
     storage: localStorage,
     onGameModeChange() {},
     onHome: vi.fn(),
+    ...(options.ranked ? { run: "timed" as const } : {}),
     ...(options.daily ? { dailyChallenge: { date: "2026-09-27", target: target(3), onComplete, progress: { round: 9, total: 10 } } } : {}),
   }, {
     createGlobe: (o: MapTapGlobeOptions) => { guess = o.onGuess; return globe; },
@@ -39,6 +42,7 @@ function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?
     fetchRound,
     validateGuess,
     fetchSummary: vi.fn(async () => null),
+    ...(options.postAttempt ? { postAttempt: options.postAttempt } : {}),
   });
   screens.push(screen);
   document.body.append(screen.element);
@@ -47,7 +51,7 @@ function setup(options: { daily?: boolean; shell?: Partial<ShellContext>; start?
   const ready = () => vi.waitFor(() => expect($(".maptap-status")?.textContent).not.toContain("Loading"));
   const start = () => $<HTMLButtonElement>(".maptap-start-action")!.click();
   // Practice opens on the category setup; most tests just want a run going.
-  if (!options.daily && options.start !== false) start();
+  if (!options.daily && !options.ranked && options.start !== false) start();
   return { screen, globe, validateGuess, fetchRound, onComplete, $, $$, ready, start, pin: async () => { guess({ lat: 1, lng: 1 }); await vi.waitFor(() => expect($(".maptap-result-panel")?.hidden).toBe(false)); } };
 }
 
@@ -220,5 +224,112 @@ describe("MapTap category setup", () => {
     expect(ui.$(".maptap-play-panel")?.hidden).toBe(false);
     expect(ui.$(".maptap-current-selection")?.hidden).toBe(true);
     expect(ui.fetchRound).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapTap ranked attempt", () => {
+  const playAll = async (ui: ReturnType<typeof setup>) => {
+    for (let i = 0; i < MAP_TAP_ATTEMPT_TARGETS; i++) {
+      await ui.ready();
+      await ui.pin();
+      ui.$<HTMLButtonElement>(".maptap-result-panel .primary-action")!.click();
+    }
+  };
+
+  it("skips setup and plays the fixed attempt: every category and difficulty, standard scoring", async () => {
+    const ui = setup({ ranked: true });
+    await ui.ready();
+    expect(ui.$(".maptap-setup")?.hidden).toBe(true);
+    expect(ui.$(".maptap-play-panel")?.hidden).toBe(false);
+    expect(ui.$(".maptap-change-categories")).toBeNull();
+    const pill = ui.$(".shell-run-pill")!;
+    expect(pill.dataset.run).toBe("timed");
+    expect(pill.querySelector(".shell-run-label")?.textContent).toBe("Ranked");
+    expect(pill.querySelector(".shell-run-clock")?.childElementCount).toBe(0);
+    expect(ui.$(".maptap-run-label")?.textContent).toBe(`Target 1 of ${MAP_TAP_ATTEMPT_TARGETS}`);
+    expect(ui.$(".maptap-active-categories")?.textContent).toContain("All location types");
+    await ui.pin();
+    expect(ui.validateGuess.mock.calls[0]?.[0]).toMatchObject({ decayKm: 1000 });
+    // No difficulty filter and no adaptive ramp: every round asks for "any difficulty".
+    expect(ui.fetchRound.mock.calls.every(([filters]) => filters?.difficulty === "")).toBe(true);
+    const categories = new Set(ui.fetchRound.mock.calls.map(([filters]) => filters?.category));
+    expect(categories.size).toBeGreaterThan(0);
+    // The ⋯ menu has no Restart / Change categories (an attempt can't be rerolled).
+    ui.$<HTMLButtonElement>(".shell-gamebar-more")!.click();
+    const menu = ui.$(".shell-menu")!.textContent ?? "";
+    expect(menu).not.toContain("Restart run");
+    expect(menu).not.toContain("Change categories");
+  });
+
+  it("leaves the adaptive skill untouched", async () => {
+    localStorage.clear();
+    const ui = setup({ ranked: true });
+    const before = JSON.stringify({ ...localStorage });
+    await ui.ready();
+    await ui.pin();
+    ui.$<HTMLButtonElement>(".maptap-result-panel .primary-action")!.click();
+    await ui.ready();
+    await ui.pin();
+    expect(JSON.stringify({ ...localStorage })).toBe(before);
+  });
+
+  it("asks before leaving, from the first target", async () => {
+    const confirmLeave = vi.fn(async (_message: string) => false);
+    const goBack = vi.fn();
+    const ui = setup({ ranked: true, shell: { confirmLeave, goBack } });
+    await ui.ready();
+    ui.$<HTMLButtonElement>(".shell-gamebar-back")!.click();
+    await vi.waitFor(() => expect(confirmLeave).toHaveBeenCalledWith(RANKED_LEAVE_MESSAGE, expect.anything()));
+    expect(goBack).not.toHaveBeenCalled();
+  });
+
+  it("ends on the ranked results card: total posted, guest rank, Try again, View leaderboard, Practise", async () => {
+    const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 4 }));
+    const openCompete = vi.fn();
+    const openGame = vi.fn();
+    const ui = setup({ ranked: true, postAttempt, shell: { openCompete, openGame } });
+    await playAll(ui);
+    const stage = ui.$(".gb-results-stage")!;
+    expect(stage.hidden).toBe(false);
+    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("MapTap · Ranked attempt");
+    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("14,500");
+    expect(postAttempt).toHaveBeenCalledWith({ gameMode: "map-tap", variant: "", value: 14500, isLoggedIn: false });
+    await vi.waitFor(() => expect(stage.querySelector(".shell-results-sub")?.textContent).toBe("That would place #4 on the board. Sign in to post your score to the leaderboard."));
+    expect(stage.querySelector(".game-results-signin")).not.toBeNull();
+    expect(stage.querySelectorAll(".gb-run-row")).toHaveLength(MAP_TAP_ATTEMPT_TARGETS);
+    expect(stage.textContent).toContain("Share");
+    expect(stage.textContent).not.toContain("Change categories");
+
+    [...stage.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("View leaderboard"))!.click();
+    expect(openCompete).toHaveBeenCalledWith("map-tap");
+    const cross = stage.querySelector<HTMLButtonElement>(".shell-results-cross")!;
+    expect(cross.textContent).toContain("Practise this mode");
+    cross.click();
+    expect(openGame).toHaveBeenCalledWith("map-tap", "practice");
+
+    const primary = stage.querySelector<HTMLButtonElement>(".shell-results-primary")!;
+    expect(primary.textContent).toBe("Try again");
+    primary.click();
+    await ui.ready();
+    expect(ui.$(".maptap-setup")?.hidden).toBe(true);
+    expect(ui.$(".maptap-run-label")?.textContent).toBe(`Target 1 of ${MAP_TAP_ATTEMPT_TARGETS}`);
+  });
+
+  it("tells a signed-in player their rank once posted", async () => {
+    const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: true, rank: 2 }));
+    const ui = setup({ ranked: true, postAttempt, shell: { signedIn: () => true } });
+    await playAll(ui);
+    expect(postAttempt).toHaveBeenCalledWith(expect.objectContaining({ isLoggedIn: true, value: 14500 }));
+    await vi.waitFor(() => expect(ui.$(".gb-results-stage .shell-results-sub")?.textContent).toBe("Posted to the leaderboard — you're #2."));
+  });
+
+  it("practice results cross-link to a ranked attempt", async () => {
+    const openCompete = vi.fn();
+    const ui = setup({ shell: { openCompete } });
+    await playAll(ui);
+    const cross = ui.$<HTMLButtonElement>(".gb-results-stage .shell-results-cross")!;
+    expect(cross.textContent).toBe("Play a ranked attempt");
+    cross.click();
+    expect(openCompete).toHaveBeenCalledWith("map-tap");
   });
 });

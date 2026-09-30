@@ -3,7 +3,7 @@ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } f
 import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
-import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -133,7 +133,10 @@ export function createApp(options: AppOptions): App {
     storage: options.storage,
   };
 
-  /** Timed runs open `&run=timed` for leaderboard modes; everything else opens the mode's practice run. */
+  /**
+   * "timed" opens a ranked attempt (`&run=timed`) for every mode with a board: a timed run on time
+   * boards, a fixed-length ranked attempt on score boards. Practice opens the mode's practice run.
+   */
   function openGame(mode: GameModeId, run: RunType, variant?: string): void {
     if (run === "timed" && isLeaderboardMode(mode)) {
       if (isPromptGameModeId(mode)) {
@@ -141,6 +144,8 @@ export function createApp(options: AppOptions): App {
         navigate({ type: "solo-game", categoryIds: [mode], run: "timed", ...flagPool });
       } else if (isWorldMapGameModeId(mode)) {
         navigate({ type: "country-guessing", mode, run: "timed", ...(mode === "puzzle" && variant ? { continent: variant } : {}) });
+      } else if (mode === "map-tap" || mode === "worldsplit" || mode === "flyover" || mode === "geoguessr" || mode === "streetview-country") {
+        navigate({ type: mode, run: "timed" });
       }
       return;
     }
@@ -641,6 +646,11 @@ export function createApp(options: AppOptions): App {
 
     if (isWorldSplitGameModeId(gameMode)) {
       navigate({ type: "worldsplit" });
+      return;
+    }
+
+    if (isFlyoverGameModeId(gameMode)) {
+      navigate({ type: "flyover" });
     }
   }
 
@@ -717,7 +727,7 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  async function startStreetViewCountry(): Promise<void> {
+  async function startStreetViewCountry(runType: RunType = "practice"): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Finding a street to explore…"));
     const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
@@ -725,6 +735,8 @@ export function createApp(options: AppOptions): App {
     mount(
       createStreetViewCountryScreen({ shell,
         countryIndex: options.countryIndex,
+        run: runType,
+        storage: options.storage,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -733,7 +745,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startGeoGuessr(): Promise<void> {
+  async function startGeoGuessr(runType: RunType = "practice"): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your first location..."));
 
@@ -744,6 +756,7 @@ export function createApp(options: AppOptions): App {
       createGeoGuessrScreen({ shell,
         countryIndex: options.countryIndex,
         storage: options.storage,
+        run: runType,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -752,7 +765,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startMapTap(): Promise<void> {
+  async function startMapTap(runType: RunType = "practice"): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Loading MapTap..."));
 
@@ -761,6 +774,7 @@ export function createApp(options: AppOptions): App {
 
     mount(
       createMapTapScreen({ shell,
+        run: runType,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -770,7 +784,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startWorldSplit(): Promise<void> {
+  async function startWorldSplit(runType: RunType = "practice"): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading Worldsplit...");
     mount(loading);
@@ -786,10 +800,37 @@ export function createApp(options: AppOptions): App {
         screenModule.createWorldSplitScreen({ shell,
           worldCountryFeatures,
           storage: options.storage,
+          run: runType,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
+  async function startFlyover(runType: RunType = "practice"): Promise<void> {
+    const run = navigationRun;
+    const loading = createLoadingScreen("Fuelling the plane...");
+    mount(loading);
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/FlyoverScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createFlyoverScreen({ shell,
+          worldCountryFeatures,
+          storage: options.storage,
+          run: runType,
+          onHome: () => navigate({ type: "landing" }),
         }),
       );
     } catch (error) {
@@ -970,19 +1011,23 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "streetview-country") {
-      runNavigation(startStreetViewCountry());
+      runNavigation(startStreetViewCountry(route.run === "timed" ? "timed" : "practice"));
       return;
     }
     if (route.type === "geoguessr") {
-      runNavigation(startGeoGuessr());
+      runNavigation(startGeoGuessr(route.run === "timed" ? "timed" : "practice"));
       return;
     }
     if (route.type === "map-tap") {
-      runNavigation(startMapTap());
+      runNavigation(startMapTap(route.run === "timed" ? "timed" : "practice"));
       return;
     }
     if (route.type === "worldsplit") {
-      runNavigation(startWorldSplit());
+      runNavigation(startWorldSplit(route.run === "timed" ? "timed" : "practice"));
+      return;
+    }
+    if (route.type === "flyover") {
+      runNavigation(startFlyover(route.run === "timed" ? "timed" : "practice"));
       return;
     }
     if (route.type === "multiplayer") {

@@ -1,7 +1,7 @@
-import { fetchAuthState, fetchFriends, fetchLeaderboard, submitBestTime, type AuthUser, type FriendInfo, type LeaderboardEntry, type LeaderboardResponse } from "../../core/auth";
+import { fetchAuthState, fetchFriends, fetchLeaderboard, type AuthUser, type FriendInfo } from "../../core/auth";
 import { cleanJoinCode, MAX_PLAYER_NAME_LENGTH, readActiveRoomCode, readPlayerName, writePlayerName } from "../../core/multiplayer/localPlayer";
-import { CONTINENTS } from "../../core/countries";
-import { GAME_MODE_GROUPS, isLeaderboardMode, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId, type LeaderboardGameModeId } from "../../core/gameModes";
+import { GAME_MODE_GROUPS, isTimerGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
+import { leaderboardConfig, type LeaderboardMetric, type LeaderboardModeConfig } from "../../core/leaderboards";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
@@ -14,8 +14,9 @@ import "../../styles/compete.css";
  *
  *   Multiplayer (default) — a live match with friends: create a room, join with a code, invite
  *                           friends who are online. Guests can play (they pick a name).
- *   Leaderboards          — a solo timed attempt: every leaderboard mode, its board and your
- *                           best, and the way into a timed run (plus "Practise first").
+ *   Leaderboards          — every mode's global board (src/core/leaderboards.ts), with one call to
+ *                           action: play a ranked attempt. Time boards rank the fastest run, score
+ *                           boards the highest total from one fixed-length attempt.
  */
 
 export type CompeteTab = "multiplayer" | "leaderboards";
@@ -28,16 +29,16 @@ export interface CompeteRoomRequest {
 export interface CompeteScreenOptions {
   readonly shell: ShellContext;
   readonly storage: Storage;
-  /** Mode to open on (from `?mode=`). Non-leaderboard modes fall back to the first board. */
+  /** Mode to open on (from `?mode=`). Unknown modes fall back to the first board. */
   readonly mode?: GameModeId;
   /** Variant to open on (from `?variant=`): "territories" / "both" for flags, a continent for puzzle. */
   readonly variant?: string;
   /** Called when the player picks another board or variant. App mirrors it into the URL with history *replace*. */
-  readonly onSelect?: (mode: LeaderboardGameModeId, variant: string) => void;
+  readonly onSelect?: (mode: GameModeId, variant: string) => void;
   /** Tab to open on. Default: Leaderboards when a `mode` is given (old board links), else Multiplayer. */
   readonly tab?: CompeteTab;
   /** Called when the player switches tab (App replaces the URL). Leaderboards passes the board shown. */
-  readonly onTab?: (tab: CompeteTab, mode: LeaderboardGameModeId, variant: string) => void;
+  readonly onTab?: (tab: CompeteTab, mode: GameModeId, variant: string) => void;
   /** Opens the full multiplayer setup (modes, rounds, timer) without creating a room yet. */
   readonly onMultiplayer?: () => void;
   /** Opens the lobby straight into a new room with the default settings. The name is already saved. */
@@ -58,51 +59,56 @@ export const QUICK_ROOM_SUMMARY = "Flags · 10 rounds · 30 seconds each";
 /** Rows per board page ("Show more" fetches the next page). */
 export const COMPETE_PAGE_SIZE = 20;
 
-type FlagVariant = "" | "territories" | "both";
-const FLAG_VARIANTS: readonly { readonly id: FlagVariant; readonly label: string }[] = [
-  { id: "", label: "Countries" },
-  { id: "territories", label: "Territories" },
-  { id: "both", label: "Both" },
-];
-const DEFAULT_CONTINENT = "Africa";
-
-/** What a timed run asks of you, per mode. One or two sentences. */
-const TIMED_RULES: Record<LeaderboardGameModeId, string> = {
-  flags: "Name every flag in the set as fast as you can.",
-  shapes: "Name every country from its outline alone, as fast as you can.",
-  codes: "Decode every ISO country code, as fast as you can.",
-  capitals: "Name the country behind every capital, as fast as you can.",
-  "capital-recall": "Name the capital of every country, as fast as you can.",
-  "name-all": "Type every country in the world until the map is full.",
-  "click-country": "Find every named country on the map, one after another.",
-  "spot-country": "Name every country as it lights up on the map.",
-  puzzle: "Drop every country of the continent into place.",
+/** The call to action on a board, per metric. */
+export const PLAY_LABELS: Record<LeaderboardMetric, string> = {
+  time: "Start a timed run",
+  score: "Play a ranked attempt",
 };
 
-interface CompeteGroup {
+const VARIANT_LABELS: Record<string, string> = { "": "Countries", territories: "Territories", both: "Both" };
+
+type BoardMode = GameModeCatalogueEntry & { readonly config: LeaderboardModeConfig };
+
+interface BoardGroup {
   readonly group: GameModeGroup;
-  readonly modes: readonly (GameModeCatalogueEntry & { readonly id: LeaderboardGameModeId })[];
+  readonly modes: readonly BoardMode[];
 }
 
-const COMPETE_GROUPS: readonly CompeteGroup[] = GAME_MODE_GROUPS.map((group) => ({
+/** Every mode with a board, in the shell's Clues / Map / Street View order. */
+const BOARD_GROUPS: readonly BoardGroup[] = GAME_MODE_GROUPS.map((group) => ({
   group,
-  modes: group.modes.filter((mode): mode is GameModeCatalogueEntry & { readonly id: LeaderboardGameModeId } => isLeaderboardMode(mode.id)),
+  modes: group.modes.flatMap((mode) => {
+    const config = leaderboardConfig(mode.id);
+    return config ? [{ ...mode, config }] : [];
+  }),
 })).filter((entry) => entry.modes.length > 0);
 
-const COMPETE_MODES = COMPETE_GROUPS.flatMap((entry) => entry.modes);
+const BOARD_MODES: readonly BoardMode[] = BOARD_GROUPS.flatMap((entry) => entry.modes);
 
-function isFlagVariant(value: string | undefined): value is FlagVariant {
-  return value === "" || value === "territories" || value === "both";
-}
-
-function isContinent(value: string | undefined): boolean {
-  return (CONTINENTS as readonly string[]).includes(value ?? "");
+/** The board API (GET /api/leaderboard): time boards carry `timeMs`, score boards `score`. */
+interface BoardEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly timeMs?: number;
+  readonly score?: number;
+  readonly achievedAt: number;
 }
 
 interface BoardStanding {
   readonly rank: number;
-  readonly timeMs: number;
+  readonly timeMs?: number;
+  readonly score?: number;
 }
+
+interface BoardResponse {
+  readonly metric?: LeaderboardMetric;
+  readonly entries: readonly BoardEntry[];
+  readonly currentUser: BoardStanding | null;
+}
+
+const numberFormat = new Intl.NumberFormat("en-US");
 
 export function createCompeteScreen(options: CompeteScreenOptions): Screen {
   const { shell, storage } = options;
@@ -110,67 +116,65 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
   const signal = controller.signal;
   let destroyed = false;
 
-  let selected: LeaderboardGameModeId = options.mode && isLeaderboardMode(options.mode) ? options.mode : COMPETE_MODES[0]!.id;
-  let flagVariant: FlagVariant = selected === "flags" && isFlagVariant(options.variant) ? options.variant : "";
-  // "countries" is the default flag board; the server stores it as "".
-  if (selected === "flags" && options.variant === "countries") flagVariant = "";
-  let continent = selected === "puzzle" && isContinent(options.variant) ? options.variant! : DEFAULT_CONTINENT;
+  const modeInfo = (id: GameModeId): BoardMode => BOARD_MODES.find((mode) => mode.id === id) ?? BOARD_MODES[0]!;
+  let selected: BoardMode = modeInfo(options.mode && BOARD_MODES.some((mode) => mode.id === options.mode) ? options.mode : BOARD_MODES[0]!.id);
+
+  /** The variant chosen per mode ("" is the default board; puzzle defaults to its first continent). */
+  const variants = new Map<GameModeId, string>();
+  {
+    // "countries" is the default flag board; the server stores it as "".
+    const requested = selected.id === "flags" && options.variant === "countries" ? "" : options.variant;
+    if (requested !== undefined && selected.config.variants.includes(requested)) variants.set(selected.id, requested);
+  }
+  const variantFor = (mode: BoardMode): string => variants.get(mode.id) ?? mode.config.variants[0] ?? "";
 
   let user: AuthUser | null = null;
   let authKnown = false;
-  /** Your server standing per board (`mode|variant`); undefined = not fetched, null = no time posted. */
-  const standings = new Map<string, BoardStanding | null>();
 
-  const variantFor = (mode: LeaderboardGameModeId): string => (mode === "flags" ? flagVariant : mode === "puzzle" ? continent : "");
-  const boardKey = (mode: LeaderboardGameModeId, variant = variantFor(mode)): string => `${mode}|${variant}`;
-  const localBest = (mode: LeaderboardGameModeId): number | null =>
-    readStoredTime(storage, timerKeysForMode(mode, mode === "flags" ? (flagVariant || "countries") : "countries").best);
+  /** Time modes keep a best on this device (per flag set; one for all puzzle continents). */
+  function localBest(mode: BoardMode): number | null {
+    if (mode.config.metric !== "time" || !isTimerGameModeId(mode.id)) return null;
+    const variant = variantFor(mode);
+    return readStoredTime(storage, timerKeysForMode(mode.id, mode.id === "flags" && (variant === "territories" || variant === "both") ? variant : "countries").best);
+  }
 
-  // ---------- Guest banner ----------
+  function formatValue(mode: BoardMode, value: { readonly timeMs?: number; readonly score?: number }): string {
+    if (mode.config.metric === "time") return typeof value.timeMs === "number" ? formatElapsedTime(value.timeMs) : "—";
+    return typeof value.score === "number" ? numberFormat.format(value.score) : "—";
+  }
 
-  const banner = el("div", {
-    className: "compete-banner",
-    attrs: { role: "note" },
-    children: [
-      el("span", { className: "compete-banner-icon", children: [shellIcon("user-round", 20, 1.8)] }),
-      el("div", {
-        className: "compete-banner-copy",
-        children: [
-          el("strong", { text: "Sign in to post your times" }),
-          el("span", { text: "You can still race the clock as a guest. Your best is kept on this device, ready to post once you sign in." }),
-        ],
-      }),
-      el("button", { className: "shell-btn shell-btn-primary compete-banner-action", text: "Sign in", attrs: { type: "button" }, on: { click: () => shell.openAccount() } }),
-    ],
-  });
+  /** "1:02.3" for times; "38,420 / 50,000" (the max quieter) for scores. */
+  function valueNode(mode: BoardMode, value: { readonly timeMs?: number; readonly score?: number }, className: string): HTMLElement {
+    const node = el("span", { className, children: [el("span", { className: "compete-value-main", text: formatValue(mode, value) })] });
+    if (mode.config.metric === "score" && mode.config.maxScore) {
+      node.append(el("span", { className: "compete-value-max", text: ` / ${numberFormat.format(mode.config.maxScore)}` }));
+    }
+    return node;
+  }
 
-  // ---------- Mode rail ----------
+  // ---------- Mode picker ----------
 
-  const railButtons = new Map<LeaderboardGameModeId, { readonly button: HTMLButtonElement; readonly meta: HTMLElement }>();
-  const rail = el("nav", {
-    className: "compete-rail",
+  const modeButtons = new Map<GameModeId, HTMLButtonElement>();
+  const picker = el("nav", {
+    className: "compete-modes",
     attrs: { "aria-label": "Leaderboard modes" },
-    children: COMPETE_GROUPS.map(({ group, modes }) =>
-      el("section", {
-        className: "compete-rail-group",
-        attrs: { "data-group": group.id },
+    children: BOARD_GROUPS.map(({ group, modes }) =>
+      el("div", {
+        className: "compete-modes-group",
+        attrs: { "data-group": group.id, role: "group", "aria-label": group.label },
         children: [
-          el("h2", { className: "compete-rail-label", text: group.label }),
-          el("ul", {
-            className: "compete-rail-list",
+          el("span", { className: "compete-modes-label", text: group.label, attrs: { "aria-hidden": "true" } }),
+          el("div", {
+            className: "compete-modes-list",
             children: modes.map((mode) => {
-              const meta = el("span", { className: "compete-rail-meta" });
               const button = el("button", {
-                className: "compete-rail-item",
+                className: "compete-mode",
                 attrs: { type: "button", "data-mode": mode.id, "data-group": group.id, "aria-pressed": "false" },
-                children: [
-                  el("span", { className: "compete-rail-icon", children: [shellIcon(mode.icon, 19, 1.7)] }),
-                  el("span", { className: "compete-rail-copy", children: [el("span", { className: "compete-rail-name", text: mode.label }), meta] }),
-                ],
+                children: [el("span", { className: "compete-mode-icon", children: [shellIcon(mode.icon, 16, 1.9)] }), el("span", { className: "compete-mode-name", text: mode.label })],
                 on: { click: () => select(mode.id) },
               });
-              railButtons.set(mode.id, { button, meta });
-              return el("li", { children: [button] });
+              modeButtons.set(mode.id, button);
+              return button;
             }),
           }),
         ],
@@ -178,118 +182,57 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     ),
   });
 
-  function renderRailItem(mode: LeaderboardGameModeId): void {
-    const item = railButtons.get(mode);
-    if (!item) return;
-    item.button.setAttribute("aria-pressed", String(mode === selected));
-    item.button.classList.toggle("is-selected", mode === selected);
-    const standing = standings.get(boardKey(mode));
-    const local = localBest(mode);
-    const best = [standing?.timeMs, local].filter((value): value is number => typeof value === "number");
-    const parts: HTMLElement[] = [];
-    if (best.length) parts.push(el("span", { className: "compete-rail-time", text: formatElapsedTime(Math.min(...best)) }));
-    if (standing) parts.push(el("span", { className: "compete-rail-rank", text: `#${standing.rank}` }));
-    if (!parts.length) parts.push(el("span", { className: "compete-rail-empty", text: "No time yet" }));
-    item.meta.replaceChildren(...parts);
+  function renderPicker(): void {
+    for (const [id, button] of modeButtons) {
+      const active = id === selected.id;
+      button.setAttribute("aria-pressed", String(active));
+      button.classList.toggle("is-selected", active);
+    }
   }
 
-  const renderRail = (): void => COMPETE_MODES.forEach((mode) => renderRailItem(mode.id));
+  // ---------- Board header: mode, one line, the call to action ----------
 
-  // ---------- Selected mode panel ----------
-
+  const headIcon = el("span", { className: "compete-board-icon" });
   const eyebrow = el("p", { className: "compete-eyebrow" });
   const title = el("h2", { className: "compete-title", attrs: { id: "compete-mode-title", tabindex: "-1" } });
-  const rules = el("p", { className: "compete-rules" });
+  const attempt = el("p", { className: "compete-attempt" });
+  const standingLine = el("p", { className: "compete-standing", attrs: { "aria-live": "polite" } });
+  const playLabel = el("span");
+  const playIcon = el("span", { className: "compete-play-icon" });
+  const playButton = el("button", {
+    className: "shell-btn shell-btn-primary compete-play",
+    attrs: { type: "button" },
+    children: [playIcon, playLabel],
+    on: { click: () => shell.openGame(selected.id, "timed", variantFor(selected) || undefined) },
+  });
+  const practiseLink = el("button", {
+    className: "compete-link compete-practise",
+    text: "or practise first",
+    attrs: { type: "button" },
+    on: { click: () => shell.openGame(selected.id, "practice") },
+  });
   const variantHost = el("div", { className: "compete-variants" });
-  const startButton = el("button", {
-    className: "shell-btn shell-btn-primary compete-start",
-    attrs: { type: "button" },
-    children: [shellIcon("timer", 19, 2), el("span", { text: "Start timed run" })],
-    on: { click: () => shell.openGame(selected, "timed", variantFor(selected) || undefined) },
-  });
-  const practiseButton = el("button", {
-    className: "shell-btn compete-practise",
-    attrs: { type: "button" },
-    children: [el("span", { text: "Practise first" })],
-    on: { click: () => shell.openGame(selected, "practice") },
-  });
 
-  const boardCaption = el("p", { className: "compete-board-caption" });
-  const boardList = el("ol", { className: "compete-board-list", attrs: { "aria-labelledby": "compete-board-title" } });
-  const boardState = el("div", { className: "compete-board-state", attrs: { role: "status", "aria-live": "polite" } });
-  const moreButton = el("button", { className: "shell-btn shell-btn-quiet compete-more", text: "Show more", attrs: { type: "button", hidden: "" }, on: { click: () => void loadBoard(false) } });
-  const board = el("section", {
-    className: "compete-card compete-board",
-    attrs: { "aria-busy": "false" },
-    children: [
-      el("header", {
-        className: "compete-card-head",
-        children: [el("h3", { className: "compete-card-title", text: "Leaderboard", attrs: { id: "compete-board-title" } }), boardCaption],
-      }),
-      boardState,
-      boardList,
-      moreButton,
-    ],
-  });
-
-  const bestBody = el("div", { className: "compete-best-body" });
-  const bestCard = el("section", {
-    className: "compete-card compete-best",
-    children: [el("header", { className: "compete-card-head", children: [el("h3", { className: "compete-card-title", text: "Your best" })] }), bestBody],
-  });
-
-  // The solo side points across to the live side (and vice versa), so neither is a dead end.
-  const liveCard = el("section", {
-    className: "compete-card compete-cross is-live",
-    children: [
-      el("span", { className: "compete-cross-icon", children: [shellIcon("users", 20, 1.8)] }),
-      el("h3", { className: "compete-card-title", text: "Prefer a live match?" }),
-      el("p", { text: "Multiplayer is a race against friends, not the clock: everyone gets the same question at once." }),
-      el("button", {
-        className: "shell-btn compete-cross-action",
-        attrs: { type: "button", "data-go-tab": "multiplayer" },
-        children: [el("span", { text: "Play friends live" }), shellIcon("arrow-right", 16, 2)],
-        on: { click: () => setTab("multiplayer", true) },
-      }),
-    ],
-  });
-
-  const panel = el("section", {
-    className: "compete-panel",
-    attrs: { "aria-labelledby": "compete-mode-title" },
+  const boardHead = el("header", {
+    className: "compete-board-head",
     children: [
       el("div", {
-        className: "compete-panel-head",
-        children: [
-          el("div", { className: "compete-panel-intro", children: [eyebrow, title, rules] }),
-          el("ul", {
-            className: "compete-facts",
-            children: [
-              el("li", { children: [shellIcon("timer", 15, 2), el("span", { text: "The clock starts on your first answer." })] }),
-              el("li", { children: [shellIcon("check", 15, 2), el("span", { text: "Finish the set to post your time." })] }),
-              el("li", { children: [shellIcon("x", 15, 2), el("span", { text: "No switching to practice mid-run." })] }),
-            ],
-          }),
-          variantHost,
-          el("div", { className: "compete-actions", children: [startButton, practiseButton] }),
-        ],
+        className: "compete-board-intro",
+        children: [headIcon, el("div", { className: "compete-board-copy", children: [eyebrow, title, attempt, standingLine] })],
       }),
-      el("div", {
-        className: "compete-panel-body",
-        children: [board, el("div", { className: "compete-side", children: [bestCard, liveCard] })],
-      }),
+      el("div", { className: "compete-cta", children: [playButton, practiseLink] }),
     ],
   });
 
   function renderVariants(): void {
-    if (selected !== "flags" && selected !== "puzzle") {
+    const choices = selected.config.variants;
+    if (choices.length < 2) {
       variantHost.hidden = true;
       variantHost.replaceChildren();
       return;
     }
     variantHost.hidden = false;
-    const label = selected === "flags" ? "Flag set" : "Continent";
-    const choices = selected === "flags" ? FLAG_VARIANTS.map((item) => ({ id: item.id as string, label: item.label })) : CONTINENTS.map((name) => ({ id: name as string, label: name as string }));
+    const label = selected.id === "flags" ? "Flag set" : selected.id === "puzzle" ? "Continent" : "Board";
     const current = variantFor(selected);
     variantHost.replaceChildren(
       el("span", { className: "compete-variants-label", text: label, attrs: { id: "compete-variant-label" } }),
@@ -298,10 +241,10 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
         attrs: { role: "radiogroup", "aria-labelledby": "compete-variant-label" },
         children: choices.map((choice) =>
           el("button", {
-            className: `compete-segment${choice.id === current ? " is-selected" : ""}`,
-            text: choice.label,
-            attrs: { type: "button", role: "radio", "aria-checked": String(choice.id === current), "data-variant": choice.id },
-            on: { click: () => selectVariant(choice.id) },
+            className: `compete-segment${choice === current ? " is-selected" : ""}`,
+            text: VARIANT_LABELS[choice] ?? choice,
+            attrs: { type: "button", role: "radio", "aria-checked": String(choice === current), "data-variant": choice },
+            on: { click: () => selectVariant(choice) },
           }),
         ),
       }),
@@ -309,59 +252,146 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
   }
 
   function renderHead(): void {
-    const mode = COMPETE_MODES.find((item) => item.id === selected)!;
-    const group = COMPETE_GROUPS.find((entry) => entry.modes.some((item) => item.id === selected))!.group;
-    panel.dataset.group = group.id;
-    eyebrow.replaceChildren(el("span", { className: "compete-eyebrow-icon", children: [shellIcon(mode.icon, 15, 1.9)] }), el("span", { text: `${group.label} · Solo timed attempt` }));
-    title.textContent = mode.label;
-    rules.textContent = TIMED_RULES[selected];
+    const group = BOARD_GROUPS.find((entry) => entry.modes.includes(selected))!.group;
+    const metric = selected.config.metric;
+    boardCard.dataset.group = group.id;
+    boardCard.dataset.metric = metric;
+    headIcon.replaceChildren(shellIcon(selected.icon, 24, 1.8));
+    eyebrow.textContent = `${group.label} · ${metric === "time" ? "Fastest time wins" : "Highest score wins"}`;
+    title.textContent = selected.label;
+    attempt.textContent = selected.config.attempt;
+    playLabel.textContent = PLAY_LABELS[metric];
+    playIcon.replaceChildren(shellIcon(metric === "time" ? "timer" : "play", 18, 2.1));
     renderVariants();
+    renderStanding();
+  }
+
+  /** One slim line: your rank and best on this board, or (guests) the way to post. */
+  function renderStanding(): void {
+    const parts: Node[] = [];
+    const local = localBest(selected);
+    if (user) {
+      if (boardLoadedKey === boardKey() && boardUser) {
+        parts.push(
+          el("span", { className: "compete-standing-rank", text: `#${numberFormat.format(boardUser.rank)}` }),
+          el("span", { text: "Your best " }),
+          el("strong", { text: formatValue(selected, boardUser) }),
+        );
+      } else if (boardLoadedKey === boardKey()) {
+        parts.push(el("span", { text: "You're not on this board yet." }));
+      }
+    } else if (authKnown || !shell.signedIn()) {
+      if (local !== null) parts.push(el("span", { text: "Best on this device " }), el("strong", { text: formatElapsedTime(local) }));
+      parts.push(
+        el("button", {
+          className: "compete-link compete-guest-note",
+          attrs: { type: "button" },
+          children: [shellIcon("user-round", 14, 2), el("span", { text: "Sign in to post your scores" })],
+          on: { click: () => shell.openAccount() },
+        }),
+      );
+    }
+    standingLine.replaceChildren(...parts);
+    standingLine.hidden = parts.length === 0;
   }
 
   // ---------- Board ----------
 
-  let boardEntries: LeaderboardEntry[] = [];
+  const boardState = el("div", { className: "compete-board-state", attrs: { role: "status", "aria-live": "polite" } });
+  const podium = el("ol", { className: "compete-podium", attrs: { "aria-label": "Top three" } });
+  const boardColumns = el("div", { className: "compete-board-columns", attrs: { "aria-hidden": "true" } });
+  const boardList = el("ol", { className: "compete-board-list", attrs: { "aria-labelledby": "compete-mode-title" } });
+  const moreButton = el("button", { className: "shell-btn shell-btn-quiet compete-more", text: "Show more", attrs: { type: "button", hidden: "" }, on: { click: () => void loadBoard(false) } });
+  const boardBody = el("div", { className: "compete-board-body", children: [boardState, podium, boardColumns, boardList, moreButton] });
+  const boardCard = el("section", {
+    className: "compete-board",
+    attrs: { "aria-labelledby": "compete-mode-title", "aria-busy": "false" },
+    children: [boardHead, variantHost, boardBody],
+  });
+
+  let boardEntries: BoardEntry[] = [];
   let boardUser: BoardStanding | null = null;
   let boardRequest = 0;
   /** `mode|variant` of the board currently shown, once its first page has arrived. */
   let boardLoadedKey: string | null = null;
+  const boardKey = (): string => `${selected.id}|${variantFor(selected)}`;
 
-  function avatar(entry: LeaderboardEntry): HTMLElement {
+  function avatar(entry: Pick<BoardEntry, "avatarEmoji" | "displayName">, className = "compete-avatar"): HTMLElement {
     return entry.avatarEmoji
-      ? el("span", { className: "compete-avatar is-emoji", text: entry.avatarEmoji, attrs: { "aria-hidden": "true" } })
-      : el("span", { className: "compete-avatar", text: entry.displayName.charAt(0).toUpperCase(), attrs: { "aria-hidden": "true" } });
+      ? el("span", { className: `${className} is-emoji`, text: entry.avatarEmoji, attrs: { "aria-hidden": "true" } })
+      : el("span", { className, text: entry.displayName.charAt(0).toUpperCase(), attrs: { "aria-hidden": "true" } });
   }
 
-  function row(entry: LeaderboardEntry, isYou: boolean): HTMLElement {
+  function youTag(): HTMLElement {
+    return el("span", { className: "compete-you", text: "You" });
+  }
+
+  function row(entry: BoardEntry, isYou: boolean, pinned = false): HTMLElement {
     const name = el("span", { className: "compete-row-name", children: [el("span", { className: "compete-row-display", text: entry.displayName })] });
-    if (isYou) name.append(el("span", { className: "compete-you", text: "You" }));
+    if (isYou) name.append(youTag());
     return el("li", {
-      className: `compete-row${entry.rank <= 3 ? ` is-podium is-rank-${entry.rank}` : ""}${isYou ? " is-you" : ""}`,
+      className: `compete-row${isYou ? " is-you" : ""}${pinned ? " is-pinned" : ""}`,
       attrs: { "data-rank": String(entry.rank) },
       children: [
-        el("span", { className: "compete-row-rank", text: String(entry.rank), attrs: { "aria-label": `Rank ${entry.rank}` } }),
+        el("span", { className: "compete-row-rank", text: numberFormat.format(entry.rank), attrs: { "aria-label": `Rank ${entry.rank}` } }),
         avatar(entry),
         name,
-        el("span", { className: "compete-row-time", text: formatElapsedTime(entry.timeMs) }),
+        valueNode(selected, entry, "compete-row-value"),
+      ],
+    });
+  }
+
+  function podiumStep(entry: BoardEntry | null, rank: number, isYou: boolean): HTMLElement {
+    if (!entry) {
+      return el("li", {
+        className: `compete-podium-step is-rank-${rank} is-open`,
+        attrs: { "data-rank": String(rank) },
+        children: [
+          el("span", { className: "compete-podium-avatar is-open", attrs: { "aria-hidden": "true" }, children: [shellIcon("trophy", 20, 1.7)] }),
+          el("span", { className: "compete-podium-name", text: "Up for grabs" }),
+          el("span", { className: "compete-podium-block", children: [el("span", { className: "compete-podium-rank", text: String(rank) })] }),
+        ],
+      });
+    }
+    return el("li", {
+      className: `compete-podium-step is-rank-${rank}${isYou ? " is-you" : ""}`,
+      attrs: { "data-rank": String(rank) },
+      children: [
+        avatar(entry, "compete-podium-avatar"),
+        el("span", { className: "compete-podium-name", children: [el("span", { className: "compete-podium-display", text: entry.displayName }), ...(isYou ? [youTag()] : [])] }),
+        valueNode(selected, entry, "compete-podium-value"),
+        el("span", { className: "compete-podium-block", children: [el("span", { className: "compete-podium-rank", text: String(rank), attrs: { "aria-label": `Rank ${rank}` } })] }),
       ],
     });
   }
 
   function renderBoard(): void {
     const youId = user?.id ?? null;
-    const rows = boardEntries.map((entry) => row(entry, entry.userId === youId));
+    const top = [1, 2, 3].map((rank) => boardEntries.find((entry) => entry.rank === rank) ?? null);
+    const hasPodium = top.some(Boolean);
+    // Visual order 2 · 1 · 3; the list order (and screen readers) stay 1 · 2 · 3 via CSS order.
+    podium.replaceChildren(...(hasPodium ? top.map((entry, index) => podiumStep(entry, index + 1, entry !== null && entry.userId === youId)) : []));
+    podium.hidden = !hasPodium;
+
+    const rest = boardEntries.filter((entry) => entry.rank > 3);
+    const rows = rest.map((entry) => row(entry, entry.userId === youId));
     // You're on the board but below the rows shown: pin your row under a gap.
     if (user && boardUser && !boardEntries.some((entry) => entry.userId === user!.id)) {
       rows.push(el("li", { className: "compete-row-gap", attrs: { "aria-hidden": "true" }, text: "···" }));
-      rows.push(row({ rank: boardUser.rank, userId: user.id, displayName: user.displayName, avatarEmoji: user.avatarEmoji, timeMs: boardUser.timeMs, achievedAt: 0 }, true));
+      rows.push(row({ rank: boardUser.rank, userId: user.id, displayName: user.displayName, avatarEmoji: user.avatarEmoji, ...(boardUser.timeMs !== undefined ? { timeMs: boardUser.timeMs } : {}), ...(boardUser.score !== undefined ? { score: boardUser.score } : {}), achievedAt: 0 }, true, true));
     }
     boardList.replaceChildren(...rows);
     boardList.hidden = rows.length === 0;
+    boardColumns.replaceChildren(el("span", { text: "Rank" }), el("span", { text: "Player" }), el("span", {
+      text: selected.config.metric === "time" ? "Time" : "Score",
+      children: selected.config.maxScore ? [el("span", { className: "compete-columns-max", text: ` / ${numberFormat.format(selected.config.maxScore)}` })] : [],
+    }));
+    boardColumns.hidden = rest.length === 0;
   }
 
   function showBoardState(kind: "loading" | "empty" | "error" | "none"): void {
-    board.setAttribute("aria-busy", String(kind === "loading"));
-    board.dataset.state = kind;
+    boardCard.setAttribute("aria-busy", String(kind === "loading"));
+    boardCard.dataset.state = kind;
     if (kind === "none") {
       boardState.replaceChildren();
       boardState.hidden = true;
@@ -374,19 +404,23 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
         el("div", {
           className: "compete-skeleton",
           attrs: { "aria-hidden": "true" },
-          children: Array.from({ length: 6 }, () => el("span", { className: "compete-skeleton-row" })),
+          children: [
+            el("div", { className: "compete-skeleton-podium", children: [el("span"), el("span"), el("span")] }),
+            ...Array.from({ length: 5 }, () => el("span", { className: "compete-skeleton-row" })),
+          ],
         }),
       );
       return;
     }
     if (kind === "empty") {
+      const time = selected.config.metric === "time";
       boardState.replaceChildren(
         el("div", {
           className: "compete-empty",
           children: [
-            el("span", { className: "compete-empty-icon", children: [shellIcon("trophy", 26, 1.6)] }),
-            el("strong", { text: "No times on this board yet" }),
-            el("span", { text: "Finish a timed run to take first place." }),
+            el("span", { className: "compete-empty-icon", children: [shellIcon("trophy", 28, 1.6)] }),
+            el("strong", { text: time ? "No times on this board yet" : "No scores on this board yet" }),
+            el("span", { text: time ? "Finish a timed run to take first place." : "Play a ranked attempt to take first place." }),
           ],
         }),
       );
@@ -398,7 +432,7 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
         className: "compete-empty is-error",
         children: [
           el("strong", { text: offline ? "You're offline" : "Couldn't load the leaderboard" }),
-          el("span", { text: offline ? "Boards need a connection. Timed runs still work, and your best is saved on this device." : "Check your connection and try again. Timed runs still work." }),
+          el("span", { text: offline ? "Boards need a connection. You can still play; reconnect to post." : "Check your connection and try again." }),
           el("button", { className: "shell-btn shell-btn-quiet compete-retry", text: "Try again", attrs: { type: "button" }, on: { click: () => void loadBoard(true) } }),
         ],
       }),
@@ -414,17 +448,18 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
       boardLoadedKey = null;
       boardEntries = [];
       boardUser = null;
-      boardList.replaceChildren();
-      boardList.hidden = true;
+      renderBoard();
+      podium.hidden = true;
+      boardColumns.hidden = true;
       moreButton.hidden = true;
-      boardCaption.textContent = "";
+      renderStanding();
       showBoardState("loading");
     } else {
       moreButton.disabled = true;
       moreButton.textContent = "Loading…";
     }
 
-    const response: LeaderboardResponse | null = await fetchLeaderboard(mode, variant, COMPETE_PAGE_SIZE, offset);
+    const response = (await fetchLeaderboard(mode.id, variant, COMPETE_PAGE_SIZE, offset)) as BoardResponse | null;
     if (destroyed || request !== boardRequest) return;
 
     moreButton.disabled = false;
@@ -437,137 +472,49 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
 
     boardEntries = reset ? [...response.entries] : [...boardEntries, ...response.entries.filter((entry) => entry.rank > (boardEntries.at(-1)?.rank ?? 0))];
     boardUser = response.currentUser ?? null;
-    boardLoadedKey = boardKey(mode, variant);
-    if (user) {
-      standings.set(boardKey(mode, variant), boardUser);
-      renderRailItem(mode);
-    }
+    boardLoadedKey = `${mode.id}|${variant}`;
     moreButton.hidden = response.entries.length < COMPETE_PAGE_SIZE;
-    boardCaption.textContent = boardEntries.length === 0 ? "" : moreButton.hidden ? `${boardEntries.length} ${boardEntries.length === 1 ? "player" : "players"}` : `Top ${boardEntries.length}`;
     showBoardState(boardEntries.length === 0 ? "empty" : "none");
     renderBoard();
-    renderBest();
-  }
-
-  // ---------- Your best ----------
-
-  let postMessage = "";
-  let posting = false;
-
-  function statBlock(label: string, value: string, extra?: string): HTMLElement {
-    return el("div", {
-      className: "compete-stat",
-      children: [
-        el("span", { className: "compete-stat-label", text: label }),
-        el("span", { className: "compete-stat-value", text: value }),
-        ...(extra ? [el("span", { className: "compete-stat-extra", text: extra })] : []),
-      ],
-    });
-  }
-
-  function renderBest(): void {
-    const mode = selected;
-    const local = localBest(mode);
-    const standing = user ? standings.get(boardKey(mode)) : undefined;
-    // Puzzle keeps one best on this device for all continents, so it can't be posted to one board.
-    const localIsPerBoard = mode !== "puzzle";
-    const children: HTMLElement[] = [];
-    const stats: HTMLElement[] = [];
-
-    if (user && standing) stats.push(statBlock("On the board", formatElapsedTime(standing.timeMs), `Rank #${standing.rank}`));
-    else if (user && standing === null) stats.push(statBlock("On the board", "—", "Not posted yet"));
-    if (local !== null) stats.push(statBlock("On this device", formatElapsedTime(local), localIsPerBoard ? undefined : "Any continent"));
-    if (stats.length) children.push(el("div", { className: "compete-stats", children: stats }));
-
-    const canPost = user !== null && standing !== undefined && local !== null && localIsPerBoard && (standing === null || local < standing.timeMs);
-    if (canPost) {
-      children.push(
-        el("button", {
-          className: "shell-btn shell-btn-primary compete-post",
-          text: posting ? "Posting…" : `Post saved best (${formatElapsedTime(local!)})`,
-          attrs: { type: "button", ...(posting ? { disabled: "" } : {}) },
-          on: { click: () => void postSavedBest(local!) },
-        }),
-      );
-    } else if (!user && authKnown && local !== null) {
-      children.push(el("button", { className: "shell-btn compete-post", text: "Sign in to post it", attrs: { type: "button" }, on: { click: () => shell.openAccount() } }));
-    }
-
-    if (!stats.length || (user && standing === null && local === null)) {
-      children.push(el("p", { className: "compete-best-hint", text: "No time yet. Start a timed run to set one." }));
-    }
-    if (postMessage) children.push(el("p", { className: "compete-best-note", text: postMessage, attrs: { role: "status" } }));
-    bestBody.replaceChildren(...children);
-  }
-
-  async function postSavedBest(timeMs: number): Promise<void> {
-    if (!user || posting) return;
-    const mode = selected;
-    posting = true;
-    postMessage = "";
-    renderBest();
-    const result = await submitBestTime({ gameMode: mode, variant: variantFor(mode), timeMs: Math.round(timeMs) });
-    if (destroyed) return;
-    posting = false;
-    if (result?.accepted) {
-      postMessage = "Posted to the leaderboard.";
-      if (mode === selected) void loadBoard(true);
-    } else {
-      postMessage = result ? "The board already has a faster time from you." : "Couldn't post that time. Check your connection and try again.";
-    }
-    renderBest();
+    renderStanding();
   }
 
   // ---------- Selection ----------
 
-  function select(mode: LeaderboardGameModeId): void {
-    if (mode === selected) return;
-    selected = mode;
-    postMessage = "";
+  function select(id: GameModeId): void {
+    if (id === selected.id) return;
+    selected = modeInfo(id);
     renderAll();
-    options.onSelect?.(selected, variantFor(selected));
+    options.onSelect?.(selected.id, variantFor(selected));
     void loadBoard(true);
-    // On phones the panel sits under the chip scroller; keep the chosen chip in view.
-    railButtons.get(mode)?.button.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    revealSelectedMode();
+  }
+
+  /** On phones the picker scrolls sideways: keep the chosen chip in view (without scrolling the page). */
+  function revealSelectedMode(): void {
+    const chip = modeButtons.get(selected.id);
+    if (!chip || picker.scrollWidth <= picker.clientWidth) return;
+    const left = chip.offsetLeft - (picker.clientWidth - chip.offsetWidth) / 2;
+    picker.scrollTo?.({ left: Math.max(0, left), behavior: "smooth" });
   }
 
   function selectVariant(variant: string): void {
-    if (variant === variantFor(selected)) return;
-    if (selected === "flags" && isFlagVariant(variant)) flagVariant = variant;
-    else if (selected === "puzzle" && isContinent(variant)) continent = variant;
-    else return;
-    postMessage = "";
+    if (variant === variantFor(selected) || !selected.config.variants.includes(variant)) return;
+    variants.set(selected.id, variant);
     renderAll();
-    options.onSelect?.(selected, variantFor(selected));
+    options.onSelect?.(selected.id, variant);
     void loadBoard(true);
   }
 
   function renderAll(): void {
+    renderPicker();
     renderHead();
-    renderRail();
-    renderBest();
-  }
-
-  /** Signed in: fetch your standing on each board (one row each) so the rail can show your ranks. */
-  async function loadStandings(): Promise<void> {
-    if (!user) return;
-    await Promise.all(
-      COMPETE_MODES.map(async (mode) => {
-        const key = boardKey(mode.id);
-        if (standings.has(key) || mode.id === selected) return;
-        const response = await fetchLeaderboard(mode.id, variantFor(mode.id), 1);
-        if (destroyed || !response || !user) return;
-        standings.set(key, response.currentUser ?? null);
-        renderRailItem(mode.id);
-      }),
-    );
   }
 
   function applyAuth(next: AuthUser | null): void {
     user = next;
     authKnown = true;
-    banner.hidden = user !== null;
-    renderAll();
+    renderStanding();
   }
 
   // ---------- Multiplayer: live match with friends ----------
@@ -912,30 +859,19 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
       );
     }
   }
-
-  // ---------- Leaderboards: solo timed attempt ----------
+  // ---------- Leaderboards: every mode's board, one call to action ----------
 
   const leaderboardsPanel = el("section", {
     className: "compete-tabpanel compete-lb",
     attrs: { id: "compete-panel-leaderboards", role: "tabpanel", "aria-labelledby": "compete-tab-leaderboards", tabindex: "-1" },
-    children: [
-      el("div", {
-        className: "compete-lb-intro",
-        children: [
-          el("p", { className: "compete-kicker is-solo", children: [shellIcon("timer", 15, 2), el("span", { text: "Solo timed attempt" })] }),
-          el("p", { className: "compete-lb-lede", children: [el("strong", { text: "Beat the leaderboard. " }), el("span", { text: "Just you against the clock: finish a set as fast as you can and your time posts to a global board." })] }),
-        ],
-      }),
-      banner,
-      el("div", { className: "compete-layout", children: [rail, panel] }),
-    ],
+    children: [picker, boardCard],
   });
 
   // ---------- Tabs ----------
 
   const TABS: readonly { readonly id: CompeteTab; readonly label: string; readonly sub: string; readonly icon: "users" | "trophy" }[] = [
     { id: "multiplayer", label: "Multiplayer", sub: "Live match with friends", icon: "users" },
-    { id: "leaderboards", label: "Leaderboards", sub: "Solo timed attempt", icon: "trophy" },
+    { id: "leaderboards", label: "Leaderboards", sub: "Solo ranked attempts", icon: "trophy" },
   ];
   const tabButtons = new Map<CompeteTab, HTMLButtonElement>();
   const tabList = el("div", {
@@ -977,7 +913,6 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     if (boardsStarted) return;
     boardsStarted = true;
     void loadBoard(true);
-    void loadStandings();
   }
 
   function renderTabs(): void {
@@ -990,7 +925,10 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     multiplayerPanel.hidden = tab !== "multiplayer";
     leaderboardsPanel.hidden = tab !== "leaderboards";
     page.element.dataset.tab = tab;
-    if (tab === "leaderboards") startBoards();
+    if (tab === "leaderboards") {
+      startBoards();
+      requestAnimationFrame(() => revealSelectedMode());
+    }
   }
 
   /** `fromLink`: a cross-link inside a panel, so move focus to the new panel's start. */
@@ -998,7 +936,7 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     if (next === tab) return;
     tab = next;
     renderTabs();
-    options.onTab?.(tab, selected, variantFor(selected));
+    options.onTab?.(tab, selected.id, variantFor(selected));
     if (fromLink) {
       (tab === "multiplayer" ? multiplayerPanel : leaderboardsPanel).focus({ preventScroll: true });
       tabList.scrollIntoView?.({ block: "nearest" });
@@ -1016,32 +954,32 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     content: [tabList, multiplayerPanel, leaderboardsPanel],
   });
 
-  banner.hidden = shell.signedIn();
   renderAll();
   renderPlayer();
   renderFriends();
   renderTabs();
   const syncAuth = (): void => void fetchAuthState().then((state) => {
     if (destroyed) return;
-    // The board response already carries your standing (the session cookie rides along), so a
-    // board that arrived before the auth check only needs re-rendering, not re-fetching.
-    if (state.user && boardLoadedKey === boardKey(selected)) standings.set(boardLoadedKey, boardUser);
     applyAuth(state.user);
     renderPlayer();
     renderFriends();
+    // The board response already carries your standing (the session cookie rides along), so a
+    // board that arrived before the auth check only needs re-rendering, not re-fetching.
     renderBoard();
-    if (boardsStarted) void loadStandings();
     void loadFriends();
   });
   syncAuth();
-  // Signing in or out from the header while here swaps the guest banner, your best and friends.
+  // Signing in or out from the header while here swaps the guest note, your row and friends.
   const unsubscribeAuth = shell.onAuthChange?.(() => {
-    if (!authKnown || shell.signedIn() !== (user !== null)) syncAuth();
+    if (!authKnown || shell.signedIn() !== (user !== null)) {
+      syncAuth();
+      if (boardsStarted) void loadBoard(true);
+    }
   });
   const unsubscribeFriends = options.subscribeFriends?.(() => void loadFriends());
 
   // Local bests can change in another tab (a timed run finished there).
-  window.addEventListener("storage", () => { renderRail(); renderBest(); }, { signal });
+  window.addEventListener("storage", () => renderStanding(), { signal });
 
   return {
     element: page.element,

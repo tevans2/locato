@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { AuthService } from "../server/auth/AuthService";
 import { createMemoryUserStore } from "../server/auth/memoryStore";
 import type { PasswordHasher, UserStore } from "../server/auth/types";
-import { checkSeedSafety, findSeedUsers, SEED_BOARDS, seedDevData, TEST_USER } from "../server/dev/seed";
+import { checkSeedSafety, findSeedUsers, SEED_BOARDS, SEED_SCORE_BOARDS, seedDevData, TEST_USER } from "../server/dev/seed";
+import { leaderboardConfig } from "../src/core/leaderboards";
 import { GAME_MODE_IDS } from "../server/leaderboard/validation";
 import { DAILY_MAX_SCORE } from "../src/core/dailyChallenge";
 
@@ -20,7 +21,10 @@ function localDay(daysAgo: number): string {
 }
 
 function boardSizes(store: UserStore): number[] {
-  return SEED_BOARDS.map((board) => store.getLeaderboard({ gameMode: board.gameMode, variant: board.variant, limit: 100, offset: 0 }).length);
+  return [
+    ...SEED_BOARDS.map((board) => store.getLeaderboard({ gameMode: board.gameMode, variant: board.variant, limit: 100, offset: 0 }).length),
+    ...SEED_SCORE_BOARDS.map((board) => store.getScoreLeaderboard({ gameMode: board.gameMode, variant: board.variant, limit: 100, offset: 0 }).length),
+  ];
 }
 
 describe("dev seed", () => {
@@ -54,6 +58,12 @@ describe("dev seed", () => {
     expect(cards.filter((card) => card.box > 0 && card.dueAt <= NOW).length).toBeGreaterThanOrEqual(3);
 
     expect(summary.tester?.ranks.some((rank) => rank.rank <= 5)).toBe(true);
+    // Top 3 on one score board, and on the board (mid-table) for the other score modes.
+    const testerScoreRanks = SEED_SCORE_BOARDS.map((board) => summary.tester?.ranks.find((rank) => rank.board === board.gameMode));
+    expect(testerScoreRanks.every((rank) => rank !== undefined)).toBe(true);
+    expect(testerScoreRanks.find((rank) => rank?.board === "geoguessr")!.rank).toBeLessThanOrEqual(3);
+    expect(summary.tester?.ranks.find((rank) => rank.board === "flag-colors")).toBeDefined();
+    expect(summary.bestScores).toBeGreaterThan(30);
     expect(summary.achievementsSnippet).toContain("locato.achievements.v1");
     expect(store.listEvents({ level: null, action: null, ip: null, userId: null, before: null, limit: 500 }).length).toBeGreaterThan(20);
   });
@@ -62,8 +72,22 @@ describe("dev seed", () => {
     const store = createMemoryUserStore();
     await seedDevData({ store, hasher: fakeHasher, now: NOW });
 
-    expect(new Set(SEED_BOARDS.map((board) => board.gameMode))).toEqual(new Set(GAME_MODE_IDS));
+    expect(new Set([...SEED_BOARDS, ...SEED_SCORE_BOARDS].map((board) => board.gameMode))).toEqual(new Set(GAME_MODE_IDS));
+    for (const board of SEED_BOARDS) expect(leaderboardConfig(board.gameMode)?.metric).toBe("time");
     for (const size of boardSizes(store)) expect(size).toBeGreaterThanOrEqual(8);
+
+    // Score boards: every total within 0..maxScore, a spread of values, highest first.
+    for (const board of SEED_SCORE_BOARDS) {
+      const maxScore = leaderboardConfig(board.gameMode)!.maxScore!;
+      const entries = store.getScoreLeaderboard({ gameMode: board.gameMode, variant: board.variant, limit: 100, offset: 0 });
+      for (const entry of entries) {
+        expect(Number.isInteger(entry.score)).toBe(true);
+        expect(entry.score).toBeGreaterThanOrEqual(0);
+        expect(entry.score).toBeLessThanOrEqual(maxScore);
+      }
+      expect(entries.map((entry) => entry.score)).toEqual([...entries.map((entry) => entry.score)].sort((a, b) => b - a));
+      expect(new Set(entries.map((entry) => entry.score)).size).toBeGreaterThan(3);
+    }
 
     const dailyToday = store.listDailyResultsForDate(localDay(0));
     expect(dailyToday.length).toBeGreaterThan(10);
@@ -136,6 +160,7 @@ describe("dev seed", () => {
     const amy = store.findUserByEmail("amy@example.com")!;
     expect(store.getStats(amy.id).totalGames).toBe(0);
     expect(store.listUserBestTimes(amy.id)).toHaveLength(0);
+    expect(store.listUserBestScores(amy.id)).toHaveLength(0);
   });
 
   it("refuses production-looking environments and non-local paths", () => {

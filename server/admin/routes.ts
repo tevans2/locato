@@ -109,7 +109,7 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
 
   if (pathname === "/api/admin/leaderboards" && method === "GET") {
     const result = service.leaderboard({ mode: url.searchParams.get("mode"), variant: url.searchParams.get("variant") ?? "", limit: intParam(url, "limit") });
-    return result.ok ? json({ entries: result.value }) : json({ error: result.error }, result.status);
+    return result.ok ? json({ metric: result.value.metric, entries: result.value.entries }) : json({ error: result.error }, result.status);
   }
 
   const bestTimeMatch = pathname.match(/^\/api\/admin\/leaderboards\/([^/]+)$/);
