@@ -87,6 +87,7 @@ export function modeName(mode: string): string {
     "flag-colors": "Flag colours",
     "map-tap": "MapTap",
     worldsplit: "Worldsplit",
+    flyover: "Flyover",
     geoguessr: "GeoGuessr",
     "streetview-country": "Street View country",
   };

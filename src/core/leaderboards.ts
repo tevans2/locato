@@ -30,6 +30,10 @@ export const MAP_TAP_ATTEMPT_TARGETS = 10;
 export const WORLD_SPLIT_ATTEMPT_ROUNDS = 5;
 export const GEOGUESSR_ATTEMPT_ROUNDS = 5;
 export const STREET_VIEW_ATTEMPT_COUNTRIES = 5;
+/** Flyover: one attempt is a run against this clock; the score is how many countries you reach. */
+export const FLYOVER_ATTEMPT_SECONDS = 90;
+/** No run can reach more countries than exist. */
+export const FLYOVER_MAX_SCORE = 196;
 /** Street View country points per country: 3 for the first guess, 2 for the second, 1 for the third, 0 if missed. */
 export const STREET_VIEW_POINTS_BY_GUESS = [3, 2, 1] as const;
 
@@ -50,6 +54,7 @@ export const LEADERBOARD_MODES: readonly LeaderboardModeConfig[] = [
   score("map-tap", `Pin ${MAP_TAP_ATTEMPT_TARGETS} places on the globe. Closer pins score more.`, MAP_TAP_ATTEMPT_TARGETS * 5000),
   score("worldsplit", `Split the population in ${WORLD_SPLIT_ATTEMPT_ROUNDS} rounds. Fairer lines score more.`, WORLD_SPLIT_ATTEMPT_ROUNDS * 100),
   score("geoguessr", `Pin ${GEOGUESSR_ATTEMPT_ROUNDS} Street View locations. Closer pins score more.`, GEOGUESSR_ATTEMPT_ROUNDS * 5000),
+  score("flyover", `Fly over as many named countries as you can in ${FLYOVER_ATTEMPT_SECONDS} seconds.`, FLYOVER_MAX_SCORE),
   score("streetview-country", `Name ${STREET_VIEW_ATTEMPT_COUNTRIES} countries from Street View. Fewer guesses score more.`, STREET_VIEW_ATTEMPT_COUNTRIES * STREET_VIEW_POINTS_BY_GUESS[0]),
 ];
 
