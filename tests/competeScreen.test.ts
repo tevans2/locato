@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("Compete screen: Leaderboards tab", () => {
-  it("offers all 14 modes grouped Clues, Map and Street View", async () => {
+  it("offers all 15 modes grouped Clues, Map and Street View", async () => {
     mockFetch();
     mount({ shell: makeShell(), tab: "leaderboards" });
     await flush();
@@ -105,7 +105,7 @@ describe("Compete screen: Leaderboards tab", () => {
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Clues", "Map", "Street View"]);
     const modes = [...document.querySelectorAll<HTMLElement>(".compete-mode")].map((item) => item.dataset.mode);
     expect(modes).toEqual(LEADERBOARD_MODES.map((config) => config.mode).sort((a, b) => GAME_ORDER.indexOf(a) - GAME_ORDER.indexOf(b)));
-    expect(modes).toHaveLength(14);
+    expect(modes).toHaveLength(15);
     expect(q(".compete-mode[data-mode='flags']")?.getAttribute("aria-pressed")).toBe("true");
     expect(q(".compete-title")?.textContent).toBe("Flags");
     expect(q(".compete-attempt")?.textContent).toBe(leaderboardConfig("flags")!.attempt);

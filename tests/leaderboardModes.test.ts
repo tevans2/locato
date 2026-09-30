@@ -8,17 +8,17 @@ describe("leaderboard modes", () => {
     expect([...LEADERBOARD_GAME_MODE_IDS].sort()).toEqual([...GAME_MODE_IDS].sort());
   });
 
-  it("give every one of the 14 modes a board", () => {
-    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(14);
+  it("give every one of the 15 modes a board", () => {
+    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(15);
     expect(new Set(LEADERBOARD_GAME_MODE_IDS)).toEqual(new Set(gameModeOptions.map((option) => option.id)));
     for (const option of gameModeOptions) expect(isLeaderboardMode(option.id)).toBe(true);
     const withBoards = GAME_MODE_GROUPS.flatMap((group) => group.modes).filter((mode) => mode.leaderboard).map((mode) => mode.id);
-    expect(withBoards).toHaveLength(14);
+    expect(withBoards).toHaveLength(15);
     expect(isLeaderboardMode("nope")).toBe(false);
   });
 
   it("split into time boards (fastest first) and score boards (highest first)", () => {
-    expect([...SCORE_GAME_MODE_IDS].sort()).toEqual(["geoguessr", "map-tap", "streetview-country", "worldsplit"]);
+    expect([...SCORE_GAME_MODE_IDS].sort()).toEqual(["flyover", "geoguessr", "map-tap", "streetview-country", "worldsplit"]);
     expect([...TIME_GAME_MODE_IDS].sort()).toEqual(["capital-recall", "capitals", "click-country", "codes", "flag-colors", "flags", "name-all", "puzzle", "shapes", "spot-country"]);
     for (const config of LEADERBOARD_MODES) {
       if (config.metric === "score") expect(config.maxScore).toBeGreaterThan(0);

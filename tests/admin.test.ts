@@ -263,7 +263,7 @@ describe("admin moderation", () => {
     expect(flags.variants).toContain("");
     expect(flags.variants).not.toContain("countries");
     expect(meta.modes.find((m: { id: string }) => m.id === "puzzle").variants).toContain("Europe");
-    expect(meta.modes).toHaveLength(14);
+    expect(meta.modes).toHaveLength(15);
     expect(meta.modes.find((m: { id: string }) => m.id === "worldsplit")).toEqual({ id: "worldsplit", metric: "score", variants: [""], maxScore: 500 });
     expect(meta.modes.find((m: { id: string }) => m.id === "flag-colors").metric).toBe("time");
   });

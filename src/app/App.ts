@@ -3,7 +3,7 @@ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } f
 import { createDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
-import { isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -144,7 +144,7 @@ export function createApp(options: AppOptions): App {
         navigate({ type: "solo-game", categoryIds: [mode], run: "timed", ...flagPool });
       } else if (isWorldMapGameModeId(mode)) {
         navigate({ type: "country-guessing", mode, run: "timed", ...(mode === "puzzle" && variant ? { continent: variant } : {}) });
-      } else if (mode === "map-tap" || mode === "worldsplit" || mode === "geoguessr" || mode === "streetview-country") {
+      } else if (mode === "map-tap" || mode === "worldsplit" || mode === "flyover" || mode === "geoguessr" || mode === "streetview-country") {
         navigate({ type: mode, run: "timed" });
       }
       return;
@@ -646,6 +646,11 @@ export function createApp(options: AppOptions): App {
 
     if (isWorldSplitGameModeId(gameMode)) {
       navigate({ type: "worldsplit" });
+      return;
+    }
+
+    if (isFlyoverGameModeId(gameMode)) {
+      navigate({ type: "flyover" });
     }
   }
 
@@ -800,6 +805,32 @@ export function createApp(options: AppOptions): App {
           onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
+  async function startFlyover(runType: RunType = "practice"): Promise<void> {
+    const run = navigationRun;
+    const loading = createLoadingScreen("Fuelling the plane...");
+    mount(loading);
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/FlyoverScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createFlyoverScreen({ shell,
+          worldCountryFeatures,
+          storage: options.storage,
+          run: runType,
+          onHome: () => navigate({ type: "landing" }),
         }),
       );
     } catch (error) {
@@ -993,6 +1024,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "worldsplit") {
       runNavigation(startWorldSplit(route.run === "timed" ? "timed" : "practice"));
+      return;
+    }
+    if (route.type === "flyover") {
+      runNavigation(startFlyover(route.run === "timed" ? "timed" : "practice"));
       return;
     }
     if (route.type === "multiplayer") {

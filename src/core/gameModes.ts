@@ -6,8 +6,9 @@ export type WorldMapGameModeId = "name-all" | "click-country" | "spot-country" |
 export type StreetViewGameModeId = "streetview-country" | "geoguessr";
 export type MapTapGameModeId = "map-tap";
 export type WorldSplitGameModeId = "worldsplit";
+export type FlyoverGameModeId = "flyover";
 export type TimerGameModeId = PromptGameModeId | WorldMapGameModeId;
-export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId | WorldSplitGameModeId;
+export type GameModeId = TimerGameModeId | StreetViewGameModeId | MapTapGameModeId | WorldSplitGameModeId | FlyoverGameModeId;
 
 export interface GameModeOption {
   readonly id: GameModeId;
@@ -21,6 +22,7 @@ const WORLD_MAP_GAME_MODE_IDS: readonly WorldMapGameModeId[] = ["name-all", "cli
 const STREET_VIEW_GAME_MODE_IDS: readonly StreetViewGameModeId[] = ["streetview-country", "geoguessr"];
 const MAP_TAP_GAME_MODE_IDS: readonly MapTapGameModeId[] = ["map-tap"];
 const WORLD_SPLIT_GAME_MODE_IDS: readonly WorldSplitGameModeId[] = ["worldsplit"];
+const FLYOVER_GAME_MODE_IDS: readonly FlyoverGameModeId[] = ["flyover"];
 
 export const promptGameModeOptions: readonly GameModeOption[] = PROMPT_GAME_MODE_IDS.map((id) => {
   const category = soloPromptCategories.find((item) => item.id === id);
@@ -92,8 +94,17 @@ export const mapTapGameModeOptions: readonly GameModeOption[] = [
   },
 ];
 
+export const flyoverGameModeOptions: readonly GameModeOption[] = [
+  {
+    id: "flyover",
+    label: "Flyover",
+    description: "Steer a plane over the named country, then the next — as many as you can before the clock runs out.",
+    group: "World map games",
+  },
+];
+
 export const timerGameModeOptions: readonly GameModeOption[] = [...promptGameModeOptions, ...worldMapGameModeOptions];
-export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...worldSplitGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
+export const gameModeOptions: readonly GameModeOption[] = [...timerGameModeOptions, ...worldSplitGameModeOptions, ...flyoverGameModeOptions, ...mapTapGameModeOptions, ...streetViewGameModeOptions];
 
 export function isPromptGameModeId(id: string): id is PromptGameModeId {
   return PROMPT_GAME_MODE_IDS.includes(id as PromptGameModeId);
@@ -113,6 +124,10 @@ export function isMapTapGameModeId(id: string): id is MapTapGameModeId {
 
 export function isWorldSplitGameModeId(id: string): id is WorldSplitGameModeId {
   return WORLD_SPLIT_GAME_MODE_IDS.includes(id as WorldSplitGameModeId);
+}
+
+export function isFlyoverGameModeId(id: string): id is FlyoverGameModeId {
+  return FLYOVER_GAME_MODE_IDS.includes(id as FlyoverGameModeId);
 }
 
 export function isTimerGameModeId(id: string): id is TimerGameModeId {
@@ -137,7 +152,7 @@ export type GameModeGroupId = "clues" | "map" | "street-view";
 /** Lucide icon names; the shell's icon set (src/ui/shell/icons.ts) draws every one of them. */
 export type GameModeIcon =
   | "flag" | "palette" | "shapes" | "hash" | "crown" | "map-pin" | "globe" | "mouse-pointer-click"
-  | "eye" | "puzzle" | "orbit" | "split" | "binoculars";
+  | "eye" | "puzzle" | "orbit" | "split" | "binoculars" | "plane";
 
 export interface GameModeCatalogueEntry {
   readonly id: GameModeId;
@@ -192,6 +207,7 @@ export const GAME_MODE_GROUPS: readonly GameModeGroup[] = [
       entry("puzzle", "Puzzle", "Rebuild a continent by hand.", "puzzle"),
       entry("map-tap", "MapTap", "Pin cities and landmarks on the globe.", "orbit"),
       entry("worldsplit", "Worldsplit", "Draw one line to split a population.", "split"),
+      entry("flyover", "Flyover", "Steer a plane over the named country.", "plane"),
     ],
   },
   {

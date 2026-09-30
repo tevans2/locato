@@ -107,7 +107,7 @@ describe("shareable game routes", () => {
   });
 
   it("carries a ranked attempt on the score modes' URLs (and on flag colours' timed run)", () => {
-    for (const mode of ["map-tap", "worldsplit", "geoguessr", "streetview-country"] as const) {
+    for (const mode of ["map-tap", "worldsplit", "flyover", "geoguessr", "streetview-country"] as const) {
       const ranked: AppRoute = { type: mode, run: "timed" };
       expect(buildRouteUrl(ranked, { pathname: "/" })).toBe(`/?game=${mode}&run=timed`);
       expect(parse(`/?game=${mode}&run=timed`)).toEqual(ranked);
