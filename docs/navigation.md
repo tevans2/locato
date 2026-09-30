@@ -8,7 +8,7 @@ shell components (`src/ui/shell/`) and every screen build against.
 
 | Section | Route(s) | What it holds |
 | --- | --- | --- |
-| **Play** (home) | `/` (landing), every game route | All 14 modes as **practice**: no clock, no leaderboard, play at your own pace. Resume. |
+| **Play** (home) | `/` (landing), every game route | Every mode: split modes start as **practice**, single-run modes as the real thing: no clock, no leaderboard, play at your own pace. Resume. |
 | **Daily** | `?view=daily-challenge` | Today's 10-round challenge, streak and result. |
 | **Learn** | `?view=academy…`, `?view=atlas`, `?country=xx` | Academy, lessons, placement, and the Atlas: an index of every country (the old flag gallery) plus each country's profile. |
 | **Compete** | `?view=compete[&tab=leaderboards][&mode=&variant=]`, timed game routes, `?view=multiplayer[&create=1]`, `?room=` | Two ways to play for keeps: **Multiplayer** (a live match with friends, the default tab) and **Leaderboards** (a solo timed attempt that posts to a global board). |
@@ -28,7 +28,7 @@ and **Leaderboards · Solo ranked attempts**. Multiplayer is the default and the
   first" opens the full setup. Guests can play: they pick a name (remembered on the device).
   A tab still seated in a room gets "Back to room".
 - **Leaderboards** (`?view=compete&tab=leaderboards[&mode=&variant=]`): the board is the page.
-  A mode picker across the top covers **all 14 modes** (grouped Clues / Map / Street View; a
+  A mode picker across the top covers **all 15 modes** (grouped Clues / Map / Street View; a
   sideways chip scroller on phones), variant pills appear only for modes that have them (flag set
   for Flags, continent for Puzzle), then the board: a podium for the top 3, ranked rows below,
   your row highlighted (and pinned to the bottom while you scroll when you rank below the rows
@@ -47,17 +47,29 @@ and **Leaderboards · Solo ranked attempts**. Multiplayer is the default and the
 
 ### Practice vs timed
 
-Practice and competition are separate places, not a dropdown inside a game.
+Each mode's board says how it is played (`runs` in `src/core/leaderboards.ts`):
 
-- **Play** always starts a practice run: no clock, hints and passes are free, nothing is posted.
-- **Compete** lists every mode's board. Picking one shows its board, and the board's call to
-  action opens the game as a ranked attempt (`&run=timed` on the game URL). Time modes show the
-  clock prominently; score modes show "Ranked" and play the fixed-length attempt described on the
-  board. A ranked attempt cannot switch to practice mid-run, and ends on a results screen that
-  submits the time or score and shows your rank. Guests are told to sign in to post (time bests
-  are kept locally).
-- A practice run offers "Try it timed →" (to that mode in Compete) on its results screen, and a
-  timed run offers "Practise this mode" back.
+- **Split modes** — the clue modes, Name all countries, Click the country, Spot the country,
+  Puzzle, and MapTap — have a practice run and a timed / ranked run, because practice offers
+  something a board can't. For the clue and map modes that's a resumable, clock-free run of the
+  whole set with free hints and passes. For MapTap it's custom settings, so its practice is called
+  **Custom** and the board run **Ranked**.
+- **Single-run modes** — Worldsplit, Flyover, GeoGuessr, Street View country — have one way to
+  play. Practice and ranked were the same game, so every finished run posts (guests see where it
+  would place) and the board keeps your best. The GameBar shows a **Best** badge instead of a
+  switch, the picker shows one button, and leaving mid-run never asks (an unfinished run just
+  isn't counted). Old `&run=timed` links open the same game.
+
+How you switch:
+
+- **In a game**, a split mode's GameBar has a two-way switch, **Practice | Timed** (or
+  **Custom | Ranked**). The other side opens that run of the same game (with the same flag set or
+  puzzle continent) and asks first if a timed run is under way.
+- **Play** starts a split mode's practice run. **Compete** lists every board, and the board's
+  call to action opens the timed run (`&run=timed`), or just "Play …" for a single-run mode.
+- A timed run can't switch to practice mid-run without leaving it, and ends on a results screen
+  that submits the time or score and shows your rank. Practice results offer "Try it timed →" and
+  timed results "Practise this mode".
 
 ## Layouts
 
@@ -65,9 +77,9 @@ Practice and competition are separate places, not a dropdown inside a game.
    lobby, daily result. `SiteHeader`: logo (always Home) · the five section links with the current
    one marked · sound, theme and account on the right. On phones the section links move to a
    bottom `TabBar`.
-2. **Game screen** — all 14 modes and a multiplayer game. `GameBar`: ← back · the game's name as a
+2. **Game screen** — all 15 modes and a multiplayer game. `GameBar`: ← back · the game's name as a
    switcher (opens the game picker; switching never silently discards a run) · the run type
-   (Practice / Timed with the clock) · a `⋯` menu with sound, theme, how to play, and the section
+   (a Practice | Timed switch with the clock, or a Best badge on single-run modes) · a `⋯` menu with sound, theme, how to play, and the section
    links. The page-to-page links live in that menu, not across the bar.
 3. **Focus screen** — lessons, placement, and each daily stage. `FocusBar`: ✕ · progress ·
    (optional) streak. The ✕ asks before discarding unsaved progress.

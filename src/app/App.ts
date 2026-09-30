@@ -144,8 +144,11 @@ export function createApp(options: AppOptions): App {
         navigate({ type: "solo-game", categoryIds: [mode], run: "timed", ...flagPool });
       } else if (isWorldMapGameModeId(mode)) {
         navigate({ type: "country-guessing", mode, run: "timed", ...(mode === "puzzle" && variant ? { continent: variant } : {}) });
-      } else if (mode === "map-tap" || mode === "worldsplit" || mode === "flyover" || mode === "geoguessr" || mode === "streetview-country") {
+      } else if (mode === "map-tap") {
         navigate({ type: mode, run: "timed" });
+      } else {
+        // Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one way to play.
+        handleGameModeChange(mode);
       }
       return;
     }
@@ -727,7 +730,7 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  async function startStreetViewCountry(runType: RunType = "practice"): Promise<void> {
+  async function startStreetViewCountry(): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Finding a street to explore…"));
     const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
@@ -735,7 +738,6 @@ export function createApp(options: AppOptions): App {
     mount(
       createStreetViewCountryScreen({ shell,
         countryIndex: options.countryIndex,
-        run: runType,
         storage: options.storage,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
@@ -745,7 +747,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startGeoGuessr(runType: RunType = "practice"): Promise<void> {
+  async function startGeoGuessr(): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your first location..."));
 
@@ -756,7 +758,6 @@ export function createApp(options: AppOptions): App {
       createGeoGuessrScreen({ shell,
         countryIndex: options.countryIndex,
         storage: options.storage,
-        run: runType,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
         onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -784,7 +785,7 @@ export function createApp(options: AppOptions): App {
     );
   }
 
-  async function startWorldSplit(runType: RunType = "practice"): Promise<void> {
+  async function startWorldSplit(): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Loading Worldsplit...");
     mount(loading);
@@ -800,7 +801,6 @@ export function createApp(options: AppOptions): App {
         screenModule.createWorldSplitScreen({ shell,
           worldCountryFeatures,
           storage: options.storage,
-          run: runType,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
           onMultiplayer: () => navigate({ type: "multiplayer" }),
@@ -813,7 +813,7 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  async function startFlyover(runType: RunType = "practice"): Promise<void> {
+  async function startFlyover(): Promise<void> {
     const run = navigationRun;
     const loading = createLoadingScreen("Fuelling the plane...");
     mount(loading);
@@ -829,7 +829,6 @@ export function createApp(options: AppOptions): App {
         screenModule.createFlyoverScreen({ shell,
           worldCountryFeatures,
           storage: options.storage,
-          run: runType,
           onHome: () => navigate({ type: "landing" }),
         }),
       );
@@ -1011,11 +1010,11 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "streetview-country") {
-      runNavigation(startStreetViewCountry(route.run === "timed" ? "timed" : "practice"));
+      runNavigation(startStreetViewCountry());
       return;
     }
     if (route.type === "geoguessr") {
-      runNavigation(startGeoGuessr(route.run === "timed" ? "timed" : "practice"));
+      runNavigation(startGeoGuessr());
       return;
     }
     if (route.type === "map-tap") {
@@ -1023,11 +1022,11 @@ export function createApp(options: AppOptions): App {
       return;
     }
     if (route.type === "worldsplit") {
-      runNavigation(startWorldSplit(route.run === "timed" ? "timed" : "practice"));
+      runNavigation(startWorldSplit());
       return;
     }
     if (route.type === "flyover") {
-      runNavigation(startFlyover(route.run === "timed" ? "timed" : "practice"));
+      runNavigation(startFlyover());
       return;
     }
     if (route.type === "multiplayer") {

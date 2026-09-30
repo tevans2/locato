@@ -156,12 +156,15 @@ describe("Compete screen: Leaderboards tab", () => {
     q<HTMLButtonElement>(".compete-mode[data-mode='map-tap']")!.click();
     expect(play.textContent).toBe("Play a ranked attempt");
     expect(q(".compete-eyebrow")?.textContent).toBe("Map · Highest score wins");
-    play.click();
-    q<HTMLButtonElement>(".compete-mode[data-mode='streetview-country']")!.click();
-    expect(play.textContent).toBe("Play a ranked attempt");
+    expect(q(".compete-practise")?.textContent).toBe("or play with custom settings");
     play.click();
     q<HTMLButtonElement>(".compete-practise")!.click();
-    expect(shell.calls).toEqual(["game:flags:timed:territories", "game:flags:timed:", "game:map-tap:timed:", "game:streetview-country:timed:", "game:streetview-country:practice:"]);
+    // A single-run mode has one way to play: "Play Street View country", and no practice link.
+    q<HTMLButtonElement>(".compete-mode[data-mode='streetview-country']")!.click();
+    expect(play.textContent).toBe("Play Street View country");
+    expect(q(".compete-practise")?.hidden).toBe(true);
+    play.click();
+    expect(shell.calls).toEqual(["game:flags:timed:territories", "game:flags:timed:", "game:map-tap:timed:", "game:map-tap:practice:", "game:streetview-country:timed:"]);
   });
 
   it("renders a time board as times, with a podium for the top three", async () => {

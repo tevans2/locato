@@ -17,7 +17,7 @@ function makeContext(overrides: Partial<ShellContext> = {}): ShellContext & { re
     openSection: (section) => calls.push(`section:${section}`),
     goHome: () => calls.push("home"),
     goBack: (fallback) => calls.push(`back:${fallback ?? ""}`),
-    openGame: (mode, run) => calls.push(`game:${mode}:${run ?? "practice"}`),
+    openGame: (mode, run, variant) => calls.push(`game:${mode}:${run ?? "practice"}${variant ? `:${variant}` : ""}`),
     openGamePicker: () => calls.push("picker"),
     openCountry: (code) => calls.push(`country:${code}`),
     openCompete: (mode) => calls.push(`compete:${mode ?? ""}`),
@@ -173,7 +173,8 @@ describe("GameBar and game picker", () => {
     const bar = createGameBar(ctx, { gameMode: "name-all", run: "timed", clock, onBack: () => undefined, onHowToPlay });
     document.body.append(bar.element);
     const pill = bar.element.querySelector(".shell-run-pill")!;
-    expect(pill.textContent).toBe("Timed01:24");
+    expect(pill.textContent).toBe("PracticeTimed01:24");
+    expect(pill.querySelector(".shell-run-option.is-active")?.textContent).toBe("Timed01:24");
     expect(pill.classList.contains("has-clock")).toBe(true);
 
     const more = bar.element.querySelector<HTMLButtonElement>(".shell-gamebar-more")!;
@@ -193,6 +194,43 @@ describe("GameBar and game picker", () => {
     keydown("Escape");
     expect(menu.hidden).toBe(true);
     bar.destroy();
+  });
+
+  it("switches a split mode between practice and timed from the bar, asking first mid-run", async () => {
+    const confirmLeave = vi.fn(async () => false);
+    const ctx = makeContext({ confirmLeave });
+    const bar = createGameBar(ctx, { gameMode: "puzzle", run: "practice", onBack: () => undefined, timedVariant: () => "Europe", leaveGuard: () => null });
+    document.body.append(bar.element);
+    const options = [...bar.element.querySelectorAll<HTMLButtonElement>(".shell-run-option")];
+    expect(options.map((option) => [option.textContent, option.getAttribute("aria-pressed")])).toEqual([["Practice", "true"], ["Timed", "false"]]);
+    options[0]!.click();
+    options[1]!.click();
+    await flush();
+    expect(ctx.calls).toEqual(["game:puzzle:timed:Europe"]);
+
+    const timedBar = createGameBar(ctx, { gameMode: "flags", run: "timed", onBack: () => undefined, leaveGuard: () => "Your timed run will end." });
+    document.body.append(timedBar.element);
+    timedBar.element.querySelector<HTMLButtonElement>('.shell-run-option[data-run="practice"]')!.click();
+    await flush();
+    expect(confirmLeave).toHaveBeenCalledWith("Your timed run will end.", expect.anything());
+    expect(ctx.calls).toEqual(["game:puzzle:timed:Europe"]);
+  });
+
+  it("labels MapTap's switch Custom | Ranked and shows a Best badge, not a switch, on single-run modes", () => {
+    const ctx = makeContext();
+    const maptap = createGameBar(ctx, { gameMode: "map-tap", run: "practice", onBack: () => undefined });
+    expect([...maptap.element.querySelectorAll(".shell-run-option")].map((option) => option.textContent)).toEqual(["Custom", "Ranked"]);
+
+    const geo = createGameBar(ctx, { gameMode: "geoguessr", run: "practice", onBack: () => undefined, best: "18,240" });
+    expect(geo.element.querySelector(".shell-run-option")).toBeNull();
+    expect(geo.element.querySelector(".shell-run-pill")?.textContent).toBe("Best18,240");
+    geo.setBest(null);
+    expect(geo.element.querySelector(".shell-run-best-value")?.textContent).toBe("—");
+
+    const picker = openGamePicker({ onPick: () => undefined });
+    expect(picker.element.querySelector('.shell-picker-timed[data-mode="geoguessr"]')).toBeNull();
+    expect(picker.element.querySelector('.shell-picker-timed[data-mode="map-tap"]')?.textContent).toBe("Ranked");
+    picker.close();
   });
 
   it("works standalone and closes on Escape without picking", () => {

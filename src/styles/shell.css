@@ -559,6 +559,47 @@
 
 #app .shell-run-pill.is-practice .shell-run-clock { background: var(--surface-soft); color: var(--text); }
 
+/* Split modes: Practice | Timed as one two-way switch. The inactive side opens the other run. */
+#app .shell-run-pill.shell-run-switch {
+  gap: 2px;
+  padding: 3px;
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+#app .shell-run-pill.shell-run-switch.is-timed { padding-right: 3px; border-color: var(--border-strong); background: var(--surface); color: var(--muted); }
+
+#app .shell-run-option {
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 150ms var(--shell-ease), color 150ms var(--shell-ease);
+}
+
+#app .shell-run-option:not(.is-active):hover { background: var(--surface-soft); color: var(--text); }
+#app .shell-run-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#app .shell-run-option.is-active { cursor: default; }
+#app .shell-run-option.is-practice.is-active { background: var(--surface-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+#app .shell-run-option.is-timed.is-active { background: var(--text); color: var(--bg); }
+#app .shell-run-option.is-timed .shell-icon { color: var(--route); }
+#app .shell-run-option.is-timed.is-active .shell-icon { color: inherit; }
+#app .shell-run-option.is-timed.is-active:has(.shell-run-clock:not(:empty)) { padding-right: 3px; }
+#app .shell-run-option.is-practice .shell-run-clock { background: var(--surface); }
+
+/* Single-run modes: no choice to make, just the best to beat. */
+#app .shell-run-pill.shell-run-best { gap: 6px; color: var(--muted); }
+#app .shell-run-pill.shell-run-best .shell-icon { color: var(--route); }
+#app .shell-run-best-value { color: var(--text); font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
 #app .shell-menu-anchor { position: relative; }
 
 #app .shell-gamebar-more { color: var(--text); }
@@ -649,11 +690,22 @@
   #app .shell-gamebar { min-height: 56px; gap: 8px; padding: 8px 0; }
   #app .shell-gamebar-start { gap: 4px; }
   #app .shell-gamebar-back { width: 38px; height: 38px; }
-  #app .shell-switcher { min-height: 44px; gap: 9px; padding-right: 8px; }
+  #app .shell-switcher { min-height: 44px; gap: 7px; padding-right: 4px; }
   #app .shell-switcher-icon { width: 34px; height: 34px; border-radius: 9px; }
   #app .shell-switcher-icon .shell-icon { width: 17px; height: 17px; }
   #app .shell-switcher-name { font-size: 0.95rem; }
   #app .shell-run-pill { height: 32px; padding: 0 10px; font-size: 0.72rem; }
+  #app .shell-run-option { padding: 0 7px; }
+  /* Mid-run the clock says "timed" on its own. */
+  #app .shell-run-option.is-timed.is-active:has(.shell-run-clock:not(:empty)) .shell-icon { display: none; }
+  #app .shell-run-option.is-timed.is-active:has(.shell-run-clock:not(:empty)) { padding-left: 3px; }
+  #app .shell-run-pill.shell-run-switch,
+  #app .shell-run-pill.shell-run-switch.is-timed.has-clock { height: 34px; padding: 3px; }
+  #app .shell-run-option .shell-run-clock { min-width: 50px; padding: 0 6px; }
+  /* Long game names truncate instead of running under the run switch. */
+  #app .shell-gamebar-start { min-width: 0; }
+  #app .shell-switcher-caret { flex: none; }
+  #app .shell-run-option.is-timed.is-active:has(.shell-run-clock:not(:empty)) .shell-run-option-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   #app .shell-gamebar-start { flex: 1 1 auto; }
   #app .shell-gamebar-end { flex: none; gap: 2px; }
   #app .shell-switcher { flex: 0 1 auto; }

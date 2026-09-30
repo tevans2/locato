@@ -1,7 +1,7 @@
 import { fetchAuthState, fetchFriends, fetchLeaderboard, type AuthUser, type FriendInfo } from "../../core/auth";
 import { cleanJoinCode, MAX_PLAYER_NAME_LENGTH, readActiveRoomCode, readPlayerName, writePlayerName } from "../../core/multiplayer/localPlayer";
 import { GAME_MODE_GROUPS, isTimerGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
-import { leaderboardConfig, type LeaderboardMetric, type LeaderboardModeConfig } from "../../core/leaderboards";
+import { leaderboardConfig, runLabels, type LeaderboardMetric, type LeaderboardModeConfig } from "../../core/leaderboards";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatElapsedTime, readStoredTime } from "../../core/timer/playTimer";
 import type { Screen } from "../../app/router";
@@ -260,7 +260,11 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
     eyebrow.textContent = `${group.label} · ${metric === "time" ? "Fastest time wins" : "Highest score wins"}`;
     title.textContent = selected.label;
     attempt.textContent = selected.config.attempt;
-    playLabel.textContent = PLAY_LABELS[metric];
+    const single = selected.config.runs === "single";
+    // Single-run modes have no practice: "Play GeoGuessr" opens the one game, whose best posts.
+    playLabel.textContent = single ? `Play ${selected.label}` : PLAY_LABELS[metric];
+    practiseLink.hidden = single;
+    if (!single) practiseLink.textContent = runLabels(selected.id).practice === "Custom" ? "or play with custom settings" : "or practise first";
     playIcon.replaceChildren(shellIcon(metric === "time" ? "timer" : "play", 18, 2.1));
     renderVariants();
     renderStanding();
@@ -420,7 +424,7 @@ export function createCompeteScreen(options: CompeteScreenOptions): Screen {
           children: [
             el("span", { className: "compete-empty-icon", children: [shellIcon("trophy", 28, 1.6)] }),
             el("strong", { text: time ? "No times on this board yet" : "No scores on this board yet" }),
-            el("span", { text: time ? "Finish a timed run to take first place." : "Play a ranked attempt to take first place." }),
+            el("span", { text: time ? "Finish a timed run to take first place." : selected.config.runs === "single" ? "Finish a run to take first place." : "Play a ranked attempt to take first place." }),
           ],
         }),
       );

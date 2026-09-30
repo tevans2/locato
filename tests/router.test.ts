@@ -106,11 +106,14 @@ describe("shareable game routes", () => {
     expect(parse("/?game=flags&run=bogus")).toEqual({ type: "solo-game", categoryIds: ["flags"], continueSaved: false });
   });
 
-  it("carries a ranked attempt on the score modes' URLs (and on flag colours' timed run)", () => {
-    for (const mode of ["map-tap", "worldsplit", "flyover", "geoguessr", "streetview-country"] as const) {
-      const ranked: AppRoute = { type: mode, run: "timed" };
-      expect(buildRouteUrl(ranked, { pathname: "/" })).toBe(`/?game=${mode}&run=timed`);
-      expect(parse(`/?game=${mode}&run=timed`)).toEqual(ranked);
+  it("carries MapTap's ranked attempt and flag colours' timed run on the URL; single-run modes have one URL", () => {
+    const ranked: AppRoute = { type: "map-tap", run: "timed" };
+    expect(buildRouteUrl(ranked, { pathname: "/" })).toBe("/?game=map-tap&run=timed");
+    expect(parse("/?game=map-tap&run=timed")).toEqual(ranked);
+    expect(parse("/?game=map-tap")).toEqual({ type: "map-tap" });
+    // Single-run modes have one URL; old ranked links open the same game.
+    for (const mode of ["worldsplit", "flyover", "geoguessr", "streetview-country"] as const) {
+      expect(parse(`/?game=${mode}&run=timed`)).toEqual({ type: mode });
       expect(parse(`/?game=${mode}`)).toEqual({ type: mode });
       expect(buildRouteUrl({ type: mode }, { pathname: "/" })).toBe(`/?game=${mode}`);
     }

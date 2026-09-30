@@ -34,8 +34,9 @@ import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type Game
 import type { Screen } from "../../app/router";
 
 /*
- * Play → the landing page (docs/navigation.md). Every mode here starts a PRACTICE run: no clock,
- * nothing posted. Timed runs live in Compete; the daily in Daily. The shared SiteHeader carries
+ * Play → the landing page (docs/navigation.md). Split modes start a PRACTICE run here: no clock,
+ * nothing posted. Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one
+ * way to play, so they open the real thing. Timed runs live in Compete; the daily in Daily. The shared SiteHeader carries
  * the navigation, so the page itself has no nav links of its own.
  */
 
@@ -167,7 +168,7 @@ function LandingGamePicker({ shell, storage }: LandingScreenOptions) {
       <header className="mode-picker-heading">
         <div>
           <h1 id="landing-title">Choose a game.</h1>
-          <p className="mode-picker-sub">Practice at your own pace: no clock, nothing posted.</p>
+          <p className="mode-picker-sub">Practice at your own pace. Score games like GeoGuessr and Flyover post your best.</p>
         </div>
         <span>{allModes.length} games</span>
       </header>

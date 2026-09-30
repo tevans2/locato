@@ -817,6 +817,7 @@
 
 #compete .compete-cta .compete-play:hover { transform: translateY(-1px); box-shadow: 0 16px 30px color-mix(in srgb, var(--brand) 36%, transparent); }
 #compete .compete-play-icon { display: grid; place-items: center; }
+#compete .compete-practise[hidden] { display: none; }
 #compete .compete-practise { justify-self: center; padding: 2px 0; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
 #compete .compete-practise:hover { color: var(--text); }
 

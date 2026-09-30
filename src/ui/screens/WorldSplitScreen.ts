@@ -1,4 +1,4 @@
-import type { RunType, ShellContext } from "../shell/types";
+import type { ShellContext } from "../shell/types";
 import {
   DEFAULT_WORLD_SPLIT_LINE,
   WORLD_SPLIT_MAX_ROUND_SCORE,
@@ -28,13 +28,11 @@ import type { GameModeId } from "../../core/gameModes";
 import { WORLD_SPLIT_ATTEMPT_ROUNDS } from "../../core/leaderboards";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
-import { createResultsCard } from "../shell/ResultsCard";
-import { createPracticeBar, createResultsStage, createRunList, formatNumber, insertIntoResults, recordLocalBest, runLeaveMessage, shareSquare, shellOrFallback } from "./practiceRun";
-import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { createResultsStage, createRunList, formatNumber, insertIntoResults, shareSquare, shellOrFallback } from "./practiceRun";
+import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MIN_DRAW_LENGTH = 24;
-const BEST_SCORE_KEY = "locato:worldsplit:best-score:v1";
 
 export interface WorldSplitScreenOptions {
   /** Navigation shell (docs/navigation.md). */
@@ -45,8 +43,6 @@ export interface WorldSplitScreenOptions {
   readonly onHome: () => void;
   readonly onDailyChallenge?: () => void;
   readonly onMultiplayer?: () => void;
-  /** "timed" (`&run=timed`): a ranked attempt of the standard rounds whose total posts to the Worldsplit board. */
-  readonly run?: RunType;
 }
 
 export interface WorldSplitScreenServices {
@@ -95,9 +91,8 @@ function feedbackForScore(score: number): string {
 
 export function createWorldSplitScreen(options: WorldSplitScreenOptions, services: WorldSplitScreenServices = {}): Screen {
   const controller = new AbortController();
-  const ranked = options.run === "timed";
-  // The rounds are fixed and the same for everyone; a ranked attempt is the standard run.
-  const rounds = ranked ? WORLD_SPLIT_ROUNDS.slice(0, WORLD_SPLIT_ATTEMPT_ROUNDS) : WORLD_SPLIT_ROUNDS;
+  // The rounds are fixed and the same for everyone, so every run is the board's standard run.
+  const rounds = WORLD_SPLIT_ROUNDS.slice(0, WORLD_SPLIT_ATTEMPT_ROUNDS);
   const shell = shellOrFallback(options.shell, options.onHome);
   const countries = buildWorldSplitCountries(options.worldCountryFeatures);
   const countryByCode = new Map(countries.map((country) => [country.code, country]));
@@ -315,7 +310,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
     finished = false;
     line = null;
     submittedResult = null;
-    roundEyebrow.textContent = `Worldsplit${ranked ? " · Ranked" : ""} · ${round.label}`;
+    roundEyebrow.textContent = `Worldsplit · ${round.label}`;
     roundTitle.textContent = round.prompt;
     roundDetail.textContent = round.detail;
     sideAValue.textContent = "?";
@@ -366,7 +361,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
     const bestRound = rounds[bestIndex];
     const ratio = score / maximum;
     updateProgress();
-    const shareText = `Locato Worldsplit${ranked ? " (ranked)" : ""} ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
+    const shareText = `Locato Worldsplit ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
     const runList = createRunList("Your splits", scores.map((roundScore, index) => ({
       label: rounds[index]!.label,
       detail: rounds[index]!.prompt,
@@ -374,40 +369,24 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
       tone: roundScore >= 85 ? "good" : roundScore >= 50 ? "ok" : "miss",
     })));
 
-    if (ranked) {
-      const rankedCard = createRankedResults(shell, {
-        mode: "worldsplit",
-        title: ratio >= 0.9 ? "You read the world at a glance" : ratio >= 0.7 ? "Strong population instinct" : "Attempt complete",
-        total: score,
-        stats: [
-          { label: "Total score", value: formatNumber(score), note: `of ${formatNumber(maximum)}` },
-          ...(bestRound ? [{ label: "Best round", value: formatNumber(scores[bestIndex] ?? 0), note: bestRound.label }] : []),
-        ],
-        shareTitle: "Locato Worldsplit",
-        shareText,
-        onTryAgain: playAgain,
-        posting: submitRankedAttempt({ shell, mode: "worldsplit", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) }),
-        tone: ratio >= 0.6 ? "celebrate" : "neutral",
-      });
-      insertIntoResults(rankedCard, runList);
-      resultsStage.show(rankedCard);
-      return;
-    }
-
-    const localBest = recordLocalBest(options.storage, BEST_SCORE_KEY, score);
-
-    const card = createResultsCard(shell, {
-      kicker: "Worldsplit · Practice",
-      title: localBest.isNew && localBest.previous > 0 ? "A new best split!" : ratio >= 0.9 ? "You read the world at a glance" : ratio >= 0.7 ? "Strong population instinct" : "Run complete",
-      subtitle: score >= 450 ? "You can read population patterns at a glance." : score >= 350 ? "A strong run across five different maps." : "Every line teaches you where people really live.",
+    // Every finished run counts: it posts, and the board keeps your best.
+    const previousBest = readSingleBest(options.storage, "worldsplit");
+    const posting = submitRankedAttempt({ shell, mode: "worldsplit", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    bar.refreshBest();
+    const isNewBest = score > previousBest;
+    const card = createRankedResults(shell, {
+      mode: "worldsplit",
+      title: isNewBest && previousBest > 0 ? "A new best split!" : ratio >= 0.9 ? "You read the world at a glance" : ratio >= 0.7 ? "Strong population instinct" : "Run complete",
+      total: score,
       stats: [
         { label: "Total score", value: formatNumber(score), note: `of ${formatNumber(maximum)}` },
         ...(bestRound ? [{ label: "Best round", value: formatNumber(scores[bestIndex] ?? 0), note: bestRound.label }] : []),
-        { label: "Your best run", value: formatNumber(localBest.best), note: localBest.isNew ? "New best" : "On this device" },
+        { label: "Your best", value: formatNumber(Math.max(previousBest, score)), note: isNewBest ? "New best" : "On this device" },
       ],
-      primary: { label: "Play again", onClick: playAgain },
-      share: { title: "Locato Worldsplit", text: shareText },
-      crossLink: rankedCrossLink(shell, "worldsplit"),
+      shareTitle: "Locato Worldsplit",
+      shareText,
+      onTryAgain: playAgain,
+      posting,
       tone: ratio >= 0.6 ? "celebrate" : "neutral",
     });
     insertIntoResults(card, runList);
@@ -491,13 +470,11 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
   const layout = el("main", { className: "worldsplit-layout", children: [mapShell, panel] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen worldsplit-screen gb-screen" });
-  const bar = ranked
-    ? createRankedBar(element, shell, { gameMode: "worldsplit", inProgress: () => !finished })
-    : createPracticeBar(element, shell, {
-        gameMode: "worldsplit",
-        leaveGuard: () => (finished ? null : runLeaveMessage(scores.length, rounds.length, "rounds")),
-        extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: playAgain }],
-      });
+  const bar = createBestBar(element, shell, {
+    gameMode: "worldsplit",
+    storage: options.storage,
+    extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: playAgain }],
+  });
   element.append(bar.element, layout, resultsStage.element);
 
   renderRound();

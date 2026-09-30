@@ -6,12 +6,16 @@ export type AppRoute =
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool; readonly run?: "timed" }
   | { readonly type: "daily-challenge" }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed"; readonly continent?: string }
-  /** The score modes. `run: "timed"` is a ranked attempt (fixed length, posts its total to the board). */
-  | { readonly type: "streetview-country"; readonly run?: "timed" }
-  | { readonly type: "geoguessr"; readonly run?: "timed" }
+  /** MapTap: `run: "timed"` is a ranked attempt (fixed settings, posts its total to the board). */
   | { readonly type: "map-tap"; readonly run?: "timed" }
-  | { readonly type: "worldsplit"; readonly run?: "timed" }
-  | { readonly type: "flyover"; readonly run?: "timed" }
+  /**
+   * Single-run score modes: one way to play, every finished run posts and the board keeps your
+   * best. Old `&run=timed` links still open them.
+   */
+  | { readonly type: "streetview-country" }
+  | { readonly type: "geoguessr" }
+  | { readonly type: "worldsplit" }
+  | { readonly type: "flyover" }
   /**
    * Compete › Multiplayer. `joinCode` joins that room (`?room=`); `create` opens straight into a
    * new room with the default settings (`?view=multiplayer&create=1`), optionally inviting one
@@ -68,7 +72,8 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     const continent = params.get("continent")?.trim();
     return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
   }
-  if (game === "map-tap" || game === "worldsplit" || game === "flyover" || game === "geoguessr" || game === "streetview-country") return { type: game, ...timed };
+  if (game === "map-tap") return { type: game, ...timed };
+  if (game === "worldsplit" || game === "flyover" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
   if (view === "academy") {
     const lesson = params.get("lesson")?.trim();
@@ -109,10 +114,11 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     if (route.run === "timed") params.set("run", "timed");
     if (route.continent) params.set("continent", route.continent);
   }
-  else if (route.type === "map-tap" || route.type === "worldsplit" || route.type === "flyover" || route.type === "geoguessr" || route.type === "streetview-country") {
+  else if (route.type === "map-tap") {
     params.set("game", route.type);
     if (route.run === "timed") params.set("run", "timed");
   }
+  else if (route.type === "worldsplit" || route.type === "flyover" || route.type === "geoguessr" || route.type === "streetview-country") params.set("game", route.type);
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
   else if (route.type === "multiplayer" && route.create) {
     params.set("view", "multiplayer");

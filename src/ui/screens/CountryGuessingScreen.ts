@@ -868,6 +868,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         onHowToPlay: () => showFeedback(feedback, getGameModeOption(playMode).description, "neutral"),
         extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: () => resetButton.click() }],
         leaveGuard: () => (timed && !roundEnded() && progressOfRun() > 0 ? "This timed run is still going — it won't be posted." : null),
+        timedVariant: () => (playMode === "puzzle" ? puzzleContinent : undefined),
       })
     : null;
 

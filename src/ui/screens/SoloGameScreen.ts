@@ -844,6 +844,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       onHowToPlay: () => showHintPopover("How to play", getGameModeOption(options.selectedGameMode).description),
       extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: restartFromMenu }],
       leaveGuard: () => (timedRunInProgress() ? "This timed run is still going — it won't be posted." : null),
+      timedVariant: () => leaderboardVariant || undefined,
     });
   }
 

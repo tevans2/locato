@@ -4,7 +4,7 @@ import { createFlyoverScreen } from "../src/ui/screens/FlyoverScreen";
 import { FLYOVER_RUN_SECONDS, FLYOVER_SKIP_PENALTY_SECONDS } from "../src/core/flyover";
 import type { WorldCountryFeature } from "../src/core/map";
 import type { ShellContext } from "../src/ui/shell/types";
-import { RANKED_LEAVE_MESSAGE, type PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
+import type { PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
 
 const square = (lng: number, lat: number) => ({ type: "Polygon" as const, coordinates: [[[lng, lat], [lng + 10, lat], [lng + 10, lat + 10], [lng, lat + 10], [lng, lat]]] });
 // rng() = 0 starts over Alpha flying due west, and always picks the nearest target: Bravo, due west.
@@ -21,7 +21,7 @@ function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
   return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
 }
 
-function setup(options: { ranked?: boolean; shell?: Partial<ShellContext>; postAttempt?: PostRankedAttempt } = {}) {
+function setup(options: { shell?: Partial<ShellContext>; postAttempt?: PostRankedAttempt } = {}) {
   let time = 1000;
   let frames: (() => void)[] = [];
   const screen = createFlyoverScreen({
@@ -29,13 +29,12 @@ function setup(options: { ranked?: boolean; shell?: Partial<ShellContext>; postA
     worldCountryFeatures: features,
     storage: localStorage,
     onHome() {},
-    ...(options.ranked ? { run: "timed" as const } : {}),
   }, {
     rng: () => 0,
     now: () => time,
     requestFrame: (callback) => { frames.push(callback); return frames.length; },
     cancelFrame: () => undefined,
-    ...(options.postAttempt ? { postAttempt: options.postAttempt } : {}),
+    postAttempt: options.postAttempt ?? (async () => ({ serverAccepted: null, rank: null })),
   });
   screens.push(screen);
   document.body.append(screen.element);
@@ -91,41 +90,49 @@ describe("Flyover", () => {
     expect(ui.$(".flyover-clock-value")?.textContent).toBe(`1:${String(30 - FLYOVER_SKIP_PENALTY_SECONDS).padStart(2, "0")}`);
   });
 
-  it("ends when the clock runs out with a practice results card and local best", () => {
-    const openCompete = vi.fn();
-    const ui = setup({ shell: { openCompete } });
-    ui.$<HTMLButtonElement>(".flyover-start")!.click();
-    ui.fly(2.5);
-    ui.frame(FLYOVER_RUN_SECONDS * 1000);
-    const stage = ui.$(".gb-results-stage")!;
-    expect(stage.hidden).toBe(false);
-    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("Flyover · Practice");
-    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("1");
-    expect(stage.querySelectorAll(".gb-run-row")).toHaveLength(1);
-    expect(localStorage.getItem("locato:flyover:best-score:v1")).toBe("1");
-    stage.querySelector<HTMLButtonElement>(".shell-results-cross")!.click();
-    expect(openCompete).toHaveBeenCalledWith("flyover");
-
-    stage.querySelector<HTMLButtonElement>(".shell-results-primary")!.click();
-    expect(stage.hidden).toBe(true);
-    expect(ui.$(".flyover-ready")?.hidden).toBe(false);
-    expect(ui.$(".flyover-score-value")?.textContent).toBe("0");
-  });
-
-  it("ranked: asks before leaving mid-flight and posts the country count", async () => {
-    const confirmLeave = vi.fn(async () => false);
+  it("posts every finished flight and keeps the best in the bar, never asking before leaving", async () => {
+    const confirmLeave = vi.fn(async () => true);
     const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 4 }));
-    const ui = setup({ ranked: true, postAttempt, shell: { confirmLeave } });
-    expect(ui.$(".shell-run-pill .shell-run-label")?.textContent).toBe("Ranked");
+    const openCompete = vi.fn();
+    localStorage.setItem("locato:flyover:best-score:v1", "3");
+    const ui = setup({ postAttempt, shell: { confirmLeave, openCompete } });
+    expect(ui.$(".shell-run-option")).toBeNull();
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("3");
     ui.$<HTMLButtonElement>(".flyover-start")!.click();
     ui.$<HTMLButtonElement>(".shell-gamebar-back")!.click();
-    await vi.waitFor(() => expect(confirmLeave).toHaveBeenCalledWith(RANKED_LEAVE_MESSAGE, expect.anything()));
+    await Promise.resolve();
+    expect(confirmLeave).not.toHaveBeenCalled();
 
     ui.fly(2.5);
     ui.frame(FLYOVER_RUN_SECONDS * 1000);
     expect(postAttempt).toHaveBeenCalledWith({ gameMode: "flyover", variant: "", value: 1, isLoggedIn: false });
     const stage = ui.$(".gb-results-stage")!;
-    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("Flyover · Ranked attempt");
+    expect(stage.hidden).toBe(false);
+    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("Flyover");
+    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("1");
+    expect(stage.querySelectorAll(".gb-run-row")).toHaveLength(1);
+    expect(stage.querySelector(".shell-results-cross")).toBeNull();
     await vi.waitFor(() => expect(stage.querySelector(".shell-results-sub")?.textContent).toContain("#4"));
+    [...stage.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
+    expect(openCompete).toHaveBeenCalledWith("flyover");
+
+    const again = stage.querySelector<HTMLButtonElement>(".shell-results-primary")!;
+    expect(again.textContent).toBe("Play again");
+    again.click();
+    expect(stage.hidden).toBe(true);
+    expect(ui.$(".flyover-ready")?.hidden).toBe(false);
+    expect(ui.$(".flyover-score-value")?.textContent).toBe("0");
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("3");
+  });
+
+  it("a better flight becomes the new best", () => {
+    localStorage.setItem("locato:ranked-best:flyover:v1", "0");
+    const ui = setup({ postAttempt: async () => ({ serverAccepted: null, rank: null }) });
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("—");
+    ui.$<HTMLButtonElement>(".flyover-start")!.click();
+    ui.fly(2.5);
+    ui.frame(FLYOVER_RUN_SECONDS * 1000);
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("1");
+    expect(localStorage.getItem("locato:ranked-best:flyover:v1")).toBe("1");
   });
 });

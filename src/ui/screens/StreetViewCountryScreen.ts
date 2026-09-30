@@ -1,5 +1,5 @@
 import type { Country, CountryId, CountryIndex } from "../../core/countries";
-import type { RunType, ShellContext } from "../shell/types";
+import type { ShellContext } from "../shell/types";
 import type { GameModeId } from "../../core/gameModes";
 import { STREET_VIEW_ATTEMPT_COUNTRIES, STREET_VIEW_POINTS_BY_GUESS, streetViewCountryPoints } from "../../core/leaderboards";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
@@ -8,9 +8,8 @@ import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
-import { createResultsCard } from "../shell/ResultsCard";
-import { createDailyStageBar, createPracticeBar, createResultsStage, createRunList, insertIntoResults, runLeaveMessage, shellOrFallback, type DailyStageProgress } from "./practiceRun";
-import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { createDailyStageBar, createResultsStage, createRunList, insertIntoResults, shellOrFallback, type DailyStageProgress } from "./practiceRun";
+import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 
 /** A practice run is this many countries; then the results screen. */
 export const STREETVIEW_RUN_LENGTH = 5;
@@ -23,12 +22,7 @@ export interface StreetViewCountryScreenOptions {
   readonly onHome: () => void;
   readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
-  /**
-   * "timed" (`&run=timed`): a ranked attempt of ${STREET_VIEW_ATTEMPT_COUNTRIES} countries scored 3/2/1/0 by
-   * guesses used (streetViewCountryPoints); the total posts to the board. Ignored in the daily.
-   */
-  readonly run?: RunType;
-  /** Keeps the device best for ranked attempts. */
+  /** Keeps the device best. */
   readonly storage?: Storage;
   readonly dailyChallenge?: {
     readonly date: string;
@@ -194,8 +188,10 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const runRounds: RunRound[] = [];
   let runFinished = false;
   const isDailyChallenge = options.dailyChallenge !== undefined;
-  const ranked = !isDailyChallenge && options.run === "timed";
-  const runLength = ranked ? STREET_VIEW_ATTEMPT_COUNTRIES : STREETVIEW_RUN_LENGTH;
+  // Outside the daily every run is scored ${STREET_VIEW_ATTEMPT_COUNTRIES} countries at 3/2/1/0 points by guesses used
+  // (streetViewCountryPoints) and posts: a single-run mode, the board keeps your best.
+  const scored = !isDailyChallenge;
+  const runLength = scored ? STREET_VIEW_ATTEMPT_COUNTRIES : STREETVIEW_RUN_LENGTH;
   const maxAttempts = 3;
   const guessedCountryIds = new Set<CountryId>();
   const roundCache: StreetViewCountryRound[] = [];
@@ -228,17 +224,11 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key",
     children: [
-      el("strong", { text: ranked ? "Ranked attempts need Street View — not available here" : "Street View isn’t set up here" }),
-      el("p", { text: ranked ? "Street View country’s ranked attempt uses Google Street View, which isn’t set up on this copy of Locato. These ranked modes play right away:" : "This mode needs Google Street View, which isn’t available on this copy of Locato. These play right away:" }),
+      el("strong", { text: "Street View isn’t set up here" }),
+      el("p", { text: "This mode needs Google Street View, which isn’t available on this copy of Locato. These play right away:" }),
       el("div", {
         className: "streetview-missing-actions",
-        children: ranked
-          ? [
-              el("button", { className: "primary-action", text: "Ranked MapTap", attrs: { type: "button" }, on: { click: () => shell.openGame("map-tap", "timed") } }),
-              el("button", { className: "ghost-action", text: "Timed Flags", attrs: { type: "button" }, on: { click: () => shell.openGame("flags", "timed") } }),
-              el("button", { className: "ghost-action", text: "Back to Compete", attrs: { type: "button" }, on: { click: () => shell.openCompete("streetview-country") } }),
-            ]
-          : isDailyChallenge
+        children: isDailyChallenge
           ? [el("button", { className: "primary-action", text: "Skip this round", attrs: { type: "button" }, on: { click: () => { queueDailyStreetViewResult({ missed: true, wrongGuesses: 0 }); completeDailyStreetView(); } } })]
           : [
               el("button", { className: "primary-action", text: "Play Flags", attrs: { type: "button" }, on: { click: () => shell.openGame("flags") } }),
@@ -297,7 +287,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     className: "stats-panel streetview-stats",
     children: [
       ...(isDailyChallenge ? [] : [el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Country" }), runNumber] })]),
-      ...(ranked ? [el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Points" }), pointsValue] })] : []),
+      ...(scored ? [el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Points" }), pointsValue] })] : []),
       el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Frame" }), frameNumber] }),
       el("div", { className: "stat-card", children: [el("span", { className: "stat-label", text: "Guesses left" }), guessesLeft] }),
       el("div", { className: "stat-card previous-guesses-card", children: [el("span", { className: "stat-label", text: "Previous" }), previousGuesses] }),
@@ -312,12 +302,12 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const answerPanel = el("aside", {
     className: "answer-panel streetview-panel",
     children: [
-      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · Street View" : ranked ? "Street View country · Ranked attempt" : "Street View country" }), el("h2", { text: "Guess the country" })] }),
+      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · Street View" : "Street View country" }), el("h2", { text: "Guess the country" })] }),
       el("p", {
         className: "streetview-rules",
         text: isDailyChallenge
           ? "You get 3 interactive Street View frames from the same hidden country. A wrong answer loads the next frame."
-          : ranked
+          : scored
             ? `${runLength} countries, 3 frames each. ${STREET_VIEW_POINTS_BY_GUESS.join(" / ")} points for a first / second / third-guess answer, 0 if missed.`
             : `${runLength} countries, 3 Street View frames each. A wrong answer loads the next frame.`,
       }),
@@ -340,11 +330,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
         ...(options.dailyChallenge?.progress ? { progress: options.dailyChallenge.progress } : {}),
         onLeave: options.onHome,
       })
-    : ranked
-    ? createRankedBar(element, shell, { gameMode: "streetview-country", inProgress: () => Boolean(apiKey) && !runFinished })
-    : createPracticeBar(element, shell, {
+    : createBestBar(element, shell, {
         gameMode: "streetview-country",
-        leaveGuard: () => (runFinished ? null : runLeaveMessage(runRounds.length, runLength, "countries")),
+        storage: options.storage ?? shell.storage ?? null,
         extraMenuItems: apiKey ? [{ label: "Restart run", icon: "rotate-ccw", onSelect: () => restartRun() }] : [],
       });
   element.append(bar.element, layout, resultsStage.element);
@@ -704,55 +692,41 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     updateControls();
     const correct = runRounds.filter((item) => item.correct).length;
     const guesses = runRounds.reduce((sum, item) => sum + item.guesses, 0);
-    const missedNames = runRounds.filter((item) => !item.correct).map((item) => countryNameFor(item.code));
     const countries = runRounds.map((item) => ({ code: item.code, name: countryNameFor(item.code), flagSrc: `/assets/flags/${item.code.toLowerCase()}.svg` }));
     const squares = runRounds.map((item) => (item.correct ? (item.guesses <= 1 ? "🟩" : "🟨") : "⬜")).join("");
     const runList = createRunList("Round by round", runRounds.map((item) => ({
       label: countryNameFor(item.code),
       detail: item.correct ? `Found with ${item.guesses} ${item.guesses === 1 ? "guess" : "guesses"}` : "Missed",
-      value: ranked ? `+${roundPoints(item)}` : item.correct ? "✓" : "✕",
+      value: `+${roundPoints(item)}`,
       tone: item.correct ? (item.guesses <= 1 ? "good" : "ok") : "miss",
       flagSrc: `/assets/flags/${item.code.toLowerCase()}.svg`,
       ariaLabel: `${countryNameFor(item.code)} in the Atlas`,
       onClick: () => shell.openCountry(item.code),
     })));
-    if (ranked) {
-      const total = runPoints();
-      const maximum = runLength * STREET_VIEW_POINTS_BY_GUESS[0];
-      const card = createRankedResults(shell, {
-        mode: "streetview-country",
-        title: total === maximum ? "A perfect attempt!" : correct >= 3 ? "Well spotted" : "Attempt complete",
-        total,
-        stats: [
-          { label: "Total score", value: String(total), note: `of ${maximum}` },
-          { label: "Correct", value: `${correct}/${runLength}` },
-          { label: "Guesses used", value: String(guesses), note: `of ${runLength * maxAttempts}` },
-        ],
-        missed: countries,
-        missedTitle: "The countries in this attempt",
-        shareTitle: "Locato Street View",
-        shareText: `Locato Street View (ranked) ${total}/${maximum}\n${squares}\nlocato.quest`,
-        onTryAgain: restartRun,
-        posting: submitRankedAttempt({ shell, mode: "streetview-country", total, storage: options.storage ?? shell.storage ?? null, ...(services.postAttempt ? { post: services.postAttempt } : {}) }),
-        tone: correct >= 3 ? "celebrate" : "neutral",
-      });
-      insertIntoResults(card, runList);
-      resultsStage.show(card);
-      return;
-    }
-    const card = createResultsCard(shell, {
-      kicker: "Street View country · Practice",
-      title: correct === runLength ? "A perfect run!" : correct >= 3 ? "Well spotted" : "Run complete",
-      subtitle: missedNames.length ? `Worth another look: ${missedNames.join(", ")}.` : "You placed every country.",
+    // Every finished run counts: it posts, and the board keeps your best.
+    const total = runPoints();
+    const maximum = runLength * STREET_VIEW_POINTS_BY_GUESS[0];
+    const storage = options.storage ?? shell.storage ?? null;
+    const previousBest = readSingleBest(storage, "streetview-country");
+    const posting = submitRankedAttempt({ shell, mode: "streetview-country", total, storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    if ("refreshBest" in bar) bar.refreshBest();
+    const isNewBest = total > previousBest;
+    const card = createRankedResults(shell, {
+      mode: "streetview-country",
+      title: isNewBest && previousBest > 0 ? "A new best run!" : total === maximum ? "A perfect run!" : correct >= 3 ? "Well spotted" : "Run complete",
+      total,
       stats: [
+        { label: "Total score", value: String(total), note: `of ${maximum}` },
         { label: "Correct", value: `${correct}/${runLength}` },
         { label: "Guesses used", value: String(guesses), note: `of ${runLength * maxAttempts}` },
+        { label: "Your best", value: String(Math.max(previousBest, total)), note: isNewBest ? "New best" : "On this device" },
       ],
       missed: countries,
       missedTitle: "The countries in this run",
-      primary: { label: "Play again", onClick: restartRun },
-      share: { title: "Locato Street View", text: `Locato Street View ${correct}/${runLength}\n${squares}\nlocato.quest` },
-      crossLink: rankedCrossLink(shell, "streetview-country"),
+      shareTitle: "Locato Street View",
+      shareText: `Locato Street View ${total}/${maximum}\n${squares}\nlocato.quest`,
+      onTryAgain: restartRun,
+      posting,
       tone: correct >= 3 ? "celebrate" : "neutral",
     });
     insertIntoResults(card, runList);
@@ -763,7 +737,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     runRounds.splice(0);
     runFinished = false;
     resultsStage.hide();
-    startNextRound(ranked ? "New ranked attempt. Five fresh countries." : "New run. Five fresh countries.");
+    startNextRound("New run. Five fresh countries.");
   }
 
   function handleGuess(): void {
@@ -788,7 +762,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
         return;
       }
       recordRunRound(true, guessedCountryIds.size);
-      const earned = ranked ? ` +${streetViewCountryPoints(guessedCountryIds.size)} ${streetViewCountryPoints(guessedCountryIds.size) === 1 ? "point" : "points"}.` : "";
+      const earned = scored ? ` +${streetViewCountryPoints(guessedCountryIds.size)} ${streetViewCountryPoints(guessedCountryIds.size) === 1 ? "point" : "points"}.` : "";
       if (runRounds.length >= runLength) {
         status = "won";
         render();
