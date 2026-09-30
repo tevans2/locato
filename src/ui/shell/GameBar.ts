@@ -1,5 +1,5 @@
-import { gameModeCatalogueEntry, gameModeGroupOf, type GameModeId } from "../../core/gameModes";
-import { leaderboardConfig } from "../../core/leaderboards";
+import { gameModeCatalogueEntry, gameModeGroupOf, isLeaderboardMode, type GameModeId } from "../../core/gameModes";
+import { isSingleRunMode, leaderboardConfig, runLabels } from "../../core/leaderboards";
 import { el } from "../dom/createElement";
 import { createPreferenceMenuItems } from "./controls";
 import { openGamePicker } from "./GamePicker";
@@ -33,11 +33,20 @@ export interface GameBarOptions {
    * game, or following a section link. Return null when it is safe to leave.
    */
   readonly leaveGuard?: () => string | null;
+  /**
+   * The board variant to open when switching Practice → Timed (the flag set, the puzzle
+   * continent). Read at click time.
+   */
+  readonly timedVariant?: () => string | undefined;
+  /** Single-run modes: the "Best" badge's value (e.g. "1,240"). Update it with `setBest`. */
+  readonly best?: string | null;
 }
 
 export interface GameBarHandle {
   readonly element: HTMLElement;
   readonly setClock: (clock: HTMLElement | null) => void;
+  /** Single-run modes: update the "Best" badge (null shows "—"). */
+  readonly setBest: (best: string | null) => void;
   /** Open the ⋯ menu programmatically (e.g. from a keyboard shortcut). */
   readonly openMenu: () => void;
   readonly destroy: () => void;
@@ -99,25 +108,67 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
   }, { signal });
   switcher.setAttribute("aria-expanded", "false");
 
+  // ---- Run type -----------------------------------------------------------------------------
+  // Split modes: a two-way switch (Practice | Timed, or Custom | Ranked for MapTap) that opens the
+  // other run of this game. Single-run modes: a "Best" badge — every run counts, nothing to pick.
+  // Modes without a board show a plain Practice label.
   const clockSlot = el("span", { className: "shell-run-clock" });
-  const pill = el("span", {
-    className: `shell-run-pill is-${options.run}`,
-    attrs: {
-      "data-run": options.run,
-      ...(ranked ? { "data-ranked": "true" } : {}),
-      title: ranked ? "Ranked attempt — your total posts to the leaderboard" : timed ? "Timed run — posts to the leaderboard" : "Practice — no clock, nothing is posted",
-    },
-    children: [
-      ranked ? shellIcon("trophy", 15, 2.1) : timed ? shellIcon("timer", 15, 2.1) : el("span", { className: "shell-run-dot", attrs: { "aria-hidden": "true" } }),
-      el("span", { className: "shell-run-label", text: ranked ? "Ranked" : timed ? "Timed" : "Practice" }),
-      clockSlot,
-    ],
-  });
+  const single = isSingleRunMode(options.gameMode);
+  const bestValue = el("strong", { className: "shell-run-best-value", text: options.best ?? "—" });
+  let pill: HTMLElement;
+  if (single) {
+    pill = el("span", {
+      className: "shell-run-pill shell-run-best is-single",
+      attrs: { "data-run": "single", title: "Every finished run counts — your best score is on the leaderboard" },
+      children: [shellIcon("trophy", 15, 2.1), el("span", { className: "shell-run-label", text: "Best" }), bestValue, clockSlot],
+    });
+  } else if (isLeaderboardMode(options.gameMode)) {
+    const labels = runLabels(options.gameMode);
+    const scoreBoard = leaderboardConfig(options.gameMode)?.metric === "score";
+    const option = (run: RunType): HTMLButtonElement => {
+      const active = run === options.run;
+      const label = run === "timed" ? labels.timed : labels.practice;
+      const button = el("button", {
+        className: `shell-run-option is-${run}${active ? " is-active" : ""}`,
+        attrs: {
+          type: "button",
+          "data-run": run,
+          "aria-pressed": String(active),
+          title: run === "practice"
+            ? `${label} — ${options.gameMode === "map-tap" ? "pick your own settings" : "no clock"}, nothing is posted`
+            : `${label} — ${scoreBoard ? "fixed settings, your total posts" : "against the clock, your time posts"} to the leaderboard`,
+        },
+        children: [
+          ...(run === "timed" ? [shellIcon(scoreBoard ? "trophy" : "timer", 14, 2.1)] : []),
+          el("span", { className: `shell-run-option-label${active ? " shell-run-label" : ""}`, text: label }),
+          ...(active ? [clockSlot] : []),
+        ],
+      });
+      if (!active) {
+        button.addEventListener("click", () => void guarded(ctx, options.leaveGuard, () => ctx.openGame(options.gameMode, run, run === "timed" ? options.timedVariant?.() : undefined), leaveTitle), { signal });
+      }
+      return button;
+    };
+    pill = el("div", {
+      className: `shell-run-pill shell-run-switch is-${options.run}`,
+      attrs: { role: "group", "aria-label": "Run type", "data-run": options.run, ...(ranked ? { "data-ranked": "true" } : {}) },
+      children: [option("practice"), option("timed")],
+    });
+  } else {
+    pill = el("span", {
+      className: "shell-run-pill is-practice",
+      attrs: { "data-run": "practice", title: "Practice — no clock, nothing is posted" },
+      children: [el("span", { className: "shell-run-dot", attrs: { "aria-hidden": "true" } }), el("span", { className: "shell-run-label", text: "Practice" }), clockSlot],
+    });
+  }
   const setClock = (clock: HTMLElement | null): void => {
     clockSlot.replaceChildren(...(clock ? [clock] : []));
     pill.classList.toggle("has-clock", Boolean(clock));
   };
   setClock(options.clock ?? null);
+  const setBest = (best: string | null): void => {
+    bestValue.textContent = best ?? "—";
+  };
 
   // ---- ⋯ menu -------------------------------------------------------------------------------
   const menuButton = el("button", {
@@ -200,6 +251,7 @@ export function createGameBar(ctx: ShellContext, options: GameBarOptions): GameB
   return {
     element,
     setClock,
+    setBest,
     openMenu,
     destroy: () => {
       closeMenu(false);

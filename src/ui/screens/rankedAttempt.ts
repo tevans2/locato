@@ -1,11 +1,11 @@
 import { gameModeCatalogueEntry, type GameModeId } from "../../core/gameModes";
-import { leaderboardConfig } from "../../core/leaderboards";
+import { isSingleRunMode, leaderboardConfig } from "../../core/leaderboards";
 import { postRankedAttempt } from "../../core/timer/leaderboardSync";
 import { createGameBar, type GameBarHandle, type GameBarMenuItem } from "../shell/GameBar";
 import { createResultsCard, type ResultsAction, type ResultsCardHandle, type ResultsCardOptions, type ResultsStat } from "../shell/ResultsCard";
 import { markShellScreen, type ShellContext } from "../shell/types";
 import { attachPostingOutcome, type TimedPostOutcome } from "./gameResults";
-import { recordLocalBest } from "./practiceRun";
+import { formatNumber, readLocalBest, recordLocalBest } from "./practiceRun";
 
 /**
  * Ranked attempts for the score modes (MapTap, Worldsplit, GeoGuessr, Street View country): one
@@ -51,6 +51,49 @@ export function rankedBestKey(mode: GameModeId): string {
   return `locato:ranked-best:${mode}:v1`;
 }
 
+/** Practice bests kept before these modes became single-run; they still count towards your best. */
+const LEGACY_PRACTICE_BEST_KEYS: Partial<Record<GameModeId, string>> = {
+  worldsplit: "locato:worldsplit:best-score:v1",
+  flyover: "locato:flyover:best-score:v1",
+  geoguessr: "locato:geoguessr:best-run:v1",
+};
+
+/** A single-run mode's best score on this device (0 when there is none). */
+export function readSingleBest(storage: Storage | null | undefined, mode: GameModeId): number {
+  const legacy = LEGACY_PRACTICE_BEST_KEYS[mode];
+  return Math.max(readLocalBest(storage, rankedBestKey(mode)), legacy ? readLocalBest(storage, legacy) : 0);
+}
+
+export interface BestBarOptions {
+  readonly gameMode: GameModeId;
+  readonly storage?: Storage | null;
+  readonly extraMenuItems?: readonly GameBarMenuItem[];
+  readonly onHowToPlay?: () => void;
+}
+
+/**
+ * GameBar for a single-run mode (Worldsplit, Flyover, GeoGuessr, Street View country): no
+ * Practice / Ranked choice, a "Best" badge instead, and leaving never asks — an unfinished run
+ * just isn't counted. Call `refreshBest` after a run is submitted.
+ */
+export function createBestBar(root: HTMLElement, shell: ShellContext, options: BestBarOptions): GameBarHandle & { readonly refreshBest: () => void } {
+  markShellScreen(root, "game");
+  const best = () => {
+    const value = readSingleBest(options.storage ?? shell.storage, options.gameMode);
+    return value > 0 ? formatNumber(value) : null;
+  };
+  const bar = createGameBar(shell, {
+    gameMode: options.gameMode,
+    run: "practice",
+    onBack: () => shell.goBack("play"),
+    backLabel: "Back",
+    best: best(),
+    ...(options.onHowToPlay ? { onHowToPlay: options.onHowToPlay } : {}),
+    ...(options.extraMenuItems ? { extraMenuItems: options.extraMenuItems } : {}),
+  });
+  return { ...bar, refreshBest: () => bar.setBest(best()) };
+}
+
 /**
  * Submit a finished attempt's total (signed in) or look up where it would place (guest). Keeps a
  * per-device best so the card can say "New personal best". Never rejects.
@@ -62,7 +105,11 @@ export async function submitRankedAttempt(input: {
   readonly storage?: Storage | null;
   readonly post?: PostRankedAttempt;
 }): Promise<TimedPostOutcome> {
-  const local = recordLocalBest(input.storage ?? null, rankedBestKey(input.mode), input.total);
+  const storage = input.storage ?? null;
+  // A single-run mode's old practice best counts too, so "New personal best" means beating it.
+  const previousBest = isSingleRunMode(input.mode) ? readSingleBest(storage, input.mode) : readLocalBest(storage, rankedBestKey(input.mode));
+  const recorded = recordLocalBest(storage, rankedBestKey(input.mode), Math.max(previousBest, input.total));
+  const local = { previous: previousBest, isNew: input.total > previousBest, best: recorded.best };
   const post = input.post ?? postRankedAttempt;
   try {
     const posting = await post({ gameMode: input.mode, variant: "", value: Math.round(input.total), isLoggedIn: input.shell.signedIn() });
@@ -91,30 +138,32 @@ export interface RankedResultsInput {
 /**
  * The end of a ranked attempt: the total, the post outcome and rank ("Posted to the leaderboard —
  * you're #N" / "That would place #N… Sign in to post"), Try again · View leaderboard · Share, and
- * "Practise this mode".
+ * "Practise this mode". A single-run mode's card is the same without the ranked framing: "Play
+ * again", and no practice cross-link (there is only one way to play).
  */
 export function createRankedResults(shell: ShellContext, input: RankedResultsInput): ResultsCardHandle {
   const label = gameModeCatalogueEntry(input.mode).label;
   const maxScore = leaderboardConfig(input.mode)?.maxScore;
+  const single = isSingleRunMode(input.mode);
   const card = createResultsCard(shell, {
-    kicker: `${label} · Ranked attempt`,
+    kicker: single ? label : `${label} · Ranked attempt`,
     title: input.title,
     subtitle: "Posting your score…",
     stats: input.stats,
     ...(input.missed ? { missed: input.missed } : {}),
     ...(input.missedTitle ? { missedTitle: input.missedTitle } : {}),
-    primary: { label: "Try again", icon: "rotate-ccw", onClick: input.onTryAgain },
+    primary: { label: single ? "Play again" : "Try again", icon: "rotate-ccw", onClick: input.onTryAgain },
     secondary: [{ label: "View leaderboard", icon: "trophy", onClick: () => shell.openCompete(input.mode) }],
     share: {
       title: input.shareTitle,
       text: input.shareText,
       ...(typeof window !== "undefined" ? { url: window.location.href } : {}),
     },
-    crossLink: { label: "Practise this mode", onClick: () => shell.openGame(input.mode, "practice") },
+    ...(single ? {} : { crossLink: { label: "Practise this mode", onClick: () => shell.openGame(input.mode, "practice") } }),
     tone: input.tone ?? "celebrate",
   });
   card.element.classList.add("game-run-results", "is-ranked");
-  card.element.dataset.run = "timed";
+  card.element.dataset.run = single ? "single" : "timed";
   if (maxScore !== undefined) card.element.dataset.maxScore = String(maxScore);
   attachPostingOutcome(shell, card, input.posting, { metric: "score" });
   return card;

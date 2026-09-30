@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GAME_MODE_IDS, SCORE_GAME_MODE_IDS, TIME_GAME_MODE_IDS } from "../server/leaderboard/validation";
 import { GAME_MODE_GROUPS, gameModeOptions, isLeaderboardMode, LEADERBOARD_GAME_MODE_IDS } from "../src/core/gameModes";
-import { LEADERBOARD_MODES, leaderboardConfig } from "../src/core/leaderboards";
+import { isSingleRunMode, LEADERBOARD_MODES, leaderboardConfig, runLabels } from "../src/core/leaderboards";
 
 describe("leaderboard modes", () => {
   it("match the server's boards", () => {
@@ -26,5 +26,14 @@ describe("leaderboard modes", () => {
     }
     expect(leaderboardConfig("map-tap")?.maxScore).toBe(50_000);
     expect(leaderboardConfig("streetview-country")?.maxScore).toBe(15);
+  });
+
+  it("keep practice apart only where it offers something the board can't", () => {
+    const single = LEADERBOARD_MODES.filter((config) => config.runs === "single").map((config) => config.mode).sort();
+    expect(single).toEqual(["flyover", "geoguessr", "streetview-country", "worldsplit"]);
+    expect(isSingleRunMode("map-tap")).toBe(false);
+    expect(isSingleRunMode("flags")).toBe(false);
+    expect(runLabels("map-tap")).toEqual({ practice: "Custom", timed: "Ranked" });
+    expect(runLabels("puzzle")).toEqual({ practice: "Practice", timed: "Timed" });
   });
 });

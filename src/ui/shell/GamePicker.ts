@@ -1,5 +1,5 @@
 import { GAME_MODE_GROUPS, type GameModeCatalogueEntry, type GameModeId } from "../../core/gameModes";
-import { leaderboardConfig } from "../../core/leaderboards";
+import { isSingleRunMode, leaderboardConfig, runLabels } from "../../core/leaderboards";
 import { el } from "../dom/createElement";
 import { shellIcon } from "./icons";
 import { shellLayer, trapOverlay } from "./layer";
@@ -26,9 +26,12 @@ export interface GamePickerHandle {
 
 function modeRow(mode: GameModeCatalogueEntry, options: GamePickerOptions, pick: (mode: GameModeId, run: RunType) => void): HTMLElement {
   const isCurrent = mode.id === options.current;
+  // Single-run modes have one way to play; split modes offer practice here and Timed / Ranked beside it.
+  const single = isSingleRunMode(mode.id);
+  const labels = runLabels(mode.id);
   const practice = el("button", {
     className: "shell-picker-main",
-    attrs: { type: "button", "data-mode": mode.id, "data-run": "practice", "aria-label": `${mode.label} — practice${isCurrent ? " (playing now)" : ""}` },
+    attrs: { type: "button", "data-mode": mode.id, "data-run": "practice", "aria-label": `${mode.label}${single ? "" : ` — ${labels.practice.toLowerCase()}`}${isCurrent ? " (playing now)" : ""}` },
     children: [
       el("span", { className: "shell-picker-icon", children: [shellIcon(mode.icon, 20, 1.6)] }),
       el("span", {
@@ -45,14 +48,14 @@ function modeRow(mode: GameModeCatalogueEntry, options: GamePickerOptions, pick:
     on: { click: () => pick(mode.id, "practice") },
   });
   const children: HTMLElement[] = [practice];
-  if (mode.leaderboard) {
+  if (mode.leaderboard && !single) {
     // Score boards play a fixed-length ranked attempt (no clock); time boards a timed run.
     const ranked = leaderboardConfig(mode.id)?.metric === "score";
     children.push(
       el("button", {
         className: `shell-picker-timed${isCurrent && options.currentRun === "timed" ? " is-current" : ""}`,
         attrs: { type: "button", "data-mode": mode.id, "data-run": "timed", "aria-label": `${mode.label} — ${ranked ? "ranked attempt" : "timed run"}`, title: ranked ? "Ranked attempt · posts to the leaderboard" : "Timed run · posts to the leaderboard" },
-        children: [shellIcon(ranked ? "trophy" : "timer", 15, 2), el("span", { text: ranked ? "Ranked" : "Timed" })],
+        children: [shellIcon(ranked ? "trophy" : "timer", 15, 2), el("span", { text: labels.timed })],
         on: { click: () => pick(mode.id, "timed") },
       }),
     );
@@ -113,7 +116,7 @@ export function openGamePicker(options: GamePickerOptions): GamePickerHandle {
           el("div", {
             children: [
               el("h2", { className: "shell-sheet-title", text: options.title ?? "Choose a game", attrs: { id: titleId } }),
-              el("p", { className: "shell-sheet-sub", text: "Practice at your own pace, or go timed to post to the leaderboards." }),
+              el("p", { className: "shell-sheet-sub", text: "Practice at your own pace, or go timed to post to the leaderboards. Score games like GeoGuessr post your best every time." }),
             ],
           }),
           close,

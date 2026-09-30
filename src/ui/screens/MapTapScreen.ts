@@ -448,7 +448,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
 
     const localBest = recordLocalBest(options.storage, MAP_TAP_BEST_RUN_KEY, total);
     const card = createResultsCard(shell, {
-      kicker: `MapTap · Practice · ${selectionLabel()}`,
+      kicker: `MapTap · Custom · ${selectionLabel()}`,
       title: localBest.isNew && localBest.previous > 0 ? "A new best run!" : ratio >= 0.7 ? "Superb pinning" : ratio >= 0.45 ? "Solid run" : "Run complete",
       subtitle: `${runLength} targets, ${formatNumber(total)} of ${formatNumber(maximum)} points.`,
       stats: [

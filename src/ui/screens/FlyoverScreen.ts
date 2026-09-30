@@ -1,4 +1,4 @@
-import type { RunType, ShellContext } from "../shell/types";
+import type { ShellContext } from "../shell/types";
 import {
   FLYOVER_HINT_AFTER_SECONDS,
   FLYOVER_RUN_SECONDS,
@@ -18,13 +18,11 @@ import {
 import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH, type WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
-import { createResultsCard } from "../shell/ResultsCard";
 import { shellIcon } from "../shell/icons";
-import { createPracticeBar, createResultsStage, createRunList, formatNumber, insertIntoResults, recordLocalBest, shellOrFallback } from "./practiceRun";
-import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback } from "./practiceRun";
+import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import "../../styles/flyover.css";
 
-const BEST_SCORE_KEY = "locato:flyover:best-score:v1";
 /** Lucide "plane" (ISC licence): drawn on the canvas, nose towards the icon's top-right corner. */
 const PLANE_PATH = "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z";
 const PLANE_SIZE = 34;
@@ -41,8 +39,6 @@ export interface FlyoverScreenOptions {
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly storage: Storage;
   readonly onHome: () => void;
-  /** "timed" (`&run=timed`): a ranked attempt whose country count posts to the Flyover board. */
-  readonly run?: RunType;
 }
 
 export interface FlyoverScreenServices {
@@ -125,7 +121,6 @@ function feedbackTitle(score: number): string {
 export function createFlyoverScreen(options: FlyoverScreenOptions, services: FlyoverScreenServices = {}): Screen {
   const controller = new AbortController();
   const { signal } = controller;
-  const ranked = options.run === "timed";
   const shell = shellOrFallback(options.shell, options.onHome);
   const rng = services.rng ?? Math.random;
   const now = services.now ?? (() => performance.now());
@@ -183,9 +178,9 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
       el("div", {
         className: "flyover-ready-card",
         children: [
-          el("span", { className: "eyebrow", text: ranked ? "Flyover · Ranked attempt" : "Flyover · Practice" }),
+          el("span", { className: "eyebrow", text: "Flyover" }),
           el("h1", { text: "Fly over the named country." }),
-          el("p", { text: `Each country you touch scores a point and names the next. You have ${FLYOVER_RUN_SECONDS} seconds.` }),
+          el("p", { text: `Each country you touch scores a point and names the next. You have ${FLYOVER_RUN_SECONDS} seconds — your best flight goes on the leaderboard.` }),
           el("ul", {
             className: "flyover-howto",
             children: [
@@ -572,7 +567,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     const score = reached.length;
     const fastest = reached.reduce<Reached | null>((best, item) => (!best || item.seconds < best.seconds ? item : best), null);
     const flags = reached.slice(0, 24).map((item) => flagEmoji(item.country.code)).join("");
-    const shareText = `Locato Flyover${ranked ? " (ranked)" : ""} ✈️ ${score} ${score === 1 ? "country" : "countries"} in ${FLYOVER_RUN_SECONDS}s\n${flags}${reached.length > 24 ? "…" : ""}\nlocato.quest`;
+    const shareText = `Locato Flyover ✈️ ${score} ${score === 1 ? "country" : "countries"} in ${FLYOVER_RUN_SECONDS}s\n${flags}${reached.length > 24 ? "…" : ""}\nlocato.quest`;
     const runList = createRunList("Your route", reached.map((item) => ({
       label: item.country.name,
       detail: item.country.continent,
@@ -588,34 +583,21 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
       ...(fastest ? [{ label: "Quickest find", value: `${fastest.seconds.toFixed(1)}s`, note: fastest.country.name }] : []),
     ];
 
-    if (ranked) {
-      const rankedCard = createRankedResults(shell, {
-        mode: "flyover",
-        title: feedbackTitle(score),
-        total: score,
-        stats,
-        ...(missed.length ? { missed, missedTitle: "Skipped — worth another look" } : {}),
-        shareTitle: "Locato Flyover",
-        shareText,
-        onTryAgain: reset,
-        posting: submitRankedAttempt({ shell, mode: "flyover", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) }),
-        tone: score >= 10 ? "celebrate" : "neutral",
-      });
-      if (reached.length) insertIntoResults(rankedCard, runList);
-      resultsStage.show(rankedCard);
-      return;
-    }
-
-    const localBest = recordLocalBest(options.storage, BEST_SCORE_KEY, score);
-    const card = createResultsCard(shell, {
-      kicker: "Flyover · Practice",
-      title: localBest.isNew && localBest.previous > 0 ? "A new best flight!" : feedbackTitle(score),
-      subtitle: score >= 18 ? "You know your way around the world." : score >= 8 ? "Every country gets quicker to find." : "Head for the big ones first, then fill in the neighbours.",
-      stats: [...stats, { label: "Your best", value: formatNumber(localBest.best), note: localBest.isNew ? "New best" : "On this device" }],
+    // Every finished flight counts: it posts, and the board keeps your best.
+    const previousBest = readSingleBest(options.storage, "flyover");
+    const posting = submitRankedAttempt({ shell, mode: "flyover", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    bar.refreshBest();
+    const isNewBest = score > previousBest;
+    const card = createRankedResults(shell, {
+      mode: "flyover",
+      title: isNewBest && previousBest > 0 ? "A new best flight!" : feedbackTitle(score),
+      total: score,
+      stats: [...stats, { label: "Your best", value: formatNumber(Math.max(previousBest, score)), note: isNewBest ? "New best" : "On this device" }],
       ...(missed.length ? { missed, missedTitle: "Skipped — worth another look" } : {}),
-      primary: { label: "Fly again", onClick: reset },
-      share: { title: "Locato Flyover", text: shareText },
-      crossLink: rankedCrossLink(shell, "flyover"),
+      shareTitle: "Locato Flyover",
+      shareText,
+      onTryAgain: reset,
+      posting,
       tone: score >= 10 ? "celebrate" : "neutral",
     });
     if (reached.length) insertIntoResults(card, runList);
@@ -691,14 +673,11 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   const layout = el("main", { className: "flyover-layout", children: [stage] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen flyover-screen gb-screen" });
-  const inProgress = () => phase === "flying";
-  const bar = ranked
-    ? createRankedBar(element, shell, { gameMode: "flyover", inProgress })
-    : createPracticeBar(element, shell, {
-        gameMode: "flyover",
-        leaveGuard: () => (inProgress() ? "You're mid-flight. Leaving ends this run and the score isn't kept." : null),
-        extraMenuItems: [{ label: "Restart flight", icon: "rotate-ccw", onSelect: reset }],
-      });
+  const bar = createBestBar(element, shell, {
+    gameMode: "flyover",
+    storage: options.storage,
+    extraMenuItems: [{ label: "Restart flight", icon: "rotate-ccw", onSelect: reset }],
+  });
   element.append(bar.element, layout, resultsStage.element);
 
   let resizeObserver: ResizeObserver | null = null;
