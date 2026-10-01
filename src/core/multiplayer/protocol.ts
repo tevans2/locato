@@ -1,6 +1,6 @@
 import type { FlagPool } from "../flagPools";
 import type { MapTapCategory } from "../maptap/types";
-import type { FinalResult, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
   | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
@@ -16,6 +16,9 @@ export type ClientMessage =
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_MAPTAP_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_GEOGUESSR_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
+  | { readonly type: "FLYOVER_POSITION"; readonly x: number; readonly y: number; readonly heading: number }
+  | { readonly type: "FLYOVER_REACHED"; readonly index: number; readonly x: number; readonly y: number; readonly clientSentAt: number }
+  | { readonly type: "FLYOVER_SKIP"; readonly index: number }
   | { readonly type: "VOTE_SKIP" }
   | { readonly type: "SEND_CHAT_MESSAGE"; readonly text: string }
   | { readonly type: "REQUEST_HINT" };
@@ -32,6 +35,12 @@ export type ServerMessage =
   | { readonly type: "ROUND_ENDED"; readonly answer: string; readonly results: readonly RoundResult[] }
   | { readonly type: "MAPTAP_ROUND_ENDED"; readonly targetName: string; readonly targetLat: number; readonly targetLng: number; readonly wikiSlug: string; readonly results: readonly MapTapRoundResult[] }
   | { readonly type: "GEOGUESSR_ROUND_ENDED"; readonly countryName: string; readonly targetLat: number; readonly targetLng: number; readonly results: readonly GeoGuessrRoundResult[] }
+  | { readonly type: "FLYOVER_PLANES"; readonly planes: readonly FlyoverPlanePosition[] }
+  /**
+   * A racer moved along the route: "reached" scores, "skipped" doesn't, and "sync" goes to one
+   * player only, correcting a claim the server turned down.
+   */
+  | { readonly type: "FLYOVER_PROGRESS"; readonly playerId: string; readonly index: number; readonly score: number; readonly event: FlyoverProgressEvent }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
 
