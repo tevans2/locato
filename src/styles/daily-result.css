@@ -39,3 +39,69 @@
 @media (max-width: 520px) {
   #app #daily-result .daily-result-actions .shell-btn { flex: 1 1 0; }
 }
+
+#app .daily-intro-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+  width: min(760px, 100%);
+  padding-top: clamp(28px, 5vw, 52px);
+}
+
+#app .daily-intro-panel .daily-result-kicker {
+  margin: 0;
+  color: var(--brand);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+#app .daily-theme-title {
+  margin: 0;
+  font-family: var(--font-editorial);
+  font-size: clamp(2.5rem, 6vw, 4.6rem);
+  font-weight: 430;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+#app .daily-intro-description { margin: 0; color: var(--muted); font-size: 1.08rem; line-height: 1.65; max-width: 600px; }
+#app .daily-intro-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+#app .daily-intro-meta span { padding: 7px 12px; border: 1px solid var(--border); border-radius: 100px; font-size: .78rem; font-weight: 700; }
+#app .daily-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 10px; }
+#app .daily-format article { display: flex; flex-direction: column; gap: 9px; border: 1px solid var(--border); border-radius: 14px; padding: 18px; background: var(--surface); }
+#app .daily-format article svg { color: var(--brand); margin-bottom: 6px; }
+#app .daily-format article span { color: var(--muted); font-size: .73rem; }
+#app .daily-format article strong { font-size: .92rem; }
+#app .daily-intro-balance { margin: 0; font-size: .86rem; line-height: 1.7; color: var(--muted); }
+#app .daily-scoring { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+#app .daily-scoring h2 { margin: 0 0 10px; font-size: 1rem; }
+#app .daily-scoring p { margin: 0; font-size: .86rem; line-height: 1.7; }
+#app .daily-scoring p + p { margin-top: 10px; }
+#app .daily-resume-note { margin: 0; font-size: .86rem; color: var(--brand); }
+#app .daily-start-button { min-height: 48px; }
+#app .daily-result-theme { margin: 0; font-family: var(--font-editorial); font-size: 1.8rem; font-weight: 430; }
+#app .daily-recap { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; width: 100%; padding: 24px 0; }
+#app .daily-recap-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; }
+#app .daily-recap-heading h2 { margin: 0; font-size: 1.2rem; }
+#app .daily-recap-heading span { font-size: .78rem; }
+#app .daily-recap-list { list-style: none; margin: 0; padding: 0; width: 100%; }
+#app .daily-recap-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+#app .daily-recap-number { color: var(--muted); font-size: .8rem; }
+#app .daily-recap-answer { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#app .daily-recap-mode { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+#app .daily-recap-answer strong { font-size: .94rem; overflow-wrap: anywhere; }
+#app .daily-recap-reason { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+#app .daily-recap-points { color: var(--brand); font-size: .9rem; }
+#app .daily-recap-row.has-loss .daily-recap-points { color: var(--text); }
+#app .daily-recap > p { margin: 0; font-size: .82rem; line-height: 1.6; }
+
+@media (max-width: 520px) {
+  #app .daily-format { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #app .daily-format article { padding: 14px; }
+  #app .daily-start-button { width: 100%; }
+  #app .daily-recap-row { gap: 9px; grid-template-columns: 22px minmax(0, 1fr) auto; }
+}

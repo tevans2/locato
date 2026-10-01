@@ -1,4 +1,8 @@
-import { DAILY_MAX_SCORE, formatDailyTime } from "../../core/dailyChallenge";
+import { DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, formatDailyTime, type DailyRoundResult } from "../../core/dailyChallenge";
+import { dailyThemeForDate } from "../../core/dailyThemes";
+import { getCategory } from "../../core/categories";
+import type { CountryIndex } from "../../core/countries";
+import { findMapTapLocation } from "../../core/maptap/locations";
 import type { ShellContext } from "../shell/types";
 import { fetchDailyLeaderboard, fetchDailySummary, type DailyChallengeResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
@@ -15,6 +19,8 @@ export interface DailyResultScreenOptions {
   readonly shell: ShellContext;
   readonly result: DailyResultSave;
   readonly storage: Storage;
+  readonly countryIndex: CountryIndex;
+  readonly onPractice: () => void;
 }
 
 export function createDailyResultScreen(options: DailyResultScreenOptions): Screen {
@@ -27,6 +33,34 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const share = el("pre", { className: "daily-share-text", text: result.shareText });
   const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
   const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
+  const practiceRounds = result.rounds?.filter((round) => round.points < DAILY_POINTS_PER_ROUND) ?? [];
+
+  function roundExplanation(round: DailyRoundResult): string {
+    if (round.missed) return "Passed or revealed · 0 points";
+    if (round.categoryId === "map-tap") return `${Math.round(round.distanceKm ?? 0).toLocaleString("en-US")} km from target · ${10 - round.points} points lost`;
+    if (round.points === 10) return "Correct first time";
+    const reasons = [round.hintsUsed > 0 ? `${round.hintsUsed} hint${round.hintsUsed === 1 ? "" : "s"}` : "", round.wrongGuesses > 0 ? `${round.wrongGuesses} wrong guess${round.wrongGuesses === 1 ? "" : "es"}` : ""].filter(Boolean);
+    return `${reasons.join(" · ")} · ${10 - round.points} points lost`;
+  }
+
+  const recap = el("section", { className: "daily-recap", attrs: { "aria-label": "Round by round review" }, children: [
+    el("div", { className: "daily-recap-heading", children: [el("h2", { text: "Your world tour" }), el("span", { className: "muted", text: "Answers & points" })] }),
+    result.rounds?.length
+      ? el("ol", { className: "daily-recap-list", children: result.rounds.map((round, position) => {
+          const country = round.countryCode ? options.countryIndex.byCode.get(round.countryCode) : undefined;
+          const location = round.targetId ? findMapTapLocation(round.targetId) : undefined;
+          const answer = location ? `${location.name} (${location.lat.toFixed(2)}°, ${location.lng.toFixed(2)}°)`
+            : round.categoryId === "capitals" ? `${country?.capital ?? ""} → ${country?.name ?? round.countryCode}` : country?.name ?? round.countryCode ?? "";
+          const label = round.categoryId === "map-tap" ? "Map Tap" : round.categoryId === "streetview-country" ? "Street View" : getCategory(round.categoryId)?.label ?? round.categoryId;
+          return el("li", { className: `daily-recap-row${round.points < 10 ? " has-loss" : ""}`, children: [
+            el("span", { className: "daily-recap-number", text: String(position + 1) }),
+            el("div", { className: "daily-recap-answer", children: [el("span", { className: "daily-recap-mode", text: label }), el("strong", { text: answer }), el("span", { className: "daily-recap-reason", text: roundExplanation(round) })] }),
+            el("strong", { className: "daily-recap-points", text: `${round.points}/10` }),
+          ] });
+        }) })
+      : el("p", { className: "muted", text: "Detailed review is available for newly played daily challenges." }),
+    ...(practiceRounds.length ? [el("button", { className: "shell-btn shell-btn-primary", text: "Practise what you missed", attrs: { type: "button", "data-action": "practice-daily" }, on: { click: options.onPractice } }), el("p", { className: "muted", text: `Revisit ${practiceRounds.length} question${practiceRounds.length === 1 ? "" : "s"} where you lost points. Practice won't change your daily score.` })] : result.rounds ? [el("p", { className: "daily-clean-sweep", text: "A perfect tour — every round earned full points." })] : []),
+  ] });
 
   function summaryStat(label: string, value: string): HTMLElement {
     return el("article", { children: [el("span", { text: label }), el("strong", { text: value })] });
@@ -154,6 +188,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
         className: "daily-result-panel",
         children: [
           el("p", { className: "daily-result-kicker", text: `Daily challenge · ${result.date}` }),
+          ...(result.challengeVersion === 2 ? [el("h2", { className: "daily-result-theme", text: dailyThemeForDate(result.date).title })] : []),
           el("h1", { className: "daily-result-score", children: [el("strong", { text: String(result.score) }), el("span", { text: `/${DAILY_MAX_SCORE}` })] }),
           el("div", {
             className: "daily-result-stats",
@@ -165,7 +200,8 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
           }),
           el("div", { className: "daily-result-actions", children: [shareButton, homeButton] }),
           share,
-          el("div", { className: "daily-legend", children: [el("span", { text: "🟩 correct without hint" }), el("span", { text: "🟨 correct with hint" }), el("span", { text: "🟥 missed or skipped" })] }),
+          el("div", { className: "daily-legend", children: [el("span", { text: "🟩 full points" }), el("span", { text: "🟨 assisted or partial" }), el("span", { text: "🟥 missed or passed" })] }),
+          recap,
           achievementList(achievementResult.unlocked),
           leaderboardPanel,
           retentionPanel,

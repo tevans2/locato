@@ -1,4 +1,5 @@
 import type { RunType, ShellContext } from "../shell/types";
+import { scoreDailyMapTapRound } from "../../core/dailyChallenge";
 import type { Screen } from "../../app/router";
 import { fetchMapTapRound, fetchWikipediaSummary, isValidLatLng, MAP_TAP_CATEGORY_OPTIONS, MAP_TAP_DEFAULT_DECAY_KM, MAP_TAP_LOCATIONS, MAP_TAP_MAX_SCORE, normalizeLongitude, scoreMapTapGuess, validateMapTapGuess, type MapTapCategory, type MapTapDifficulty, type MapTapGuessResult, type MapTapLocation, type MapTapRoundTarget } from "../../core/maptap";
 import { describeMapTapSkill, difficultyForSkill, defaultMapTapSkill, readMapTapSkill, recordMapTapResult, saveMapTapSkill } from "../../core/maptap/skill";
@@ -46,8 +47,12 @@ export interface MapTapScreenOptions {
   readonly storage?: Storage;
   readonly dailyChallenge?: {
     readonly date: string;
+    readonly title?: string;
+    readonly practice?: boolean;
     readonly target: MapTapLocation;
     readonly onComplete: (result: MapTapGuessResult) => void;
+    /** Save the scored pin before showing its answer, so refreshing cannot replay it. */
+    readonly onResult?: (result: MapTapGuessResult) => void;
     /** Where this stage sits in today's daily ("Round 9 of 10"), for the FocusBar. */
     readonly progress?: DailyStageProgress;
   };
@@ -266,14 +271,14 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   function renderResult(result: MapTapGuessResult): void {
     resultPanel.hidden = false;
     const lastOfRun = !isDailyChallenge && runResults.length >= runLength;
-    newRoundButton.textContent = isDailyChallenge ? "Continue daily challenge" : lastOfRun ? "See results" : "Next target";
+    newRoundButton.textContent = isDailyChallenge ? options.dailyChallenge?.practice ? "Continue practice" : "Continue daily challenge" : lastOfRun ? "See results" : "Next target";
     const insideZone = result.distanceKm <= result.toleranceKm;
     const zoneNote = insideZone ? ` — right in the ${formatNumber(result.toleranceKm)} km target zone` : "";
     const verdict = result.score / result.maxScore >= 0.6 ? "Great pin!" : insideZone ? "Nailed the area!" : "Not quite — trace the line on the globe, then try the next one.";
     resultPanel.replaceChildren(
       newRoundButton,
       el("p", { className: "maptap-result-verdict", text: `${verdict} ${result.target.name} is highlighted on the globe.` }),
-      el("div", { className: "maptap-result-score", children: [el("span", { text: "Score" }), el("strong", { text: `${formatNumber(result.score)}/${formatNumber(result.maxScore)}` })] }),
+      el("div", { className: "maptap-result-score", children: [el("span", { text: isDailyChallenge ? "Round score" : "Score" }), el("strong", { text: isDailyChallenge ? `${scoreDailyMapTapRound(result.score, result.maxScore)}/10` : `${formatNumber(result.score)}/${formatNumber(result.maxScore)}` })] }),
       el("div", { className: "maptap-result-stat", children: [el("span", { text: "Distance" }), el("strong", { text: `${formatKm(result.distanceKm)}${zoneNote}` })] }),
       el("div", { className: "maptap-result-stat", children: [el("span", { text: "Actual" }), el("strong", { text: `${result.target.name} (${formatCategory(result.target.category)})` })] }),
     );
@@ -332,7 +337,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
       adaptiveRoundIndex += 1;
       statusText.textContent = `Rotate or zoom the globe, then click once as close as you can. ${describeMapTapSkill(skill.level)}`;
     } else {
-      statusText.textContent = "Daily MapTap: click once as close as you can.";
+      statusText.textContent = `${options.dailyChallenge?.practice ? "Practice" : "Daily"} MapTap: click once as close as you can.`;
     }
     globe.reset();
     globe.setAcceptingGuesses(true);
@@ -385,6 +390,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     }
 
     activeResult = result;
+    options.dailyChallenge?.onResult?.(result);
     if (!isDailyChallenge) {
       runResults.push(result);
       // A ranked attempt leaves the adaptive skill alone (its difficulty mix is fixed).
@@ -396,7 +402,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     setControlsDisabled(false);
     renderRunProgress();
     statusText.textContent = isDailyChallenge
-      ? "Result revealed. Continue to the next daily round."
+      ? options.dailyChallenge?.practice ? "Result revealed. Continue your practice." : "Result revealed. Continue to the next daily round."
       : ranked ? `${formatNumber(result.score)} points. ${runResults.length} of ${runLength} targets pinned.` : describeMapTapSkill(skill.level);
     globe.reveal(result);
     renderResult(result);
@@ -586,7 +592,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     className: "maptap-play-panel",
     attrs: isDailyChallenge || ranked ? {} : { hidden: "true" },
     children: [
-      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · MapTap" : ranked ? "MapTap · Ranked attempt" : "MapTap" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta] }),
+      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? `${options.dailyChallenge?.practice ? "Daily practice" : "Daily challenge"} · MapTap` : ranked ? "MapTap · Ranked attempt" : "MapTap" }), el("h1", { text: "Click on:" }), promptTarget, promptMeta] }),
       runProgress,
       statusText,
       el("div", { className: "maptap-current-selection", attrs: isDailyChallenge ? { hidden: "true" } : {}, children: [el("span", { className: "stat-label", text: "Playing" }), activeCategoriesLabel] }),
@@ -608,6 +614,8 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   const bar = isDailyChallenge
     ? createDailyStageBar(element, {
         stage: "MapTap",
+        ...(options.dailyChallenge?.title ? { title: options.dailyChallenge.title } : {}),
+        practice: options.dailyChallenge?.practice ?? false,
         ...(options.dailyChallenge?.progress ? { progress: options.dailyChallenge.progress } : {}),
         onLeave: options.onHome,
       })

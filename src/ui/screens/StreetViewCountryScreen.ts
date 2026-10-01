@@ -9,6 +9,7 @@ import { el } from "../dom/createElement";
 import { createFeedbackView, showFeedback } from "../dom/renderFeedback";
 import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { createDailyStageBar, createResultsStage, createRunList, insertIntoResults, shellOrFallback, type DailyStageProgress } from "./practiceRun";
+import { scoreDailyRound } from "../../core/dailyChallenge";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 
 /** A practice run is this many countries; then the results screen. */
@@ -26,6 +27,9 @@ export interface StreetViewCountryScreenOptions {
   readonly storage?: Storage;
   readonly dailyChallenge?: {
     readonly date: string;
+    readonly title?: string;
+    readonly practice?: boolean;
+    readonly onResult?: (result: { readonly missed: boolean; readonly wrongGuesses: number }) => void;
     readonly round: StreetViewCountryRound;
     readonly onComplete: (result: { readonly missed: boolean; readonly wrongGuesses: number }) => void;
     /** Where this stage sits in today's daily ("Round 9 of 10"), for the FocusBar. */
@@ -302,7 +306,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const answerPanel = el("aside", {
     className: "answer-panel streetview-panel",
     children: [
-      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? "Daily challenge · Street View" : "Street View country" }), el("h2", { text: "Guess the country" })] }),
+      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? `${options.dailyChallenge?.practice ? "Daily practice" : "Daily challenge"} · Street View` : "Street View country" }), el("h2", { text: "Guess the country" })] }),
       el("p", {
         className: "streetview-rules",
         text: isDailyChallenge
@@ -327,6 +331,8 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const bar = isDailyChallenge
     ? createDailyStageBar(element, {
         stage: "Street View",
+        ...(options.dailyChallenge?.title ? { title: options.dailyChallenge.title } : {}),
+        practice: options.dailyChallenge?.practice ?? false,
         ...(options.dailyChallenge?.progress ? { progress: options.dailyChallenge.progress } : {}),
         onLeave: options.onHome,
       })
@@ -654,12 +660,13 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     const progress = options.dailyChallenge?.progress;
     const isLastStage = !progress || progress.round >= progress.total;
     if (isLastStage) return streetViewFullscreen ? "Results" : "See results";
-    return streetViewFullscreen ? "Continue" : "Continue daily challenge";
+    return streetViewFullscreen ? "Continue" : options.dailyChallenge?.practice ? "Continue practice" : "Continue daily challenge";
   }
 
   function queueDailyStreetViewResult(result: DailyStreetViewResult): void {
     if (!options.dailyChallenge || dailyCompleted) return;
     pendingDailyResult = result;
+    options.dailyChallenge.onResult?.(result);
   }
 
   function completeDailyStreetView(): void {
@@ -758,7 +765,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
         status = "won";
         queueDailyStreetViewResult({ missed: false, wrongGuesses: attemptIndex });
         render();
-        showFeedback(feedback, `Correct — ${countryName}.`, "good");
+        showFeedback(feedback, `Correct — ${countryName}. +${scoreDailyRound(0, false, attemptIndex)} points.`, "good");
         return;
       }
       recordRunRound(true, guessedCountryIds.size);

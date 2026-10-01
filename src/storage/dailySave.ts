@@ -1,4 +1,4 @@
-import { createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, type DailyRoundMark } from "../core/dailyChallenge";
+import { createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, parseDailyRoundResults, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import type { SoloSave } from "./localSave";
 
 const DAILY_SAVE_PREFIX = "locato:daily:";
@@ -15,6 +15,8 @@ export interface DailyResultSave {
   readonly marks: readonly DailyRoundMark[];
   readonly shareText: string;
   readonly completedAt: number;
+  readonly challengeVersion?: 2;
+  readonly rounds?: readonly DailyRoundResult[];
 }
 
 function dailySaveScope(userId?: string | null): string {
@@ -59,6 +61,11 @@ function parseDailyResult(raw: string, date: string): DailyResultSave | null {
       typeof parsed.shareText !== "string"
     ) {
       return null;
+    }
+    if (parsed.rounds !== undefined) {
+      const rounds = parseDailyRoundResults(parsed.rounds);
+      if (!rounds || rounds.length !== DAILY_COUNTRY_COUNT || rounds.reduce((sum, round) => sum + round.points, 0) !== parsed.score) return null;
+      return { ...parsed, rounds } as DailyResultSave;
     }
     return parsed as DailyResultSave;
   } catch {
@@ -106,6 +113,8 @@ export interface DailyProgressSave {
   readonly roundHintsUsed: number;
   readonly roundWrongGuesses: number;
   readonly updatedAt: number;
+  readonly challengeVersion?: 2;
+  readonly rounds?: readonly DailyRoundResult[];
 }
 
 export function dailyProgressKey(userId?: string | null): string {
@@ -143,11 +152,17 @@ export function readDailyProgress(storage: Storage, date: string, seed: string, 
       typeof parsed.hintsUsed === "number" &&
       typeof parsed.elapsedMs === "number";
     if (valid) {
+      const rounds = parsed.rounds === undefined ? undefined : parseDailyRoundResults(parsed.rounds);
+      if (rounds === null || (rounds && (rounds.length !== parsed.marks!.length || rounds.reduce((sum, round) => sum + round.points, 0) !== parsed.score))) {
+        storage.removeItem(key);
+        return null;
+      }
       return {
         ...(parsed as DailyProgressSave),
         engine: parsed.engine ?? null,
         roundHintsUsed: parsed.roundHintsUsed ?? 0,
         roundWrongGuesses: parsed.roundWrongGuesses ?? 0,
+        ...(rounds ? { rounds } : {}),
       };
     }
   } catch {

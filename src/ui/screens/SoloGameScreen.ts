@@ -1,9 +1,9 @@
 import type { AuthUser } from "../../core/auth";
 import type { RunType, ShellContext } from "../shell/types";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
-import { getCategory } from "../../core/categories";
+import { buildPromptSlots, getCategory, type PromptSlot } from "../../core/categories";
 import { matchesCapitalName } from "../../core/categories/matching";
-import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark } from "../../core/dailyChallenge";
+import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
 import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
 import { getGameModeOption, isLeaderboardMode, type GameModeId, type PromptGameModeId } from "../../core/gameModes";
 import { getCurrentCountry, TOTAL_HINTS, type GameEngine, type GameEvent, type GameState } from "../../core/game";
@@ -42,6 +42,7 @@ export interface DailyPromptProgress {
   /** Penalties already taken on the round in progress. */
   readonly roundHintsUsed: number;
   readonly roundWrongGuesses: number;
+  readonly rounds?: readonly DailyRoundResult[];
 }
 
 export interface SoloGameScreenOptions {
@@ -77,13 +78,17 @@ export interface SoloGameScreenOptions {
   readonly worldCountryFeatures?: readonly WorldCountryFeature[];
   readonly dailyChallenge?: {
     readonly date: string;
-    readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[] }) => void;
+    readonly onComplete: (result: { readonly score: number; readonly timeMs: number; readonly hintsUsed: number; readonly marks: readonly DailyRoundMark[]; readonly rounds: readonly DailyRoundResult[] }) => void;
+    readonly title?: string;
+    readonly practice?: boolean;
+    readonly promptSlots?: readonly PromptSlot[];
     /** Progress restored from a saved daily (the engine carries the matching state). */
     readonly initialProgress?: DailyPromptProgress;
     /** Called after every answer, hint or wrong guess so the daily can be saved and resumed. */
     readonly onProgress?: (progress: DailyPromptProgress) => void;
     /** Rounds across every daily stage (default DAILY_COUNTRY_COUNT); the prompt stage is first. */
     readonly totalRounds?: number;
+    readonly roundOffset?: number;
   };
 }
 
@@ -116,6 +121,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const countries = visibleCountries(countryIndex, initialState);
   const restoredDaily = options.dailyChallenge?.initialProgress;
   const dailyMarks: DailyRoundMark[] = [...(restoredDaily?.marks ?? [])];
+  const dailyRounds: DailyRoundResult[] = [...(restoredDaily?.rounds ?? [])];
+  const dailyAssignments = new Map((options.dailyChallenge?.promptSlots ?? buildPromptSlots(countryIndex, initialState.categoryIds, initialState.seed)).map((slot) => [slot.countryId, slot.categoryId]));
   let dailyHintsUsed = restoredDaily?.hintsUsed ?? 0;
   let dailyRoundHintsUsed = restoredDaily?.roundHintsUsed ?? 0;
   let dailyRoundWrongGuesses = restoredDaily?.roundWrongGuesses ?? 0;
@@ -282,13 +289,14 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         hideHintPopover();
         const country = countryIndex.byId[event.countryId];
         if (options.selectedGameMode === "capital-recall") latestCapitalRecallCountryId = event.countryId;
-        if (country) showFeedback(views.feedback, `Correct: ${answerLabelFor(country)}. +${event.points} points.`, "good");
+        const points = isDailyChallenge ? dailyRounds.at(-1)?.points ?? 0 : event.points;
+        if (country) showFeedback(views.feedback, `Correct: ${answerLabelFor(country)}. +${points} points.`, "good");
         continue;
       }
 
       if (event.type === "GUESS_WRONG") {
         revealAnswerArmed = false;
-        showFeedback(views.feedback, "Not quite. Streak reset, prompt still live.", "bad");
+        showFeedback(views.feedback, isDailyChallenge ? `Not quite. This round is now worth up to ${scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses)} points. Try again.` : "Not quite. Streak reset, prompt still live.", "bad");
         continue;
       }
 
@@ -307,7 +315,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         revealAnswerArmed = false;
         if (!isDailyChallenge) soloHintsUsed += 1;
         showHintPopover(event.hint.title, event.hint.message);
-        showFeedback(views.feedback, "Hint ready.", "neutral");
+        showFeedback(views.feedback, isDailyChallenge ? `Hint ready. This round is now worth up to ${scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses)} points.` : "Hint ready.", "neutral");
         continue;
       }
 
@@ -503,6 +511,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   function render(persist = true): void {
     const state = engine.getState();
     const current = getCurrentCountry(countryIndex, state);
+    const displayRound = state.roundNumber + (options.dailyChallenge?.roundOffset ?? 0);
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
     const content = current && category ? category.prompt(current) : null;
     const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
@@ -522,6 +531,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       });
     } else {
       updateStatsView(stats, countryIndex, state);
+      if (isDailyChallenge) {
+        stats.scoreLabel.textContent = options.dailyChallenge?.practice ? "Round score" : "Daily score";
+        stats.score.textContent = `${dailyScore}/${options.dailyChallenge?.practice ? 10 : 100}`;
+        const total = options.dailyChallenge?.totalRounds ?? DAILY_COUNTRY_COUNT;
+        const completed = dailyMarks.length + (options.dailyChallenge?.roundOffset ?? 0);
+        stats.remaining.textContent = String(Math.max(0, total - completed));
+        stats.progress.textContent = `${completed} of ${total} rounds completed`;
+        stats.progressFill.style.transform = `scaleX(${(completed / total).toFixed(4)})`;
+      }
     }
     if (isCapitalRecallMode && capitalRecallMap) {
       activeFlagColorTarget = null;
@@ -540,7 +558,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       );
     } else if ((content?.kind === "map-click" || content?.kind === "map-highlight") && dailyMap) {
       activeFlagColorTarget = null;
-      prompt.status.textContent = `Round ${state.roundNumber}`;
+      prompt.status.textContent = `Round ${displayRound}`;
       prompt.kicker.textContent = category?.label ?? "Map";
       prompt.imageSlot.replaceChildren(
         el("div", {
@@ -577,7 +595,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       activeFlagColorTarget = null;
       activeMapPromptKey = null;
       if (dailyMap) setWorldMapTargetCountry(dailyMap, null);
-      updatePromptView(prompt, content, state.roundNumber, category?.label ?? "Prompt");
+      updatePromptView(prompt, content, displayRound, category?.label ?? "Prompt");
     }
     updateAtlasView(atlas, countries, freePlayEnabled ? freePlayGuessedCountryIds : state.guessedCountryIds);
     const playing = state.status === "playing";
@@ -615,13 +633,17 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     }
     if (engine.getState().status === "playing" && shouldAutoFocusTextInput()) input.focus();
     if (isDailyChallenge && events.length > 0) {
-      options.dailyChallenge?.onProgress?.({ score: dailyScore, hintsUsed: dailyHintsUsed, marks: [...dailyMarks], roundHintsUsed: dailyRoundHintsUsed, roundWrongGuesses: dailyRoundWrongGuesses });
+      options.dailyChallenge?.onProgress?.({ score: dailyScore, hintsUsed: dailyHintsUsed, marks: [...dailyMarks], rounds: [...dailyRounds], roundHintsUsed: dailyRoundHintsUsed, roundWrongGuesses: dailyRoundWrongGuesses });
     }
     if (isDailyChallenge) renderDailyProgress();
     if (isDailyChallenge) completeDailyIfNeeded(events);
   }
 
   function recordDailyEvents(events: readonly GameEvent[]): void {
+    function recordRound(countryId: CountryId, missed: boolean): void {
+      dailyRounds.push({ categoryId: dailyAssignments.get(countryId) ?? "flags", countryCode: countryIndex.byId[countryId]!.code,
+        points: scoreDailyRound(dailyRoundHintsUsed, missed, dailyRoundWrongGuesses), hintsUsed: dailyRoundHintsUsed, wrongGuesses: dailyRoundWrongGuesses, missed });
+    }
     for (const event of events) {
       if (event.type === "HINT_REVEALED") {
         dailyHintsUsed += 1;
@@ -635,6 +657,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "GUESS_CORRECT") {
+        recordRound(event.countryId, false);
         dailyScore += scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses);
         dailyMarks.push(dailyRoundHintsUsed > 0 || dailyRoundWrongGuesses > 0 ? "hint" : "correct");
         dailyRoundHintsUsed = 0;
@@ -643,6 +666,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       }
 
       if (event.type === "ANSWER_REVEALED" || event.type === "ROUND_SKIPPED") {
+        recordRound(event.type === "ANSWER_REVEALED" ? event.countryId : event.previousCountryId, true);
         dailyScore += scoreDailyRound(dailyRoundHintsUsed, true, dailyRoundWrongGuesses);
         dailyMarks.push("miss");
         dailyRoundHintsUsed = 0;
@@ -661,6 +685,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       timeMs: Math.max(0, (state.endedAt ?? Date.now()) - (state.startedAt ?? Date.now())),
       hintsUsed: dailyHintsUsed,
       marks: [...dailyMarks],
+      rounds: [...dailyRounds],
     });
   }
 
@@ -817,17 +842,18 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const dailyRoundLabel = el("span", { className: "daily-round-label" });
   function renderDailyProgress(): void {
     if (!focusBar) return;
-    const done = Math.min(dailyMarks.length, dailyTotalRounds);
+    const done = Math.min(dailyMarks.length + (options.dailyChallenge?.roundOffset ?? 0), dailyTotalRounds);
     const round = Math.min(done + 1, dailyTotalRounds);
-    dailyRoundLabel.textContent = `Round ${round} of ${dailyTotalRounds}`;
-    focusBar.setProgress(done / dailyTotalRounds, `Round ${round} of ${dailyTotalRounds}`);
+    const label = `${options.dailyChallenge?.practice ? "Review" : "Round"} ${round} of ${dailyTotalRounds}`;
+    dailyRoundLabel.textContent = label;
+    focusBar.setProgress(done / dailyTotalRounds, label);
   }
   if (isDailyChallenge) {
     focusBar = createFocusBar({
       // App's exit says "Your daily progress is saved — resume any time today".
       onClose: () => (options.onExitDailyChallenge ?? (() => shell?.openSection("daily")))(),
-      closeLabel: "Leave the daily challenge (progress is saved)",
-      title: "Daily challenge",
+      closeLabel: options.dailyChallenge?.practice ? "Back to daily result" : "Leave the daily challenge (progress is saved)",
+      title: options.dailyChallenge?.title ?? "Daily challenge",
       progress: 0,
       progressLabel: "Daily challenge progress",
       trailing: dailyRoundLabel,

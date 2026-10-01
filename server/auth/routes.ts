@@ -8,6 +8,7 @@ import { handleAdminRoutes, type AdminRouteContext } from "../admin/routes";
 import { MAX_ACADEMY_PAYLOAD_BYTES } from "../academy/validation";
 import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
+import { parseDailyRoundResults, scoreDailyRound } from "../../src/core/dailyChallenge";
 
 const MAX_STAT_VALUE = 1_000_000;
 const DAILY_COUNTRY_COUNT = 10;
@@ -164,6 +165,15 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
   if (!isDurationMs(timeMs) || !isNonNegInt(hintsUsed)) return null;
   const parsedMarks = parseDailyMarks(marks);
   if (!parsedMarks) return null;
+  const rounds = body.rounds === undefined ? undefined : parseDailyRoundResults(body.rounds);
+  if (rounds === null || (body.challengeVersion !== undefined && body.challengeVersion !== 2)) return null;
+  if (rounds && (rounds.length !== DAILY_COUNTRY_COUNT || rounds.reduce((sum, round) => sum + round.points, 0) !== score ||
+    rounds.reduce((sum, round) => sum + round.hintsUsed, 0) !== hintsUsed ||
+    rounds.some((round, i) => {
+      const expectedMark = round.missed ? "miss" : round.categoryId === "map-tap" ? round.points === 10 ? "correct" : round.points > 0 ? "hint" : "miss" : round.hintsUsed > 0 || round.wrongGuesses > 0 ? "hint" : "correct";
+      return parsedMarks[i] !== expectedMark || (round.categoryId !== "map-tap" && scoreDailyRound(round.hintsUsed, round.missed, round.wrongGuesses) !== round.points);
+    }))) return null;
+  if (body.challengeVersion === 2 && !rounds) return null;
   return {
     date,
     seed,
@@ -173,6 +183,8 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
     marks: parsedMarks,
     shareText: createDailyShareText(date, score, timeMs, parsedMarks),
     completedAt: isTimestampMs(completedAt) ? completedAt : Date.now(),
+    ...(body.challengeVersion === 2 ? { challengeVersion: 2 } : {}),
+    ...(rounds ? { rounds } : {}),
   };
 }
 

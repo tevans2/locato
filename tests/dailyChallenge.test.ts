@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDailyChallenge, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, formatDailyTime, scoreDailyMapTapRound, scoreDailyRound } from "../src/core/dailyChallenge";
-import { indexCountries, type RawCountry } from "../src/core/countries";
+import { createDailyChallenge, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, formatDailyTime, scoreDailyMapTapRound, scoreDailyRound, parseDailyRoundResults } from "../src/core/dailyChallenge";
+import { indexCountries, rawCountries, type RawCountry } from "../src/core/countries";
+import { fameTier } from "../src/core/countries/fame";
+import { createGameEngine } from "../src/core/game";
+import { createSoloSave, hydrateGameState } from "../src/storage/localSave";
+import { findMapTapLocation } from "../src/core/maptap/locations";
 
 const fixtureCountries = Array.from({ length: 14 }, (_, index) => {
   const number = index + 1;
@@ -35,6 +39,51 @@ describe("daily challenge", () => {
     const second = createDailyChallenge(index, "2026-06-12");
 
     expect([second.countryIds, second.mapTapTargetId, second.streetViewCountryCode]).not.toEqual([first.countryIds, first.mapTapTargetId, first.streetViewCountryCode]);
+  });
+
+  it("keeps a fixed format, difficulty balance and thematic connection across a month", () => {
+    const index = indexCountries(rawCountries);
+    const themes = new Set<string>();
+    for (let day = 1; day <= 31; day++) {
+      const challenge = createDailyChallenge(index, `2026-10-${String(day).padStart(2, "0")}`);
+      themes.add(challenge.theme!.id);
+      expect(challenge.promptSlots!.map((slot) => slot.categoryId)).toEqual(["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"]);
+      expect(challenge.countryIds.map((id) => fameTier(index.byId[id]!.code))).toEqual([1, 1, 2, 2, 1, 3, 2, 3]);
+      expect(new Set(challenge.countryIds).size).toBe(8);
+      for (const position of [0, 2, 4, 6]) expect(challenge.theme!.countryCodes).toContain(index.byId[challenge.countryIds[position]!]!.code);
+      expect(challenge.theme!.mapTapTargetIds).toContain(challenge.mapTapTargetId);
+      expect(findMapTapLocation(challenge.mapTapTargetId)!.difficulty).not.toBe("hard");
+      expect(challenge.theme!.countryCodes).toContain(challenge.streetViewCountryCode);
+      expect(index.byCode.has(challenge.streetViewCountryCode)).toBe(true);
+    }
+    expect(themes.size).toBe(7);
+  });
+
+  it("plays and resumes the explicit daily categories instead of reassigning them", () => {
+    const index = indexCountries(rawCountries);
+    const challenge = createDailyChallenge(index, "2026-10-01");
+    const input = { countryIndex: index, categoryIds: challenge.categoryIds, seed: challenge.seed, promptSlots: challenge.promptSlots!, poolOrdering: "fixed" as const };
+    const engine = createGameEngine(input);
+    for (const [position, slot] of challenge.promptSlots!.entries()) {
+      expect(engine.getState()).toMatchObject({ currentCountryId: slot.countryId, currentCategoryId: slot.categoryId, roundNumber: position + 1 });
+      const saved = createSoloSave(index, engine.getState(), 10_000);
+      const resumed = createGameEngine({ ...input, initialState: hydrateGameState(index, saved)! });
+      expect(resumed.getState().currentCategoryId).toBe(slot.categoryId);
+      const country = index.byId[slot.countryId]!;
+      engine.dispatch({ type: "SUBMIT_GUESS", value: slot.categoryId === "pick-country" ? country.code : country.name, now: 11_000 });
+    }
+    expect(engine.getState().status).toBe("complete");
+    engine.dispatch({ type: "RESET_GAME", now: 12_000 });
+    expect(engine.getState().currentCountryId).toBe(challenge.countryIds[0]);
+  });
+
+  it("rejects malformed review details and preserves a zero-point correct round", () => {
+    const round = { categoryId: "flags", countryCode: "JP", points: 0, hintsUsed: 3, wrongGuesses: 1, missed: false };
+    expect(parseDailyRoundResults([round])).toEqual([round]);
+    expect(parseDailyRoundResults([{ ...round, points: 11 }])).toBeNull();
+    expect(parseDailyRoundResults([{ ...round, categoryId: "invalid" }])).toBeNull();
+    expect(parseDailyRoundResults([{ ...round, countryCode: "<script>" }])).toBeNull();
+    expect(parseDailyRoundResults([{ ...round, categoryId: "map-tap", targetId: "tokyo", distanceKm: Infinity }])).toBeNull();
   });
 
   it("formats time and share text", () => {

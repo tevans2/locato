@@ -108,7 +108,7 @@ function createInitialState(
   poolOrdering?: CreateGameEngineInput["poolOrdering"],
 ): GameState {
   const poolCountryIds = [...assignments.keys()];
-  const initialQueue = poolOrdering === "fame-ramp" && countryIndex
+  const initialQueue = poolOrdering === "fixed" ? { remainingCountryIds: poolCountryIds } : poolOrdering === "fame-ramp" && countryIndex
     ? createFameRampQueue(poolCountryIds, countryIndex, seed)
     : createRoundQueue(poolCountryIds, seed);
   const next = takeNextCountry(initialQueue, new Set<CountryId>());
@@ -159,8 +159,19 @@ function advanceToNextCountry(
 export function createGameEngine(input: CreateGameEngineInput): GameEngine {
   const { countryIndex } = input;
   let categoryIds = input.initialState?.categoryIds ?? input.categoryIds;
-  let assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, input.initialState?.seed ?? input.seed), input.poolCountryIds);
-  let state = input.initialState ?? createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now(), input.countryIndex, input.poolOrdering);
+  function assignmentsFor(seed: string): ReadonlyMap<CountryId, string> {
+    const assignments = input.promptSlots
+      ? new Map(input.promptSlots.filter((slot) => {
+          const country = countryIndex.byId[slot.countryId];
+          const category = getCategory(slot.categoryId);
+          return country && category && category.eligible(country) && (!country.allowedCategoryIds || country.allowedCategoryIds.includes(category.id));
+        }).map((slot) => [slot.countryId, slot.categoryId]))
+      : buildAssignments(countryIndex, categoryIds, seed);
+    return filterAssignments(assignments, input.poolCountryIds);
+  }
+  let assignments = assignmentsFor(input.initialState?.seed ?? input.seed);
+  let state = input.initialState ? { ...input.initialState, currentCategoryId: input.initialState.currentCountryId === null ? null : assignments.get(input.initialState.currentCountryId) ?? null }
+    : createInitialState(assignments, categoryIds, input.seed, input.now ?? Date.now(), input.countryIndex, input.poolOrdering);
 
   function categoryFor(countryId: CountryId) {
     return getCategory(assignments.get(countryId) ?? "") ?? getCategory("flags");
@@ -186,7 +197,7 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
       if (command.type === "START_GAME" || command.type === "RESET_GAME") {
         if (command.type === "START_GAME") categoryIds = command.categoryIds;
         const seed = command.type === "START_GAME" ? command.seed : state.seed;
-        assignments = filterAssignments(buildAssignments(countryIndex, categoryIds, seed), input.poolCountryIds);
+        assignments = assignmentsFor(seed);
         state = createInitialState(assignments, categoryIds, seed, command.now, input.countryIndex, input.poolOrdering);
         if (state.currentCountryId !== null) events.push({ type: "GAME_STARTED", currentCountryId: state.currentCountryId });
         if (command.type === "RESET_GAME") events.push({ type: "GAME_RESET" });

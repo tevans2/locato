@@ -91,6 +91,8 @@ export interface DailyChallengeResult {
   readonly marks: readonly DailyRoundMark[];
   readonly shareText: string;
   readonly completedAt: number;
+  readonly challengeVersion?: 2;
+  readonly rounds?: readonly import("../../src/core/dailyChallenge").DailyRoundResult[];
 }
 
 export interface DailyFriendResult {

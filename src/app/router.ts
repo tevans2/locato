@@ -5,6 +5,7 @@ export type AppRoute =
   | { readonly type: "landing" }
   | { readonly type: "solo-game"; readonly categoryIds?: readonly string[]; readonly continueSaved?: boolean; readonly flagPool?: FlagPool; readonly run?: "timed" }
   | { readonly type: "daily-challenge" }
+  | { readonly type: "daily-practice"; readonly date: string }
   | { readonly type: "country-guessing"; readonly mode?: WorldMapGameModeId; readonly run?: "timed"; readonly continent?: string }
   /** MapTap: `run: "timed"` is a ranked attempt (fixed settings, posts its total to the board). */
   | { readonly type: "map-tap"; readonly run?: "timed" }
@@ -75,6 +76,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   if (game === "map-tap") return { type: game, ...timed };
   if (game === "worldsplit" || game === "flyover" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
+  if (view === "daily-practice" && /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "")) return { type: "daily-practice", date: params.get("date")! };
   if (view === "academy") {
     const lesson = params.get("lesson")?.trim();
     if (lesson === "placement") return { type: "academy-placement" };
@@ -109,6 +111,9 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     // Practice runs resume their per-mode save anyway; the flag stays for old links. Timed runs never resume.
     if (route.run !== "timed") params.set("resume", "1");
     if (route.run === "timed") params.set("run", "timed");
+  } else if (route.type === "daily-practice") {
+    params.set("view", route.type);
+    params.set("date", route.date);
   } else if (route.type === "country-guessing") {
     params.set("game", route.mode ?? "name-all");
     if (route.run === "timed") params.set("run", "timed");

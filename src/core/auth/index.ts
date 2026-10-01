@@ -2,6 +2,7 @@
 // No cookies are accessed from JS — they are HttpOnly and sent automatically by the browser.
 
 import { leaderboardConfig, type LeaderboardMetric } from "../leaderboards";
+import type { DailyRoundResult } from "../dailyChallenge";
 
 export interface AuthUser {
   readonly id: string;
@@ -93,6 +94,8 @@ export interface DailyChallengeResult {
   readonly marks: readonly DailyRoundMark[];
   readonly shareText: string;
   readonly completedAt: number;
+  readonly challengeVersion?: 2;
+  readonly rounds?: readonly DailyRoundResult[];
 }
 
 export interface DailyFriendResult {

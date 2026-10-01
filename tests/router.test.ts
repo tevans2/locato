@@ -17,6 +17,12 @@ describe("shareable game routes", () => {
     expect(parse("/?game=shapes&resume=1")).toEqual({ type: "solo-game", categoryIds: ["shapes"], continueSaved: true });
   });
 
+  it("keeps targeted daily practice on refresh", () => {
+    const route: AppRoute = { type: "daily-practice", date: "2026-10-01" };
+    expect(parse(buildRouteUrl(route, { pathname: "/" }))).toEqual(route);
+    expect(parse("/?view=daily-practice&date=bad")).toBeNull();
+  });
+
   it("preserves mixed prompt categories and filters invalid category IDs", () => {
     const route: AppRoute = { type: "solo-game", categoryIds: ["flags", "capitals"], continueSaved: true };
     expect(parse(buildRouteUrl(route, { pathname: "/play" }))).toEqual(route);
