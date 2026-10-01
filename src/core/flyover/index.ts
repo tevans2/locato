@@ -244,3 +244,62 @@ export function startingPlane(countries: readonly FlyoverCountry[], rng: Rng = M
   const [x, y] = start?.centre ?? [MAP_VIEWBOX_WIDTH / 2, MAP_VIEWBOX_HEIGHT / 2];
   return { x, y, heading: rng() * Math.PI * 2 - Math.PI };
 }
+
+// --- Multiplayer ---------------------------------------------------------------------------
+
+/** Flight lengths a multiplayer host can pick. */
+export const FLYOVER_MULTIPLAYER_DURATIONS_MS = [60_000, 90_000, 120_000] as const;
+export const DEFAULT_FLYOVER_MULTIPLAYER_DURATION_MS = 90_000;
+/** Everyone takes off together after this countdown. */
+export const FLYOVER_TAKEOFF_COUNTDOWN_MS = 3_000;
+/**
+ * The clock is shared in a race, so a skip can't cost time off it: instead the plane flies a
+ * holding pattern this long, during which no country counts.
+ */
+export const FLYOVER_SKIP_HOLD_SECONDS = 5;
+
+export interface FlyoverRoute {
+  readonly start: PlaneState;
+  /** Every racer flies to these in order. Each is picked near the one before. */
+  readonly route: readonly FlyoverCountry[];
+}
+
+/**
+ * A race route from a seeded rng: a starting plane over a random country, then each target picked
+ * among the nearest unvisited countries to the previous target (the solo game picks near the
+ * plane instead, which can't be shared). Runs until every targetable country is on it.
+ */
+export function buildFlyoverRoute(countries: readonly FlyoverCountry[], rng: Rng): FlyoverRoute {
+  const start = startingPlane(countries, rng);
+  const route: FlyoverCountry[] = [];
+  const used = new Set<string>();
+  const startCountry = countryUnderPoint(countries, start.x, start.y);
+  if (startCountry) used.add(startCountry.code);
+  let from: ProjectedPoint = [start.x, start.y];
+  for (;;) {
+    const next = pickNextTarget(countries, from, used, rng);
+    if (!next) break;
+    route.push(next);
+    used.add(next.code);
+    from = next.centre;
+  }
+  return { start, route };
+}
+
+/** The least time a plane could take between two points, flying straight on full boost. */
+export function minimumFlightSeconds(from: ProjectedPoint, to: ProjectedPoint): number {
+  return wrappedDistance(from, to) / (FLYOVER_SPEED * FLYOVER_BOOST);
+}
+
+/**
+ * Could an honest plane have reached `at` (touching `country`) from `from` in `elapsedSeconds`?
+ * Generous on time — network jitter lands messages late or bunched — but never on place.
+ */
+export function isPlausibleReach(country: FlyoverCountry, at: ProjectedPoint, from: ProjectedPoint, elapsedSeconds: number): boolean {
+  // The same test the plane ran (identical maths, so an honest touch always passes), plus a wider
+  // ring for a position rounded on the way. A wider ring alone misses slivers the plane's own
+  // ring catches, so it can't replace it.
+  const touches = planeTouchesCountry(country, at[0], at[1]) || planeTouchesCountry(country, at[0], at[1], FLYOVER_TOUCH_RADIUS * 1.5);
+  if (!touches) return false;
+  return elapsedSeconds >= minimumFlightSeconds(from, at) * 0.75 - 1.5;
+}
