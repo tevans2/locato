@@ -159,6 +159,28 @@ export interface LeaderboardEntry {
   readonly achievedAt: number;
 }
 
+// Score boards (highest score wins; ties go to whoever got there first).
+export interface SubmitBestScoreInput {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
+export interface LeaderboardScoreEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
+export interface UserLeaderboardScoreRank {
+  readonly rank: number;
+  readonly score: number;
+}
+
 export interface LeaderboardQuery {
   readonly gameMode: string;
   readonly variant: string;
@@ -169,6 +191,13 @@ export interface LeaderboardQuery {
 export interface UserLeaderboardRank {
   readonly rank: number;
   readonly timeMs: number;
+}
+
+/** Where a time would sit on a board: `rank` is 1 + the number of strictly faster best times. */
+export interface LeaderboardTimePlacement {
+  readonly rank: number;
+  /** Players with a time on this board. */
+  readonly total: number;
 }
 
 // Admin account controls. Never carries password hashes.
@@ -199,6 +228,13 @@ export interface AdminBestTime {
   readonly achievedAt: number;
 }
 
+export interface AdminBestScore {
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly score: number;
+  readonly achievedAt: number;
+}
+
 // Raw activity rows since a cutoff; the service aggregates them into the overview.
 export interface AdminActivityRows {
   readonly signups: readonly { readonly userId: string; readonly at: number }[];
@@ -212,6 +248,7 @@ export interface AdminTotals {
   readonly games: number;
   readonly dailies: number;
   readonly bestTimes: number;
+  readonly bestScores: number;
   readonly activeSessions: number;
   readonly friendships: number;
 }
@@ -274,6 +311,12 @@ export interface CreateSessionInput {
   readonly createdAt: number;
 }
 
+// Academy training progress as stored: the validated AcademyProgress JSON plus its merged updatedAt.
+export interface StoredAcademyProgress {
+  readonly progress: string;
+  readonly updatedAt: number;
+}
+
 export interface UserStore {
   createUser(input: CreateUserInput): StoredUser;
   findUserByEmail(email: string): StoredUser | null;
@@ -297,6 +340,13 @@ export interface UserStore {
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;
+  getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement;
+  // Score boards: one best (highest) score per user per mode + variant.
+  submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult;
+  getScoreLeaderboard(query: LeaderboardQuery): readonly LeaderboardScoreEntry[];
+  getUserScoreRank(userId: string, gameMode: string, variant: string): UserLeaderboardScoreRank | null;
+  /** `rank` is 1 + the number of strictly higher best scores. */
+  getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement;
   // Admin account controls.
   listUsers(query: AdminUserListQuery): AdminUserList;
   deleteUser(id: string): boolean;
@@ -306,8 +356,11 @@ export interface UserStore {
   listUserProviders(userId: string): readonly string[];
   listUserBestTimes(userId: string): readonly AdminBestTime[];
   deleteBestTime(userId: string, gameMode: string, variant: string): boolean;
+  listUserBestScores(userId: string): readonly AdminBestScore[];
+  deleteBestScore(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;
-  // Clears game history, per-category stats, and aggregates; leaderboards and dailies are untouched.
+  // Clears game history, per-category stats, and aggregates; leaderboards, dailies and Academy
+  // progress are untouched.
   resetUserStats(userId: string): void;
   getAdminTotals(now: number): AdminTotals;
   listActivitySince(since: number): AdminActivityRows;
@@ -324,6 +377,9 @@ export interface UserStore {
   areFriends(a: string, b: string): boolean;
   friendIds(userId: string): readonly string[];
   searchUsers(query: string, excludeId: string, limit: number): readonly PublicUser[];
+  // Academy (training) progress, one JSON blob per user; deleted with the user.
+  getAcademyProgress(userId: string): StoredAcademyProgress | null;
+  saveAcademyProgress(userId: string, progress: string, updatedAt: number): void;
 }
 
 export interface PasswordHasher {

@@ -1,5 +1,6 @@
 import type {
   AdminActivityRows,
+  AdminBestScore,
   AdminBestTime,
   AdminEvent,
   AdminEventInput,
@@ -18,13 +19,18 @@ import type {
   PublicUser,
   SendFriendRequestResult,
   GameResult,
+  StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardScoreEntry,
+  LeaderboardTimePlacement,
   Session,
   StoredUser,
+  SubmitBestScoreInput,
   SubmitBestTimeInput,
   SubmitBestTimeResult,
   UserLeaderboardRank,
+  UserLeaderboardScoreRank,
   UserStats,
   UserStore,
 } from "./types";
@@ -41,11 +47,13 @@ export function createMemoryUserStore(): UserStore {
   const gameRecords = new Map<string, GameRecord[]>();
   const dailyResults = new Map<string, DailyChallengeResult>();
   const bestTimes = new Map<string, { userId: string; gameMode: string; variant: string; timeMs: number; achievedAt: number }>();
+  const bestScores = new Map<string, { userId: string; gameMode: string; variant: string; score: number; achievedAt: number }>();
 
   // Friendships keyed by canonical "low|high" pair (low < high by id string).
   const friendships = new Map<string, { low: string; high: string; status: "pending" | "accepted"; requestedBy: string; createdAt: number }>();
   const events: AdminEvent[] = [];
   let nextEventId = 1;
+  const academyProgress = new Map<string, StoredAcademyProgress>();
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -237,6 +245,49 @@ export function createMemoryUserStore(): UserStore {
 
       return { rank, timeMs: row.timeMs };
     },
+    getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement {
+      const board = [...bestTimes.values()].filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
+      return { rank: board.filter((entry) => entry.timeMs < timeMs).length + 1, total: board.length };
+    },
+    submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
+      const key = bestTimeKey(userId, input.gameMode, input.variant);
+      const existing = bestScores.get(key);
+      if (existing && input.score <= existing.score) {
+        return { accepted: false, isPersonalBest: false };
+      }
+      bestScores.set(key, { userId, gameMode: input.gameMode, variant: input.variant, score: input.score, achievedAt: input.achievedAt });
+      return { accepted: true, isPersonalBest: true };
+    },
+    getScoreLeaderboard(query: LeaderboardQuery): readonly LeaderboardScoreEntry[] {
+      const rows = [...bestScores.values()]
+        .filter((row) => row.gameMode === query.gameMode && row.variant === query.variant)
+        .sort((a, b) => (a.score !== b.score ? b.score - a.score : a.achievedAt - b.achievedAt));
+
+      return rows.slice(query.offset, query.offset + query.limit).map((row, index) => {
+        const user = usersById.get(row.userId);
+        return {
+          rank: query.offset + index + 1,
+          userId: row.userId,
+          displayName: user?.displayName ?? "Player",
+          avatarEmoji: user?.avatarEmoji ?? null,
+          score: row.score,
+          achievedAt: row.achievedAt,
+        };
+      });
+    },
+    getUserScoreRank(userId: string, gameMode: string, variant: string): UserLeaderboardScoreRank | null {
+      const row = bestScores.get(bestTimeKey(userId, gameMode, variant));
+      if (!row) return null;
+      const rank =
+        [...bestScores.values()]
+          .filter((entry) => entry.gameMode === gameMode && entry.variant === variant)
+          .filter((entry) => entry.score > row.score || (entry.score === row.score && entry.achievedAt < row.achievedAt)).length + 1;
+      return { rank, score: row.score };
+    },
+    getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement {
+      const board = [...bestScores.values()].filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
+      return { rank: board.filter((entry) => entry.score > score).length + 1, total: board.length };
+    },
     listUsers(query: AdminUserListQuery): AdminUserList {
       const needle = query.query?.toLowerCase() ?? null;
       const matched = [...usersById.values()]
@@ -267,11 +318,13 @@ export function createMemoryUserStore(): UserStore {
       for (const [key, value] of usersByOAuth) if (value.id === id) usersByOAuth.delete(key);
       for (const [key, session] of sessions) if (session.userId === id) sessions.delete(key);
       for (const [key, entry] of bestTimes) if (entry.userId === id) bestTimes.delete(key);
+      for (const [key, entry] of bestScores) if (entry.userId === id) bestScores.delete(key);
       for (const key of dailyResults.keys()) if (key.startsWith(`${id}:`)) dailyResults.delete(key);
       stats.delete(id);
       categoryStats.delete(id);
       gameRecords.delete(id);
       for (const [key, f] of friendships) if (f.low === id || f.high === id) friendships.delete(key);
+      academyProgress.delete(id);
       return true;
     },
     deleteUserSessions(userId: string): number {
@@ -305,6 +358,13 @@ export function createMemoryUserStore(): UserStore {
         .map((row) => ({ gameMode: row.gameMode, variant: row.variant, timeMs: row.timeMs, achievedAt: row.achievedAt }));
     },
     deleteBestTime: (userId, gameMode, variant) => bestTimes.delete(bestTimeKey(userId, gameMode, variant)),
+    listUserBestScores(userId: string): readonly AdminBestScore[] {
+      return [...bestScores.values()]
+        .filter((row) => row.userId === userId)
+        .sort((a, b) => a.gameMode.localeCompare(b.gameMode) || a.variant.localeCompare(b.variant))
+        .map((row) => ({ gameMode: row.gameMode, variant: row.variant, score: row.score, achievedAt: row.achievedAt }));
+    },
+    deleteBestScore: (userId, gameMode, variant) => bestScores.delete(bestTimeKey(userId, gameMode, variant)),
     deleteDailyResult: (userId, date) => dailyResults.delete(dailyKey(userId, date)),
     resetUserStats(userId: string): void {
       stats.delete(userId);
@@ -317,6 +377,7 @@ export function createMemoryUserStore(): UserStore {
         games: [...gameRecords.values()].reduce((sum, records) => sum + records.length, 0),
         dailies: dailyResults.size,
         bestTimes: bestTimes.size,
+        bestScores: bestScores.size,
         activeSessions: [...sessions.values()].filter((s) => s.expiresAt > now).length,
         friendships: [...friendships.values()].filter((f) => f.status === "accepted").length,
       };
@@ -423,6 +484,10 @@ export function createMemoryUserStore(): UserStore {
         .sort((a, b) => a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()))
         .slice(0, limit)
         .map((u) => ({ id: u.id, username: u.displayName, avatarEmoji: u.avatarEmoji }));
+    },
+    getAcademyProgress: (userId) => academyProgress.get(userId) ?? null,
+    saveAcademyProgress(userId: string, progress: string, updatedAt: number): void {
+      academyProgress.set(userId, { progress, updatedAt });
     },
   };
 }

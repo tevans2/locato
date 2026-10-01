@@ -84,6 +84,18 @@ export function modeName(mode: string): string {
     "click-country": "Click country",
     "spot-country": "Spot country",
     puzzle: "Puzzle",
+    "flag-colors": "Flag colours",
+    "map-tap": "MapTap",
+    worldsplit: "Worldsplit",
+    flyover: "Flyover",
+    geoguessr: "GeoGuessr",
+    "streetview-country": "Street View country",
   };
   return labels[mode] ?? mode;
+}
+
+/** A board entry's value: a time on time boards, points on score boards. */
+export function formatBoardValue(entry: { readonly timeMs?: number; readonly score?: number }): string {
+  if (typeof entry.score === "number") return `${formatNumber(entry.score)} pts`;
+  return typeof entry.timeMs === "number" ? formatDuration(entry.timeMs) : "—";
 }

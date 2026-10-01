@@ -37,6 +37,29 @@ npm run serve   # bun server/index.ts  → http://localhost:3000
 
 `npm run serve` serves the built `dist/` plus the API and WebSocket endpoint. SQLite auto-creates at `./.data/locato.db`. Session cookies are marked `Secure` only when `NODE_ENV=production`, so plain `http://localhost` works in dev.
 
+### Seed dev data
+
+A fresh database has empty leaderboards, dailies and admin charts. Fill it with realistic, deterministic data:
+
+```sh
+npm run seed                 # seed or refresh ./.data/locato.db (or $DATABASE_PATH)
+npm run dev:seeded           # seed, then start the server (bun server/index.ts)
+npm run seed -- --reset      # delete every seed account first, then seed from scratch
+npm run seed -- --clean      # delete every seed account and stop
+npm run seed -- --seed=7     # a different (still deterministic) dataset
+```
+
+**Test user:** `tester@locato.test` / password `locato-dev` (username `tester`). Sign in on the landing page. The tester is mid-table on most boards, 3rd on Capitals (so the medals and "you" highlight show), has a 7-day daily streak (10 of the last 14 days), about 55 games of history, 5 friends plus one incoming and one outgoing request, and Academy progress with two groups mastered, a few started and some cards due for review. The ~40 seed players (for example `atlas_amy@seed.locato.test`) use the same password.
+
+What gets seeded: best times on all 9 leaderboard modes, including the flag pools (countries, territories, both) and every puzzle continent; 14 days of daily results; 60 days of game history and sign-ins for the admin overview; and admin events. One player (`zoomzoom`) has an impossibly fast Codes time and daily so the admin "too fast" flags have something to show. The command prints a summary with row counts and the tester's ranks.
+
+- **Re-running is safe.** Seed accounts keep their ids and their data is replaced, so nothing is duplicated and a signed-in tester stays signed in. Admin events are written once per database, because the store can't delete them.
+- **Only seed accounts are touched.** That means emails on `@seed.locato.test` plus `tester@locato.test`. If a real account already has a seed username, that seed player is skipped. `--reset` and `--clean` delete only seed accounts.
+- **Refuses anything production-like.** It won't run when `NODE_ENV=production`, when `FLY_APP_NAME`/`FLY_MACHINE_ID` is set, or when `DATABASE_PATH` is under `/data` (the Fly volume). It also refuses any path outside the project, your home directory or a temp directory.
+- **Achievements** are stored per device in `localStorage`, so the seed can't write them. It prints a one-line `localStorage.setItem("locato.achievements.v1", …)` snippet; paste it into the browser console after signing in.
+
+The seeding logic is in `server/dev/seed.ts` and writes through the `UserStore` API, so it also runs against the in-memory store in `tests/seedDev.test.ts`. `scripts/seed-dev.ts` is the Bun wrapper that opens SQLite.
+
 ## Test and build
 
 ```sh

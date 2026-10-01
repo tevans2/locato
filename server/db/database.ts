@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type {
   AdminActivityRows,
+  AdminBestScore,
   AdminBestTime,
   AdminEvent,
   AdminEventInput,
@@ -24,13 +25,18 @@ import type {
   PublicUser,
   SendFriendRequestResult,
   GameResult,
+  StoredAcademyProgress,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardScoreEntry,
+  LeaderboardTimePlacement,
   Session,
   StoredUser,
+  SubmitBestScoreInput,
   SubmitBestTimeInput,
   SubmitBestTimeResult,
   UserLeaderboardRank,
+  UserLeaderboardScoreRank,
   UserStats,
   UserStore,
 } from "../auth/types";
@@ -136,6 +142,18 @@ function migrate(db: Database): void {
     CREATE INDEX IF NOT EXISTS mode_best_times_rank
       ON mode_best_times (game_mode, variant, best_time_ms ASC, achieved_at ASC);
 
+    CREATE TABLE IF NOT EXISTS mode_best_scores (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_mode TEXT NOT NULL,
+      variant TEXT NOT NULL DEFAULT '',
+      best_score INTEGER NOT NULL,
+      achieved_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, game_mode, variant)
+    );
+
+    CREATE INDEX IF NOT EXISTS mode_best_scores_rank
+      ON mode_best_scores (game_mode, variant, best_score DESC, achieved_at ASC);
+
     CREATE TABLE IF NOT EXISTS daily_challenge_results (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
@@ -174,6 +192,12 @@ function migrate(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS admin_events_time ON admin_events(time);
     CREATE INDEX IF NOT EXISTS admin_events_action ON admin_events(action);
+
+    CREATE TABLE IF NOT EXISTS academy_progress (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      progress TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Additive migrations: columns added after initial schema deployment.
@@ -498,6 +522,94 @@ export class SqliteUserStore implements UserStore {
     return { rank: rankRow?.rank ?? 1, timeMs: row.timeMs };
   }
 
+  getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement {
+    const row = this.db
+      .query<{ faster: number | null; total: number }>(
+        `SELECT SUM(CASE WHEN best_time_ms < ? THEN 1 ELSE 0 END) AS faster, COUNT(*) AS total
+         FROM mode_best_times
+         WHERE game_mode = ? AND variant = ?`,
+      )
+      .get(timeMs, gameMode, variant);
+    return { rank: (row?.faster ?? 0) + 1, total: row?.total ?? 0 };
+  }
+
+  submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
+    const existing = this.db
+      .query<{ bestScore: number }>("SELECT best_score AS bestScore FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?")
+      .get(userId, input.gameMode, input.variant);
+
+    if (existing && input.score <= existing.bestScore) {
+      return { accepted: false, isPersonalBest: false };
+    }
+
+    this.db
+      .query(
+        `INSERT INTO mode_best_scores (user_id, game_mode, variant, best_score, achieved_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
+           best_score = excluded.best_score,
+           achieved_at = excluded.achieved_at
+         WHERE excluded.best_score > mode_best_scores.best_score`,
+      )
+      .run(userId, input.gameMode, input.variant, input.score, input.achievedAt);
+
+    return { accepted: true, isPersonalBest: true };
+  }
+
+  getScoreLeaderboard(query: LeaderboardQuery): readonly LeaderboardScoreEntry[] {
+    const rows = this.db
+      .query<{ userId: string; displayName: string; avatarEmoji: string | null; score: number; achievedAt: number }>(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+                m.best_score AS score, m.achieved_at AS achievedAt
+         FROM mode_best_scores m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.game_mode = ? AND m.variant = ?
+         ORDER BY m.best_score DESC, m.achieved_at ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(query.gameMode, query.variant, query.limit, query.offset);
+
+    return rows.map((row, index) => ({
+      rank: query.offset + index + 1,
+      userId: row.userId,
+      displayName: row.displayName,
+      avatarEmoji: row.avatarEmoji,
+      score: row.score,
+      achievedAt: row.achievedAt,
+    }));
+  }
+
+  getUserScoreRank(userId: string, gameMode: string, variant: string): UserLeaderboardScoreRank | null {
+    const row = this.db
+      .query<{ score: number; achievedAt: number }>(
+        "SELECT best_score AS score, achieved_at AS achievedAt FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?",
+      )
+      .get(userId, gameMode, variant);
+    if (!row) return null;
+
+    const rankRow = this.db
+      .query<{ rank: number }>(
+        `SELECT 1 + COUNT(*) AS rank
+         FROM mode_best_scores
+         WHERE game_mode = ? AND variant = ?
+           AND (best_score > ? OR (best_score = ? AND achieved_at < ?))`,
+      )
+      .get(gameMode, variant, row.score, row.score, row.achievedAt);
+
+    return { rank: rankRow?.rank ?? 1, score: row.score };
+  }
+
+  getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement {
+    const row = this.db
+      .query<{ higher: number | null; total: number }>(
+        `SELECT SUM(CASE WHEN best_score > ? THEN 1 ELSE 0 END) AS higher, COUNT(*) AS total
+         FROM mode_best_scores
+         WHERE game_mode = ? AND variant = ?`,
+      )
+      .get(score, gameMode, variant);
+    return { rank: (row?.higher ?? 0) + 1, total: row?.total ?? 0 };
+  }
+
   listUsers(query: AdminUserListQuery): AdminUserList {
     const filter = query.query ? "WHERE u.email LIKE $like OR u.display_name LIKE $like" : "";
     const like = query.query ? `%${query.query}%` : "";
@@ -526,7 +638,7 @@ export class SqliteUserStore implements UserStore {
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
-  // user_stats, and mode_best_times.
+  // user_stats, mode_best_times, mode_best_scores, and academy_progress.
   deleteUser(id: string): boolean {
     if (!this.findUserById(id)) return false;
     this.db.query("DELETE FROM users WHERE id = ?").run(id);
@@ -563,6 +675,16 @@ export class SqliteUserStore implements UserStore {
     return this.db.query("DELETE FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?").run(userId, gameMode, variant).changes > 0;
   }
 
+  listUserBestScores(userId: string): readonly AdminBestScore[] {
+    return this.db
+      .query<AdminBestScore>("SELECT game_mode AS gameMode, variant, best_score AS score, achieved_at AS achievedAt FROM mode_best_scores WHERE user_id = ? ORDER BY game_mode, variant")
+      .all(userId);
+  }
+
+  deleteBestScore(userId: string, gameMode: string, variant: string): boolean {
+    return this.db.query("DELETE FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?").run(userId, gameMode, variant).changes > 0;
+  }
+
   deleteDailyResult(userId: string, date: string): boolean {
     return this.db.query("DELETE FROM daily_challenge_results WHERE user_id = ? AND date = ?").run(userId, date).changes > 0;
   }
@@ -582,6 +704,7 @@ export class SqliteUserStore implements UserStore {
       games: count("SELECT COUNT(*) AS n FROM game_records"),
       dailies: count("SELECT COUNT(*) AS n FROM daily_challenge_results"),
       bestTimes: count("SELECT COUNT(*) AS n FROM mode_best_times"),
+      bestScores: count("SELECT COUNT(*) AS n FROM mode_best_scores"),
       activeSessions: count("SELECT COUNT(*) AS n FROM sessions WHERE expires_at > ?", now),
       friendships: count("SELECT COUNT(*) AS n FROM friendships WHERE status = 'accepted'"),
     };
@@ -701,5 +824,18 @@ export class SqliteUserStore implements UserStore {
        WHERE display_name LIKE ? COLLATE NOCASE AND id != ?
        ORDER BY display_name COLLATE NOCASE LIMIT ?`,
     ).all(`%${query}%`, excludeId, limit);
+  }
+
+  getAcademyProgress(userId: string): StoredAcademyProgress | null {
+    return this.db.query<StoredAcademyProgress>("SELECT progress, updated_at AS updatedAt FROM academy_progress WHERE user_id = ?").get(userId);
+  }
+
+  saveAcademyProgress(userId: string, progress: string, updatedAt: number): void {
+    this.db
+      .query(
+        `INSERT INTO academy_progress (user_id, progress, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET progress = excluded.progress, updated_at = excluded.updated_at`,
+      )
+      .run(userId, progress, updatedAt);
   }
 }

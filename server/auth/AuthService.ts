@@ -2,11 +2,16 @@ import { createSessionToken, createUserId } from "./tokens";
 import {
   DEFAULT_LEADERBOARD_LIMIT,
   MAX_LEADERBOARD_LIMIT,
-  MAX_TIME_MS,
-  MIN_TIME_MS,
   isLeaderboardGameMode,
+  isValidLeaderboardScore,
+  isValidLeaderboardTime,
+  leaderboardMetric,
   normalizeLeaderboardVariant,
 } from "../leaderboard/validation";
+import type { LeaderboardMetric } from "../../src/core/leaderboards";
+import { mergeAcademyProgress } from "../academy/merge";
+import { validateAcademyProgress } from "../academy/validation";
+import type { AcademyProgress } from "../../src/core/academy/types";
 import type {
   AuthUser,
   DailyChallengeResult,
@@ -19,14 +24,26 @@ import type {
   SendFriendRequestResult,
   LeaderboardEntry,
   LeaderboardQuery,
+  LeaderboardScoreEntry,
+  LeaderboardTimePlacement,
   PasswordHasher,
   Session,
   StoredUser,
   SubmitBestTimeResult,
   UserLeaderboardRank,
+  UserLeaderboardScoreRank,
   UserStats,
   UserStore,
 } from "./types";
+
+/** Validate a board's mode + variant (both from untrusted input) and look up its metric. */
+function resolveBoard(gameModeRaw: unknown, variantRaw: unknown): { gameMode: string; variant: string; metric: LeaderboardMetric } | { error: string } {
+  const gameMode = typeof gameModeRaw === "string" ? gameModeRaw : "";
+  if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+  const variant = normalizeLeaderboardVariant(gameMode, typeof variantRaw === "string" ? variantRaw : "");
+  if (variant === null) return { error: "Invalid leaderboard variant." };
+  return { gameMode, variant, metric: leaderboardMetric(gameMode)! };
+}
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 200;
@@ -69,6 +86,12 @@ function previousDailyDate(date: string, daysBack: number): string {
 
 const SUBMIT_RATE_LIMIT = 10;
 const SUBMIT_RATE_WINDOW_MS = 60_000;
+// Academy sync fires after lessons and on sign-in from each device, so it gets more headroom.
+const ACADEMY_SYNC_RATE_LIMIT = 30;
+
+export type AcademySyncOutcome =
+  | { readonly ok: true; readonly progress: AcademyProgress; readonly cards: number }
+  | { readonly ok: false; readonly status: number; readonly error: string };
 
 export class AuthService {
   private readonly clock: () => number;
@@ -243,40 +266,96 @@ export class AuthService {
       .map((entry, index) => ({ rank: index + 1, ...entry }));
   }
 
-  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown }): SubmitBestTimeResult | { error: string } {
+  /**
+   * Post one attempt to a board: `timeMs` for time boards, `score` for score boards (sending the
+   * other one is rejected). Only a personal best replaces the stored entry.
+   */
+  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): SubmitBestTimeResult | { error: string } {
     if (!this.allowSubmit(userId)) return { error: "Too many submissions. Try again shortly." };
 
-    const gameMode = typeof input.gameMode === "string" ? input.gameMode : "";
-    if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+    const board = resolveBoard(input.gameMode, input.variant);
+    if ("error" in board) return board;
+    const { gameMode, variant, metric } = board;
 
-    const variantRaw = typeof input.variant === "string" ? input.variant : "";
-    const variant = normalizeLeaderboardVariant(gameMode, variantRaw);
-    if (variant === null) return { error: "Invalid leaderboard variant." };
-
-    const timeMs = input.timeMs;
-    if (typeof timeMs !== "number" || !Number.isInteger(timeMs) || timeMs < MIN_TIME_MS || timeMs > MAX_TIME_MS) {
-      return { error: "Invalid completion time." };
+    if (metric === "time") {
+      if (input.score !== undefined) return { error: "This leaderboard ranks times, not scores." };
+      if (!isValidLeaderboardTime(input.timeMs)) return { error: "Invalid completion time." };
+      return this.store.submitBestTime(userId, { gameMode, variant, timeMs: input.timeMs, achievedAt: this.clock() });
     }
-
-    return this.store.submitBestTime(userId, { gameMode, variant, timeMs, achievedAt: this.clock() });
+    if (input.timeMs !== undefined) return { error: "This leaderboard ranks scores, not times." };
+    if (!isValidLeaderboardScore(gameMode, input.score)) return { error: "Invalid score." };
+    return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock() });
   }
 
-  getLeaderboard(query: { gameMode?: unknown; variant?: unknown; limit?: unknown; offset?: unknown }): { entries: readonly LeaderboardEntry[] } | { error: string } {
-    const gameMode = typeof query.gameMode === "string" ? query.gameMode : "";
-    if (!isLeaderboardGameMode(gameMode)) return { error: "Invalid game mode." };
+  /** Alias of submitBestTime: it takes either metric. */
+  submitLeaderboardAttempt(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): SubmitBestTimeResult | { error: string } {
+    return this.submitBestTime(userId, input);
+  }
 
-    const variantRaw = typeof query.variant === "string" ? query.variant : "";
-    const variant = normalizeLeaderboardVariant(gameMode, variantRaw);
-    if (variant === null) return { error: "Invalid leaderboard variant." };
+  getLeaderboard(query: { gameMode?: unknown; variant?: unknown; limit?: unknown; offset?: unknown }):
+    | { metric: "time"; entries: readonly LeaderboardEntry[] }
+    | { metric: "score"; entries: readonly LeaderboardScoreEntry[] }
+    | { error: string } {
+    const board = resolveBoard(query.gameMode, query.variant);
+    if ("error" in board) return board;
+    const { gameMode, variant, metric } = board;
 
     const limit = typeof query.limit === "number" && Number.isInteger(query.limit) ? Math.min(Math.max(query.limit, 1), MAX_LEADERBOARD_LIMIT) : DEFAULT_LEADERBOARD_LIMIT;
     const offset = typeof query.offset === "number" && Number.isInteger(query.offset) && query.offset >= 0 ? query.offset : 0;
     const boardQuery: LeaderboardQuery = { gameMode, variant, limit, offset };
-    return { entries: this.store.getLeaderboard(boardQuery) };
+    return metric === "time"
+      ? { metric, entries: this.store.getLeaderboard(boardQuery) }
+      : { metric, entries: this.store.getScoreLeaderboard(boardQuery) };
   }
 
-  getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
-    return this.store.getUserRank(userId, gameMode, variant);
+  /** The player's standing on a board: `timeMs` on time boards, `score` on score boards. */
+  getUserLeaderboardRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | UserLeaderboardScoreRank | null {
+    const metric = leaderboardMetric(gameMode);
+    if (metric === "score") return this.store.getUserScoreRank(userId, gameMode, variant);
+    if (metric === "time") return this.store.getUserRank(userId, gameMode, variant);
+    return null;
+  }
+
+  /** Where `timeMs` (time boards) or `score` (score boards) would place (signed in or not). */
+  getLeaderboardTimePlacement(query: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): LeaderboardTimePlacement | { error: string } {
+    const board = resolveBoard(query.gameMode, query.variant);
+    if ("error" in board) return board;
+    const { gameMode, variant, metric } = board;
+
+    if (metric === "time") {
+      if (query.score !== undefined && query.score !== null) return { error: "This leaderboard ranks times, not scores." };
+      if (!isValidLeaderboardTime(query.timeMs)) return { error: "Invalid completion time." };
+      return this.store.getTimePlacement(gameMode, variant, query.timeMs);
+    }
+    if (query.timeMs !== undefined && query.timeMs !== null) return { error: "This leaderboard ranks scores, not times." };
+    if (!isValidLeaderboardScore(gameMode, query.score)) return { error: "Invalid score." };
+    return this.store.getScorePlacement(gameMode, variant, query.score);
+  }
+
+  // --- Academy ---
+
+  getAcademyProgress(userId: string): AcademyProgress | null {
+    const stored = this.store.getAcademyProgress(userId);
+    if (!stored) return null;
+    try {
+      // Re-validate on the way out so a corrupt or legacy row can't reach the client.
+      const parsed = validateAcademyProgress(JSON.parse(stored.progress), this.clock());
+      return parsed.ok ? parsed.progress : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Validates an upload, merges it with the account copy (never a blind overwrite), stores and
+  // returns the merged result.
+  syncAcademyProgress(userId: string, input: unknown): AcademySyncOutcome {
+    if (!this.allowSubmit(`academy:${userId}`, ACADEMY_SYNC_RATE_LIMIT)) return { ok: false, status: 429, error: "Too many sync requests. Try again shortly." };
+    const incoming = validateAcademyProgress(input, this.clock());
+    if (!incoming.ok) return { ok: false, status: 400, error: incoming.error };
+    const current = this.getAcademyProgress(userId);
+    const merged = current ? mergeAcademyProgress(current, incoming.progress) : incoming.progress;
+    this.store.saveAcademyProgress(userId, JSON.stringify(merged), merged.updatedAt);
+    return { ok: true, progress: merged, cards: Object.keys(merged.cards).length };
   }
 
   // --- Friends ---
@@ -335,10 +414,10 @@ export class AuthService {
     return handle ? this.store.findUserByUsername(handle)?.id ?? null : null;
   }
 
-  private allowSubmit(userId: string): boolean {
+  private allowSubmit(userId: string, limit = SUBMIT_RATE_LIMIT): boolean {
     const now = this.clock();
     const recent = (this.submitTimestamps.get(userId) ?? []).filter((timestamp) => now - timestamp < SUBMIT_RATE_WINDOW_MS);
-    if (recent.length >= SUBMIT_RATE_LIMIT) return false;
+    if (recent.length >= limit) return false;
     recent.push(now);
     this.submitTimestamps.set(userId, recent);
     return true;

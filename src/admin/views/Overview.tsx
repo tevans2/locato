@@ -75,7 +75,7 @@ export function OverviewView({ client, onOpenUser }: { client: AdminClient; onOp
             <div><dt>Accounts</dt><dd>{formatCompact(totals.users)}</dd></div>
             <div><dt>Recorded games</dt><dd>{formatCompact(totals.games)}</dd></div>
             <div><dt>Daily results</dt><dd>{formatCompact(totals.dailies)}</dd></div>
-            <div><dt>Leaderboard times</dt><dd>{formatCompact(totals.bestTimes)}</dd></div>
+            <div><dt>Leaderboard bests</dt><dd>{formatCompact(totals.bestTimes + (totals.bestScores ?? 0))}</dd></div>
             <div><dt>Active sessions</dt><dd>{formatCompact(totals.activeSessions)}</dd></div>
             <div><dt>Friendships</dt><dd>{formatCompact(totals.friendships)}</dd></div>
           </dl>

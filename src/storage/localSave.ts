@@ -1,9 +1,12 @@
 import { buildPromptSlots } from "../core/categories";
 import type { CountryId, CountryIndex } from "../core/countries";
 import type { GameState } from "../core/game";
-import { DEFAULT_FLAG_POOL, type FlagPool } from "../core/flagPools";
+import { DEFAULT_FLAG_POOL, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 
-export const SOLO_SAVE_KEY = "locato:solo:v2";
+/** The single browser-wide solo save used before per-mode saves. Migrated on first read. */
+export const LEGACY_SOLO_SAVE_KEY = "locato:solo:v2";
+/** Per-mode practice saves: `locato:solo:v3:<mode>` (flags runs add `@<flagPool>`). */
+export const SOLO_SAVE_PREFIX = "locato:solo:v3:";
 
 export interface SoloSave {
   readonly version: 2;
@@ -71,24 +74,106 @@ export function createSoloSave(index: CountryIndex, state: GameState, updatedAt:
   };
 }
 
-export function saveSoloGame(storage: Storage, index: CountryIndex, state: GameState, updatedAt = Date.now(), flagPool: FlagPool = DEFAULT_FLAG_POOL): void {
-  storage.setItem(SOLO_SAVE_KEY, JSON.stringify(createSoloSave(index, state, updatedAt, flagPool)));
+/**
+ * Stable id for one practice run slot: the sorted prompt categories, plus the flag pool when the
+ * run includes flags (a territories flags run is kept apart from the countries one).
+ */
+export function soloSaveId(categoryIds: readonly string[], flagPool?: FlagPool | null): string {
+  const mode = [...new Set(categoryIds)].sort().join("+");
+  return categoryIds.includes("flags") ? `${mode}@${normalizeFlagPool(flagPool ?? DEFAULT_FLAG_POOL)}` : mode;
 }
 
-export function clearSoloSave(storage: Storage): void {
-  storage.removeItem(SOLO_SAVE_KEY);
+export function soloSaveKey(categoryIds: readonly string[], flagPool?: FlagPool | null): string {
+  return `${SOLO_SAVE_PREFIX}${soloSaveId(categoryIds, flagPool)}`;
 }
 
-export function readSoloSave(storage: Storage): SoloSave | null {
-  const raw = storage.getItem(SOLO_SAVE_KEY);
+function parseSoloSave(raw: string | null): SoloSave | null {
   if (!raw) return null;
-
   try {
     const parsed = JSON.parse(raw) as Partial<SoloSave>;
     return parsed.version === 2 && typeof parsed.seed === "string" && Array.isArray(parsed.categoryIds) ? (parsed as SoloSave) : null;
   } catch {
     return null;
   }
+}
+
+function saveKeyFor(save: SoloSave): string {
+  return soloSaveKey(save.categoryIds, save.categoryIds.includes("flags") ? save.flagPool : undefined);
+}
+
+/** Move the old single save into its mode's slot (unless that slot already has a newer run). */
+export function migrateLegacySoloSave(storage: Storage): void {
+  const raw = storage.getItem(LEGACY_SOLO_SAVE_KEY);
+  if (raw === null) return;
+  const legacy = parseSoloSave(raw);
+  if (legacy) {
+    const key = saveKeyFor(legacy);
+    const existing = parseSoloSave(storage.getItem(key));
+    if (!existing || existing.updatedAt < legacy.updatedAt) storage.setItem(key, raw);
+  }
+  storage.removeItem(LEGACY_SOLO_SAVE_KEY);
+}
+
+export function saveSoloGame(storage: Storage, index: CountryIndex, state: GameState, updatedAt = Date.now(), flagPool: FlagPool = DEFAULT_FLAG_POOL): void {
+  const save = createSoloSave(index, state, updatedAt, flagPool);
+  storage.setItem(saveKeyFor(save), JSON.stringify(save));
+}
+
+/**
+ * Save the run in progress — practice runs only. Timed runs are deliberately never saved: the
+ * clock is wall time so they can't be resumed honestly, and they must not overwrite (or, on
+ * restart, clear) the mode's practice run. Leaving a timed run asks first instead.
+ */
+export function persistSoloRun(storage: Storage, index: CountryIndex, state: GameState, run: "practice" | "timed", updatedAt = Date.now(), flagPool: FlagPool = DEFAULT_FLAG_POOL): void {
+  if (run === "timed") return;
+  saveSoloGame(storage, index, state, updatedAt, flagPool);
+}
+
+/** Restart: clears the mode's practice save; a timed restart leaves it alone. */
+export function clearSoloRun(storage: Storage, categoryIds: readonly string[], run: "practice" | "timed", flagPool?: FlagPool | null): void {
+  if (run === "timed") return;
+  clearSoloSave(storage, categoryIds, flagPool);
+}
+
+/** Clear one mode's practice run (Restart). Other modes keep their saves. */
+export function clearSoloSave(storage: Storage, categoryIds: readonly string[], flagPool?: FlagPool | null): void {
+  migrateLegacySoloSave(storage);
+  storage.removeItem(soloSaveKey(categoryIds, flagPool));
+}
+
+function allSoloSaves(storage: Storage): SoloSave[] {
+  migrateLegacySoloSave(storage);
+  const saves: SoloSave[] = [];
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (!key?.startsWith(SOLO_SAVE_PREFIX)) continue;
+    const save = parseSoloSave(storage.getItem(key));
+    if (save) saves.push(save);
+  }
+  return saves.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export function isSoloSaveResumable(save: SoloSave): boolean {
+  return (save.status ?? (save.currentCountryCode === null ? "complete" : "playing")) !== "complete";
+}
+
+/**
+ * The saved run for one mode. For a flags run with no pool given, the most recently played flag
+ * pool's run is returned.
+ */
+export function readSoloSave(storage: Storage, categoryIds: readonly string[], flagPool?: FlagPool | null): SoloSave | null {
+  migrateLegacySoloSave(storage);
+  if (!categoryIds.includes("flags") || (flagPool !== undefined && flagPool !== null)) {
+    return parseSoloSave(storage.getItem(soloSaveKey(categoryIds, flagPool)));
+  }
+  const id = soloSaveId(categoryIds);
+  const mode = id.slice(0, id.lastIndexOf("@"));
+  return allSoloSaves(storage).find((save) => soloSaveId(save.categoryIds, save.flagPool).startsWith(`${mode}@`)) ?? null;
+}
+
+/** The most recently played practice run that can still be resumed (landing "Resume"). */
+export function readLatestSoloSave(storage: Storage): SoloSave | null {
+  return allSoloSaves(storage).find(isSoloSaveResumable) ?? null;
 }
 
 export function hydrateGameState(index: CountryIndex, save: SoloSave): GameState | null {

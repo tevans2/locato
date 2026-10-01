@@ -5,6 +5,8 @@ import { createOAuthState } from "./tokens";
 import { NOOP_SOCIAL, type SocialBridge } from "../../src/core/social/socialProtocol";
 import { logEvent } from "../admin/events";
 import { handleAdminRoutes, type AdminRouteContext } from "../admin/routes";
+import { MAX_ACADEMY_PAYLOAD_BYTES } from "../academy/validation";
+import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 
 const MAX_STAT_VALUE = 1_000_000;
@@ -82,6 +84,21 @@ function redirect(location: string): Response {
 async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await request.json();
+    return body !== null && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  } catch {
+    return null;
+  }
+}
+
+// Like readJsonBody, but refuses bodies over `maxBytes` (by Content-Length and by actual size,
+// since the header can be absent or wrong) before parsing them.
+async function readLimitedJsonBody(request: Request, maxBytes: number): Promise<Record<string, unknown> | null | "too-large"> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return "too-large";
+  try {
+    const text = await request.text();
+    if (new TextEncoder().encode(text).length > maxBytes) return "too-large";
+    const body: unknown = JSON.parse(text);
     return body !== null && typeof body === "object" ? (body as Record<string, unknown>) : {};
   } catch {
     return null;
@@ -267,8 +284,9 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
   if (pathname === "/api/leaderboard" && method === "GET") {
     const gameMode = url.searchParams.get("mode") ?? "";
     const variant = url.searchParams.get("variant") ?? "";
-    const limit = Number(url.searchParams.get("limit"));
-    const offset = Number(url.searchParams.get("offset"));
+    // An absent limit/offset means the default (Number(null) would be 0, i.e. a one-row page).
+    const limit = url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : Number.NaN;
+    const offset = url.searchParams.has("offset") ? Number(url.searchParams.get("offset")) : Number.NaN;
     const result = service.getLeaderboard({
       gameMode,
       variant,
@@ -278,11 +296,8 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if ("error" in result) return json({ error: result.error }, 400);
 
     const user = service.authenticate(readSessionToken(request));
-    const currentUser =
-      user === null
-        ? null
-        : service.getUserLeaderboardRank(user.id, gameMode, variant === "" ? "" : variant);
-    return json({ entries: result.entries, currentUser });
+    const currentUser = user === null ? null : service.getUserLeaderboardRank(user.id, gameMode, variant);
+    return json({ metric: result.metric, entries: result.entries, currentUser });
   }
 
   if (pathname === "/api/leaderboard" && method === "POST") {
@@ -290,10 +305,58 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const result = service.submitBestTime(user.id, body);
+    const result = service.submitLeaderboardAttempt(user.id, body);
     if ("error" in result) return json({ error: result.error }, 400);
-    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, timeMs: body.timeMs, accepted: result.accepted });
-    return json(result);
+    const gameMode = String(body.gameMode);
+    const variant = typeof body.variant === "string" ? body.variant : "";
+    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, ...(body.score !== undefined ? { score: body.score } : { timeMs: body.timeMs }), accepted: result.accepted });
+    // `rank` / `bestTimeMs` (time boards) or `bestScore` (score boards) describe the player's
+    // standing after this submission (their best, which may be an earlier attempt).
+    const standing = service.getUserLeaderboardRank(user.id, gameMode, variant);
+    if (leaderboardMetric(gameMode) === "score") {
+      return json({ ...result, rank: standing?.rank ?? null, bestScore: standing && "score" in standing ? standing.score : null });
+    }
+    return json({ ...result, rank: standing?.rank ?? null, bestTimeMs: standing && "timeMs" in standing ? standing.timeMs : null });
+  }
+
+  if (pathname === "/api/leaderboard/rank" && method === "GET") {
+    const numberParam = (name: string): number | null | undefined => {
+      const raw = url.searchParams.get(name);
+      if (raw === null) return undefined;
+      return /^\d{1,10}$/.test(raw) ? Number(raw) : null;
+    };
+    const placement = service.getLeaderboardTimePlacement({
+      gameMode: url.searchParams.get("mode") ?? "",
+      variant: url.searchParams.get("variant") ?? "",
+      timeMs: numberParam("timeMs"),
+      score: numberParam("score"),
+    });
+    if ("error" in placement) return json({ error: placement.error }, 400);
+    return json(placement);
+  }
+
+  if (pathname === "/api/academy" && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    return json({ progress: service.getAcademyProgress(user.id) });
+  }
+
+  if (pathname === "/api/academy" && method === "PUT") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readLimitedJsonBody(request, MAX_ACADEMY_PAYLOAD_BYTES);
+    if (body === "too-large") {
+      log("warn", "academy.sync.rejected", { ip: ip(request), userId: user.id, reason: "too-large" });
+      return json({ error: "Progress payload is too large." }, 413);
+    }
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.syncAcademyProgress(user.id, body.progress);
+    if (!result.ok) {
+      log("warn", "academy.sync.rejected", { ip: ip(request), userId: user.id, reason: result.error, status: result.status });
+      return json({ error: result.error }, result.status);
+    }
+    log("info", "academy.sync", { ip: ip(request), userId: user.id, cards: result.cards });
+    return json({ progress: result.progress });
   }
 
   // --- Admin console (gated by ADMIN_TOKEN; the surface stays hidden when unset) ---

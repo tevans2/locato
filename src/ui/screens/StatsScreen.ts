@@ -1,13 +1,26 @@
 import { fetchFullStats, type CategoryStats, type FullStats, type GameRecord } from "../../core/auth";
+import type { ShellContext } from "../shell/types";
 import { getCategory } from "../../core/categories";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
-import { createBrandLockup } from "../dom/createBrandLockup";
+import { createSitePage } from "../shell/SiteHeader";
+import { ACHIEVEMENTS, getUnlockedAchievements } from "../../storage/achievements";
+import { createYouHeading, createYouTabs, type YouTab } from "../components/youTabs";
+import "../../styles/you.css";
 
 export interface StatsScreenOptions {
-  readonly onHome: () => void;
-  readonly onBack: () => void;
-  readonly onDailyChallenge?: () => void;
+  /** Navigation shell (docs/navigation.md). */
+  readonly shell: ShellContext;
+  /** Where achievements are kept (local to this browser). */
+  readonly storage?: Storage;
+  /** "achievements" opens that tab. Default "stats". */
+  readonly initialTab?: Exclude<YouTab, "friends">;
+  /** The Friends tab (its own route). */
+  readonly onFriends: () => void;
+  /** Called when the tab changes in place, so the URL can follow if wanted. */
+  readonly onTabChange?: (tab: Exclude<YouTab, "friends">) => void;
+  /** Test hook: replaces the account fetch. */
+  readonly fetchStats?: () => Promise<FullStats | null>;
 }
 
 function pct(correct: number, wrong: number): string {
@@ -179,40 +192,127 @@ export function buildStats(stats: FullStats, container: HTMLElement): void {
   );
 }
 
-export function createStatsScreen(options: StatsScreenOptions): Screen {
-  const backButton = el("button", { className: "ghost-action screen-back-button", text: "Back", attrs: { type: "button", "aria-label": "Back to game" } });
-  backButton.addEventListener("click", options.onBack);
-
-  const dailyButton = el("button", { className: "ghost-action screen-header-action", text: "Daily Challenge", attrs: { type: "button", "aria-label": "Open daily challenge", ...(options.onDailyChallenge ? {} : { hidden: "true" }) } });
-  dailyButton.addEventListener("click", () => options.onDailyChallenge?.());
-
-  const logo = createBrandLockup(options.onHome);
-
-  const content = el("div", { className: "stats-content" });
-  const loading = el("p", { className: "stats-loading", text: "Loading stats…" });
-  content.appendChild(loading);
-
-  const element = el("section", {
-    className: "game-screen stats-screen",
+/** Guest state for the You pages: what signing in unlocks, and the button that opens the panel. */
+export function signInPrompt(shell: ShellContext, title: string, copy: string): HTMLElement {
+  return el("div", {
+    className: "you-guest",
     children: [
-      el("header", {
-        className: "stats-header",
-        children: [
-          el("div", { className: "stats-header-title", children: [logo, el("h1", { text: "Stats" })] }),
-          el("div", { className: "screen-header-actions", children: [dailyButton, backButton] }),
-        ],
-      }),
-      content,
+      el("p", { className: "you-guest-title", text: title }),
+      el("p", { className: "you-guest-copy", text: copy }),
+      el("button", { className: "shell-btn shell-btn-primary", text: "Sign in", attrs: { type: "button" }, on: { click: () => shell.openAccount() } }),
     ],
   });
+}
 
-  void fetchFullStats().then((stats) => {
-    if (!stats) {
-      content.replaceChildren(el("p", { className: "stats-loading", text: "Sign in to see your stats." }));
+/** Every achievement: unlocked ones first, locked ones dimmed with how to earn them. */
+export function buildAchievements(storage: Storage | undefined): HTMLElement {
+  const unlocked = new Set(storage ? getUnlockedAchievements(storage).map((a) => a.id) : []);
+  const ordered = [...ACHIEVEMENTS].sort((a, b) => Number(unlocked.has(b.id)) - Number(unlocked.has(a.id)));
+  const percent = ACHIEVEMENTS.length === 0 ? 0 : Math.round((unlocked.size / ACHIEVEMENTS.length) * 100);
+  return el("div", {
+    className: "you-achievements",
+    children: [
+      el("div", {
+        className: "you-achievements-summary",
+        children: [
+          el("p", { className: "you-achievements-count", children: [el("strong", { text: String(unlocked.size) }), document.createTextNode(` of ${ACHIEVEMENTS.length} unlocked`)] }),
+          el("div", {
+            className: "you-achievements-bar",
+            attrs: { role: "progressbar", "aria-label": "Achievements unlocked", "aria-valuemin": "0", "aria-valuemax": String(ACHIEVEMENTS.length), "aria-valuenow": String(unlocked.size) },
+            children: [el("span", { attrs: { style: `width: ${percent}%` } })],
+          }),
+          el("p", { className: "you-achievements-note", text: "Achievements are kept in this browser." }),
+        ],
+      }),
+      el("ul", {
+        className: "you-achievement-grid",
+        attrs: { "aria-label": "Achievements" },
+        children: ordered.map((achievement) => {
+          const isUnlocked = unlocked.has(achievement.id);
+          return el("li", {
+            className: `you-achievement${isUnlocked ? " is-unlocked" : " is-locked"}`,
+            attrs: { "data-achievement": achievement.id },
+            children: [
+              el("span", { className: "you-achievement-seal", attrs: { "aria-hidden": "true" }, text: isUnlocked ? "✓" : "" }),
+              el("span", {
+                className: "you-achievement-copy",
+                children: [
+                  el("strong", { text: achievement.title }),
+                  el("span", { text: achievement.description }),
+                  el("span", { className: "you-achievement-state", text: isUnlocked ? "Unlocked" : "Locked" }),
+                ],
+              }),
+            ],
+          });
+        }),
+      }),
+    ],
+  });
+}
+
+const TAB_COPY: Readonly<Record<Exclude<YouTab, "friends">, { readonly title: string; readonly subtitle: string }>> = {
+  stats: { title: "Stats", subtitle: "Every game you've played while signed in, in one place." },
+  achievements: { title: "Achievements", subtitle: "Milestones from the daily challenge, practice runs and the world map." },
+};
+
+export function createStatsScreen(options: StatsScreenOptions): Screen {
+  const { shell } = options;
+  let tab: Exclude<YouTab, "friends"> = options.initialTab ?? "stats";
+  let destroyed = false;
+
+  const heading = createYouHeading(TAB_COPY[tab].title, TAB_COPY[tab].subtitle);
+  const content = el("div", { className: "stats-content you-panel", attrs: { id: "stats-panel" } });
+  const achievementsPanel = el("div", { className: "you-panel", attrs: { id: "achievements-panel" } });
+
+  const tabs = createYouTabs(tab, (next) => {
+    if (next === "friends") {
+      options.onFriends();
       return;
     }
-    buildStats(stats, content);
+    if (next === tab) return;
+    tab = next;
+    show();
+    options.onTabChange?.(tab);
   });
 
-  return { element, destroy: () => undefined };
+  function show(): void {
+    heading.setTitle(TAB_COPY[tab].title, TAB_COPY[tab].subtitle);
+    tabs.setCurrent(tab);
+    content.hidden = tab !== "stats";
+    achievementsPanel.hidden = tab !== "achievements";
+    if (tab === "achievements") achievementsPanel.replaceChildren(buildAchievements(options.storage));
+  }
+
+  const page = createSitePage(shell, { section: "you", id: "stats", className: "you-page", content: [heading.element, tabs.element, content, achievementsPanel] });
+
+  // Re-run when the player signs in or out (or the start-up session check resolves after mount).
+  let statsRequest = 0;
+  function loadStats(): void {
+    const request = ++statsRequest;
+    if (!shell.signedIn()) {
+      content.replaceChildren(signInPrompt(shell, "Sign in to see your stats", "Accuracy, best streaks, world-map times and multiplayer wins are saved to your account."));
+      return;
+    }
+    content.replaceChildren(el("p", { className: "stats-loading", text: "Loading stats…" }));
+    void (options.fetchStats ?? fetchFullStats)().then((stats) => {
+      if (destroyed || request !== statsRequest) return;
+      if (!stats) {
+        content.replaceChildren(signInPrompt(shell, "Couldn't load your stats", "Check your connection, or sign in again to see them."));
+        return;
+      }
+      buildStats(stats, content);
+    });
+  }
+  loadStats();
+  const unsubscribeAuth = shell.onAuthChange?.(loadStats);
+  show();
+
+  return {
+    element: page.element,
+    destroy: () => {
+      destroyed = true;
+      unsubscribeAuth?.();
+      page.destroy();
+    },
+  };
 }

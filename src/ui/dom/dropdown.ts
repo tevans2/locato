@@ -19,15 +19,6 @@ function closeOtherDropdowns(current: HTMLDetailsElement): void {
   }
 }
 
-function closeMobileMenus(): void {
-  for (const sheet of document.querySelectorAll<HTMLElement>(".mobile-nav-sheet:not([hidden])")) {
-    sheet.hidden = true;
-  }
-  for (const trigger of document.querySelectorAll<HTMLElement>(".mobile-nav-trigger[aria-expanded='true']")) {
-    trigger.setAttribute("aria-expanded", "false");
-  }
-}
-
 export function closeDropdown(dropdown: HTMLElement): void {
   if (dropdown instanceof HTMLDetailsElement) dropdown.open = false;
 }
@@ -97,7 +88,6 @@ export function enhanceDropdown(
     () => {
       dropdown.classList.toggle("is-open", dropdown.open);
       if (!dropdown.open) return;
-      closeMobileMenus();
       closeOtherDropdowns(dropdown);
       queuePosition();
     },

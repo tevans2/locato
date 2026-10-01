@@ -37,36 +37,3 @@ export function toggleTheme(storage?: Storage): LocatoTheme {
   setTheme(theme, storage);
   return theme;
 }
-
-export function createThemeToggle(storage?: Storage): HTMLButtonElement {
-  const label = document.createElement("span");
-  label.className = "theme-switch-label";
-
-  const thumb = document.createElement("span");
-  thumb.className = "theme-switch-thumb";
-
-  const track = document.createElement("span");
-  track.className = "theme-switch-track";
-  track.append(thumb);
-
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "theme-switch global-theme-switch";
-  button.setAttribute("role", "switch");
-  button.append(label, track);
-
-  const sync = () => {
-    const dark = currentTheme() === "dark";
-    label.textContent = dark ? "Light" : "Dark";
-    button.setAttribute("aria-checked", String(dark));
-    button.setAttribute("aria-label", dark ? "Use light mode" : "Use dark mode");
-  };
-
-  button.addEventListener("click", () => {
-    toggleTheme(storage);
-    sync();
-  });
-  window.addEventListener(LOCATO_THEME_EVENT, sync);
-  sync();
-  return button;
-}

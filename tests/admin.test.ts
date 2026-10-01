@@ -150,6 +150,14 @@ describe("admin users", () => {
     expect(detail.stats).toMatchObject({ totalGames: 1, totalCorrect: 3 });
     expect(detail.recentGames).toHaveLength(1);
     expect(detail.bestTimes).toEqual([{ gameMode: "flags", variant: "", timeMs: 9_000, achievedAt: NOW, suspicious: true }]);
+    expect(detail.bestScores).toEqual([]);
+    h.store.submitBestScore(carol.id, { gameMode: "map-tap", variant: "", score: 50_000, achievedAt: NOW });
+    h.store.submitBestScore(carol.id, { gameMode: "streetview-country", variant: "", score: 15, achievedAt: NOW });
+    const withScores = await body(await h.route(adminRequest(`/api/admin/users/${carol.id}`)));
+    expect(withScores.bestScores).toEqual([
+      { gameMode: "map-tap", variant: "", score: 50_000, achievedAt: NOW, suspicious: true },
+      { gameMode: "streetview-country", variant: "", score: 15, achievedAt: NOW, suspicious: false },
+    ]);
     expect(detail.sessions).toHaveLength(1);
     expect(Object.keys(detail.sessions[0]).sort()).toEqual(["createdAt", "expiresAt"]);
     expect(JSON.stringify(detail)).not.toContain(carol.token);
@@ -230,6 +238,24 @@ describe("admin moderation", () => {
     expect((await h.route(adminRequest(`/api/admin/leaderboards/${fast.id}?mode=flags&variant=`, "DELETE")))?.status).toBe(404);
   });
 
+  it("lists and removes score board entries", async () => {
+    const h = createHarness();
+    const perfect = await seedUser(h, "perfect@b.com");
+    const real = await seedUser(h, "real@b.com");
+    h.store.submitBestScore(real.id, { gameMode: "geoguessr", variant: "", score: 19_000, achievedAt: NOW });
+    h.store.submitBestScore(perfect.id, { gameMode: "geoguessr", variant: "", score: 25_000, achievedAt: NOW });
+
+    const board = await body(await h.route(adminRequest("/api/admin/leaderboards?mode=geoguessr&variant=")));
+    expect(board.metric).toBe("score");
+    expect(board.entries.map((e: { userId: string; score: number; suspicious: boolean }) => [e.userId, e.score, e.suspicious])).toEqual([[perfect.id, 25_000, true], [real.id, 19_000, false]]);
+    expect((await body(await h.route(adminRequest("/api/admin/leaderboards?mode=flags&variant=")))).metric).toBe("time");
+
+    expect((await h.route(adminRequest(`/api/admin/leaderboards/${perfect.id}?mode=geoguessr&variant=`, "DELETE")))?.status).toBe(200);
+    expect(h.store.getScoreLeaderboard({ gameMode: "geoguessr", variant: "", limit: 10, offset: 0 }).map((e) => e.userId)).toEqual([real.id]);
+    expect((await h.route(adminRequest(`/api/admin/leaderboards/${perfect.id}?mode=geoguessr&variant=`, "DELETE")))?.status).toBe(404);
+    expect(h.store.getAdminTotals(NOW).bestScores).toBe(1);
+  });
+
   it("lists leaderboard modes and variants", async () => {
     const h = createHarness();
     const meta = await body(await h.route(adminRequest("/api/admin/leaderboards/meta")));
@@ -237,6 +263,9 @@ describe("admin moderation", () => {
     expect(flags.variants).toContain("");
     expect(flags.variants).not.toContain("countries");
     expect(meta.modes.find((m: { id: string }) => m.id === "puzzle").variants).toContain("Europe");
+    expect(meta.modes).toHaveLength(15);
+    expect(meta.modes.find((m: { id: string }) => m.id === "worldsplit")).toEqual({ id: "worldsplit", metric: "score", variants: [""], maxScore: 500 });
+    expect(meta.modes.find((m: { id: string }) => m.id === "flag-colors").metric).toBe("time");
   });
 
   it("flags too-fast and backdated daily results and removes them", async () => {

@@ -1,0 +1,277 @@
+/*
+ * Map + Street View practice modes on the navigation shell (MapTap, Worldsplit, GeoGuessr,
+ * Street View country): page gutter under the GameBar / daily FocusBar, run progress, the
+ * results stage and the per-round list placed inside the shell's results card.
+ * Everything is scoped to `.gb-screen` or the four screens' own classes.
+ */
+
+/* ---------- Screen frame: the app root drops its padding for shell screens ---------- */
+
+#app > .gb-screen[data-shell] {
+  width: min(1560px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: 0 var(--shell-gutter) clamp(12px, 2dvh, 20px);
+}
+
+#app > .gb-screen[data-shell] > :is(.shell-gamebar, .shell-focusbar) {
+  flex: none;
+  margin-bottom: clamp(10px, 1.6dvh, 16px);
+}
+
+#app > .gb-screen[data-shell] > [hidden] { display: none !important; }
+
+/* Daily stage bar: "Round N of 10" beside the progress track. */
+#app .gb-daily-bar { border-bottom: 1px solid var(--border); }
+#app .gb-daily-count {
+  flex: none;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Results stage ---------- */
+
+#app .gb-results-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(8px, 3dvh, 36px) 0 clamp(20px, 4dvh, 48px);
+}
+
+/* ---------- Per-round list inside a results card ---------- */
+
+#app .gb-run-list { margin-top: 24px; text-align: left; }
+
+#app .gb-run-list-title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#app .gb-run-list-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+#app .gb-run-list-items > li { border-bottom: 1px solid var(--border); }
+
+#app .gb-run-row {
+  appearance: none;
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transform: none;
+}
+
+#app button.gb-run-row { cursor: pointer; transition: background 140ms ease; }
+#app button.gb-run-row:hover { background: var(--surface-soft); }
+#app button.gb-run-row[aria-pressed="true"] { background: color-mix(in srgb, var(--brand) 12%, transparent); }
+#app button.gb-run-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+
+#app .gb-run-index {
+  flex: none;
+  width: 2ch;
+  color: var(--subtle);
+  font-size: 0.72rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+#app .gb-run-flag {
+  flex: none;
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+#app .gb-run-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+#app .gb-run-copy strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#app .gb-run-copy small { overflow: hidden; color: var(--muted); font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
+
+#app .gb-run-value {
+  flex: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+#app .gb-run-value.is-good { color: var(--good); }
+#app .gb-run-value.is-ok { color: var(--route); }
+#app .gb-run-value.is-miss { color: var(--subtle); }
+
+/* ---------- MapTap ---------- */
+
+#app > .maptap-screen.gb-screen[data-shell] { height: 100dvh; min-height: 0; }
+#app > .maptap-screen.gb-screen .maptap-layout { flex: 1 1 auto; }
+
+.maptap-run { display: grid; gap: 8px; margin: 2px 0 4px; }
+.maptap-run[hidden] { display: none; }
+.maptap-run-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.maptap-run-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.maptap-run-score { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.maptap-run-total { color: var(--text); font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.maptap-run-dots { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.maptap-run-dot { height: 6px; border-radius: 999px; background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--border); }
+.maptap-run-dot.is-current { background: color-mix(in srgb, var(--brand) 30%, var(--surface-soft)); box-shadow: inset 0 0 0 1px var(--brand); }
+.maptap-run-dot.is-done { background: var(--route); box-shadow: none; }
+.maptap-run-dot.is-strong { background: var(--good); }
+
+/* Setup panel: seven category rows overflow the sidebar, so keep "Start MapTap" in reach. */
+.maptap-setup .maptap-start-action { position: sticky; bottom: 0; z-index: 1; box-shadow: 0 -14px 14px -2px var(--surface); }
+.maptap-setup .maptap-category-option { border-color: var(--border); background: var(--surface); }
+.maptap-setup .maptap-category-option:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); background: var(--surface-soft); }
+.maptap-setup .maptap-category-option:has(input:checked) { border-color: color-mix(in srgb, var(--brand) 60%, var(--border)); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); }
+.maptap-setup .maptap-category-count { background: var(--surface-soft); }
+.maptap-play-panel .maptap-current-selection { border-color: var(--border); background: var(--bg-elevated); }
+.maptap-setup .maptap-setup-toolbar .maptap-selection-summary { flex: 1 1 auto; min-width: 0; }
+.maptap-setup .maptap-setup-toolbar .maptap-toggle-all { flex: 0 0 auto; width: auto; min-width: 0; white-space: nowrap; }
+.maptap-play-panel .maptap-actions > button { flex: 1 1 auto; padding-inline: 12px; font-size: 0.88rem; white-space: nowrap; }
+
+/* ---------- Worldsplit ---------- */
+
+#app > .worldsplit-screen.gb-screen[data-shell] { height: 100dvh; min-height: 0; }
+
+/* ---------- Street View country ---------- */
+
+#app > .streetview-country-screen.gb-screen[data-shell] { height: 100dvh; min-height: 0; }
+#app > .streetview-country-screen.gb-screen.is-unconfigured .streetview-layout { grid-template-columns: minmax(0, 1fr); }
+.streetview-missing-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+@media (max-width: 1100px) {
+  #app > :is(.worldsplit-screen, .streetview-country-screen).gb-screen[data-shell] { height: auto; min-height: 100dvh; }
+}
+
+@media (max-width: 700px) {
+  #app > .gb-screen[data-shell] { padding-inline: 12px; }
+  #app > .maptap-screen.gb-screen[data-shell] { height: auto; min-height: 100dvh; }
+  #app .gb-run-row { min-height: 46px; gap: 10px; }
+}
+
+/* ---------- GeoGuessr: immersive, with a dark GameBar floating over the panorama ---------- */
+
+/* The play surface keeps its fixed dark look in both themes, so the shell pieces drawn on it
+   (GameBar, its ⋯ menu, the results card) read the dark tokens here. */
+#app > .geoguessr-screen[data-shell] {
+  color-scheme: dark;
+  --bg: #101c1b;
+  --surface: #172321;
+  --surface-soft: #22302d;
+  --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.28);
+  --text: #eef1e8;
+  --muted: #a7b3ad;
+  --subtle: #7f8c86;
+  --brand: #d8ec99;
+  --brand-hover: #e9f7be;
+  --on-brand: #15241b;
+  --focus: #d8ec99;
+  --accent-soft: #24352c;
+  --good: #b9e07a;
+  --route: #f0a27e;
+  --shadow: 0 20px 55px rgba(0, 0, 0, 0.45);
+  --shadow-panel: 0 10px 32px rgba(0, 0, 0, 0.3);
+  --shell-tile-street: #3a2d24;
+  --shell-tile-ink-street: #f0a27e;
+  --multiplayer-scrim: rgba(4, 7, 5, 0.6);
+  width: 100%;
+  height: 100dvh;
+}
+
+#app .geoguessr-screen .geo-topbar { display: block; top: 0; left: 0; right: 0; }
+#app .geoguessr-screen .geo-gamebar {
+  min-height: 64px;
+  padding: 10px max(20px, env(safe-area-inset-right)) 10px max(20px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, #0f1a18 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+#app .geoguessr-screen .geo-topbar > .geo-session { top: 4px; height: 56px; }
+.geoguessr-screen:is([data-phase="unconfigured"], [data-phase="loading"], [data-phase="error"]) .geo-session { visibility: hidden; }
+
+.geo-alt-games { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+.geo-alt-games[hidden] { display: none; }
+:root body:not(:has(.landing-screen-shell)) .geoguessr-screen .geo-alt-games .geo-primary { width: auto; }
+.geoguessr-screen[data-phase="unconfigured"] :is(.geo-bottom-tools, .geo-map-panel, .geo-open-map) { visibility: hidden; }
+.geoguessr-screen[data-phase="unconfigured"] .geo-loading-icon { color: var(--route); }
+
+/* The results card sits in the left column over the review map. */
+#app .geoguessr-screen[data-phase="complete"] .geo-result-card { top: 88px; bottom: 24px; width: 340px; max-height: none; padding: 0; overflow-y: auto; transform: none; }
+#app .geoguessr-screen .geo-result-card .shell-results {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 20px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: none;
+  text-align: left;
+}
+/* Score and "Play again" first; the pins review and Atlas links follow. */
+#app .geoguessr-screen .geo-result-card .shell-results-seal { display: none; }
+#app .geoguessr-screen .geo-result-card .shell-results-title { font-size: 1.6rem; }
+#app .geoguessr-screen .geo-result-card .shell-results-stats { flex-wrap: wrap; margin-top: 14px; }
+#app .geoguessr-screen .geo-result-card .shell-results-stat { flex: 1 1 40%; align-items: flex-start; padding: 10px 2px; }
+#app .geoguessr-screen .geo-result-card .shell-results-stat.is-hero { flex-basis: 100%; border-bottom: 1px solid var(--border); }
+#app .geoguessr-screen .geo-result-card .shell-results-stat.is-hero strong { font-size: 2.3rem; }
+#app .geoguessr-screen .geo-result-card .shell-results-stat + .shell-results-stat { border-left: 0; }
+#app .geoguessr-screen .geo-result-card .shell-results-stat strong { font-size: 1.15rem; }
+#app .geoguessr-screen .geo-result-card .shell-results-actions { order: 5; justify-items: stretch; margin-top: 16px; }
+#app .geoguessr-screen .geo-result-card .shell-results-status { order: 6; }
+#app .geoguessr-screen .geo-result-card .gb-run-list { order: 7; margin-top: 20px; }
+#app .geoguessr-screen .geo-result-card .shell-results-missed { order: 8; margin-top: 20px; }
+#app .geoguessr-screen .geo-result-card .shell-results-primary { width: 100%; min-width: 0; min-height: 48px; }
+#app .geoguessr-screen .geo-result-card .shell-results-secondary { justify-content: flex-start; }
+#app .geoguessr-screen .geo-result-card .shell-results-secondary .shell-btn { flex: 1 1 auto; }
+
+@media (max-width: 700px) {
+  #app .geoguessr-screen .geo-gamebar { min-height: 56px; padding: 8px 12px; }
+  #app .geoguessr-screen .geo-topbar > .geo-session {
+    position: absolute;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    height: 40px;
+  }
+  /* The round HUD sits under the bar on phones, so the review map and card move down 44px. */
+  #app .geoguessr-screen:is([data-phase="result"], [data-phase="complete"]) .geo-map-panel { top: 116px; }
+  #app .geoguessr-screen .geo-result-card { top: calc(32dvh + 154px); max-height: calc(68dvh - 170px - env(safe-area-inset-bottom)); }
+  #app .geoguessr-screen .geo-map-legend { top: calc(32dvh + 127px); }
+  #app .geoguessr-screen[data-phase="complete"] .geo-result-card { width: auto; top: calc(25dvh + 154px); max-height: calc(75dvh - 170px - env(safe-area-inset-bottom)); }
+  #app .geoguessr-screen[data-phase="complete"] .geo-map-legend { top: calc(25dvh + 127px); }
+}
+.geoguessr-screen[data-phase="unconfigured"] .geo-loading-actions { display: none; }

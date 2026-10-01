@@ -57,7 +57,6 @@ body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled) {
 .brand-logo { filter: none; opacity: 1; }
 .brand-name { color: var(--text); font-family: var(--font-sans); letter-spacing: -.03em; }
 
-.landing-return-action,
 .auth-trigger {
   border-color: var(--border-strong);
   border-radius: var(--radius-sm);
@@ -67,26 +66,19 @@ body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled) {
   backdrop-filter: blur(12px);
 }
 
-.landing-return-action:hover,
 .auth-trigger:hover {
   border-color: var(--text);
   background: var(--surface);
   box-shadow: 0 8px 24px rgba(25,35,31,.1);
 }
 
-body:not(:has(.landing-screen-shell)) .game-header,
-.stats-header,
-.friends-header {
+body:not(:has(.landing-screen-shell)) .game-header {
   border-bottom-color: var(--border);
 }
 
 body:not(:has(.landing-screen-shell)) .game-header .nav-action,
 body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
-body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
-body:not(:has(.landing-screen-shell)) .stats-header .screen-back-button,
-body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action,
-.category-dropdown-summary,
-.action-menu-trigger {
+.category-dropdown-summary {
   border-color: var(--border-strong);
   border-radius: var(--radius-sm);
   color: var(--text);
@@ -96,7 +88,6 @@ body:not(:has(.landing-screen-shell)) .stats-header .screen-header-action,
 
 body:not(:has(.landing-screen-shell)) .game-header .nav-action,
 body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
-body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
 .answer-panel > .actions button,
 .country-guess-panel > .actions button,
 .answer-panel .mobile-extras-panel > .actions button,
@@ -113,8 +104,7 @@ body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
 }
 
 .category-dropdown-menu,
-.action-menu-panel,
-.mobile-nav-sheet:not([hidden]) {
+.action-menu-panel {
   border-color: var(--border-strong);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -172,7 +162,6 @@ body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
 
 .stat-card,
 .progress-card,
-.daily-badge,
 .daily-share-text,
 .daily-history-row,
 .achievement-chip,
@@ -207,8 +196,7 @@ body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
 .guess-form input,
 .maptap-filter-select,
 .maptap-decay-input,
-.puzzle-continent-select,
-.country-guess-timer-select { border-color: var(--border-strong); background-color: var(--surface); }
+.puzzle-continent-select { border-color: var(--border-strong); background-color: var(--surface); }
 
 .feedback.good,
 .achievement-panel { border-color: #9fca67; color: #49771f; background: #eef7e3; }
@@ -342,6 +330,5 @@ body:not(:has(.landing-screen-shell)) .game-header .daily-badge,
 .atlas-chip { border-color: #a2ca70; color: var(--text); background: var(--accent-soft); }
 
 @media (max-width: 700px) {
-  .landing-return-action,
   .auth-trigger { border-radius: var(--radius-sm); }
 }

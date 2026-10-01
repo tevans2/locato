@@ -84,7 +84,9 @@ describe("Street View Country frame loading", () => {
       expect(active.hidden).toBe(false);
       expect(input.disabled).toBe(false);
       expect(loader.classList.contains("is-active")).toBe(false);
-      expect(screen.element.querySelector(".stat-value")?.textContent).toBe(`${attempt + 1} / 3`);
+      // Practice runs show a "Country n / 5" card first; the frame counter is the one out of 3.
+      const frameStat = [...screen.element.querySelectorAll(".stat-value")].find((node) => node.textContent?.endsWith("/ 3"));
+      expect(frameStat?.textContent).toBe(`${attempt + 1} / 3`);
 
       if (attempt < 2) {
         input.value = wrongGuesses[attempt]!.name;
