@@ -249,6 +249,8 @@ export function createGeoGuessMap(options: GeoGuessMapOptions): GeoGuessMap {
         streetViewControl: false,
         fullscreenControl: false,
         clickableIcons: false,
+        draggableCursor: "crosshair",
+        draggingCursor: "crosshair",
         gestureHandling: "greedy",
         backgroundColor: "#172323",
       });

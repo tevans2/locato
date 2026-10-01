@@ -204,15 +204,11 @@
   width: 100%;
   height: 100%;
   display: block;
-  cursor: grab;
+  cursor: crosshair;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   outline: none;
-}
-
-.capital-recall-map-svg.is-panning {
-  cursor: grabbing;
 }
 
 .capital-recall-map-svg:focus-visible {
@@ -1113,14 +1109,10 @@
   height: 100%;
   min-height: 0;
   display: block;
-  cursor: grab;
+  cursor: crosshair;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-}
-
-.world-map-svg.is-panning {
-  cursor: grabbing;
 }
 
 .world-map-controls {
@@ -1179,7 +1171,7 @@
   fill: rgba(237, 74, 67, 0.72);
   stroke: rgba(255, 220, 209, 0.9);
   stroke-width: 0.9;
-  cursor: pointer;
+  cursor: crosshair;
 }
 
 .world-map-country.is-review-active {
@@ -1353,14 +1345,6 @@
   display: none !important;
 }
 
-.world-map-panel.is-click-country-mode .world-map-svg:not(.is-panning) {
-  cursor: crosshair;
-}
-
-.world-map-panel.is-click-country-mode .world-map-country[data-country-id] {
-  cursor: crosshair;
-}
-
 .world-map-panel.is-click-country-mode .world-map-country[data-country-id]:hover {
   fill: rgba(184, 227, 109, 0.18);
   stroke: rgba(245, 244, 206, 0.7);
@@ -1391,12 +1375,8 @@
   width: 100%;
   height: 100%;
   display: block;
-  cursor: grab;
-  touch-action: none;
-}
-
-.world-globe-panel.is-click-country-mode .world-globe-canvas {
   cursor: crosshair;
+  touch-action: none;
 }
 
 .country-click-prompt {
@@ -1466,6 +1446,7 @@
   height: 100%;
   min-height: 0;
   display: block;
+  cursor: crosshair;
   touch-action: none;
   user-select: none;
 }
@@ -1498,12 +1479,11 @@
   stroke: rgba(245, 244, 206, 0.94);
   stroke-width: 1.15;
   filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
-  cursor: grab;
+  cursor: crosshair;
   transition: filter 120ms ease, opacity 120ms ease, fill 120ms ease;
 }
 
 .puzzle-country-piece.is-dragging {
-  cursor: grabbing;
   fill: rgba(245, 244, 206, 0.84);
   filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 10px rgba(184, 227, 109, 0.32));
 }
@@ -1515,7 +1495,6 @@
 .puzzle-country-piece.is-placed {
   fill: rgba(184, 227, 109, 0.88);
   stroke: rgba(245, 244, 206, 0.98);
-  cursor: grab;
   filter: drop-shadow(0 0 8px rgba(184, 227, 109, 0.34));
 }
 
@@ -1535,10 +1514,6 @@
   top: auto;
   bottom: 12px;
   right: 12px;
-}
-
-.puzzle-board-svg.is-panning {
-  cursor: grabbing;
 }
 
 .puzzle-border-toggle {
@@ -2700,11 +2675,7 @@
 
 .maptap-globe .maplibregl-canvas {
   background: transparent !important;
-  cursor: grab;
-}
-
-.maptap-globe .maplibregl-canvas:active {
-  cursor: grabbing;
+  cursor: crosshair;
 }
 
 .maptap-attribution {

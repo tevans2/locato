@@ -41,7 +41,6 @@
   outline-offset: -4px;
 }
 
-.worldsplit-map.is-drawing { cursor: grabbing; }
 .worldsplit-ocean { fill: transparent; }
 
 .worldsplit-graticule line {
