@@ -1,4 +1,5 @@
 import type { CountryId, CountryIndex } from "../countries";
+import type { PromptSlot } from "../categories/types";
 
 export interface Hint {
   readonly title: string;
@@ -47,7 +48,9 @@ export interface CreateGameEngineInput {
   readonly poolCountryIds?: readonly CountryId[];
   // "fame-ramp" front-loads famous countries for solo play; daily/multiplayer keep the
   // default seeded shuffle.
-  readonly poolOrdering?: "shuffle" | "fame-ramp";
+  readonly poolOrdering?: "shuffle" | "fame-ramp" | "fixed";
+  /** Explicit category assignments and order for curated daily/review decks. */
+  readonly promptSlots?: readonly PromptSlot[];
   readonly initialState?: GameState;
 }
 

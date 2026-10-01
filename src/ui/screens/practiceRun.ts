@@ -79,18 +79,18 @@ export const DAILY_LEAVE_LABEL = "Leave daily challenge — your progress is sav
  * FocusBar for a daily stage: ✕ (App's leave handler already says the daily is saved) and
  * "Round N of 10" progress spanning the whole daily. Marks `root` as a focus screen.
  */
-export function createDailyStageBar(root: HTMLElement, options: { readonly stage: string; readonly progress?: DailyStageProgress; readonly onLeave: () => void }): FocusBarHandle {
+export function createDailyStageBar(root: HTMLElement, options: { readonly stage: string; readonly title?: string; readonly practice?: boolean; readonly progress?: DailyStageProgress; readonly onLeave: () => void }): FocusBarHandle {
   markShellScreen(root, "focus");
   const progress = options.progress;
-  const count = el("span", { className: "gb-daily-count", text: progress ? `Round ${progress.round} of ${progress.total}` : "Daily challenge" });
+  const count = el("span", { className: "gb-daily-count", text: progress ? `${options.practice ? "Review" : "Round"} ${progress.round} of ${progress.total}` : "Daily challenge" });
   const bar = createFocusBar({
     onClose: options.onLeave,
-    closeLabel: DAILY_LEAVE_LABEL,
-    title: `Daily challenge · ${options.stage}`,
+    closeLabel: options.practice ? "Back to daily result" : DAILY_LEAVE_LABEL,
+    title: `${options.title ?? "Daily challenge"} · ${options.stage}`,
     progressLabel: "Daily challenge progress",
     trailing: count,
   });
-  if (progress) bar.setProgress(Math.max(0, progress.round - 1) / Math.max(1, progress.total), `Round ${progress.round} of ${progress.total}`);
+  if (progress) bar.setProgress(Math.max(0, progress.round - 1) / Math.max(1, progress.total), count.textContent ?? "");
   else bar.setProgress(0);
   bar.element.classList.add("gb-daily-bar");
   return bar;

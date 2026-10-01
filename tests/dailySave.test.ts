@@ -47,6 +47,15 @@ function makeResult(date: string, score: number) {
 }
 
 describe("daily result save", () => {
+  it("preserves round review details and rejects a mismatched score", () => {
+    const storage = new MemoryStorage();
+    const result = { ...makeResult("2026-10-01", 100), challengeVersion: 2 as const,
+      rounds: Array.from({ length: 10 }, () => ({ categoryId: "flags", countryCode: "JP", points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false })) };
+    saveDailyResult(storage, result);
+    expect(readDailyResult(storage, result.date)).toEqual(result);
+    saveDailyResult(storage, { ...result, score: 90 });
+    expect(readDailyResult(storage, result.date)).toBeNull();
+  });
   it("keeps daily saves separate per signed-in account", () => {
     const storage = new MemoryStorage();
     const date = "2026-06-12";

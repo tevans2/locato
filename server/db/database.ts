@@ -43,6 +43,19 @@ import type {
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
 
+interface DailyResultRow extends Omit<DailyChallengeResult, "marks" | "rounds" | "challengeVersion"> {
+  readonly marks: string;
+  readonly rounds: string | null;
+  readonly challengeVersion: 2 | null;
+}
+
+function dailyResultFromRow(row: DailyResultRow): DailyChallengeResult {
+  const { marks, rounds, challengeVersion, ...result } = row;
+  return { ...result, marks: JSON.parse(marks) as DailyRoundMark[],
+    ...(rounds ? { rounds: JSON.parse(rounds) as NonNullable<DailyChallengeResult["rounds"]> } : {}),
+    ...(challengeVersion === 2 ? { challengeVersion } : {}) };
+}
+
 export function openDatabase(path: string): Database {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true });
@@ -164,6 +177,8 @@ function migrate(db: Database): void {
       marks TEXT NOT NULL,
       share_text TEXT NOT NULL,
       completed_at INTEGER NOT NULL,
+      challenge_version INTEGER,
+      rounds TEXT,
       PRIMARY KEY (user_id, date)
     );
     CREATE INDEX IF NOT EXISTS daily_challenge_results_user_completed
@@ -203,6 +218,8 @@ function migrate(db: Database): void {
   // Additive migrations: columns added after initial schema deployment.
   const addIfMissing = (sql: string) => { try { db.exec(sql); } catch { /* already exists */ } };
   addIfMissing("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;");
+  addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN challenge_version INTEGER;");
+  addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN rounds TEXT;");
   // Expand user_stats from old 4-column schema to full split schema.
   for (const col of ["total_games", "total_correct", "total_wrong", "solo_games", "solo_correct", "solo_wrong", "solo_best_streak", "multiplayer_games", "multiplayer_wins", "multiplayer_correct", "multiplayer_wrong", "multiplayer_best_streak", "world_map_games", "world_map_completions", "world_best_time_ms", "world_best_countries"]) {
     addIfMissing(`ALTER TABLE user_stats ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0;`);
@@ -404,21 +421,21 @@ export class SqliteUserStore implements UserStore {
 
   getDailyResult(userId: string, date: string): DailyChallengeResult | null {
     const row = this.db
-      .query<{ date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
-        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt FROM daily_challenge_results WHERE user_id = ? AND date = ?",
+      .query<DailyResultRow>(
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE user_id = ? AND date = ?",
       )
       .get(userId, date);
     if (!row) return null;
-    return { ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] };
+    return dailyResultFromRow(row);
   }
 
   listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[] {
     const rows = this.db
-      .query<{ date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
-        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt FROM daily_challenge_results WHERE user_id = ? ORDER BY date DESC LIMIT ?",
+      .query<DailyResultRow>(
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE user_id = ? ORDER BY date DESC LIMIT ?",
       )
       .all(userId, limit);
-    return rows.map((row) => ({ ...row, marks: JSON.parse(row.marks) as DailyRoundMark[] }));
+    return rows.map(dailyResultFromRow);
   }
 
   listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
@@ -430,15 +447,15 @@ export class SqliteUserStore implements UserStore {
 
   listDailyResultsForDate(date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
     const rows = this.db
-      .query<{ userId: string; date: string; seed: string; score: number; timeMs: number; hintsUsed: number; marks: string; shareText: string; completedAt: number }>(
-        `SELECT user_id AS userId, date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt
+      .query<DailyResultRow & { userId: string }>(
+        `SELECT user_id AS userId, date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds
          FROM daily_challenge_results
          WHERE date = ?`,
       )
       .all(date);
     return rows.map((row) => {
       const { userId, ...result } = row;
-      return { userId, result: { ...result, marks: JSON.parse(result.marks) as DailyRoundMark[] } };
+      return { userId, result: dailyResultFromRow(result) };
     });
   }
 
@@ -448,10 +465,10 @@ export class SqliteUserStore implements UserStore {
 
     this.db
       .query(
-        `INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at, challenge_version, rounds)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt);
+      .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt, result.challengeVersion ?? null, result.rounds ? JSON.stringify(result.rounds) : null);
 
     return this.getDailyResult(userId, result.date)!;
   }

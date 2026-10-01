@@ -30,6 +30,7 @@ import { getAchievementState } from "../../storage/achievements";
 import { dailyProgressKey } from "../../storage/dailySave";
 import { academyLevel } from "../../core/academy/mastery";
 import { DAILY_COUNTRY_COUNT, getLocalDailyDate } from "../../core/dailyChallenge";
+import { dailyThemeForDate } from "../../core/dailyThemes";
 import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
 
@@ -198,12 +199,13 @@ function LandingGamePicker({ shell, storage }: LandingScreenOptions) {
 }
 
 function LandingMoreWays({ shell, storage, now }: LandingScreenOptions) {
-  const daily = readDailyStatus(storage, now?.() ?? new Date());
+  const today = now?.() ?? new Date();
+  const daily = readDailyStatus(storage, today);
   const dailyLine = daily.done
     ? `Done for today${daily.streak > 1 ? ` · ${daily.streak}-day streak` : ""}. See your result.`
     : daily.roundsPlayed > 0
       ? `In progress · round ${daily.roundsPlayed + 1} of ${DAILY_COUNTRY_COUNT}. Pick up where you left off.`
-      : `${DAILY_COUNTRY_COUNT} rounds, the same for everyone today.${daily.streak > 0 ? ` Keep your ${daily.streak}-day streak going.` : ""}`;
+      : `${dailyThemeForDate(getLocalDailyDate(today)).title} · ${DAILY_COUNTRY_COUNT} rounds, the same for everyone today.${daily.streak > 0 ? ` Keep your ${daily.streak}-day streak going.` : ""}`;
   return <section className="landing-more" aria-label="More ways to play">
     <button type="button" className="landing-more-card is-daily" data-testid="card-daily" data-state={daily.done ? "done" : daily.roundsPlayed > 0 ? "in-progress" : "new"} onClick={() => shell.openSection("daily")}>
       <span className="landing-more-icon" aria-hidden="true">{daily.done ? <Check size={22} strokeWidth={2} /> : <CalendarDays size={22} strokeWidth={1.6} />}</span>

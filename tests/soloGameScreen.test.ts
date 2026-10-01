@@ -179,4 +179,25 @@ describe("SoloGameScreen practice vs timed", () => {
     root.querySelector<HTMLButtonElement>(".shell-focusbar-close")!.click();
     expect(onExit).toHaveBeenCalled();
   });
+
+  it("records why daily points were lost, and retains the details when resumed", () => {
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const ui = setup({ dailyChallenge: { date: "2026-10-01", onComplete, onProgress } });
+    const firstCode = countries[ui.engine.getState().currentCountryId!]!.code;
+    ui.root.querySelector<HTMLInputElement>("#guess-input")!.value = "incorrect";
+    ui.root.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    ui.root.querySelector<HTMLButtonElement>(".hint-action")!.click();
+    ui.answerCurrent();
+    expect(ui.root.querySelector(".feedback")!.textContent).toContain("+5 points");
+    expect(ui.root.querySelector(".stats-panel")!.textContent).toContain("5/100");
+    const initialProgress = onProgress.mock.calls.at(-1)![0];
+    expect(initialProgress.rounds).toEqual([{ categoryId: "flags", countryCode: firstCode, points: 5, hintsUsed: 1, wrongGuesses: 1, missed: false }]);
+    const resumed = setup({ engine: ui.engine, dailyChallenge: { date: "2026-10-01", onComplete, initialProgress } });
+    resumed.root.querySelector<HTMLButtonElement>(".mobile-pass-action")!.click();
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete.mock.calls[0]![0]).toMatchObject({ score: 5, hintsUsed: 1, marks: ["hint", "miss"] });
+    expect(onComplete.mock.calls[0]![0].rounds).toHaveLength(2);
+    expect(onComplete.mock.calls[0]![0].rounds[1]).toMatchObject({ points: 0, missed: true });
+  });
 });

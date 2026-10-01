@@ -244,6 +244,23 @@ describe("auth routes", () => {
     expect(body.result.timeMs).toBe(134_000);
   });
 
+  it("syncs daily review details privately and rejects inconsistent totals", async () => {
+    const { service } = createService();
+    const registration = await route(service, jsonRequest("/auth/register", "POST", { email: "review@b.com", password: "supersecret", displayName: "review" }));
+    const token = tokenFrom(registration!);
+    const rounds = Array.from({ length: 10 }, () => ({ categoryId: "flags", countryCode: "JP", points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false }));
+    rounds[0] = { ...rounds[0]!, points: 5, hintsUsed: 1, wrongGuesses: 1 };
+    const result = { date: "2026-10-01", seed: "daily:2026-10-01", score: 95, timeMs: 100_000, hintsUsed: 1, marks: ["hint", ...Array(9).fill("correct")], challengeVersion: 2, rounds };
+    const invalid = await route(service, jsonRequest("/api/daily", "POST", { ...result, score: 100 }, token));
+    expect(invalid?.status).toBe(400);
+    const save = await route(service, jsonRequest("/api/daily", "POST", result, token));
+    expect(save?.status).toBe(200);
+    const fetched = await route(service, jsonRequest("/api/daily/2026-10-01", "GET", undefined, token));
+    expect((await fetched!.json()).result).toMatchObject({ rounds, challengeVersion: 2, score: 95 });
+    const leaderboard = await route(service, jsonRequest("/api/daily/leaderboard?date=2026-10-01", "GET"));
+    expect((await leaderboard!.json()).entries[0].result.rounds).toBeUndefined();
+  });
+
   it("returns daily retention summary with streak and friends who finished today", async () => {
     const { service } = createService();
     const user = await route(service, jsonRequest("/auth/register", "POST", { email: "daily-summary@b.com", password: "supersecret", displayName: "daily_summary" }));

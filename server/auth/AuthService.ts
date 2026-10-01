@@ -245,7 +245,8 @@ export class AuthService {
       .listDailyResultsForUsers(this.store.friendIds(userId), date)
       .map((entry) => {
         const friend = this.store.findUserById(entry.userId);
-        return friend ? { user: this.toPublicUser(friend), result: entry.result } : null;
+        const { rounds: _rounds, ...publicResult } = entry.result;
+        return friend ? { user: this.toPublicUser(friend), result: publicResult } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.user.username.localeCompare(b.user.username));
@@ -258,7 +259,8 @@ export class AuthService {
       .listDailyResultsForDate(date)
       .map((entry) => {
         const user = this.store.findUserById(entry.userId);
-        return user ? { user: this.toPublicUser(user), result: entry.result } : null;
+        const { rounds: _rounds, ...publicResult } = entry.result;
+        return user ? { user: this.toPublicUser(user), result: publicResult } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.result.hintsUsed - b.result.hintsUsed || a.user.username.localeCompare(b.user.username))

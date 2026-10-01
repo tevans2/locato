@@ -1,5 +1,7 @@
-import { buildPromptSlots } from "./categories";
+import { buildPromptSlots, getCategory, type PromptSlot } from "./categories";
 import type { CountryId, CountryIndex } from "./countries";
+import { fameTier, type FameTier } from "./countries/fame";
+import { dailyThemeForDate, type DailyTheme } from "./dailyThemes";
 import { createSeededRandom, shuffle } from "./game";
 import { MAP_TAP_LOCATIONS } from "./maptap/locations";
 import { streetViewCountryRounds } from "./streetview";
@@ -13,6 +15,47 @@ export const DAILY_POINTS_PER_ROUND = DAILY_MAX_SCORE / DAILY_COUNTRY_COUNT;
 export const DAILY_HINT_PENALTY = 3;
 export const DAILY_WRONG_GUESS_PENALTY = 2;
 export const DAILY_CATEGORY_IDS = ["flags", "shapes", "capitals", "pick-country", "spot-country"] as const;
+export const DAILY_FORMAT = [
+  { label: "Flags", rounds: "1–2", icon: "flag" },
+  { label: "Capitals", rounds: "3–4", icon: "crown" },
+  { label: "Country shapes", rounds: "5–6", icon: "shapes" },
+  { label: "Country locations", rounds: "7–8", icon: "map-pin" },
+  { label: "Map Tap", rounds: "9", icon: "globe" },
+  { label: "Street View", rounds: "10", icon: "binoculars" },
+] as const;
+
+export interface DailyRoundResult {
+  readonly categoryId: string;
+  readonly countryCode?: string;
+  readonly targetId?: string;
+  readonly points: number;
+  readonly hintsUsed: number;
+  readonly wrongGuesses: number;
+  readonly missed: boolean;
+  readonly distanceKm?: number;
+}
+
+/** Validate persisted and API review details with the same bounded schema. */
+export function parseDailyRoundResults(value: unknown): readonly DailyRoundResult[] | null {
+  if (!Array.isArray(value) || value.length > DAILY_COUNTRY_COUNT) return null;
+  const results: DailyRoundResult[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return null;
+    const r = item as DailyRoundResult;
+    if (![...DAILY_CATEGORY_IDS, "map-tap", "streetview-country"].includes(r.categoryId) ||
+      !Number.isInteger(r.points) || r.points < 0 || r.points > DAILY_POINTS_PER_ROUND ||
+      !Number.isInteger(r.hintsUsed) || r.hintsUsed < 0 || r.hintsUsed > 1000 ||
+      !Number.isInteger(r.wrongGuesses) || r.wrongGuesses < 0 || r.wrongGuesses > 1_000_000 ||
+      typeof r.missed !== "boolean" || (r.missed && r.points !== 0)) return null;
+    if (r.categoryId === "map-tap") {
+      if (typeof r.targetId !== "string" || !MAP_TAP_LOCATIONS.some((location) => location.id === r.targetId) ||
+        (r.distanceKm !== undefined && (!Number.isFinite(r.distanceKm) || r.distanceKm < 0 || r.distanceKm > 21_000))) return null;
+    } else if (typeof r.countryCode !== "string" || !/^[A-Z]{2}$/.test(r.countryCode)) return null;
+    results.push({ categoryId: r.categoryId, points: r.points, hintsUsed: r.hintsUsed, wrongGuesses: r.wrongGuesses, missed: r.missed,
+      ...(r.categoryId === "map-tap" ? { targetId: r.targetId!, ...(r.distanceKm !== undefined ? { distanceKm: r.distanceKm } : {}) } : { countryCode: r.countryCode! }) });
+  }
+  return results;
+}
 
 export type DailyRoundMark = "correct" | "hint" | "miss";
 
@@ -23,6 +66,9 @@ export interface DailyChallenge {
   readonly countryIds: readonly CountryId[];
   readonly mapTapTargetId: string;
   readonly streetViewCountryCode: string;
+  readonly promptSlots?: readonly PromptSlot[];
+  readonly theme?: DailyTheme;
+  readonly challengeVersion?: 2;
 }
 
 export function getLocalDailyDate(date = new Date()): string {
@@ -32,7 +78,7 @@ export function getLocalDailyDate(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate()): DailyChallenge {
+export function createLegacyDailyChallenge(index: CountryIndex, date: string): DailyChallenge {
   const seed = `daily:${date}`;
   const eligibleCountryIds = buildPromptSlots(index, DAILY_CATEGORY_IDS, seed).map((slot) => slot.countryId);
   const countryIds = shuffle(eligibleCountryIds, createSeededRandom(`${seed}:countries`)).slice(0, DAILY_PROMPT_COUNTRY_COUNT);
@@ -49,6 +95,35 @@ export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDa
     mapTapTargetId,
     streetViewCountryCode,
   };
+}
+
+export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate()): DailyChallenge {
+  const seed = `daily:${date}`;
+  const theme = dailyThemeForDate(date);
+  const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"];
+  const tiers: readonly FameTier[] = [1, 1, 2, 2, 1, 3, 2, 3];
+  const used = new Set<CountryId>();
+  const candidates = shuffle(index.countries.filter((country) => !country.allowedCategoryIds), createSeededRandom(`${seed}:balanced`));
+  const promptSlots: PromptSlot[] = [];
+  categories.forEach((categoryId, position) => {
+    const eligible = candidates.filter((country) => !used.has(country.id) && getCategory(categoryId)?.eligible(country));
+    const tier = eligible.filter((country) => fameTier(country.code) === tiers[position]);
+    const themed = position % 2 === 0;
+    const country = (themed ? tier.find((country) => theme.countryCodes.includes(country.code)) : undefined) ?? tier[0] ?? eligible[0];
+    if (country) {
+      used.add(country.id);
+      promptSlots.push({ countryId: country.id, categoryId });
+    }
+  });
+  const themedLocations = MAP_TAP_LOCATIONS.filter((location) => theme.mapTapTargetIds.includes(location.id));
+  const approachableLocations = themedLocations.filter((location) => location.difficulty !== "hard");
+  const mapTapTargetId = shuffle(approachableLocations.length ? approachableLocations : themedLocations, createSeededRandom(`${seed}:maptap`))[0]?.id ?? MAP_TAP_LOCATIONS[0]!.id;
+  const streetRounds = streetViewCountryRounds.filter((round) => index.byCode.has(round.countryCode));
+  const themedStreetRounds = streetRounds.filter((round) => theme.countryCodes.includes(round.countryCode));
+  const mediumStreetRounds = themedStreetRounds.filter((round) => fameTier(round.countryCode) === 2);
+  const streetSource = mediumStreetRounds.length ? mediumStreetRounds : themedStreetRounds.length ? themedStreetRounds : streetRounds.length ? streetRounds : streetViewCountryRounds;
+  const streetViewCountryCode = shuffle(streetSource, createSeededRandom(`${seed}:streetview`))[0]?.countryCode ?? "";
+  return { date, seed, categoryIds: DAILY_CATEGORY_IDS, countryIds: promptSlots.map((slot) => slot.countryId), promptSlots, theme, challengeVersion: 2, mapTapTargetId, streetViewCountryCode };
 }
 
 export function formatDailyTime(milliseconds: number): string {
