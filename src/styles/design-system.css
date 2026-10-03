@@ -40,19 +40,6 @@ button:disabled { cursor: not-allowed; }
 .category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu:has(.game-mode-group),.action-menu-panel { border-radius: 12px; border-color: var(--border); box-shadow: var(--shadow); }
 :root :is(.world-map-country-label,.world-map-control-button,.maptap-info-card,.hint-popover,.achievement-panel,.map-review-panel,.country-click-prompt) { border-radius: 9px; }
 :root[data-theme="dark"] .world-map-country-label { color: var(--text); }
-/* Legacy game controls and SVG states share the dark palette too. */
-:root[data-theme="dark"] :is(.progress-track, .atlas-progress-track, .cat-bar-track, .multiplayer-timer) { background: var(--surface-soft); }
-:root[data-theme="dark"] :is(.category-option:hover, .category-option:has(input:checked), .puzzle-piece-card:hover, .puzzle-piece-card:focus-visible, .puzzle-piece-card.is-in-play, .map-review-country.is-active, .stats-hero-card.is-highlight, .recent-game-row.is-win, .atlas-chip) { border-color: var(--earth); }
-:root[data-theme="dark"] :is(.feedback.good, .achievement-panel) { border-color: var(--good); }
-:root[data-theme="dark"] :is(.feedback.bad, .map-review-panel) { border-color: var(--bad); }
-:root[data-theme="dark"] .game-mode-option input { accent-color: var(--brand); }
-:root[data-theme="dark"] .multiplayer-mode-dropdown .category-dropdown-summary { border-left-color: var(--brand); }
-:root[data-theme="dark"] .world-map-country-unplayable { fill: var(--map-land-fill-unplayable); stroke: var(--border); }
-:root[data-theme="dark"] :is(.world-map-country.is-guessed, .puzzle-country-piece.is-placed, .puzzle-country-piece.is-accuracy-close) { fill: var(--earth); stroke: var(--map-line-guessed); }
-:root[data-theme="dark"] :is(.world-map-country.is-target, .world-map-country.is-review-missed, .world-map-country.is-review-active, .puzzle-country-piece.is-accuracy-far) { fill: var(--route); stroke: var(--map-line-target); }
-:root[data-theme="dark"] .world-map-panel.is-click-country-mode .world-map-country[data-country-id]:hover { fill: var(--accent-soft); stroke: var(--earth); }
-:root[data-theme="dark"] .puzzle-piece-card-path { fill: var(--earth); }
-:root[data-theme="dark"] :is(.country-guess-screen.is-map-fullscreen .country-guess-panel, .streetview-country-screen.is-streetview-fullscreen .game-header, .streetview-country-screen.is-streetview-fullscreen .streetview-panel) { background: var(--surface); }
 .multiplayer-setup { border-radius: 16px; border-color: var(--border); box-shadow: var(--shadow-panel); }
 /* Multiplayer surfaces follow the same theme tokens as solo play. Keep floating status/chat/modal
    UI out of the old always-dark palette so switching theme never leaves a mismatched overlay. */
@@ -77,11 +64,6 @@ button:disabled { cursor: not-allowed; }
     radial-gradient(ellipse at 25% 15%, color-mix(in srgb, var(--surface) 60%, var(--accent-soft)), transparent 70%),
     linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 65%, var(--surface-soft)), color-mix(in srgb, var(--accent) 35%, var(--surface-soft)));
   box-shadow: var(--shadow-panel);
-}
-:root[data-theme="dark"] .flag-color-reveal-canvas {
-  background:
-    radial-gradient(ellipse at 25% 15%, color-mix(in srgb, var(--brand) 8%, var(--surface)), transparent 70%),
-    linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--brand) 12%, var(--surface-soft)));
 }
 /* Country-outline SVG assets are white-filled. Solo uses the same luminance flip via its
    background-image renderer; multiplayer renders an <img>, so apply it here as well. */

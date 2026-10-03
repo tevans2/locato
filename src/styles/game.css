@@ -439,69 +439,69 @@
   letter-spacing: 0.04em;
 }
 
-/* Capital Recall shares the charcoal map palette and teal / rose progress colours. */
+/* Capital Recall dark theme: restores the original always-dark map presentation. */
 :root[data-theme="dark"] .capital-recall-map-panel {
   background:
-    radial-gradient(circle at 16% 20%, color-mix(in srgb, var(--earth) 16%, transparent), transparent 32%),
-    radial-gradient(circle at 82% 74%, color-mix(in srgb, var(--route) 16%, transparent), transparent 34%),
-    linear-gradient(180deg, var(--map-ocean-top), var(--map-ocean-bottom));
+    radial-gradient(circle at 16% 20%, rgba(184, 227, 109, 0.16), transparent 32%),
+    radial-gradient(circle at 82% 74%, rgba(187, 130, 86, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(8, 16, 13, 0.98), rgba(7, 10, 8, 0.98));
 }
 
 :root[data-theme="dark"] .capital-recall-country {
-  fill: color-mix(in srgb, var(--land) 24%, transparent);
-  stroke: var(--border);
+  fill: rgba(116, 136, 108, 0.24);
+  stroke: rgba(232, 226, 211, 0.16);
 }
 
 :root[data-theme="dark"] .capital-recall-country.is-solved {
-  fill: color-mix(in srgb, var(--earth) 46%, transparent);
-  stroke: color-mix(in srgb, var(--earth) 38%, transparent);
+  fill: rgba(184, 227, 109, 0.46);
+  stroke: rgba(184, 227, 109, 0.38);
 }
 
 :root[data-theme="dark"] .capital-recall-country.is-current {
-  fill: color-mix(in srgb, var(--route) 44%, transparent);
-  stroke: color-mix(in srgb, var(--text) 52%, transparent);
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--route) 46%, transparent));
+  fill: rgba(187, 130, 86, 0.44);
+  stroke: rgba(232, 226, 211, 0.52);
+  filter: drop-shadow(0 0 7px rgba(187, 130, 86, 0.46));
 }
 
 :root[data-theme="dark"] .capital-recall-marker-halo {
-  fill: color-mix(in srgb, var(--earth) 16%, transparent);
-  stroke: color-mix(in srgb, var(--earth) 22%, transparent);
+  fill: rgba(184, 227, 109, 0.16);
+  stroke: rgba(184, 227, 109, 0.22);
 }
 
 :root[data-theme="dark"] .capital-recall-marker-dot {
-  stroke: var(--bg);
+  stroke: rgba(8, 12, 8, 0.92);
 }
 
 :root[data-theme="dark"] .capital-recall-marker.is-latest .capital-recall-marker-halo,
 :root[data-theme="dark"] .capital-recall-marker.is-current .capital-recall-marker-halo {
-  fill: color-mix(in srgb, var(--route) 24%, transparent);
-  stroke: color-mix(in srgb, var(--text) 55%, transparent);
+  fill: rgba(187, 130, 86, 0.24);
+  stroke: rgba(232, 226, 211, 0.55);
 }
 
 :root[data-theme="dark"] .capital-recall-marker-label {
-  stroke: var(--bg);
+  stroke: rgba(6, 10, 7, 0.94);
 }
 
 :root[data-theme="dark"] .capital-map-gesture-hint {
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border-color: rgba(232, 226, 211, 0.12);
+  background: rgba(6, 10, 8, 0.7);
 }
 
 :root[data-theme="dark"] .capital-map-current-copy {
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-color: rgba(232, 226, 211, 0.15);
+  background: rgba(6, 10, 8, 0.76);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
 }
 
 :root[data-theme="dark"] .capital-map-progress {
-  border-color: var(--border-strong);
+  border-color: rgba(184, 227, 109, 0.24);
   color: var(--accent);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: rgba(6, 10, 8, 0.74);
 }
 
 :root[data-theme="dark"] .capital-map-recent-chip {
   border-color: rgba(232, 226, 211, 0.13);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: rgba(6, 10, 8, 0.74);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
 }
 

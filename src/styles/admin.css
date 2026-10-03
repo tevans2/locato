@@ -15,14 +15,14 @@
   --sidebar-w: 232px;
 }
 :root[data-theme="dark"] {
-  --chart-1: var(--earth);
-  --chart-2: var(--route);
-  --chart-grid: rgba(216, 195, 158, 0.08);
-  --warn: var(--brand);
-  --warn-soft: #40392f;
-  --bad-soft: var(--route-soft);
-  --good-soft: var(--accent-soft);
-  --row-hover: rgba(216, 195, 158, 0.04);
+  --chart-1: #2fa58e;
+  --chart-2: #e0673f;
+  --chart-grid: rgba(226, 234, 225, 0.08);
+  --warn: #e6b85c;
+  --warn-soft: #3c3220;
+  --bad-soft: #432a24;
+  --good-soft: #2a3a22;
+  --row-hover: rgba(226, 234, 225, 0.04);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
