@@ -21,18 +21,18 @@
 }
 
 :root[data-theme="dark"] {
-  --compete-gold: var(--brand);
-  --compete-gold-soft: #40392f;
-  --compete-silver: #c7c4c0;
-  --compete-silver-soft: #3b3937;
-  --compete-bronze: #d7a78b;
-  --compete-bronze-soft: #40342d;
+  --compete-gold: #e7c267;
+  --compete-gold-soft: #3b3421;
+  --compete-silver: #c3cbc6;
+  --compete-silver-soft: #2e3a32;
+  --compete-bronze: #e39a72;
+  --compete-bronze-soft: #3e2f25;
   --compete-you: color-mix(in srgb, var(--accent) 20%, var(--surface));
-  --compete-live: var(--route);
-  --compete-live-hover: #e59bab;
-  --compete-live-ink: var(--on-brand);
-  --compete-live-soft: var(--route-soft);
-  --compete-online: var(--good);
+  --compete-live: #f07a58;
+  --compete-live-hover: #f59274;
+  --compete-live-ink: #24120b;
+  --compete-live-soft: #3e2b22;
+  --compete-online: #9bd45b;
 }
 
 /* ---------- Resets ---------- */
@@ -984,7 +984,7 @@
   font-weight: 850;
 }
 
-:root[data-theme="dark"] #compete .compete-podium-rank { color: var(--on-brand); }
+:root[data-theme="dark"] #compete .compete-podium-rank { color: #1a2119; }
 #compete .compete-podium-step.is-open .compete-podium-rank { background: var(--surface-soft); color: var(--subtle); }
 #compete .compete-podium-step.is-open .compete-podium-block { background: color-mix(in srgb, var(--surface-soft) 50%, transparent); box-shadow: inset 0 2px 0 var(--border-strong); }
 #compete .compete-podium-step.is-you .compete-podium-block { background: linear-gradient(180deg, var(--compete-you), color-mix(in srgb, var(--compete-you) 30%, transparent)); }

@@ -713,14 +713,14 @@ svg.cp-feature-shape path { fill: var(--brand); stroke: var(--brand); stroke-wid
 :root[data-theme="dark"] #country-profile .cp-look-flag {
   filter: drop-shadow(0 0 .6px rgba(0, 0, 0, .6)) drop-shadow(0 14px 22px rgba(0, 0, 0, .45));
 }
-:root[data-theme="dark"] #country-profile .cp-locator .world-map-country.is-cp-self { stroke: var(--map-line-target); }
+:root[data-theme="dark"] #country-profile .cp-locator .world-map-country.is-cp-self { stroke: #ffd9c9; }
 :root[data-theme="dark"] #country-profile .cp-locator .world-map-country.is-cp-neighbour {
   fill: color-mix(in srgb, var(--accent) 34%, transparent);
   stroke: var(--accent);
 }
 :root[data-theme="dark"] #country-profile .cp-key.is-neighbour { background: color-mix(in srgb, var(--accent) 34%, var(--surface)); box-shadow: inset 0 0 0 1px var(--accent); }
-:root[data-theme="dark"] #country-profile .cp-map-capital { fill: var(--brand); stroke: var(--bg); }
-:root[data-theme="dark"] #country-profile .cp-map-capital-label { fill: var(--text); stroke: var(--bg); }
+:root[data-theme="dark"] #country-profile .cp-map-capital { fill: #fffef2; stroke: #151e18; }
+:root[data-theme="dark"] #country-profile .cp-map-capital-label { fill: #fffef2; stroke: #0b100b; }
 :root[data-theme="dark"] #country-profile .cp-level.is-learning { background: var(--route-soft); }
 
 /* ---- Responsive ---------------------------------------------------------------------- */

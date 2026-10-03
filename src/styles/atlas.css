@@ -10,9 +10,9 @@
 }
 
 :root[data-theme="dark"] #atlas {
-  --atlas-m-learning: var(--brand);
-  --atlas-m-familiar: var(--earth);
-  --atlas-m-mastered: #b5d4ca;
+  --atlas-m-learning: #b89a57;
+  --atlas-m-familiar: #8db15e;
+  --atlas-m-mastered: #cbe78f;
 }
 
 #atlas :where(.atlas-toolbar, .atlas-grid, .atlas-empty) :where(button, input, select) {
