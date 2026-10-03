@@ -590,7 +590,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         activeFlagColorTarget = content.value;
         flagColorReveal.reset(content.value);
       }
-      prompt.imageSlot.replaceChildren(flagColorReveal.element);
+      if (prompt.imageSlot.firstElementChild !== flagColorReveal.element) {
+        prompt.imageSlot.replaceChildren(flagColorReveal.element);
+      }
     } else {
       activeFlagColorTarget = null;
       activeMapPromptKey = null;

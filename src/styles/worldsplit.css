@@ -287,18 +287,18 @@
 
 :root[data-theme="dark"] .worldsplit-map-shell {
   background:
-    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 84%, #1e5a5c), transparent 55%),
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--sea) 84%, var(--surface-soft)), transparent 55%),
     var(--sea);
 }
 
 :root[data-theme="dark"] .worldsplit-country {
-  fill: #d8dacb;
-  stroke: rgba(12, 20, 17, .68);
+  fill: var(--land);
+  stroke: var(--bg);
 }
 
-:root[data-theme="dark"] .worldsplit-country.is-side-a { fill: #91cf4d; }
-:root[data-theme="dark"] .worldsplit-country.is-side-b { fill: #63b5ad; }
-:root[data-theme="dark"] .worldsplit-country.is-outside { fill: #7f9185; }
+:root[data-theme="dark"] .worldsplit-country.is-side-a { fill: var(--earth); }
+:root[data-theme="dark"] .worldsplit-country.is-side-b { fill: var(--route); }
+:root[data-theme="dark"] .worldsplit-country.is-outside { fill: var(--subtle); }
 
 @media (max-width: 980px) {
   .worldsplit-layout {

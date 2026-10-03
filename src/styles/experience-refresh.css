@@ -777,7 +777,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 }
 
 /* Dark theme — the structure stays identical while the cartographic palette
-   switches to deep ink, muted sea glass and warm pale land. */
+   switches to charcoal, warm sand, teal and dusty rose. */
 :root[data-theme="dark"] body {
   background: var(--bg);
 }
@@ -808,16 +808,16 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .primary-action,
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action {
-  border-color: var(--accent);
-  color: #172116;
-  background: var(--accent);
+  border-color: var(--brand);
+  color: var(--on-brand);
+  background: var(--brand);
 }
 
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .primary-action:hover:not(:disabled),
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .input-row .guess-submit-action:hover:not(:disabled) {
-  border-color: #b3e875;
-  color: #172116;
-  background: #a7e161;
+  border-color: var(--brand-hover);
+  color: var(--on-brand);
+  background: var(--brand-hover);
 }
 
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) .auth-trigger,
@@ -829,8 +829,8 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] .flag-slot {
   border-color: var(--border-strong);
   background:
-    linear-gradient(rgba(232,240,231,.035) 1px, transparent 1px) 0 0 / 44px 44px,
-    linear-gradient(90deg, rgba(232,240,231,.028) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(color-mix(in srgb, var(--text) 3.5%, transparent) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, color-mix(in srgb, var(--text) 2.8%, transparent) 1px, transparent 1px) 0 0 / 44px 44px,
     var(--bg-elevated);
 }
 
@@ -841,14 +841,14 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] .maptap-map-panel,
 :root[data-theme="dark"] .maptap-globe {
   background:
-    linear-gradient(rgba(232,240,231,.04) 1px, transparent 1px) 0 0 / 64px 64px,
-    linear-gradient(90deg, rgba(232,240,231,.032) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(color-mix(in srgb, var(--text) 4%, transparent) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, color-mix(in srgb, var(--text) 3.2%, transparent) 1px, transparent 1px) 0 0 / 64px 64px,
     var(--sea);
 }
 
 :root[data-theme="dark"] .world-map-country {
   fill: var(--land);
-  stroke: #60736c;
+  stroke: var(--map-line-country);
 }
 
 :root[data-theme="dark"] .world-map-control-button,
@@ -857,11 +857,11 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] .world-map-country-label,
 :root[data-theme="dark"] .maptap-info-card {
   color: var(--text);
-  background: rgba(20, 29, 23, .94);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
 }
 
 :root[data-theme="dark"] .multiplayer-setup-intro {
-  background: #25361f;
+  background: var(--surface-soft);
 }
 
 :root[data-theme="dark"] .multiplayer-setup-intro > .muted,
@@ -872,13 +872,13 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] .feedback.good,
 :root[data-theme="dark"] .achievement-panel {
   color: var(--good);
-  background: rgba(139, 210, 63, .08);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
 }
 
 :root[data-theme="dark"] .feedback.bad,
 :root[data-theme="dark"] .map-review-panel {
   color: var(--bad);
-  background: rgba(239, 106, 69, .08);
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
 }
 
 @media (max-width: 1100px) {

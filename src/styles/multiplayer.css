@@ -526,26 +526,29 @@
 }
 
 .flag-color-reveal {
-  width: min(100%, 720px);
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  place-items: center;
-  gap: 10px;
+  /* A definite frame keeps tall flags within the board rather than growing its grid row. */
+  position: absolute;
+  inset: clamp(10px, 1.8dvh, 18px);
 }
 
-.flag-color-reveal-canvas {
-  width: auto;
-  height: auto;
-  max-width: min(92%, calc(100% - 24px));
-  max-height: min(92%, calc(100% - 42px));
-  border-radius: var(--radius-md);
-  background: #121712;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+.flag-color-reveal-canvas,
+.multiplayer-flag-slot .flag-color-reveal-canvas {
+  position: absolute;
+  inset: 0 0 38px;
+  margin: auto;
+  max-width: min(92%, calc(100% - clamp(32px, 5vw, 64px)), var(--flag-natural-width, 900px));
+  max-height: min(92%, calc(100% - clamp(32px, 5dvh, 64px) - 38px), var(--flag-natural-height, 600px));
+}
+
+.flag-color-reveal-transition {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .flag-color-reveal-meta {
+  position: absolute;
+  inset-inline: 18px;
+  bottom: 16px;
   margin: 0;
   color: var(--muted);
   font-size: 0.8rem;
@@ -762,6 +765,10 @@
 
   .multiplayer-flag-slot .flag-image {
     max-height: 240px;
+  }
+
+  .multiplayer-flag-slot .flag-color-reveal-canvas {
+    max-height: min(240px, calc(100% - clamp(32px, 5dvh, 64px) - 38px), var(--flag-natural-height, 600px));
   }
 
   .multiplayer-round-panel,
