@@ -70,6 +70,7 @@ export function SystemView({ client }: { client: AdminClient }) {
             <div><dt>GitHub sign-in</dt><dd><On value={s.features.githubOAuth} /></dd></div>
             <div><dt>Google sign-in</dt><dd><On value={s.features.googleOAuth} /></dd></div>
             <div><dt>Allowed origins</dt><dd>{s.features.allowedOrigins?.join(", ") ?? "any"}</dd></div>
+            <div><dt>Run audit</dt><dd>{s.features.runAuditEnforced ? "Enforcing: failed runs are refused" : "Observing: runs are flagged, not refused"}</dd></div>
             {Object.entries(s.limits).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{UNITS[key]?.(value) ?? value}</dd></div>)}
           </dl>
         </Panel>

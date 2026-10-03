@@ -138,3 +138,67 @@ describe("CountryGuessingScreen practice vs timed", () => {
     expect(root.querySelector(".shell-switcher")).not.toBeNull();
   });
 });
+
+describe("CountryGuessingScreen run audit", () => {
+  const user = { id: "u1", email: "u@test.local", displayName: "u", avatarUrl: null } as never;
+
+  function mockServer() {
+    const calls: { path: string; body: Record<string, unknown> }[] = [];
+    const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      calls.push({ path, body });
+      const reply = path === "/api/runs/start" ? { runId: "run_test" } : path === "/api/leaderboard" ? { accepted: true, isPersonalBest: true, rank: 1, bestTimeMs: 1 } : { ok: true };
+      return new Response(JSON.stringify(reply), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return calls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks for a ticket on the first country and sends the timeline when a practice run is restarted", async () => {
+    const calls = mockServer();
+    const { root, type } = setup({ getAuthUser: () => user });
+    type("Japan");
+    type("Brazil");
+    expect(calls.filter((call) => call.path === "/api/runs/start")).toEqual([{ path: "/api/runs/start", body: { gameMode: "name-all", variant: "", timed: false } }]);
+    [...root.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Restart")!.click();
+    await vi.waitFor(() => expect(calls.some((call) => call.path === "/api/runs/finish")).toBe(true));
+    const finish = calls.find((call) => call.path === "/api/runs/finish")!.body;
+    expect(finish).toMatchObject({ runId: "run_test", outcome: "abandoned" });
+    const entries = (finish.timeline as { entries: unknown[][] }).entries;
+    expect(entries.map((entry) => entry[0])).toEqual(["JP", "BR"]);
+    // Test events are dispatched from script, so the browser marks them untrusted.
+    expect(entries.map((entry) => [entry[2], entry[3]])).toEqual([[0, 1], [0, 1]]);
+  });
+
+  it("a given-up run says so", async () => {
+    const calls = mockServer();
+    const { root, type } = setup({ getAuthUser: () => user });
+    type("Japan");
+    [...root.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Give up")!.click();
+    await vi.waitFor(() => expect(calls.find((call) => call.path === "/api/runs/finish")?.body.outcome).toBe("given-up"));
+    expect(calls.filter((call) => call.path === "/api/runs/finish")).toHaveLength(1);
+  });
+
+  it("posts a finished timed run with its ticket and timeline", async () => {
+    const calls = mockServer();
+    const { type } = setup({ run: "timed", getAuthUser: () => user });
+    type("Japan");
+    type("Brazil");
+    type("Kenya");
+    await vi.waitFor(() => expect(calls.some((call) => call.path === "/api/leaderboard")).toBe(true));
+    const post = calls.find((call) => call.path === "/api/leaderboard")!.body;
+    expect(post).toMatchObject({ gameMode: "name-all", runId: "run_test" });
+    expect((post.timeline as { entries: unknown[][] }).entries.map((entry) => entry[0])).toEqual(["JP", "BR", "KE"]);
+    // The timed run's timeline goes with the post, not as a separate finish.
+    expect(calls.some((call) => call.path === "/api/runs/finish")).toBe(false);
+  });
+
+  it("guests send nothing", () => {
+    const calls = mockServer();
+    const { type } = setup();
+    type("Japan");
+    expect(calls).toEqual([]);
+  });
+});

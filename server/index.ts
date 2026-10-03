@@ -97,7 +97,10 @@ setInterval(() => roomManager.sweep(Date.now()), TICK_INTERVAL_MS).unref?.();
 const SESSION_TTL_MS = readIntegerEnv("SESSION_TTL_DAYS", 30) * 24 * 60 * 60 * 1000;
 const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/locato.db");
 const userStore = new SqliteUserStore(openDatabase(databasePath));
-const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS });
+// RUN_AUDIT_ENFORCE=1 refuses leaderboard posts from runs that fail a hard check. Unset, runs are
+// audited and flagged only (observe mode), so thresholds can be checked against real play first.
+const enforceRunAudit = process.env.RUN_AUDIT_ENFORCE === "1";
+const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
 // Out-of-band admin credential. When unset, the /api/admin surface is disabled entirely.
@@ -149,6 +152,7 @@ async function systemSnapshot(): Promise<Record<string, unknown>> {
       githubOAuth: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
       googleOAuth: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
       allowedOrigins: origins ? [...origins] : null,
+      runAuditEnforced: enforceRunAudit,
     },
     streetview: await streetViewPool.stats(),
   };

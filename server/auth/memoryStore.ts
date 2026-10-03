@@ -20,6 +20,9 @@ import type {
   SendFriendRequestResult,
   GameResult,
   StoredAcademyProgress,
+  StoredRun,
+  CreateRunInput,
+  FinishRunInput,
   LeaderboardEntry,
   LeaderboardQuery,
   LeaderboardScoreEntry,
@@ -54,6 +57,7 @@ export function createMemoryUserStore(): UserStore {
   const events: AdminEvent[] = [];
   let nextEventId = 1;
   const academyProgress = new Map<string, StoredAcademyProgress>();
+  const runs = new Map<string, StoredRun>();
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -325,6 +329,7 @@ export function createMemoryUserStore(): UserStore {
       gameRecords.delete(id);
       for (const [key, f] of friendships) if (f.low === id || f.high === id) friendships.delete(key);
       academyProgress.delete(id);
+      for (const [key, run] of runs) if (run.userId === id) runs.delete(key);
       return true;
     },
     deleteUserSessions(userId: string): number {
@@ -392,6 +397,28 @@ export function createMemoryUserStore(): UserStore {
           .map(([key, r]) => ({ userId: key.slice(0, -r.date.length - 1), at: r.completedAt })),
         logins: [...sessions.values()].filter((s) => s.createdAt >= since).map((s) => ({ userId: s.userId, at: s.createdAt })),
       };
+    },
+    createRun(input: CreateRunInput): void {
+      runs.set(input.id, { ...input, finishedAt: null, outcome: null, claimedMs: null, countries: 0, timeline: null, flags: [], verdict: null, posted: false, refused: false });
+    },
+    findRun(id: string): StoredRun | null {
+      return runs.get(id) ?? null;
+    },
+    finishRun(id: string, input: FinishRunInput): void {
+      const run = runs.get(id);
+      if (run) runs.set(id, { ...run, ...input });
+    },
+    listUserRuns(userId: string, limit: number): readonly StoredRun[] {
+      return [...runs.values()].filter((run) => run.userId === userId).sort((a, b) => b.startedAt - a.startedAt).slice(0, limit);
+    },
+    listFlaggedRuns(limit: number): readonly StoredRun[] {
+      return [...runs.values()]
+        .filter((run) => run.verdict === "review" || run.verdict === "reject")
+        .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))
+        .slice(0, limit);
+    },
+    hasOverlappingRun(userId: string, runId: string, startedAt: number): boolean {
+      return [...runs.values()].some((run) => run.userId === userId && run.id !== runId && run.startedAt <= startedAt && run.finishedAt !== null && run.finishedAt > startedAt);
     },
     recordEvent(event: AdminEventInput): void {
       events.push({ ...event, id: nextEventId++ });

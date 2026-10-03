@@ -5,6 +5,9 @@ import { getGameModeOption, type GameModeId, type WorldMapGameModeId } from "../
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
 import { formatTimerCompletionSuffix, postTimedRun } from "../../core/timer/leaderboardSync";
+import { finishAuditedRun, startAuditedRun } from "../../core/auth";
+import { isAuditedMode, type RunOutcome } from "../../core/runAudit";
+import { createRunRecorder, type RunRecorder } from "../../core/runAudit/recorder";
 import { createPlayTimer, formatElapsedTime, formatStoredTime, type PlayTimer } from "../../core/timer/playTimer";
 import { recordWorldAchievements, type Achievement } from "../../storage/achievements";
 import type { Screen } from "../../app/router";
@@ -89,6 +92,12 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let runStartedAt: number | null = null;
   let runWrongGuesses = 0;
   let lastResults: RunResultsHandle | null = null;
+  // Run audit (src/core/runAudit): when each country was found and how it was typed, plus the
+  // server's ticket for the run, so a posted time can be checked. Name all countries only.
+  const audited = isAuditedMode(playMode);
+  let recorder: RunRecorder | null = null;
+  let auditTicket: Promise<string | null> | null = null;
+  let auditEnded = false;
   function complete(): boolean {
     if (playMode === "puzzle") return puzzleTotalCount > 0 && puzzlePlacedCount >= puzzleTotalCount;
     return guessedCountryIds.size >= countryIndex.countries.length;
@@ -98,6 +107,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     return runGivenUp || complete();
   }
   function recordCurrentRun(completed: boolean): void {
+    // A finished timed run sends its timeline with the leaderboard post instead.
+    if (!(timed && completed)) endAuditedRun(completed ? "complete" : "abandoned");
     const countriesFound = playMode === "puzzle" ? puzzlePlacedCount : guessedCountryIds.size;
     if (countriesFound === 0 || currentRunRecorded) return;
     currentRunRecorded = true;
@@ -206,11 +217,18 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
+    let run: { readonly runId: string | null; readonly timeline: ReturnType<RunRecorder["timeline"]> } | undefined;
+    if (audited && recorder && !auditEnded) {
+      auditEnded = true;
+      const timeline = recorder.timeline();
+      run = { runId: auditTicket ? await auditTicket : null, timeline };
+    }
     const posting = await postTimedRun({
       gameMode: playMode,
       variant: playMode === "puzzle" ? puzzleContinent : "",
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
+      ...(run ? { run } : {}),
     });
     return { isNewLocalBest, ...posting };
   }
@@ -281,6 +299,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   function resetGame(feedbackMessage: string, captureReview = true): void {
     if (captureReview && !runGivenUp) captureReviewForCurrentRun();
     recordCurrentRun(false); // record the run being abandoned before clearing it
+    resetAuditedRun();
     clearSpotFocusTimeout();
     lastFocusedSpotTargetId = null;
     setAtlasOpen(atlas, false);
@@ -335,9 +354,35 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     runStartedAt ??= Date.now();
   }
 
+  /** A country found in an audited run: ask for the run's ticket on the first, then note it. */
+  function noteAuditedFind(country: Country): void {
+    if (!audited || !recorder || auditEnded) return;
+    if (auditTicket === null && options.getAuthUser() !== null) auditTicket = startAuditedRun({ gameMode: playMode, timed });
+    recorder.mark(country.code, timed ? playTimer.currentElapsedMs() : Date.now() - (runStartedAt ?? Date.now()));
+  }
+
+  /** The run ended without a leaderboard post: send its timeline for the audit trail. */
+  function endAuditedRun(outcome: RunOutcome): void {
+    if (!audited || !recorder || auditEnded) return;
+    auditEnded = true;
+    const ticket = auditTicket;
+    const timeline = recorder.timeline();
+    if (!ticket || timeline.entries.length === 0) return;
+    void ticket.then((runId) => {
+      if (runId) finishAuditedRun({ runId, outcome, timeline });
+    });
+  }
+
+  function resetAuditedRun(): void {
+    recorder?.reset();
+    auditTicket = null;
+    auditEnded = false;
+  }
+
   function recordGuess(country: Country): void {
     playTimer.startIfNeeded();
     noteRunStarted();
+    noteAuditedFind(country);
     guessedCountryIds.add(country.id);
     lastCountryName.textContent = country.name;
     recordWorldProgress(false);
@@ -464,6 +509,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (playMode !== "name-all" || roundEnded()) return;
 
     captureReviewForCurrentRun("the given-up run", true);
+    endAuditedRun("given-up");
     recordCurrentRun(false);
     const finalTimeMs = timed ? playTimer.stop() : 0;
     runGivenUp = true;
@@ -905,6 +951,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     ],
   });
 
+  if (audited) recorder = createRunRecorder({ root: element, signal: controller.signal });
   markShellScreen(element, "game");
   render();
 
