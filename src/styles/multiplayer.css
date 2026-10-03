@@ -526,12 +526,18 @@
 }
 
 .flag-color-reveal {
-  /* Let the canvases use the same grid cell and sizing as ordinary flag images. */
-  display: contents;
+  /* A definite frame keeps tall flags within the board rather than growing its grid row. */
+  position: absolute;
+  inset: clamp(10px, 1.8dvh, 18px);
 }
 
-.flag-color-reveal-canvas {
-  grid-area: 1 / 1;
+.flag-color-reveal-canvas,
+.multiplayer-flag-slot .flag-color-reveal-canvas {
+  position: absolute;
+  inset: 0 0 38px;
+  margin: auto;
+  max-width: min(92%, calc(100% - clamp(32px, 5vw, 64px)), var(--flag-natural-width, 900px));
+  max-height: min(92%, calc(100% - clamp(32px, 5dvh, 64px) - 38px), var(--flag-natural-height, 600px));
 }
 
 .flag-color-reveal-transition {
@@ -759,6 +765,10 @@
 
   .multiplayer-flag-slot .flag-image {
     max-height: 240px;
+  }
+
+  .multiplayer-flag-slot .flag-color-reveal-canvas {
+    max-height: min(240px, calc(100% - clamp(32px, 5dvh, 64px) - 38px), var(--flag-natural-height, 600px));
   }
 
   .multiplayer-round-panel,

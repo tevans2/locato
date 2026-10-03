@@ -1,12 +1,10 @@
 import { el } from "./createElement";
 
-// Compare at a modest resolution; display the original image at its full size.
-const WIDTH = 360;
-const HEIGHT = 240;
 const DISPLAY_WIDTH = 900;
 const DISPLAY_HEIGHT = 600;
 const MATCH_DISTANCE = 82;
 const MIN_ALPHA = 24;
+const MAX_CACHED_FLAGS = 4;
 
 export interface FlagColorRevealView {
   readonly element: HTMLElement;
@@ -23,11 +21,11 @@ type FlagPixels = {
 
 const pixelCache = new Map<string, Promise<FlagPixels | null>>();
 
-function colorDistance(target: Uint8ClampedArray, guess: Uint8ClampedArray, offset: number): number {
+function colorDistanceSquared(target: Uint8ClampedArray, guess: Uint8ClampedArray, offset: number): number {
   const dr = channel(target, offset) - channel(guess, offset);
   const dg = channel(target, offset + 1) - channel(guess, offset + 1);
   const db = channel(target, offset + 2) - channel(guess, offset + 2);
-  return Math.sqrt(dr * dr + dg * dg + db * db);
+  return dr * dr + dg * dg + db * db;
 }
 
 function channel(data: Uint8ClampedArray, offset: number): number {
@@ -43,23 +41,25 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-async function loadFlagPixels(src: string): Promise<FlagPixels | null> {
-  const cached = pixelCache.get(src);
+async function loadFlagPixels(src: string, width: number, height: number, loadedImage?: HTMLImageElement): Promise<FlagPixels | null> {
+  const key = JSON.stringify([src, width, height]);
+  const cached = pixelCache.get(key);
   if (cached) return cached;
 
-  const promise = loadImage(src).then((image) => {
+  const promise = (loadedImage ? Promise.resolve(loadedImage) : loadImage(src)).then((image) => {
     if (!image) return null;
     const canvas = document.createElement("canvas");
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    ctx.drawImage(image, 0, 0, WIDTH, HEIGHT);
-    return { data: ctx.getImageData(0, 0, WIDTH, HEIGHT).data, width: image.naturalWidth, height: image.naturalHeight, image };
+    ctx.drawImage(image, 0, 0, width, height);
+    return { data: ctx.getImageData(0, 0, width, height).data, width: image.naturalWidth, height: image.naturalHeight, image };
   });
 
-  pixelCache.set(src, promise);
+  pixelCache.set(key, promise);
+  // Full-resolution comparisons are larger; don't retain an entire run's pixel buffers.
+  if (pixelCache.size > MAX_CACHED_FLAGS) pixelCache.delete(pixelCache.keys().next().value!);
   return promise;
 }
 
@@ -71,12 +71,12 @@ export function createFlagColorRevealView(): FlagColorRevealView {
   const ctx = canvas.getContext("2d");
   const previousCtx = previous.getContext("2d");
   const buffer = document.createElement("canvas");
-  buffer.width = WIDTH;
-  buffer.height = HEIGHT;
+  buffer.width = DISPLAY_WIDTH;
+  buffer.height = DISPLAY_HEIGHT;
   const bufferCtx = buffer.getContext("2d", { willReadFrequently: true });
   const flagLayer = document.createElement("canvas");
   const flagLayerCtx = flagLayer.getContext("2d");
-  const revealed = new Uint8Array(WIDTH * HEIGHT);
+  let revealed = new Uint8Array(DISPLAY_WIDTH * DISPLAY_HEIGHT);
   let targetSrc = "";
   let targetPixels: FlagPixels | null = null;
   let renderToken = 0;
@@ -91,7 +91,7 @@ export function createFlagColorRevealView(): FlagColorRevealView {
       previousCtx.clearRect(0, 0, previous.width, previous.height);
       previousCtx.drawImage(canvas, 0, 0);
     }
-    const mask = bufferCtx.createImageData(WIDTH, HEIGHT);
+    const mask = bufferCtx.createImageData(buffer.width, buffer.height);
     let revealedCount = 0;
     for (let pixel = 0; pixel < revealed.length; pixel += 1) {
       if (revealed[pixel] !== 1 || !targetPixels) continue;
@@ -127,26 +127,38 @@ export function createFlagColorRevealView(): FlagColorRevealView {
       revealed.fill(0);
       const token = ++renderToken;
       render();
-      targetReady = loadFlagPixels(nextTargetSrc).then((pixels) => {
+      targetReady = loadImage(nextTargetSrc).then(async (image) => {
+        if (token !== renderToken || targetSrc !== nextTargetSrc) return;
+        if (!image) return;
+        const naturalWidth = image.naturalWidth || DISPLAY_WIDTH;
+        const naturalHeight = image.naturalHeight || DISPLAY_HEIGHT;
+        const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+        // Compare and mask at the same resolution as the displayed flag, including Retina.
+        const width = Math.ceil(naturalWidth * pixelRatio);
+        const height = Math.ceil(naturalHeight * pixelRatio);
+        const pixels = await loadFlagPixels(nextTargetSrc, width, height, image);
         if (token !== renderToken || targetSrc !== nextTargetSrc) return;
         targetPixels = pixels;
-        if (pixels) {
-          // Match the normal flag image's intrinsic dimensions and aspect ratio.
-          canvas.width = previous.width = flagLayer.width = pixels.width || DISPLAY_WIDTH;
-          canvas.height = previous.height = flagLayer.height = pixels.height || DISPLAY_HEIGHT;
-        }
+        element.style.setProperty("--flag-natural-width", `${naturalWidth}px`);
+        element.style.setProperty("--flag-natural-height", `${naturalHeight}px`);
+        canvas.width = previous.width = flagLayer.width = buffer.width = width;
+        canvas.height = previous.height = flagLayer.height = buffer.height = height;
+        revealed = new Uint8Array(width * height);
         render();
       });
     },
     addGuess(flagSrc: string): void {
       const token = renderToken;
-      void Promise.all([targetReady, loadFlagPixels(flagSrc)]).then(([, guessPixels]) => {
+      void targetReady.then(async () => {
+        if (token !== renderToken || !targetPixels) return;
+        const guessPixels = await loadFlagPixels(flagSrc, buffer.width, buffer.height);
         if (token !== renderToken || !targetPixels || !guessPixels) return;
         let changed = false;
         for (let pixel = 0; pixel < revealed.length; pixel += 1) {
+          if (revealed[pixel] === 1) continue;
           const offset = pixel * 4;
           if (channel(targetPixels.data, offset + 3) < MIN_ALPHA || channel(guessPixels.data, offset + 3) < MIN_ALPHA) continue;
-          if (revealed[pixel] !== 1 && colorDistance(targetPixels.data, guessPixels.data, offset) <= MATCH_DISTANCE) {
+          if (colorDistanceSquared(targetPixels.data, guessPixels.data, offset) <= MATCH_DISTANCE * MATCH_DISTANCE) {
             revealed[pixel] = 1;
             changed = true;
           }
