@@ -20,18 +20,18 @@
 }
 
 :root[data-theme="dark"] {
-  --acad-m-new: #3a4a3f;
-  --acad-m-learning: #5a7350;
-  --acad-m-familiar: #8db15e;
-  --acad-m-mastered: #cbe78f;
-  --acad-line: #7f938a;
-  --acad-line-group: #f4f1d8;
-  --acad-ink: #f08a65;
-  --acad-ink-soft: rgba(240, 138, 101, 0.14);
-  --acad-paper: #1f2c23;
-  --acad-paper-edge: #2b3b2f;
-  --acad-dot-ring: #10170f;
-  --acad-glow: rgba(203, 231, 143, 0.16);
+  --acad-m-new: #4a4640;
+  --acad-m-learning: #52655e;
+  --acad-m-familiar: #7db0a3;
+  --acad-m-mastered: #b5d4ca;
+  --acad-line: #9b9080;
+  --acad-line-group: var(--text);
+  --acad-ink: var(--route);
+  --acad-ink-soft: color-mix(in srgb, var(--route) 14%, transparent);
+  --acad-paper: var(--surface);
+  --acad-paper-edge: var(--surface-soft);
+  --acad-dot-ring: var(--bg);
+  --acad-glow: color-mix(in srgb, var(--earth) 16%, transparent);
 }
 
 /* ---------- Shell ---------- */
@@ -308,8 +308,8 @@
 
 :root[data-theme="dark"] #academy .academy-map .world-map-panel {
   background:
-    radial-gradient(ellipse at 50% 42%, rgba(120, 190, 170, 0.08), transparent 62%),
-    linear-gradient(180deg, #17302f, #102322);
+    radial-gradient(ellipse at 50% 42%, color-mix(in srgb, var(--text) 8%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--map-ocean-top), var(--map-ocean-bottom));
 }
 
 #academy .academy-map .world-map-svg {
@@ -599,7 +599,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-:root[data-theme="dark"] #academy .academy-review-count { color: #25140d; }
+:root[data-theme="dark"] #academy .academy-review-count { color: var(--on-brand); }
 
 /* Welcome + continue cards */
 
@@ -1032,7 +1032,7 @@
 
 #academy .academy-group-card.is-started .academy-waypoint { border-color: var(--acad-m-familiar); color: var(--text); }
 #academy .academy-group-card.is-complete .academy-waypoint { border-color: var(--acad-m-mastered); background: var(--acad-m-mastered); color: var(--on-brand); }
-:root[data-theme="dark"] #academy .academy-group-card.is-complete .academy-waypoint { color: #17230f; }
+:root[data-theme="dark"] #academy .academy-group-card.is-complete .academy-waypoint { color: var(--on-brand); }
 #academy .academy-group-card.is-next .academy-waypoint { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
 
 #academy .academy-group-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }

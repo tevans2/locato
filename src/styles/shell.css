@@ -132,7 +132,7 @@
 }
 
 :is(#app, #shell-layer) .shell-btn-danger:hover { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 86%, black); }
-:root[data-theme="dark"] :is(#app, #shell-layer) .shell-btn-danger { color: #1a120e; }
+:root[data-theme="dark"] :is(#app, #shell-layer) .shell-btn-danger { color: var(--on-brand); }
 
 /* ---------- Brand ---------- */
 

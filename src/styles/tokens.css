@@ -64,49 +64,49 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --brand: #c0d49e;
-  --brand-hover: #d0e2b1;
-  --on-brand: #1b3023;
-  --focus: #c0d49e;
-  --route-soft: #3e3226;
-  --bg: #151e18;
-  --bg-elevated: #1c2820;
-  --surface: #1c2820;
-  --surface-soft: #26352a;
-  --border: rgba(226, 234, 225, 0.13);
-  --border-strong: rgba(226, 234, 225, 0.28);
-  --text: #efefdd;
-  --muted: #adb9a6;
-  --subtle: #748078;
-  --accent: #b9d18f;
-  --accent-soft: #2c3e2b;
-  /* Dark map palette: preserves the previous always-dark renderer values. */
-  --map-ocean-top: #121a10;
-  --map-ocean-mid: #0b100b;
-  --map-ocean-bottom: #11180f;
-  --map-land-fill: rgba(232, 226, 211, 0.09);
-  --map-land-fill-unplayable: rgba(232, 226, 211, 0.04);
-  --map-line-country: #e8e2d3;
-  --map-line-guessed: #f5f4ce;
-  --map-line-hit: #ffdcd1;
-  --map-line-target: #ffebdb;
-  --map-fill-guessed: rgba(184, 227, 109, 0.74);
-  --map-fill-target: rgba(237, 74, 67, 0.9);
-  --map-fill-missed: rgba(237, 74, 67, 0.72);
-  --multiplayer-scrim: rgba(4, 7, 5, 0.74);
-  --earth: #66b6a8;
-  --route: #f07a58;
-  --good: #9bd45b;
-  --bad: #ef8069;
-  --sea: #173638;
-  --land: #d7d9c9;
+  --brand: #f3d9a7;
+  --brand-hover: #f9e5be;
+  --on-brand: #292725;
+  --focus: #f3d9a7;
+  --route-soft: #403139;
+  --bg: #262626;
+  --bg-elevated: #33312f;
+  --surface: #33312f;
+  --surface-soft: #3b3835;
+  --border: rgba(216, 195, 158, 0.13);
+  --border-strong: rgba(216, 195, 158, 0.28);
+  --text: #dbc8a4;
+  --muted: #b7ada0;
+  --subtle: #a3988b;
+  --accent: #7db0a3;
+  --accent-soft: #303d39;
+  /* Charcoal maps with sand borders, teal guesses and rose targets. */
+  --map-ocean-top: #33312f;
+  --map-ocean-mid: #2d2c2b;
+  --map-ocean-bottom: #262626;
+  --map-land-fill: rgba(216, 195, 158, 0.09);
+  --map-land-fill-unplayable: rgba(216, 195, 158, 0.04);
+  --map-line-country: #9b9080;
+  --map-line-guessed: #b5d4ca;
+  --map-line-hit: #edb6c8;
+  --map-line-target: #edb6c8;
+  --map-fill-guessed: rgba(125, 176, 163, 0.74);
+  --map-fill-target: rgba(207, 129, 155, 0.9);
+  --map-fill-missed: rgba(207, 129, 155, 0.72);
+  --multiplayer-scrim: rgba(20, 19, 18, 0.74);
+  --earth: #7db0a3;
+  --route: #cf819b;
+  --good: #8dbfb1;
+  --bad: #e59bab;
+  --sea: #2d2c2b;
+  --land: #bfb39d;
   --shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
   --shadow-panel: 0 14px 38px rgba(0, 0, 0, 0.24);
-  --panel-border: rgba(226, 234, 225, 0.2);
-  --panel-border-strong: rgba(226, 234, 225, 0.34);
+  --panel-border: rgba(216, 195, 158, 0.2);
+  --panel-border-strong: rgba(216, 195, 158, 0.34);
   --panel-bg: var(--surface);
   --panel-bg-strong: var(--surface-soft);
   --panel-grid:
-    linear-gradient(rgba(232, 240, 231, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
-    linear-gradient(90deg, rgba(232, 240, 231, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
+    linear-gradient(rgba(216, 195, 158, 0.035) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(216, 195, 158, 0.028) 1px, transparent 1px) 0 0 / 40px 40px;
 }
