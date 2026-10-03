@@ -1,6 +1,7 @@
 // Client-side auth module. Talks to the server's /auth/* and /api/* endpoints via fetch.
 // No cookies are accessed from JS — they are HttpOnly and sent automatically by the browser.
 
+import type { RunOutcome, RunTimeline } from "../runAudit";
 import { leaderboardConfig, type LeaderboardMetric } from "../leaderboards";
 import type { DailyRoundResult } from "../dailyChallenge";
 
@@ -147,6 +148,8 @@ export interface LeaderboardAttemptInput {
   readonly variant?: string;
   readonly timeMs?: number;
   readonly score?: number;
+  /** Audited modes: the run's ticket (null if the server never issued one) and how it was played. */
+  readonly run?: { readonly runId: string | null; readonly timeline: RunTimeline };
 }
 
 export interface SubmitBestTimeResponse {
@@ -269,12 +272,48 @@ export async function submitLeaderboardAttempt(input: LeaderboardAttemptInput): 
   const body: Record<string, unknown> = { gameMode: input.gameMode, variant: input.variant ?? "" };
   if (input.score !== undefined) body.score = Math.round(input.score);
   if (input.timeMs !== undefined) body.timeMs = Math.round(input.timeMs);
+  if (input.run) {
+    if (input.run.runId) body.runId = input.run.runId;
+    body.timeline = input.run.timeline;
+  }
   try {
     const response = await postJson("/api/leaderboard", body);
     if (!response.ok) return null;
     return (await response.json()) as SubmitBestTimeResponse;
   } catch {
     return null;
+  }
+}
+
+/**
+ * A ticket for a run that's just started, so the server can time it and check it when it ends
+ * (src/core/runAudit). Signed-in players only; resolves null when offline or not tracked.
+ */
+export async function startAuditedRun(input: { readonly gameMode: string; readonly variant?: string; readonly timed: boolean }): Promise<string | null> {
+  try {
+    const response = await postJson("/api/runs/start", { gameMode: input.gameMode, variant: input.variant ?? "", timed: input.timed });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { runId?: unknown };
+    return typeof data.runId === "string" ? data.runId : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A run ended without a leaderboard post (practice, given up, restarted or left). `keepalive` lets
+ * it finish sending as the page closes.
+ */
+export function finishAuditedRun(input: { readonly runId: string; readonly outcome: RunOutcome; readonly timeline: RunTimeline }): void {
+  try {
+    void fetch("/api/runs/finish", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    // Offline or blocked: the run just isn't in the audit trail.
   }
 }
 

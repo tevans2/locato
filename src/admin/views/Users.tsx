@@ -4,6 +4,7 @@ import type { AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../a
 import { formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
 import { EventRow } from "./Events";
+import { RunsTable } from "./Runs";
 
 const PAGE = 50;
 
@@ -222,6 +223,13 @@ function UserDrawer({ client, id, onClose, onChanged, helpers }: { client: Admin
                     </tbody>
                   </table>
                 </div>
+              )}
+            </section>
+
+            <section className="adm-section">
+              <h3>Runs</h3>
+              {(d.runs?.length ?? 0) === 0 ? <Empty>No audited runs yet. Name all countries runs are recorded from this version on.</Empty> : (
+                <RunsTable runs={d.runs} />
               )}
             </section>
 

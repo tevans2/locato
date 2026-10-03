@@ -4,6 +4,7 @@ import type { AdminClient, AdminDailyEntry, AdminLeaderboardEntry } from "../api
 import { formatBoardValue, formatDateTime, formatDuration, modeName, todayUtc } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
 import type { ActionHelpers } from "./Users";
+import { FlaggedRuns } from "./Runs";
 
 type Meta = { modes: { id: string; metric: "time" | "score"; variants: string[] }[] };
 type BoardEntry = AdminLeaderboardEntry;
@@ -17,6 +18,7 @@ const FLAG_LABELS: Record<string, string> = { "too-fast": "too fast", backdated:
 export function ModerationView({ client, onOpenUser, helpers }: { client: AdminClient; onOpenUser: (id: string) => void; helpers: ActionHelpers }) {
   return (
     <div className="adm-stack">
+      <FlaggedRuns client={client} onOpenUser={onOpenUser} />
       <DailyBoard client={client} onOpenUser={onOpenUser} helpers={helpers} />
       <BestTimes client={client} onOpenUser={onOpenUser} helpers={helpers} />
     </div>

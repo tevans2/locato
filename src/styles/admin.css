@@ -290,3 +290,10 @@ g.is-hovered .adm-hit { fill: var(--row-hover); }
   .adm-drawer-head, .adm-drawer-body { padding-left: 16px; padding-right: 16px; }
   .adm-event-summary { display: none; }
 }
+
+/* Run audit: countries found over time, against the fastest honest run (dashed). */
+.adm-run-curve { display: block; overflow: visible; }
+.adm-run-curve-line { fill: none; stroke: var(--chart-1); stroke-width: 1.6; stroke-linejoin: round; }
+.adm-run-curve-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: .6; }
+.adm-runs .adm-run-checks { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 320px; }
+.adm-runs .adm-run-checks > div { flex-basis: 100%; }

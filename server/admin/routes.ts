@@ -104,6 +104,9 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
     return reset ? json({ ok: true }) : json({ error: "User not found." }, 404);
   }
 
+  // --- Run audit ---
+  if (pathname === "/api/admin/runs" && method === "GET") return json({ runs: service.flaggedRuns(intParam(url, "limit")) });
+
   // --- Leaderboards ---
   if (pathname === "/api/admin/leaderboards/meta" && method === "GET") return json(service.leaderboardMeta());
 

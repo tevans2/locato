@@ -5,6 +5,7 @@ import { isLeaderboardGameMode, leaderboardMetric, leaderboardModeConfig, normal
 import type { AdminRoomSummary, RoomManagerStats } from "../rooms/RoomManager";
 import type {
   AdminBestScore,
+  StoredRun,
   AdminBestTime,
   AdminEvent,
   AdminEventLevel,
@@ -113,6 +114,35 @@ export interface AdminUserDetail {
   readonly friendRequests: { readonly incoming: number; readonly outgoing: number };
   readonly events: readonly AdminEvent[];
   readonly academy: AdminAcademySummary | null;
+  /** Audited runs, newest first (src/core/runAudit). */
+  readonly runs: readonly AdminRun[];
+}
+
+/** A run for the admin console: its checks, plus when each country was found (for the curve). */
+export interface AdminRun {
+  readonly id: string;
+  readonly userId: string;
+  readonly displayName: string | null;
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timed: boolean;
+  readonly startedAt: number;
+  readonly finishedAt: number | null;
+  readonly outcome: StoredRun["outcome"];
+  readonly claimedMs: number | null;
+  readonly countries: number;
+  readonly flags: StoredRun["flags"];
+  readonly verdict: StoredRun["verdict"];
+  readonly posted: boolean;
+  readonly refused: boolean;
+  readonly ip: string | null;
+  readonly userAgent: string | null;
+  /** ms into the run each country was found. */
+  readonly times: readonly number[];
+  readonly typedInputs: number;
+  readonly scriptedInputs: number;
+  readonly pastes: number;
+  readonly hiddenMs: number;
 }
 
 export interface AdminDailyEntry {
@@ -255,6 +285,41 @@ export class AdminService {
       friendRequests: { incoming: requests.incoming.length, outgoing: requests.outgoing.length },
       events: this.store.listEvents({ level: null, action: null, ip: null, userId: id, before: null, limit: 50 }),
       academy: this.academySummary(id),
+      runs: this.store.listUserRuns(id, 30).map((run) => this.toAdminRun(run, user.displayName)),
+    };
+  }
+
+  /** Runs that raised a flag, across every player, newest first. */
+  flaggedRuns(limit: unknown): readonly AdminRun[] {
+    const count = typeof limit === "number" && Number.isInteger(limit) ? Math.min(Math.max(limit, 1), 200) : 50;
+    return this.store.listFlaggedRuns(count).map((run) => this.toAdminRun(run, this.store.findUserById(run.userId)?.displayName ?? null));
+  }
+
+  private toAdminRun(run: StoredRun, displayName: string | null): AdminRun {
+    const entries = run.timeline?.entries ?? [];
+    return {
+      id: run.id,
+      userId: run.userId,
+      displayName,
+      gameMode: run.gameMode,
+      variant: run.variant,
+      timed: run.timed,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      outcome: run.outcome,
+      claimedMs: run.claimedMs,
+      countries: run.countries,
+      flags: run.flags,
+      verdict: run.verdict,
+      posted: run.posted,
+      refused: run.refused,
+      ip: run.ip,
+      userAgent: run.userAgent,
+      times: entries.map((entry) => entry[1]),
+      typedInputs: entries.reduce((sum, entry) => sum + entry[2], 0),
+      scriptedInputs: entries.reduce((sum, entry) => sum + entry[3], 0),
+      pastes: run.timeline?.signals.pastes ?? 0,
+      hiddenMs: run.timeline?.signals.hiddenMs ?? 0,
     };
   }
 

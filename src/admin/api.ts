@@ -1,8 +1,8 @@
-import type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminUserDetail } from "../../server/admin/AdminService";
+import type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail } from "../../server/admin/AdminService";
 import type { AdminEvent, AdminUserList, AuthUser, LeaderboardEntry, PublicUser } from "../../server/auth/types";
 import type { AdminRoomSummary } from "../../server/rooms/RoomManager";
 
-export type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
+export type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
 
 const TOKEN_KEY = "locato.admin.token";
 
@@ -73,7 +73,7 @@ export interface AdminSystem {
   readonly database: { readonly path: string; readonly sizeBytes: number; readonly walBytes: number };
   readonly rooms: { readonly rooms: number; readonly connections: number };
   readonly limits: Record<string, number>;
-  readonly features: { readonly githubOAuth: boolean; readonly googleOAuth: boolean; readonly allowedOrigins: readonly string[] | null };
+  readonly features: { readonly githubOAuth: boolean; readonly googleOAuth: boolean; readonly allowedOrigins: readonly string[] | null; readonly runAuditEnforced?: boolean };
   readonly streetview: Record<string, unknown>;
 }
 
