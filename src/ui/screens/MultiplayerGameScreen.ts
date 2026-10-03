@@ -307,7 +307,9 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
             activeFlagColorPromptSrc = visibleRound.prompt.value;
             flagColorReveal.reset(visibleRound.prompt.value);
           }
-          flagSlot.replaceChildren(flagColorReveal.element);
+          if (flagSlot.firstElementChild !== flagColorReveal.element) {
+            flagSlot.replaceChildren(flagColorReveal.element);
+          }
         } else {
           setWorldMapTargetCountry(mapView, null);
           flagSlot.replaceChildren(el("div", { className: "prompt-text", text: visibleRound.prompt.value }));

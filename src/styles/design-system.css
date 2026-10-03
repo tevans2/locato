@@ -59,7 +59,12 @@ button:disabled { cursor: not-allowed; }
 .multiplayer-modal .modal-headline,.leaderboard-score,.leaderboard-row.is-local .leaderboard-name { color: var(--brand); }
 .multiplayer-modal .eyebrow,.multiplayer-modal .modal-hint { color: var(--muted); }
 .leaderboard-row.is-winner { border-color: var(--brand); background: var(--accent-soft); }
-.flag-color-reveal-canvas { background: var(--surface-soft); box-shadow: var(--shadow-panel); }
+.flag-color-reveal-canvas {
+  background:
+    radial-gradient(ellipse at 25% 15%, color-mix(in srgb, var(--surface) 60%, var(--accent-soft)), transparent 70%),
+    linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 65%, var(--surface-soft)), color-mix(in srgb, var(--accent) 35%, var(--surface-soft)));
+  box-shadow: var(--shadow-panel);
+}
 /* Country-outline SVG assets are white-filled. Solo uses the same luminance flip via its
    background-image renderer; multiplayer renders an <img>, so apply it here as well. */
 :root:not([data-theme="dark"]) .multiplayer-flag-slot .country-shape-image { filter: invert(1) hue-rotate(180deg); }
