@@ -1,4 +1,4 @@
-import type { AuthService } from "./AuthService";
+import type { AuthService, RunAuditResult, RunRequestMeta } from "./AuthService";
 import { readSessionToken, serializeClearCookie, serializeSessionCookie, type CookieOptions } from "./cookies";
 import { buildAuthUrl, consumeOAuthState, exchangeOAuthCode, saveOAuthState } from "./oauth";
 import { createOAuthState } from "./tokens";
@@ -20,6 +20,25 @@ function publicRef(user: AuthUser) {
 
 function ip(request: Request): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
+
+// A run's timeline is one short entry per country found: a few KB for Name all countries.
+const MAX_RUN_PAYLOAD_BYTES = 32 * 1024;
+
+function runMeta(request: Request): RunRequestMeta {
+  return { ip: ip(request), userAgent: request.headers.get("user-agent") };
+}
+
+// Every audited run lands in the event log; flagged ones as warnings so they stand out there.
+function logRunAudit(request: Request, userId: string, audit: RunAuditResult, extra: Record<string, unknown> = {}): void {
+  log(audit.verdict === "ok" ? "info" : "warn", audit.refused ? "run.refused" : audit.verdict === "ok" ? "run.audited" : "run.flagged", {
+    ip: ip(request),
+    userId,
+    runId: audit.runId,
+    verdict: audit.verdict,
+    flags: audit.flags.map((item) => item.code),
+    ...extra,
+  });
 }
 
 // Constant-time string comparison so the admin token can't be recovered via response timing.
@@ -312,23 +331,49 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json({ metric: result.metric, entries: result.entries, currentUser });
   }
 
-  if (pathname === "/api/leaderboard" && method === "POST") {
+  if (pathname === "/api/runs/start" && method === "POST") {
     const user = service.authenticate(readSessionToken(request));
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const result = service.submitLeaderboardAttempt(user.id, body);
+    const result = service.startRun(user.id, body, runMeta(request));
     if ("error" in result) return json({ error: result.error }, 400);
+    return json(result);
+  }
+
+  if (pathname === "/api/runs/finish" && method === "POST") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readLimitedJsonBody(request, MAX_RUN_PAYLOAD_BYTES);
+    if (body === "too-large") return json({ error: "Run is too large." }, 413);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.finishRun(user.id, body, runMeta(request));
+    if ("error" in result) return json({ error: result.error }, 400);
+    logRunAudit(request, user.id, result);
+    // The player isn't told which checks a run raised: that would teach a script what to avoid.
+    return json({ ok: true });
+  }
+
+  if (pathname === "/api/leaderboard" && method === "POST") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readLimitedJsonBody(request, MAX_RUN_PAYLOAD_BYTES);
+    if (body === "too-large") return json({ error: "Run is too large." }, 413);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.submitLeaderboardAttempt(user.id, body, runMeta(request));
+    if (result.audit) logRunAudit(request, user.id, result.audit, { mode: body.gameMode, timeMs: body.timeMs });
+    if ("error" in result) return json({ error: result.error }, 400);
+    const { audit: _audit, ...posted } = result;
     const gameMode = String(body.gameMode);
     const variant = typeof body.variant === "string" ? body.variant : "";
-    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, ...(body.score !== undefined ? { score: body.score } : { timeMs: body.timeMs }), accepted: result.accepted });
+    log("info", "leaderboard.submitted", { ip: ip(request), userId: user.id, mode: body.gameMode, variant: body.variant, ...(body.score !== undefined ? { score: body.score } : { timeMs: body.timeMs }), accepted: result.accepted, ...(result.audit ? { runId: result.audit.runId, verdict: result.audit.verdict } : {}) });
     // `rank` / `bestTimeMs` (time boards) or `bestScore` (score boards) describe the player's
     // standing after this submission (their best, which may be an earlier attempt).
     const standing = service.getUserLeaderboardRank(user.id, gameMode, variant);
     if (leaderboardMetric(gameMode) === "score") {
-      return json({ ...result, rank: standing?.rank ?? null, bestScore: standing && "score" in standing ? standing.score : null });
+      return json({ ...posted, rank: standing?.rank ?? null, bestScore: standing && "score" in standing ? standing.score : null });
     }
-    return json({ ...result, rank: standing?.rank ?? null, bestTimeMs: standing && "timeMs" in standing ? standing.timeMs : null });
+    return json({ ...posted, rank: standing?.rank ?? null, bestTimeMs: standing && "timeMs" in standing ? standing.timeMs : null });
   }
 
   if (pathname === "/api/leaderboard/rank" && method === "GET") {

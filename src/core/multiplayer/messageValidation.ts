@@ -1,6 +1,6 @@
 import { isFlagPool } from "../flagPools";
 import type { ClientMessage, ServerMessage } from "./protocol";
-import type { FinalResult, GeoGuessrRoundResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, FlyoverPlanePosition, GeoGuessrRoundResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 import { isMapTapCategory } from "../maptap/locations";
 import type { MapTapCategory } from "../maptap/types";
 
@@ -14,7 +14,8 @@ export const MAX_ROOM_CATEGORY_IDS = 8;
 export const MIN_ROOM_ROUND_LIMIT = 3;
 export const MAX_ROOM_ROUND_LIMIT = 20;
 export const MIN_ROOM_ROUND_DURATION_MS = 10_000;
-export const MAX_ROOM_ROUND_DURATION_MS = 90_000;
+// Flyover's longest flight is two minutes; the other rooms offer at most 90 seconds in the UI.
+export const MAX_ROOM_ROUND_DURATION_MS = 120_000;
 
 export type MessageParseResult<T> =
   | { readonly ok: true; readonly message: T }
@@ -81,7 +82,32 @@ function isMapTapCategoryList(value: unknown): value is readonly MapTapCategory[
 }
 
 function isPromptContent(value: unknown): boolean {
-  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe" || value.kind === "geoguessr-streetview") && typeof value.value === "string";
+  return isRecord(value) && (value.kind === "image" || value.kind === "text" || value.kind === "map-click" || value.kind === "map-highlight" || value.kind === "flag-colors" || value.kind === "maptap-globe" || value.kind === "geoguessr-streetview" || value.kind === "flyover-flight") && typeof value.value === "string";
+}
+
+// Flyover positions are projected world-map units: 1000 wide, 500 tall (see core/map).
+const FLYOVER_MAP_WIDTH = 1000;
+const FLYOVER_MAP_HEIGHT = 500;
+const MAX_FLYOVER_ROUTE_INDEX = 400;
+
+function isMapX(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0 && value <= FLYOVER_MAP_WIDTH;
+}
+
+function isMapY(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0 && value <= FLYOVER_MAP_HEIGHT;
+}
+
+function isHeading(value: unknown): value is number {
+  return isFiniteNumber(value) && Math.abs(value) <= Math.PI + 0.001;
+}
+
+function isRouteIndex(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_FLYOVER_ROUTE_INDEX;
+}
+
+function isPlanePosition(value: unknown): value is FlyoverPlanePosition {
+  return isRecord(value) && typeof value.playerId === "string" && isMapX(value.x) && isMapY(value.y) && isHeading(value.heading);
 }
 
 export function parseClientMessage(value: unknown): MessageParseResult<ClientMessage> {
@@ -166,6 +192,17 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isFiniteNumber(value.lng)) return reject("invalid-guess", "Longitude is required.");
       if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
       return { ok: true, message: { type: "SUBMIT_GEOGUESSR_GUESS", lat: value.lat as number, lng: value.lng as number, clientSentAt: value.clientSentAt as number } };
+    case "FLYOVER_POSITION":
+      if (!isMapX(value.x) || !isMapY(value.y) || !isHeading(value.heading)) return reject("invalid-position", "Plane position is invalid.");
+      return { ok: true, message: { type: "FLYOVER_POSITION", x: value.x, y: value.y, heading: value.heading } };
+    case "FLYOVER_REACHED":
+      if (!isRouteIndex(value.index)) return reject("invalid-route-index", "Route index is invalid.");
+      if (!isMapX(value.x) || !isMapY(value.y)) return reject("invalid-position", "Plane position is invalid.");
+      if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
+      return { ok: true, message: { type: "FLYOVER_REACHED", index: value.index, x: value.x, y: value.y, clientSentAt: value.clientSentAt } };
+    case "FLYOVER_SKIP":
+      if (!isRouteIndex(value.index)) return reject("invalid-route-index", "Route index is invalid.");
+      return { ok: true, message: { type: "FLYOVER_SKIP", index: value.index } };
     case "VOTE_SKIP":
       return { ok: true, message: { type: "VOTE_SKIP" } };
     case "SEND_CHAT_MESSAGE":
@@ -188,7 +225,8 @@ function isPlayer(value: unknown): value is PublicPlayerState {
     isFiniteNumber(value.score) &&
     isFiniteNumber(value.streak) &&
     isFiniteNumber(value.correctAnswers) &&
-    isFiniteNumber(value.wrongAnswers)
+    isFiniteNumber(value.wrongAnswers) &&
+    (value.routeIndex === undefined || isFiniteNumber(value.routeIndex))
   );
 }
 
@@ -318,6 +356,14 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
       }
       return { ok: true, message: { type: "GEOGUESSR_ROUND_ENDED", countryName: value.countryName, targetLat: value.targetLat, targetLng: value.targetLng, results: value.results } };
     }
+    case "FLYOVER_PLANES":
+      if (!Array.isArray(value.planes) || !value.planes.every(isPlanePosition)) return reject("invalid-planes", "Plane positions are invalid.");
+      return { ok: true, message: { type: "FLYOVER_PLANES", planes: value.planes } };
+    case "FLYOVER_PROGRESS":
+      if (typeof value.playerId !== "string" || !isRouteIndex(value.index) || !isFiniteNumber(value.score) || (value.event !== "reached" && value.event !== "skipped" && value.event !== "sync")) {
+        return reject("invalid-progress", "Flyover progress is invalid.");
+      }
+      return { ok: true, message: { type: "FLYOVER_PROGRESS", playerId: value.playerId, index: value.index, score: value.score, event: value.event } };
     case "GAME_COMPLETED":
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");
       return { ok: true, message: { type: "GAME_COMPLETED", results: value.results } };

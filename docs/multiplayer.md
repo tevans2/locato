@@ -21,6 +21,15 @@ Everyone in a room sees the same prompt stream (flags or any other category) in 
 
 **Scoring** (`Room.calculatePoints`): `100 + min(streak, 10) * 10 + secondsRemaining`, where `secondsRemaining` is whole seconds left in the round when the answer lands. Faster answers and longer streaks score higher.
 
+## Flyover races
+
+Flyover rooms (`categoryIds: ["flyover"]`, `server/rooms/FlyoverRoom.ts`) are one timed flight instead of rounds. Everyone takes off together after a 3-second countdown from the same place, and flies the same seeded route (`buildFlyoverRoute` in `src/core/flyover`: each country picked near the one before). The most countries reached when the clock runs out wins; ties go to whoever reached their last country first. The host picks the flight length: 60, 90 (default) or 120 seconds.
+
+- **The server never flies the planes.** Each client flies its own and claims each reach (`FLYOVER_REACHED { index, x, y }`). The server accepts it only if it's the player's next route index, the position touches that country (the server loads the same `world-map.json` and runs the same touch test), and an honest plane could have flown there from its last confirmed point in the time since (full boost, with slack for network jitter). Anything else gets a `FLYOVER_PROGRESS { event: "sync" }` sent to that player alone, and the client rolls back to the server's place on the route.
+- **Skips** can't cost time off a shared clock. Instead the plane flies a 5-second holding pattern in which no country counts, and the server enforces it.
+- **Ghost planes:** clients report their position about five times a second (`FLYOVER_POSITION`, rate-limited separately from answers and dropped silently when over the limit). The server relays everyone's latest positions in one `FLYOVER_PLANES` message per 250ms tick, and clients smooth between updates.
+- **Reconnecting** keeps a racer's score and route position (`routeIndex` on the public player). The plane resumes over the last country it reached.
+
 ## Public vs private state
 
 Clients only ever receive public round state — the prompt asset and timing — never the country name, code, aliases, or accepted answers. The answer is revealed only in `ROUND_ENDED`. The server alone decides correctness, the round winner, points, and when a round ends.
@@ -33,21 +42,23 @@ On connect the server sends `SESSION_ASSIGNED { playerId, roomCode, sessionToken
 
 Defined in `src/core/multiplayer/protocol.ts` (the source of truth) and validated server-side before any state changes.
 
-**Client → server (`ClientMessage`):** `CREATE_ROOM` (`playerName`, `categoryIds`), `JOIN_ROOM` (`roomCode`, `playerName`), `REJOIN_ROOM` (`roomCode`, `playerId`, `sessionToken`), `LEAVE_ROOM`, `SET_READY` (`ready`), `START_GAME`, `PLAY_AGAIN`, `SUBMIT_ANSWER` (`answer`, `clientSentAt`), `REQUEST_HINT`.
+**Client → server (`ClientMessage`):** `CREATE_ROOM` (`playerName`, `categoryIds`), `JOIN_ROOM` (`roomCode`, `playerName`), `REJOIN_ROOM` (`roomCode`, `playerId`, `sessionToken`), `LEAVE_ROOM`, `SET_READY` (`ready`), `START_GAME`, `PLAY_AGAIN`, `SUBMIT_ANSWER` (`answer`, `clientSentAt`), `REQUEST_HINT`; Flyover adds `FLYOVER_POSITION` (`x`, `y`, `heading`), `FLYOVER_REACHED` (`index`, `x`, `y`, `clientSentAt`) and `FLYOVER_SKIP` (`index`).
 
-**Server → client (`ServerMessage`):** `SESSION_ASSIGNED`, `ROOM_SNAPSHOT`, `PLAYER_JOINED`, `PLAYER_LEFT`, `GAME_STARTED`, `ROUND_STARTED`, `ANSWER_ACCEPTED` (`playerId`, `points`), `ANSWER_REJECTED` (`reason`, sent only to the guesser), `ROUND_ENDED` (`answer`, `results`), `GAME_COMPLETED` (`results`), `ERROR`.
+**Server → client (`ServerMessage`):** `SESSION_ASSIGNED`, `ROOM_SNAPSHOT`, `PLAYER_JOINED`, `PLAYER_LEFT`, `GAME_STARTED`, `ROUND_STARTED`, `ANSWER_ACCEPTED` (`playerId`, `points`), `ANSWER_REJECTED` (`reason`, sent only to the guesser), `ROUND_ENDED` (`answer`, `results`), `GAME_COMPLETED` (`results`), `ERROR`; Flyover adds `FLYOVER_PLANES` (`planes`) and `FLYOVER_PROGRESS` (`playerId`, `index`, `score`, `event`: reached, skipped or sync).
 
 ## Code map
 
 | Concern | Location |
 | --- | --- |
-| Room state, round flow, scoring, prompt queue | `server/rooms/Room.ts` |
+| Room state, round flow, scoring, prompt queue | `server/rooms/Room.ts` (MapTap, GeoGuessr and Flyover have their own rooms beside it) |
+| Flyover race: route, reach checks, position relay | `server/rooms/FlyoverRoom.ts`, `src/core/flyover` |
 | Sockets, message routing, room create/join, TTL + empty-room cleanup, room/player limits | `server/rooms/RoomManager.ts` |
 | Raw message parsing | `server/protocol/parseMessage.ts` |
 | Strict client-message validation | `src/core/multiplayer/messageValidation.ts` |
 | Protocol + public room/round types | `src/core/multiplayer/{protocol,roomTypes}.ts` |
 | Browser transport (WS + mock) | `src/core/multiplayer/{webSocketTransport,mockTransport}.ts` |
 | Lobby/game UI | `src/ui/screens/MultiplayerLobbyScreen.ts` |
+| Flyover race view (shares the flight with solo) | `src/ui/components/{MultiplayerFlyoverGameView,FlyoverFlight}.ts` |
 
 ## Safeguards
 

@@ -10,6 +10,8 @@ export interface EndGameModalState {
   readonly localPlayerId: PlayerId | null;
   readonly results: readonly FinalResult[];
   readonly canPlayAgain: boolean;
+  /** The note beside each score (defaults to "N correct"). */
+  readonly describe?: (result: FinalResult) => string;
 }
 
 export interface EndGameModal {
@@ -31,7 +33,7 @@ function leaderboardRows(state: EndGameModalState): readonly HTMLElement[] {
         el("span", { className: "leaderboard-rank", text: `#${result.rank}` }),
         el("span", { className: "leaderboard-name", text: isLocal ? `${result.name} (you)` : result.name }),
         el("span", { className: "leaderboard-score", text: formatScore(result.score) }),
-        el("span", { className: "leaderboard-meta", text: `${result.correctAnswers} correct` }),
+        el("span", { className: "leaderboard-meta", text: state.describe ? state.describe(result) : `${result.correctAnswers} correct` }),
       ],
     });
   });

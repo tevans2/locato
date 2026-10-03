@@ -26,6 +26,9 @@ import type {
   SendFriendRequestResult,
   GameResult,
   StoredAcademyProgress,
+  StoredRun,
+  CreateRunInput,
+  FinishRunInput,
   LeaderboardEntry,
   LeaderboardQuery,
   LeaderboardScoreEntry,
@@ -208,6 +211,29 @@ function migrate(db: Database): void {
     CREATE INDEX IF NOT EXISTS admin_events_time ON admin_events(time);
     CREATE INDEX IF NOT EXISTS admin_events_action ON admin_events(action);
 
+    -- Run audit trail: one row per run the server issued a ticket for (src/core/runAudit).
+    CREATE TABLE IF NOT EXISTS runs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_mode TEXT NOT NULL,
+      variant TEXT NOT NULL DEFAULT '',
+      timed INTEGER NOT NULL,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      outcome TEXT,
+      claimed_ms INTEGER,
+      countries INTEGER NOT NULL DEFAULT 0,
+      timeline TEXT,
+      flags TEXT NOT NULL DEFAULT '[]',
+      verdict TEXT,
+      posted INTEGER NOT NULL DEFAULT 0,
+      refused INTEGER NOT NULL DEFAULT 0,
+      ip TEXT,
+      user_agent TEXT
+    );
+    CREATE INDEX IF NOT EXISTS runs_user_started ON runs(user_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS runs_verdict_finished ON runs(verdict, finished_at DESC);
+
     CREATE TABLE IF NOT EXISTS academy_progress (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       progress TEXT NOT NULL,
@@ -267,6 +293,42 @@ const STATS_SELECT = `SELECT
   COALESCE(world_best_time_ms, 0) AS worldBestTimeMs,
   COALESCE(world_best_countries, 0) AS worldBestCountries
 FROM user_stats WHERE user_id = ?`;
+
+interface RunRow {
+  id: string;
+  userId: string;
+  gameMode: string;
+  variant: string;
+  timed: number;
+  startedAt: number;
+  finishedAt: number | null;
+  outcome: string | null;
+  claimedMs: number | null;
+  countries: number;
+  timeline: string | null;
+  flags: string;
+  verdict: string | null;
+  posted: number;
+  refused: number;
+  ip: string | null;
+  userAgent: string | null;
+}
+
+const RUN_SELECT = `SELECT id, user_id AS userId, game_mode AS gameMode, variant, timed, started_at AS startedAt, finished_at AS finishedAt,
+  outcome, claimed_ms AS claimedMs, countries, timeline, flags, verdict, posted, refused, ip, user_agent AS userAgent FROM runs`;
+
+function toStoredRun(row: RunRow): StoredRun {
+  return {
+    ...row,
+    timed: row.timed === 1,
+    outcome: row.outcome as StoredRun["outcome"],
+    timeline: row.timeline ? (JSON.parse(row.timeline) as StoredRun["timeline"]) : null,
+    flags: JSON.parse(row.flags) as StoredRun["flags"],
+    verdict: row.verdict as StoredRun["verdict"],
+    posted: row.posted === 1,
+    refused: row.refused === 1,
+  };
+}
 
 export class SqliteUserStore implements UserStore {
   constructor(private readonly db: Database) {}
@@ -734,6 +796,35 @@ export class SqliteUserStore implements UserStore {
       dailies: this.db.query<{ userId: string; at: number }>("SELECT user_id AS userId, completed_at AS at FROM daily_challenge_results WHERE completed_at >= ?").all(since),
       logins: this.db.query<{ userId: string; at: number }>("SELECT user_id AS userId, created_at AS at FROM sessions WHERE created_at >= ?").all(since),
     };
+  }
+
+  createRun(input: CreateRunInput): void {
+    this.db
+      .query("INSERT INTO runs (id, user_id, game_mode, variant, timed, started_at, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(input.id, input.userId, input.gameMode, input.variant, input.timed ? 1 : 0, input.startedAt, input.ip, input.userAgent);
+  }
+
+  findRun(id: string): StoredRun | null {
+    const row = this.db.query<RunRow>(`${RUN_SELECT} WHERE id = ?`).get(id);
+    return row ? toStoredRun(row) : null;
+  }
+
+  finishRun(id: string, input: FinishRunInput): void {
+    this.db
+      .query("UPDATE runs SET finished_at = ?, outcome = ?, claimed_ms = ?, countries = ?, timeline = ?, flags = ?, verdict = ?, posted = ?, refused = ? WHERE id = ?")
+      .run(input.finishedAt, input.outcome, input.claimedMs, input.countries, input.timeline ? JSON.stringify(input.timeline) : null, JSON.stringify(input.flags), input.verdict, input.posted ? 1 : 0, input.refused ? 1 : 0, id);
+  }
+
+  listUserRuns(userId: string, limit: number): readonly StoredRun[] {
+    return this.db.query<RunRow>(`${RUN_SELECT} WHERE user_id = ? ORDER BY started_at DESC LIMIT ?`).all(userId, limit).map(toStoredRun);
+  }
+
+  listFlaggedRuns(limit: number): readonly StoredRun[] {
+    return this.db.query<RunRow>(`${RUN_SELECT} WHERE verdict IN ('review', 'reject') ORDER BY finished_at DESC LIMIT ?`).all(limit).map(toStoredRun);
+  }
+
+  hasOverlappingRun(userId: string, runId: string, startedAt: number): boolean {
+    return this.db.query("SELECT 1 FROM runs WHERE user_id = ? AND id != ? AND started_at <= ? AND finished_at > ? LIMIT 1").get(userId, runId, startedAt, startedAt) !== null;
   }
 
   recordEvent(event: AdminEventInput): void {

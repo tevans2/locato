@@ -1,3 +1,5 @@
+import type { RunFlag, RunOutcome, RunTimeline, RunVerdict } from "../../src/core/runAudit";
+
 export interface AuthUser {
   readonly id: string;
   readonly email: string;
@@ -319,6 +321,54 @@ export interface StoredAcademyProgress {
   readonly updatedAt: number;
 }
 
+// A run the server issued a ticket for (or saw posted without one): how it was played, the
+// checks it raised, and whether it reached the board. See src/core/runAudit.
+export interface StoredRun {
+  readonly id: string;
+  readonly userId: string;
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timed: boolean;
+  /** Server time the ticket was issued (the run's first move). */
+  readonly startedAt: number;
+  readonly finishedAt: number | null;
+  readonly outcome: RunOutcome | null;
+  readonly claimedMs: number | null;
+  readonly countries: number;
+  readonly timeline: RunTimeline | null;
+  readonly flags: readonly RunFlag[];
+  readonly verdict: RunVerdict | null;
+  /** Posted to the leaderboard (accepted or refused). */
+  readonly posted: boolean;
+  /** The post was refused because the run failed a hard check. */
+  readonly refused: boolean;
+  readonly ip: string | null;
+  readonly userAgent: string | null;
+}
+
+export interface CreateRunInput {
+  readonly id: string;
+  readonly userId: string;
+  readonly gameMode: string;
+  readonly variant: string;
+  readonly timed: boolean;
+  readonly startedAt: number;
+  readonly ip: string | null;
+  readonly userAgent: string | null;
+}
+
+export interface FinishRunInput {
+  readonly finishedAt: number;
+  readonly outcome: RunOutcome;
+  readonly claimedMs: number | null;
+  readonly countries: number;
+  readonly timeline: RunTimeline | null;
+  readonly flags: readonly RunFlag[];
+  readonly verdict: RunVerdict;
+  readonly posted: boolean;
+  readonly refused: boolean;
+}
+
 export interface UserStore {
   createUser(input: CreateUserInput): StoredUser;
   findUserByEmail(email: string): StoredUser | null;
@@ -379,6 +429,15 @@ export interface UserStore {
   areFriends(a: string, b: string): boolean;
   friendIds(userId: string): readonly string[];
   searchUsers(query: string, excludeId: string, limit: number): readonly PublicUser[];
+  // Run audit trail (src/core/runAudit); deleted with the user.
+  createRun(input: CreateRunInput): void;
+  findRun(id: string): StoredRun | null;
+  finishRun(id: string, input: FinishRunInput): void;
+  listUserRuns(userId: string, limit: number): readonly StoredRun[];
+  /** Finished runs that raised a flag, newest first. */
+  listFlaggedRuns(limit: number): readonly StoredRun[];
+  /** Did another of the user's runs start before `startedAt` and finish after it? */
+  hasOverlappingRun(userId: string, runId: string, startedAt: number): boolean;
   // Academy (training) progress, one JSON blob per user; deleted with the user.
   getAcademyProgress(userId: string): StoredAcademyProgress | null;
   saveAcademyProgress(userId: string, progress: string, updatedAt: number): void;

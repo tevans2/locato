@@ -4,6 +4,8 @@ import { gameModeOptions, type GameModeOption } from "../../core/gameModes";
 import { DEFAULT_FLAG_POOL, flagPoolLabel, normalizeFlagPool } from "../../core/flagPools";
 import { createMultiplayerMapTapGameView, type MapTapMultiplayerReveal } from "../components/MultiplayerMapTapGameView";
 import { createMultiplayerGeoGuessrGameView, type GeoGuessrMultiplayerReveal } from "../components/MultiplayerGeoGuessrGameView";
+import { createMultiplayerFlyoverGameView } from "../components/MultiplayerFlyoverGameView";
+import { DEFAULT_FLYOVER_MULTIPLAYER_DURATION_MS, FLYOVER_MULTIPLAYER_DURATIONS_MS } from "../../core/flyover";
 import type { CountryIndex } from "../../core/countries";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
@@ -88,12 +90,13 @@ interface RoundReveal {
   readonly results: readonly RoundResult[];
 }
 
-type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country" | "map-tap" | "geoguessr";
+type MultiplayerPlayMode = "flags" | "flag-colors" | "shapes" | "codes" | "capitals" | "click-country" | "spot-country" | "map-tap" | "geoguessr" | "flyover";
 
 type MultiplayerModeOption = Omit<GameModeOption, "id"> & { readonly id: MultiplayerPlayMode };
 
-const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country", "map-tap", "geoguessr"];
-const EXCLUSIVE_MULTIPLAYER_MODES: readonly MultiplayerPlayMode[] = ["map-tap", "geoguessr"];
+const MULTIPLAYER_MODE_IDS: readonly MultiplayerPlayMode[] = ["flags", "flag-colors", "shapes", "codes", "capitals", "click-country", "spot-country", "map-tap", "geoguessr", "flyover"];
+// These play in a room of their own, chosen when the room is made.
+const EXCLUSIVE_MULTIPLAYER_MODES: readonly MultiplayerPlayMode[] = ["map-tap", "geoguessr", "flyover"];
 
 const MULTIPLAYER_MODE_OPTIONS: readonly MultiplayerModeOption[] = gameModeOptions
   .filter((option) => MULTIPLAYER_MODE_IDS.includes(option.id as MultiplayerPlayMode))
@@ -118,6 +121,30 @@ function isMapTapRoom(room: PublicRoomState | null): boolean {
 
 function isGeoGuessrRoom(room: PublicRoomState | null): boolean {
   return room?.categoryIds.length === 1 && room.categoryIds[0] === "geoguessr";
+}
+
+function isFlyoverRoom(room: PublicRoomState | null): boolean {
+  return room?.categoryIds.length === 1 && room.categoryIds[0] === "flyover";
+}
+
+function isFlyoverModeSelection(modes: readonly MultiplayerPlayMode[]): boolean {
+  return modes.length === 1 && modes[0] === "flyover";
+}
+
+/** The room type a selection needs: an exclusive mode's own room, or the mixed quiz room. */
+function roomTypeForModes(modes: readonly MultiplayerPlayMode[]): MultiplayerPlayMode | "quiz" {
+  return modes.length === 1 && EXCLUSIVE_MULTIPLAYER_MODES.includes(modes[0]!) ? modes[0]! : "quiz";
+}
+
+function flightLengthLabel(ms: number): string {
+  return `${Math.round(ms / 1000)} sec flight`;
+}
+
+function createFlightLengthSelect(label: string): HTMLSelectElement {
+  return el("select", {
+    attrs: { "aria-label": label },
+    children: FLYOVER_MULTIPLAYER_DURATIONS_MS.map((ms) => el("option", { text: flightLengthLabel(ms), attrs: { value: String(ms), ...(ms === DEFAULT_FLYOVER_MULTIPLAYER_DURATION_MS ? { selected: "" } : {}) } })),
+  });
 }
 
 function categoryIdsForModes(modes: readonly MultiplayerPlayMode[]): readonly string[] {
@@ -333,6 +360,9 @@ function createMultiplayerMapTapCategorySelector(options: {
 
 function setupCopyForModes(modes: readonly MultiplayerPlayMode[]): { readonly title: string; readonly description: string } {
   const selected: readonly MultiplayerPlayMode[] = modes.length > 0 ? modes : ["flags"];
+  if (isFlyoverModeSelection(selected)) {
+    return { title: "Host a Flyover race", description: "Same route, same clock: everyone takes off together and the most countries flown over wins." };
+  }
   if (selected.includes("geoguessr")) {
     return { title: "Host a GeoGuessr expedition", description: "Explore the same mystery streets, lock in a pin, and race for the closest location." };
   }
@@ -434,7 +464,22 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       { label: "60 sec", value: 60_000 },
     ].map((option) => el("option", { text: option.label, attrs: { value: String(option.value), ...(option.value === 30_000 ? { selected: "" } : {}) } })),
   });
+  const roundLimitField = el("label", { className: "multiplayer-field", children: [el("span", { text: "Rounds" }), roundLimitSelect] });
+  const roundDurationField = el("label", { className: "multiplayer-field", children: [el("span", { text: "Time per round" }), roundDurationSelect] });
+  const flightLengthSelect = createFlightLengthSelect("Flight length");
+  const flightLengthField = el("label", { className: "multiplayer-field", children: [el("span", { text: "Flight length" }), flightLengthSelect] });
+  const lobbyFlightLengthSelect = createFlightLengthSelect("Flight length");
+  const lobbyFlightLengthField = el("label", { className: "multiplayer-field lobby-flight-length", children: [el("span", { text: "Flight length" }), lobbyFlightLengthSelect] });
   let playModes: readonly MultiplayerPlayMode[] = ["flags"];
+  /** Flyover is one timed flight: it has a flight length instead of rounds and a round timer. */
+  function syncSetupFields(): void {
+    const flyover = isFlyoverModeSelection(playModes);
+    roundLimitField.hidden = flyover;
+    roundDurationField.hidden = flyover;
+    flightLengthField.hidden = !flyover;
+  }
+  syncSetupFields();
+  lobbyFlightLengthField.hidden = true;
   let chatOpen = false;
   let lastSeenChatCount = 0;
   const initialSetupCopy = setupCopyForModes(playModes);
@@ -460,7 +505,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       setupDescription.textContent = setupCopy.description;
       setupMapTapCategorySelector.element.hidden = !isMapTapModeSelection(modes);
       setupFlagPoolSelector.element.hidden = !modes.includes("flags");
-
+      syncSetupFields();
     },
   });
   const lobbyModeDropdown = createMultiplayerModeSelector({
@@ -470,8 +515,11 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     label: "Room modes",
     onChange: (modes) => {
       if (!room || room.status !== "lobby" || localPlayerId !== room.hostPlayerId) return;
-      if (isMapTapModeSelection(modes) !== isMapTapRoom(room)) {
-        feedback = "MapTap is chosen when the room is created; start a new room to switch room type.";
+      const wanted = roomTypeForModes(modes);
+      const current = roomTypeForModes(modesFromCategoryIds(room.categoryIds));
+      if (wanted !== current) {
+        const exclusive = wanted === "quiz" ? current : wanted;
+        feedback = `${getMultiplayerModeOption(exclusive as MultiplayerPlayMode).label} is chosen when the room is created; start a new room to switch room type.`;
         lobbyModeDropdown.setSelectedModes(modesFromCategoryIds(room.categoryIds));
         render();
         return;
@@ -582,8 +630,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
               el("div", { className: "multiplayer-field multiplayer-mode-field", children: [el("span", { text: "Mode rotation" }), modeDropdown.element] }),
               el("div", { className: "multiplayer-field multiplayer-flag-pool-field", children: [setupFlagPoolSelector.element] }),
               el("div", { className: "multiplayer-field multiplayer-maptap-category-field", children: [setupMapTapCategorySelector.element] }),
-              el("label", { className: "multiplayer-field", children: [el("span", { text: "Rounds" }), roundLimitSelect] }),
-              el("label", { className: "multiplayer-field", children: [el("span", { text: "Time per round" }), roundDurationSelect] }),
+              roundLimitField,
+              roundDurationField,
+              flightLengthField,
             ],
           }),
           el("div", { className: "multiplayer-create-row", children: [createButton] }),
@@ -609,6 +658,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       lobbyModeDropdown.element,
       lobbyMapTapCategorySelector.element,
       lobbyFlagPoolSelector.element,
+      lobbyFlightLengthField,
 
       playerList,
       inviteSection,
@@ -646,6 +696,18 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
       transport?.send({ type: "VOTE_SKIP" });
     },
   });
+
+  const flyoverGameView = createMultiplayerFlyoverGameView({
+    signal: controller.signal,
+    worldCountryFeatures: options.worldCountryFeatures,
+    onPosition: (plane) => transport?.send({ type: "FLYOVER_POSITION", x: plane.x, y: plane.y, heading: plane.heading }),
+    onReach: (index, plane) => transport?.send({ type: "FLYOVER_REACHED", index, x: plane.x, y: plane.y, clientSentAt: Date.now() }),
+    onSkip: (index) => transport?.send({ type: "FLYOVER_SKIP", index }),
+  });
+  lobbyFlightLengthSelect.addEventListener("change", () => {
+    if (!room || room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !isFlyoverRoom(room)) return;
+    transport?.send({ type: "SET_ROOM_OPTIONS", categoryIds: ["flyover"], roundDurationMs: Number(lobbyFlightLengthSelect.value) });
+  }, { signal: controller.signal });
 
   function disconnectCurrentTransport(): void {
     cleanupMessageHandler?.();
@@ -752,13 +814,20 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     lobbyPanel.hidden = !hasRoom || room?.status !== "lobby";
     const isMapTap = isMapTapRoom(room);
     const isGeoGuessr = isGeoGuessrRoom(room);
-    gameView.element.hidden = !hasRoom || room?.status === "lobby" || isMapTap || isGeoGuessr;
+    const isFlyover = isFlyoverRoom(room);
+    gameView.element.hidden = !hasRoom || room?.status === "lobby" || isMapTap || isGeoGuessr || isFlyover;
+    flyoverGameView.element.hidden = !hasRoom || room?.status === "lobby" || !isFlyover;
     mapTapGameView.element.hidden = !hasRoom || room?.status === "lobby" || !isMapTap;
     geoGuessrGameView.element.hidden = !hasRoom || room?.status === "lobby" || !isGeoGuessr;
 
     // Toggle the modal before the no-room early return so leaving the room also dismisses it.
     if (room && room.status === "complete" && finalResults) {
-      endGameModal.show({ localPlayerId, results: finalResults, canPlayAgain: localPlayerId === room.hostPlayerId });
+      endGameModal.show({
+        localPlayerId,
+        results: finalResults,
+        canPlayAgain: localPlayerId === room.hostPlayerId,
+        ...(isFlyover ? { describe: (result: FinalResult) => `${result.score === 1 ? "country" : "countries"}${result.wrongAnswers ? ` · ${result.wrongAnswers} skipped` : ""}` } : {}),
+      });
     } else {
       endGameModal.hide();
     }
@@ -789,7 +858,10 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     const roomModes = modesFromCategoryIds(room.categoryIds);
     const localIsHost = localPlayerId === room.hostPlayerId;
     lobbyModeDropdown.setSelectedModes(roomModes);
-    lobbyModeDropdown.setDisabled(room.status !== "lobby" || !localIsHost || isMapTap || isGeoGuessr);
+    lobbyModeDropdown.setDisabled(room.status !== "lobby" || !localIsHost || isMapTap || isGeoGuessr || isFlyover);
+    lobbyFlightLengthField.hidden = !isFlyover;
+    lobbyFlightLengthSelect.value = String(room.settings.roundDurationMs);
+    lobbyFlightLengthSelect.disabled = room.status !== "lobby" || !localIsHost;
     const roomMapTapCategories = room.settings.mapTapCategories ?? MAP_TAP_CATEGORIES;
     lobbyMapTapCategorySelector.element.hidden = !isMapTap;
     lobbyMapTapCategorySelector.setSelectedCategories(roomMapTapCategories);
@@ -799,7 +871,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     lobbyFlagPoolSelector.element.hidden = !hasFlagRounds;
     lobbyFlagPoolSelector.setValue(roomFlagPool);
     lobbyFlagPoolSelector.setDisabled(room.status !== "lobby" || !localIsHost);
-    roomSettings.textContent = `${modeSelectionDescription(roomModes)}${isMapTap ? ` · ${mapTapCategoryDescription(roomMapTapCategories)}` : ""}${hasFlagRounds ? ` · ${flagPoolLabel(roomFlagPool)}` : ""} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
+    roomSettings.textContent = isFlyover ? `Flyover race · ${flightLengthLabel(room.settings.roundDurationMs)}` : `${modeSelectionDescription(roomModes)}${isMapTap ? ` · ${mapTapCategoryDescription(roomMapTapCategories)}` : ""}${hasFlagRounds ? ` · ${flagPoolLabel(roomFlagPool)}` : ""} · ${room.settings.roundLimit} rounds · ${Math.round(room.settings.roundDurationMs / 1000)} sec timer`;
 
     playerList.replaceChildren(...createPlayerRows(room, localPlayerId));
     // Show "invite friends" only to signed-in users while waiting in the lobby. Friends are fetched
@@ -838,7 +910,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     startButton.disabled = room.status !== "lobby" || localPlayerId !== room.hostPlayerId || !allConnectedPlayersReady(room);
 
     const canSubmit = room.status === "playing" && status === "connected";
-    if (isMapTap) {
+    if (isFlyover) {
+      flyoverGameView.update({ room, localPlayerId, round: activeRound, canSubmit });
+    } else if (isMapTap) {
       mapTapGameView.update({ room, localPlayerId, round: activeRound, reveal: mapTapReveal, finalResults, feedback, canSubmit });
     } else if (isGeoGuessr) {
       geoGuessrGameView.update({ room, localPlayerId, round: activeRound, reveal: geoGuessrReveal, finalResults, feedback, canSubmit });
@@ -848,6 +922,16 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   }
 
   function handleMessage(message: ServerMessage): void {
+    // Flyover's live traffic goes straight to the race view: it arrives several times a second
+    // and redrawing the whole lobby for it would be wasted work.
+    if (message.type === "FLYOVER_PLANES") {
+      flyoverGameView.setPlanes(message.planes);
+      return;
+    }
+    if (message.type === "FLYOVER_PROGRESS") {
+      flyoverGameView.applyProgress(message);
+      return;
+    }
     switch (message.type) {
       case "SESSION_ASSIGNED":
         localPlayerId = message.playerId;
@@ -872,7 +956,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         mapTapReveal = null;
         geoGuessrReveal = null;
         finalResults = null;
-        feedback = `Round ${message.round.roundNumber} is live.`;
+        feedback = message.round.prompt.kind === "flyover-flight" ? "The race is on." : `Round ${message.round.roundNumber} is live.`;
         break;
       case "ANSWER_ACCEPTED":
         feedback = message.playerId === localPlayerId ? `You took the round for ${message.points} points.` : `${playerName(message.playerId)} took the round.`;
@@ -1003,8 +1087,9 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
           ...(isMapTapModeSelection(modeDropdown.selectedModes()) ? { mapTapCategories: setupMapTapCategorySelector.selectedCategories() } : {}),
           flagPool: setupFlagPoolSelector.value(),
 
-          roundLimit: Number(roundLimitSelect.value),
-          roundDurationMs: Number(roundDurationSelect.value),
+          ...(isFlyoverModeSelection(modeDropdown.selectedModes())
+            ? { roundDurationMs: Number(flightLengthSelect.value) }
+            : { roundLimit: Number(roundLimitSelect.value), roundDurationMs: Number(roundDurationSelect.value) }),
         }),
       );
     },
@@ -1118,7 +1203,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
   dailyButton.addEventListener("click", () => leaveScreen(options.onDailyChallenge), { signal: controller.signal });
   backButton.addEventListener("click", () => leaveScreen(options.onBackToSolo), { signal: controller.signal });
 
-  const layout = el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element, geoGuessrGameView.element] });
+  const layout = el("div", { className: "multiplayer-layout", children: [setupPanel, lobbyPanel, gameView.element, mapTapGameView.element, geoGuessrGameView.element, flyoverGameView.element] });
   // Site page (Compete): the shared header's logo and section links ask before leaving a room.
   const siteHeader = options.shell
     ? createSiteHeader(options.shell, {

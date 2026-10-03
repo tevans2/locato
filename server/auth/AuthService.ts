@@ -11,6 +11,8 @@ import {
 import type { LeaderboardMetric } from "../../src/core/leaderboards";
 import { mergeAcademyProgress } from "../academy/merge";
 import { validateAcademyProgress } from "../academy/validation";
+import { auditRun, isAuditedMode, parseRunTimeline, runVerdict, type RunFlag, type RunOutcome, type RunVerdict } from "../../src/core/runAudit";
+import { indexCountries, rawCountries } from "../../src/core/countries";
 import type { AcademyProgress } from "../../src/core/academy/types";
 import type {
   AuthUser,
@@ -34,6 +36,7 @@ import type {
   UserLeaderboardScoreRank,
   UserStats,
   UserStore,
+  StoredRun,
 } from "./types";
 
 /** Validate a board's mode + variant (both from untrusted input) and look up its metric. */
@@ -57,7 +60,33 @@ const DEFAULT_DAILY_HISTORY_LIMIT = 14;
 export interface AuthServiceOptions {
   readonly sessionTtlMs: number;
   readonly clock?: () => number;
+  /**
+   * Refuse leaderboard posts from runs that fail a hard audit check. Off, every run is still
+   * audited and recorded, but only flagged (observe mode, used to set the thresholds).
+   */
+  readonly enforceRunAudit?: boolean;
 }
+
+/** Where a request came from, kept on the run for the audit trail. */
+export interface RunRequestMeta {
+  readonly ip: string | null;
+  readonly userAgent: string | null;
+}
+
+export interface RunAuditResult {
+  readonly runId: string;
+  readonly verdict: RunVerdict;
+  readonly flags: readonly RunFlag[];
+  /** Enforcing and the run failed a hard check: the post was refused. */
+  readonly refused: boolean;
+}
+
+const RUN_START_RATE_LIMIT = 30;
+const RUN_OUTCOMES: readonly RunOutcome[] = ["complete", "given-up", "abandoned"];
+// The countries Name all countries expects, in the game's own (A–Z) order.
+const NAME_ALL_COUNTRIES = indexCountries(rawCountries).countries;
+const NAME_ALL_CODES = NAME_ALL_COUNTRIES.map((country) => country.code);
+const NAME_ALL_NAMES = new Map(NAME_ALL_COUNTRIES.map((country) => [country.code, country.name]));
 
 export type AuthOutcome =
   | { readonly ok: true; readonly user: AuthUser; readonly session: Session }
@@ -289,9 +318,122 @@ export class AuthService {
     return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock() });
   }
 
-  /** Alias of submitBestTime: it takes either metric. */
-  submitLeaderboardAttempt(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): SubmitBestTimeResult | { error: string } {
-    return this.submitBestTime(userId, input);
+  /**
+   * Post a finished run to its board. Audited modes (src/core/runAudit) are checked first: the
+   * run's ticket, its timeline and its pace. The run and its flags are always recorded; the post
+   * is refused only when enforcing and a hard check failed.
+   */
+  submitLeaderboardAttempt(
+    userId: string,
+    input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown; runId?: unknown; timeline?: unknown },
+    meta: RunRequestMeta = { ip: null, userAgent: null },
+  ): (SubmitBestTimeResult & { readonly audit?: RunAuditResult }) | { error: string; readonly audit?: RunAuditResult } {
+    const gameMode = typeof input.gameMode === "string" ? input.gameMode : "";
+    const variant = typeof input.variant === "string" ? input.variant : "";
+    if (!isAuditedMode(gameMode) || !isValidLeaderboardTime(input.timeMs) || "error" in resolveBoard(gameMode, variant)) {
+      return this.submitBestTime(userId, input);
+    }
+    const previousBestMs = this.store.getUserRank(userId, gameMode, variant)?.timeMs ?? null;
+    const audit = this.auditFinishedRun(userId, {
+      gameMode,
+      variant,
+      timed: true,
+      outcome: "complete",
+      runId: input.runId,
+      timeline: input.timeline,
+      claimedMs: input.timeMs,
+      previousBestMs,
+      posted: true,
+    }, meta);
+    if (audit.refused) return { error: "This run couldn't be verified, so it wasn't posted.", audit };
+    const result = this.submitBestTime(userId, input);
+    return "error" in result ? result : { ...result, audit };
+  }
+
+  /** A ticket for a run that's just started (its first move): the server's own start time. */
+  startRun(userId: string, input: { gameMode?: unknown; variant?: unknown; timed?: unknown }, meta: RunRequestMeta = { ip: null, userAgent: null }): { runId: string } | { error: string } {
+    if (!this.allowSubmit(`run:${userId}`, RUN_START_RATE_LIMIT)) return { error: "Too many runs started. Try again shortly." };
+    const gameMode = typeof input.gameMode === "string" ? input.gameMode : "";
+    if (!isAuditedMode(gameMode)) return { error: "Runs aren't tracked for this mode." };
+    const runId = `run_${createSessionToken().slice(0, 24)}`;
+    this.store.createRun({
+      id: runId,
+      userId,
+      gameMode,
+      variant: typeof input.variant === "string" ? input.variant.slice(0, 40) : "",
+      timed: input.timed === true,
+      startedAt: this.clock(),
+      ip: meta.ip,
+      userAgent: meta.userAgent?.slice(0, 300) ?? null,
+    });
+    return { runId };
+  }
+
+  /** A run ended without a leaderboard post: practice, given up, left, or restarted. */
+  finishRun(userId: string, input: { runId?: unknown; outcome?: unknown; timeline?: unknown }, meta: RunRequestMeta = { ip: null, userAgent: null }): RunAuditResult | { error: string } {
+    const run = typeof input.runId === "string" ? this.store.findRun(input.runId) : null;
+    if (!run || run.userId !== userId) return { error: "Unknown run." };
+    if (run.finishedAt !== null) return { error: "This run has already ended." };
+    const outcome = RUN_OUTCOMES.find((item) => item === input.outcome) ?? "abandoned";
+    if (!isAuditedMode(run.gameMode)) return { error: "Runs aren't tracked for this mode." };
+    return this.auditFinishedRun(userId, {
+      gameMode: run.gameMode,
+      variant: run.variant,
+      timed: run.timed,
+      outcome,
+      runId: run.id,
+      timeline: input.timeline,
+      claimedMs: null,
+      previousBestMs: null,
+      posted: false,
+    }, meta);
+  }
+
+  listUserRuns(userId: string, limit = 30): readonly StoredRun[] {
+    return this.store.listUserRuns(userId, limit);
+  }
+
+  private auditFinishedRun(
+    userId: string,
+    input: { gameMode: string; variant: string; timed: boolean; outcome: RunOutcome; runId: unknown; timeline: unknown; claimedMs: number | null; previousBestMs: number | null; posted: boolean },
+    meta: RunRequestMeta,
+  ): RunAuditResult {
+    const now = this.clock();
+    const ticket = typeof input.runId === "string" ? this.store.findRun(input.runId) : null;
+    // A ticket only counts for its owner, its mode, and once.
+    const run = ticket && ticket.userId === userId && ticket.gameMode === input.gameMode && ticket.finishedAt === null ? ticket : null;
+    const timeline = parseRunTimeline(input.timeline);
+    const flags = auditRun({
+      mode: "name-all",
+      timed: input.timed,
+      outcome: input.outcome,
+      timeline,
+      claimedMs: input.claimedMs,
+      serverElapsedMs: run ? now - run.startedAt : null,
+      countryCodes: NAME_ALL_CODES,
+      countryNames: NAME_ALL_NAMES,
+      previousBestMs: input.previousBestMs,
+      overlapsPreviousRun: run ? this.store.hasOverlappingRun(userId, run.id, run.startedAt) : false,
+    });
+    const verdict = runVerdict(flags);
+    const refused = input.posted && verdict === "reject" && this.options.enforceRunAudit === true;
+    // A post without a usable ticket still goes in the trail, as a run that started as it ended.
+    const runId = run?.id ?? `run_${createSessionToken().slice(0, 24)}`;
+    if (!run) {
+      this.store.createRun({ id: runId, userId, gameMode: input.gameMode, variant: input.variant, timed: input.timed, startedAt: now, ip: meta.ip, userAgent: meta.userAgent?.slice(0, 300) ?? null });
+    }
+    this.store.finishRun(runId, {
+      finishedAt: now,
+      outcome: input.outcome,
+      claimedMs: input.claimedMs,
+      countries: timeline?.entries.length ?? 0,
+      timeline,
+      flags,
+      verdict,
+      posted: input.posted,
+      refused,
+    });
+    return { runId, verdict, flags, refused };
   }
 
   getLeaderboard(query: { gameMode?: unknown; variant?: unknown; limit?: unknown; offset?: unknown }):

@@ -14,10 +14,12 @@ export interface PublicPlayerState {
   readonly streak: number;
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
+  /** Flyover: how far along the shared route this racer is (reached + skipped). */
+  readonly routeIndex?: number;
 }
 
 export interface PublicPromptContent {
-  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe" | "geoguessr-streetview";
+  readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe" | "geoguessr-streetview" | "flyover-flight";
   readonly value: string;
 }
 
@@ -97,3 +99,19 @@ export interface FinalResult {
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
 }
+
+/** The `flyover-flight` prompt value (JSON): where every plane takes off and the shared route. */
+export interface FlyoverFlightPrompt {
+  readonly start: { readonly x: number; readonly y: number; readonly heading: number };
+  /** Country codes, in order. */
+  readonly route: readonly string[];
+}
+
+export interface FlyoverPlanePosition {
+  readonly playerId: PlayerId;
+  readonly x: number;
+  readonly y: number;
+  readonly heading: number;
+}
+
+export type FlyoverProgressEvent = "reached" | "skipped" | "sync";

@@ -1,4 +1,4 @@
-import { fetchLeaderboardRank, submitLeaderboardAttempt } from "../auth";
+import { fetchLeaderboardRank, submitLeaderboardAttempt, type LeaderboardAttemptInput } from "../auth";
 import type { GameModeId, TimerGameModeId } from "../gameModes";
 import { leaderboardConfig } from "../leaderboards";
 import { formatElapsedTime } from "./playTimer";
@@ -26,6 +26,8 @@ export async function postRankedAttempt(input: {
   readonly variant: string;
   readonly value: number;
   readonly isLoggedIn: boolean;
+  /** Audited modes: the run's ticket and timeline (src/core/runAudit). */
+  readonly run?: LeaderboardAttemptInput["run"];
 }): Promise<TimedRunPosting> {
   const config = leaderboardConfig(input.gameMode);
   if (!config) return { serverAccepted: null, rank: null };
@@ -36,7 +38,7 @@ export async function postRankedAttempt(input: {
   const result = await submitLeaderboardAttempt(
     config.metric === "score"
       ? { gameMode: input.gameMode, variant: input.variant, score: input.value }
-      : { gameMode: input.gameMode, variant: input.variant, timeMs: input.value },
+      : { gameMode: input.gameMode, variant: input.variant, timeMs: input.value, ...(input.run ? { run: input.run } : {}) },
   );
   if (!result) return { serverAccepted: false, rank: null, failed: true };
   return { serverAccepted: result.accepted, rank: result.rank ?? null };
@@ -48,8 +50,9 @@ export async function postTimedRun(input: {
   readonly variant: string;
   readonly timeMs: number;
   readonly isLoggedIn: boolean;
+  readonly run?: LeaderboardAttemptInput["run"];
 }): Promise<TimedRunPosting> {
-  return postRankedAttempt({ gameMode: input.gameMode, variant: input.variant, value: input.timeMs, isLoggedIn: input.isLoggedIn });
+  return postRankedAttempt({ gameMode: input.gameMode, variant: input.variant, value: input.timeMs, isLoggedIn: input.isLoggedIn, ...(input.run ? { run: input.run } : {}) });
 }
 
 export function timerLeaderboardNote(result: TimerLeaderboardResult, isLoggedIn: boolean): string {

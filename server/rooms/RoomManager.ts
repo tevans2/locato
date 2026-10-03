@@ -4,6 +4,9 @@ import { parseRawClientMessage } from "../protocol/parseMessage";
 import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type RoomResult } from "./Room";
 import { MapTapRoom } from "./MapTapRoom";
 import { GeoGuessrRoom } from "./GeoGuessrRoom";
+import { FlyoverRoom } from "./FlyoverRoom";
+import { loadFlyoverCountries } from "./flyoverCountries";
+import type { FlyoverCountry } from "../../src/core/flyover";
 import { getCategory, resolveCategoryIds } from "../../src/core/categories";
 import type { MapTapCategory } from "../../src/core/maptap/types";
 import type { FlagPool } from "../../src/core/flagPools";
@@ -24,6 +27,8 @@ export interface PlayerSession {
   readonly sessionToken: string;
   readonly answerWindowStartedAt: number;
   readonly answerCount: number;
+  readonly positionWindowStartedAt?: number;
+  readonly positionCount?: number;
 }
 
 export interface RoomManagerOptions {
@@ -34,6 +39,9 @@ export interface RoomManagerOptions {
   readonly emptyRoomTtlMs?: number;
   readonly answerRateLimitPerSecond?: number;
   readonly resultDisplayMs?: number;
+  /** Country shapes for Flyover rooms; loaded from the built map on first use by default. */
+  readonly flyoverCountries?: () => readonly FlyoverCountry[];
+  readonly positionRateLimitPerSecond?: number;
 }
 
 export interface RoomManagerStats {
@@ -44,7 +52,7 @@ export interface RoomManagerStats {
 // Admin-facing room view: no session tokens, chat, or prompt answers.
 export interface AdminRoomSummary {
   readonly code: RoomCode;
-  readonly kind: "quiz" | "map-tap" | "geoguessr";
+  readonly kind: "quiz" | "map-tap" | "geoguessr" | "flyover";
   readonly status: string;
   readonly categoryIds: readonly string[];
   readonly roundNumber: number | null;
@@ -59,6 +67,8 @@ const DEFAULT_MAX_ROOMS = 500;
 const DEFAULT_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 const DEFAULT_EMPTY_ROOM_TTL_MS = 30_000;
 const DEFAULT_ANSWER_RATE_LIMIT_PER_SECOND = 5;
+// Flyover clients report their plane five times a second; leave room for timer jitter.
+const DEFAULT_POSITION_RATE_LIMIT_PER_SECOND = 12;
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function createId(prefix: string): string {
@@ -89,11 +99,11 @@ function defaultCountryIndex(): CountryIndex {
 }
 
 function hasSupportedCategory(categoryIds: readonly string[]): boolean {
-  if (categoryIds.length === 1 && (categoryIds[0] === "map-tap" || categoryIds[0] === "geoguessr")) return true;
+  if (categoryIds.length === 1 && (categoryIds[0] === "map-tap" || categoryIds[0] === "geoguessr" || categoryIds[0] === "flyover")) return true;
   return categoryIds.some((id) => getCategory(id) !== undefined);
 }
 
-type AnyRoom = Room | MapTapRoom | GeoGuessrRoom;
+type AnyRoom = Room | MapTapRoom | GeoGuessrRoom | FlyoverRoom;
 
 function isMapTapRoom(room: AnyRoom): room is MapTapRoom {
   return room instanceof MapTapRoom;
@@ -101,6 +111,18 @@ function isMapTapRoom(room: AnyRoom): room is MapTapRoom {
 
 function isGeoGuessrRoom(room: AnyRoom): room is GeoGuessrRoom {
   return room instanceof GeoGuessrRoom;
+}
+
+function isFlyoverRoom(room: AnyRoom): room is FlyoverRoom {
+  return room instanceof FlyoverRoom;
+}
+
+/** Rooms with their own way to play: one mode only, chosen when the room is made. */
+function roomKind(room: AnyRoom): AdminRoomSummary["kind"] {
+  if (isMapTapRoom(room)) return "map-tap";
+  if (isGeoGuessrRoom(room)) return "geoguessr";
+  if (isFlyoverRoom(room)) return "flyover";
+  return "quiz";
 }
 
 export class RoomManager {
@@ -111,6 +133,8 @@ export class RoomManager {
   private readonly emptyRoomTtlMs: number;
   private readonly answerRateLimitPerSecond: number;
   private readonly resultDisplayMs: number;
+  private readonly flyoverCountries: () => readonly FlyoverCountry[];
+  private readonly positionRateLimitPerSecond: number;
   private readonly rooms = new Map<RoomCode, AnyRoom>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
   private readonly connectionByPlayerId = new Map<string, MultiplayerConnection>();
@@ -126,6 +150,8 @@ export class RoomManager {
     this.emptyRoomTtlMs = options.emptyRoomTtlMs ?? DEFAULT_EMPTY_ROOM_TTL_MS;
     this.answerRateLimitPerSecond = options.answerRateLimitPerSecond ?? DEFAULT_ANSWER_RATE_LIMIT_PER_SECOND;
     this.resultDisplayMs = options.resultDisplayMs ?? DEFAULT_RESULT_DISPLAY_MS;
+    this.flyoverCountries = options.flyoverCountries ?? loadFlyoverCountries;
+    this.positionRateLimitPerSecond = options.positionRateLimitPerSecond ?? DEFAULT_POSITION_RATE_LIMIT_PER_SECOND;
   }
 
   stats(): RoomManagerStats {
@@ -138,7 +164,7 @@ export class RoomManager {
         const snapshot = room.snapshot();
         return {
           code: room.code,
-          kind: isMapTapRoom(room) ? "map-tap" : isGeoGuessrRoom(room) ? "geoguessr" : "quiz",
+          kind: roomKind(room),
           status: snapshot.status,
           categoryIds: snapshot.categoryIds,
           roundNumber: snapshot.round?.roundNumber ?? null,
@@ -205,6 +231,10 @@ export class RoomManager {
         if (room.state === "playing") this.broadcastResult(room, room.endRound(now));
         else if (room.state === "round-result") this.broadcastResult(room, room.advanceAfterResult(now));
       }
+      if (isFlyoverRoom(room)) {
+        const planes = room.drainPlanes();
+        if (planes) this.broadcastMessages(room, [planes]);
+      }
 
       const ttl = room.isEmpty ? this.emptyRoomTtlMs : this.roomTtlMs;
       if (room.updatedAt + ttl <= now) this.deleteRoom(room.code);
@@ -241,6 +271,8 @@ export class RoomManager {
         this.withSessionRoom(connection, (room, session) => {
           if (isMapTapRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.mapTapCategories !== undefined ? { mapTapCategories: message.mapTapCategories } : {}), ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
+          } else if (isFlyoverRoom(room)) {
+            this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
           } else if (isGeoGuessrRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
 
@@ -274,7 +306,7 @@ export class RoomManager {
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (isMapTapRoom(room) || isGeoGuessrRoom(room)) { sendError(connection, "wrong-mode", "Use a map guess in this room."); return; }
+          if (isMapTapRoom(room) || isGeoGuessrRoom(room) || isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "Use a map guess in this room."); return; }
           const limited = this.rateLimitAnswer(connection, session, now);
           if (!limited.ok) { sendError(connection, limited.code, limited.message); return; }
           this.sendRoomResult(connection, room, room.submitAnswer(session.playerId, message.answer, now));
@@ -290,6 +322,30 @@ export class RoomManager {
         this.withSessionRoom(connection, (room, session) => {
           if (!isGeoGuessrRoom(room)) { sendError(connection, "wrong-mode", "This is not a GeoGuessr room."); return; }
           this.sendRoomResult(connection, room, room.submitGuess(session.playerId, message.lat, message.lng, now));
+        });
+        return;
+      case "FLYOVER_POSITION":
+        this.withSessionRoom(connection, (room, session) => {
+          if (!isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "This is not a Flyover room."); return; }
+          // Positions are cosmetic and frequent: over the limit they're dropped, not answered.
+          if (!this.allowPosition(connection, session, now)) return;
+          this.sendRoomResult(connection, room, room.updatePosition(session.playerId, message.x, message.y, message.heading, now));
+        });
+        return;
+      case "FLYOVER_REACHED":
+        this.withSessionRoom(connection, (room, session) => {
+          if (!isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "This is not a Flyover room."); return; }
+          const limited = this.rateLimitAnswer(connection, session, now);
+          if (!limited.ok) { sendError(connection, limited.code, limited.message); return; }
+          this.sendRoomResult(connection, room, room.reach(session.playerId, message.index, message.x, message.y, now));
+        });
+        return;
+      case "FLYOVER_SKIP":
+        this.withSessionRoom(connection, (room, session) => {
+          if (!isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "This is not a Flyover room."); return; }
+          const limited = this.rateLimitAnswer(connection, session, now);
+          if (!limited.ok) { sendError(connection, limited.code, limited.message); return; }
+          this.sendRoomResult(connection, room, room.skip(session.playerId, message.index, now));
         });
         return;
       case "VOTE_SKIP":
@@ -327,7 +383,28 @@ export class RoomManager {
     const playerId = createId("player");
     const isMapTap = categoryIds.length === 1 && categoryIds[0] === "map-tap";
     const isGeoGuessr = categoryIds.length === 1 && categoryIds[0] === "geoguessr";
-    const room: AnyRoom = isMapTap
+    const isFlyover = categoryIds.length === 1 && categoryIds[0] === "flyover";
+    let flyoverCountries: readonly FlyoverCountry[] = [];
+    if (isFlyover) {
+      try {
+        flyoverCountries = this.flyoverCountries();
+      } catch {
+        sendError(connection, "mode-unavailable", "Flyover rooms aren't available right now.");
+        return;
+      }
+    }
+    const room: AnyRoom = isFlyover
+      ? new FlyoverRoom({
+          code: roomCode,
+          hostPlayerId: playerId,
+          hostName: connection.authenticatedName ?? playerName,
+          countries: flyoverCountries,
+          seed: createId("seed"),
+          now,
+          maxPlayers: this.maxPlayersPerRoom,
+          ...(settings.roundDurationMs !== undefined ? { flightMs: settings.roundDurationMs } : {}),
+        })
+      : isMapTap
       ? new MapTapRoom({
           code: roomCode,
           hostPlayerId: playerId,
@@ -469,6 +546,15 @@ export class RoomManager {
 
     if (nextSession.answerCount > this.answerRateLimitPerSecond) return { ok: false, code: "answer-rate-limited", message: "Too many answers. Slow down." };
     return { ok: true, message: nextSession };
+  }
+
+  private allowPosition(connection: MultiplayerConnection, session: PlayerSession, now: number): boolean {
+    const startedAt = session.positionWindowStartedAt ?? 0;
+    const nextSession = now - startedAt >= 1000
+      ? { ...session, positionWindowStartedAt: now, positionCount: 1 }
+      : { ...session, positionCount: (session.positionCount ?? 0) + 1 };
+    this.assignSession(connection, nextSession);
+    return (nextSession.positionCount ?? 0) <= this.positionRateLimitPerSecond;
   }
 
   private sendRoomResult(connection: MultiplayerConnection, room: AnyRoom, result: RoomResult): void {
