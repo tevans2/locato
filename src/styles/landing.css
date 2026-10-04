@@ -86,6 +86,8 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .landing-atlas { position: relative; }
 .landing-atlas-heading { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
 .landing-atlas-heading > span { color: var(--muted); font-size: .65rem; font-weight: 750; letter-spacing: .2em; text-transform: uppercase; }
+.atlas-heading-actions { display: flex; align-items: center; gap: 14px; }
+.atlas-heading-actions > time { color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
 .atlas-reset { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--brand); cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
 .atlas-reset:hover:not(:disabled) { border-color: var(--brand); background: var(--accent-soft); }
 .atlas-reset:disabled { cursor: default; opacity: .45; }
@@ -105,6 +107,16 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .atlas-country-copy > span { color: var(--muted); font-size: .71rem; line-height: 1.5; overflow-wrap: anywhere; }
 .atlas-country-copy > button { display: inline-flex; align-items: center; gap: 7px; min-height: 26px; padding: 2px 0 0; border: 0; background: transparent; color: var(--brand); font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
 .atlas-country-copy > button:hover { color: var(--brand-hover); text-decoration: underline; text-underline-offset: 3px; }
+.atlas-daily-card { right: 12px; bottom: 12px; z-index: 1; display: block; width: min(288px, calc(100% - 24px)); padding: 16px 18px 12px; }
+.atlas-daily-country { display: flex; align-items: center; gap: 11px; }
+.atlas-daily-country > img { flex: none; width: 36px; height: 24px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px #253e3010; }
+.atlas-daily-country .atlas-country-copy > strong { font-size: .95rem; }
+.atlas-daily-fact { margin: 12px 0 8px; padding-top: 11px; border-top: 1px solid var(--border); font-size: .76rem; line-height: 1.6; }
+.atlas-daily-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.atlas-daily-footer > button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0; border: 0; background: transparent; color: var(--brand); font: inherit; font-size: .73rem; font-weight: 750; cursor: pointer; }
+.atlas-daily-footer > a { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; color: var(--muted); font-size: .62rem; text-decoration: none; }
+.atlas-daily-footer > a > svg { transform: rotate(-45deg); }
+.atlas-daily-footer > :is(button, a):hover { color: var(--brand-hover); text-decoration: underline; text-underline-offset: 3px; }
 .atlas-interaction-hint { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; margin-block: 0 14px; color: var(--muted); font-size: .75rem; }
 .atlas-interaction-hint > svg { flex: none; }
 .atlas-hover-hint::before { content: "·"; margin-inline: 8px; }
@@ -121,6 +133,8 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
   .mode-atlas-preview { width: min(100%, 520px); justify-self: center; }
   .landing-atlas-heading > span { font-size: .56rem; }
   .atlas-globe-stage { margin-top: -4px; }
+  .atlas-globe-stage:has(.atlas-daily-card) { margin-bottom: 112px; }
+  .atlas-daily-card { bottom: -100px; }
   .atlas-interaction-hint { font-size: .65rem; margin-bottom: 12px; }
 }
 @media (pointer: coarse) {
@@ -129,6 +143,7 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
   .atlas-hover-hint::before { font-size: .65rem; }
   .atlas-reset { width: 44px; height: 44px; }
   .atlas-country-copy > button { min-height: 36px; }
+  .atlas-daily-footer > :is(button, a) { min-height: 44px; }
 }
 
 /* Daily + Compete: a compact row of two cards under the picker. */

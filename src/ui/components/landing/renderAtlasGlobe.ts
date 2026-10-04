@@ -26,6 +26,7 @@ export interface AtlasGlobe {
 
 interface AtlasOptions {
   readonly countryIndex: CountryIndex;
+  readonly featuredCountryCode?: string | undefined;
   readonly onHover: (hover: AtlasHover | null) => void;
   readonly onOpenCountry: (code: string) => void;
 }
@@ -81,6 +82,8 @@ export function createAtlasGlobe(host: HTMLElement, features: readonly WorldCoun
   const picking = canvasContext(PICK_WIDTH, PICK_HEIGHT, true);
   const countryByPixel = new Map<number, Country>();
   const featureByCode = new Map(features.map((feature) => [feature.code.toUpperCase(), feature]));
+  const featuredCountry = options.featuredCountryCode ? options.countryIndex.byCode.get(options.featuredCountryCode) ?? null : null;
+  const featuredFeature = featuredCountry ? featureByCode.get(featuredCountry.code) : undefined;
   features.forEach((feature, index) => {
     const country = options.countryIndex.byCode.get(feature.code.toUpperCase());
     if (!country) return;
@@ -206,13 +209,19 @@ export function createAtlasGlobe(host: HTMLElement, features: readonly WorldCoun
   }
 
   function select(country: Country | null, position?: THREE.Vector3): void {
+    country ??= featuredCountry;
     if (country?.code === selected?.code) return;
     selected = country;
     highlight.clearRect(0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    // Today's country stays highlighted while the visitor discovers other countries.
+    if (featuredFeature) {
+      highlight.lineWidth = 2.5;
+      paintFeature(highlight, featuredFeature, "#69825a", "#315c41");
+    }
     const feature = country ? featureByCode.get(country.code) : undefined;
     if (feature) {
       highlight.lineWidth = 2.5;
-      paintFeature(highlight, feature, "#315c41", "#264b35");
+      paintFeature(highlight, feature, country?.code === featuredCountry?.code ? "#69825a" : "#315c41", "#264b35");
       localAnchor.copy(position ?? new THREE.Vector3(...atlasPosition(atlasCountryAnchor(feature)))).normalize();
       marker.position.copy(localAnchor).multiplyScalar(1.007);
     }
@@ -281,6 +290,9 @@ export function createAtlasGlobe(host: HTMLElement, features: readonly WorldCoun
     const hit = countryAt(event);
     select(hit?.country ?? null, hit?.position);
   }, listenerOptions);
+  host.parentElement?.addEventListener("pointerleave", () => {
+    if (activePointer === null) select(null);
+  }, listenerOptions);
 
   function finishPointer(event: PointerEvent): void {
     if (event.pointerId !== activePointer) return;
@@ -305,6 +317,14 @@ export function createAtlasGlobe(host: HTMLElement, features: readonly WorldCoun
   }, listenerOptions);
 
   function reset(): void {
+    if (featuredFeature && featuredCountry) {
+      selectCountry(featuredCountry.code);
+      // Leave a little room for the fact tile to the country's lower right.
+      root.rotation.y -= 0.24;
+      root.rotation.x -= 0.12;
+      requestRender();
+      return;
+    }
     root.rotation.set(INITIAL_PITCH, INITIAL_YAW, 0);
     select(null);
     select(options.countryIndex.byCode.get("ZA") ?? null);
