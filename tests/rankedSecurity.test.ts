@@ -41,7 +41,7 @@ describe("ranked authority", () => {
   });
 
   it.each(LEADERBOARD_MODES)("completes an actual server-owned $mode run and protects its result", async (config) => {
-    const { time, service, user, request } = await harness(config.mode === "streetview-country");
+    const { time, service, user, request } = await harness(config.mode === "streetview-country" || config.mode === "puzzle");
     const variant = config.mode === "puzzle" ? "Europe" : config.variants[0]!;
     const start = await request("/api/ranked/start", { gameMode: config.mode, variant });
     expect(start.status).toBe(200);
@@ -71,22 +71,53 @@ describe("ranked authority", () => {
     expect((await request("/api/leaderboard", body)).status).toBe(400);
   });
 
-  it("rejects stale challenges, other owners, fast repeated guesses, and malformed flight controls", async () => {
+  it("rejects stale challenges, other owners, and malformed flight controls without delaying valid guesses", async () => {
     const { time, service, user } = await harness();
     let state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));
     const oldId = state.question!.id;
     const answer = answerFor(service.ranked, state);
-    expect(await service.ranked.action(user.id, { runId: state.runId, questionId: oldId, ...answer })).toHaveProperty("error");
+    expect(state.startedAt).toBeNull();
     time.value += 5000;
     expect(await service.ranked.action("wrong-owner", { runId: state.runId, questionId: oldId, ...answer })).toHaveProperty("error");
     state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: oldId, ...answer }));
-    time.value += 5000;
+    time.value += 1;
     expect(await service.ranked.action(user.id, { runId: state.runId, questionId: oldId, ...answer })).toHaveProperty("error");
+    state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, ...answerFor(service.ranked, state) }));
+    expect(state.status).toBe("complete");
+    expect(state.timeMs).toBe(1);
     state = stateOf(await service.startRankedGame(user.id, { gameMode: "flyover", variant: "" }));
     for (const input of [{ turn: 0, speed: 1000 }, { turn: 0, radius: 100 }, { turn: 0, x: 0, y: 0 }, { turn: 9 }, { turn: 0, towards: Infinity }, { turn: 0, boost: 6 }]) {
       expect(await service.ranked.action(user.id, { runId: state.runId, type: "input", input })).toHaveProperty("error");
     }
     expect(await service.ranked.action(user.id, { runId: state.runId, type: "reach", x: 0, y: 0, score: 196 })).toHaveProperty("error");
+  });
+
+  it("starts timed games on a submitted guess, ignores idle partial input and hints, and uses server time", async () => {
+    const { time, service, user } = await harness();
+    let state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));
+    time.value += 60_000;
+    state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer: "Sout", auto: true }));
+    expect(state.startedAt).toBeNull();
+    state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "hint" }));
+    expect(state.startedAt).toBeNull();
+    state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "skip" }));
+    expect(state.startedAt).toBeNull();
+    const firstGuessAt = time.value;
+    state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer: "Not a country", startedAt: firstGuessAt - 1_000_000 }));
+    expect(state.startedAt).toBe(firstGuessAt);
+    for (let i = 0; i < 2; i++) {
+      time.value += 5_000;
+      state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, ...answerFor(service.ranked, state) }));
+    }
+    expect(state.timeMs).toBe(10_000);
+  });
+
+  it("expires idle runs from creation even when their timer has never started", async () => {
+    const { time, service, user } = await harness();
+    const state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));
+    expect(state.startedAt).toBeNull();
+    time.value += 2 * 60 * 60 * 1000 + 1;
+    expect(await service.ranked.action(user.id, { runId: state.runId, type: "poll" })).toMatchObject({ error: "This game expired. Start a new game." });
   });
 
   it("keeps masked flag pixels and asset ownership on the server", async () => {

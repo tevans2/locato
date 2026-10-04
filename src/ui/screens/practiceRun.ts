@@ -36,7 +36,7 @@ export function shellOrFallback(shell: ShellContext | undefined, onHome: () => v
     openGame: () => undefined,
     openGamePicker: () => undefined,
     openCountry: () => undefined,
-    openCompete: () => undefined,
+    openLeaderboards: () => undefined,
     openAccount: () => undefined,
     controls: document.createElement("div"),
     confirmLeave: async () => true,

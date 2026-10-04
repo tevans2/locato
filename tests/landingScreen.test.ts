@@ -25,7 +25,7 @@ const storage: Storage = {
   key: (index) => [...values.keys()][index] ?? null,
 };
 function shell(): ShellContext {
-  return { openSection: vi.fn(), goHome: vi.fn(), goBack: vi.fn(), openGame: vi.fn(), openGamePicker: vi.fn(), openCountry: vi.fn(), openCompete: vi.fn(), openAccount: vi.fn(), controls: document.createElement("div"), confirmLeave: vi.fn(async () => true), signedIn: () => false };
+  return { openSection: vi.fn(), goHome: vi.fn(), goBack: vi.fn(), openGame: vi.fn(), openGamePicker: vi.fn(), openCountry: vi.fn(), openLeaderboards: vi.fn(), openAccount: vi.fn(), controls: document.createElement("div"), confirmLeave: vi.fn(async () => true), signedIn: () => false };
 }
 async function mount() {
   const navigation = shell();

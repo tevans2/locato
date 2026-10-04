@@ -6,7 +6,7 @@ import type { MapTapGuessResult, MapTapRoundTarget } from "./maptap/types";
 import type { GeoGuessrGuessResult } from "./geoguessr";
 import type { WorldSplitResult } from "./worldsplit";
 
-/** Only the current challenge crosses the wire. Answers and queues stay on the server. */
+/** Only the current challenge crosses the wire. Future queues stay on the server. */
 export interface RankedQuestion {
   readonly id: string;
   readonly kind: "text" | "image" | "flag-colors" | "name-all" | "click" | "spot" | "puzzle" | "pin" | "street" | "split" | "flight";
@@ -15,6 +15,8 @@ export interface RankedQuestion {
   readonly paths?: readonly (readonly ProjectedPoint[])[];
   readonly frames?: readonly { readonly asset: string }[];
   readonly mapTap?: MapTapRoundTarget;
+  /** Current-clue presentation only. Never authorizes an answer or exposes future questions. */
+  readonly answerToken?: string;
 }
 
 /** Answer details are revealed only after the corresponding move has been checked. */
@@ -33,7 +35,7 @@ export interface RankedState {
   readonly mode: GameModeId | "daily";
   readonly variant: string;
   readonly status: "playing" | "complete";
-  readonly startedAt: number;
+  readonly startedAt: number | null;
   readonly serverNow: number;
   readonly endsAt: number | null;
   readonly index: number;

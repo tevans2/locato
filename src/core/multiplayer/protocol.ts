@@ -3,16 +3,18 @@ import type { MapTapCategory } from "../maptap/types";
 import type { FinalResult, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
-  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
+  | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly avatarEmoji?: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
 
-  | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string }
+  | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string; readonly avatarEmoji?: string }
   | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
   | { readonly type: "LEAVE_ROOM" }
-  | { readonly type: "SET_READY"; readonly ready: boolean }
   | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
 
   | { readonly type: "START_GAME" }
+  /** Host, after a game: start the next one straight away with the same players and settings. */
   | { readonly type: "PLAY_AGAIN" }
+  /** Host, after a game: back to the lobby to change settings before the next one. */
+  | { readonly type: "RETURN_TO_LOBBY" }
   | { readonly type: "SUBMIT_ANSWER"; readonly answer: string; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_MAPTAP_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_GEOGUESSR_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }

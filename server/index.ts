@@ -284,6 +284,7 @@ const server = Bun.serve<WebSocketData>({
         send: (msg) => socket.send(msg),
         close: (code, reason) => socket.close(code, reason),
         authenticatedName: socket.data.user?.displayName ?? null,
+        authenticatedAvatar: socket.data.user?.avatarEmoji ?? null,
         authenticatedUserId: socket.data.user?.id ?? null,
       };
       connectionMap.set(socket, connection);

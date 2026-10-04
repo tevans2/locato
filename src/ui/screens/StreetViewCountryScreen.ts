@@ -13,6 +13,7 @@ import { scoreDailyRound } from "../../core/dailyChallenge";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import type { RankedSession } from "./RankedSession";
 import { createPrivateStreetView } from "../components/PrivateStreetView";
+import { rankedGuessCountry } from "../../core/rankedPresentation";
 
 /** A practice run is this many countries; then the results screen. */
 export const STREETVIEW_RUN_LENGTH = 5;
@@ -23,7 +24,6 @@ export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
-  readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   /** Keeps the device best. */
   readonly storage?: Storage;
@@ -781,20 +781,28 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
 
     if (options.ranked) {
       loadingRound = true; updateControls();
+      const prediction = rankedGuessCountry(options.countryIndex, options.ranked.state.question, "streetview-country", guess.name, false);
+      if (prediction) {
+        round = { ...round, countryCode: prediction.code };
+        recordRunRound(true, guessedCountryIds.size);
+        pointsValue.textContent = String(runPoints());
+        showFeedback(feedback, `Correct — ${prediction.name}.`, "good");
+      }
       try {
         const state = await options.ranked.move({ type: "answer", answer: guess.name });
         if (controller.signal.aborted) return;
         loadingRound = false;
         const detail = state.result;
+        if (prediction && detail?.kind !== "correct") throw new Error("That answer could not be verified. Please enter it again.");
         if (detail?.countryCode) {
           round = { ...round, countryCode: detail.countryCode };
           const correct = detail.kind === "correct";
-          recordRunRound(correct, guessedCountryIds.size);
+          if (!prediction) recordRunRound(correct, guessedCountryIds.size);
           if (!correct) { status = "lost"; render(); showFeedback(feedback, `Answer — ${targetCountry().name}.`, "bad"); }
           else if (runRounds.length >= runLength) { status = "won"; render(); showResults(); }
           else startNextRound(`Correct — ${targetCountry().name}. Next country loaded.`, "good");
         } else { attemptIndex++; render(); showFeedback(feedback, `Not ${guess.name}. New frame loaded.`, "bad"); }
-      } catch (error) { loadingRound = false; guessedCountryIds.delete(guess.id); render(); showFeedback(feedback, (error as Error).message, "bad"); }
+      } catch (error) { if (prediction) runRounds.pop(); loadingRound = false; guessedCountryIds.delete(guess.id); render(); showFeedback(feedback, (error as Error).message, "bad"); }
       return;
     }
 

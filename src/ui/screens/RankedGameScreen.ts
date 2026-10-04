@@ -24,7 +24,7 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
   const variant = options.variant ?? (mode === "puzzle" ? "Europe" : "");
   const session = new RankedSession(mode, variant);
   const countryIndex = options.countryIndex ?? indexCountries(rawCountries);
-  const common = { shell, storage, countryIndex, onHome: shell.goHome, onGameModeChange: (next: GameModeId) => shell.openGame(next), onMultiplayer: () => shell.openSection("compete"), onDailyChallenge: () => shell.openSection("daily") };
+  const common = { shell, storage, countryIndex, onHome: shell.goHome, onGameModeChange: (next: GameModeId) => shell.openGame(next), onDailyChallenge: () => shell.openSection("daily") };
   try {
     if (mode !== "flyover") await session.start();
     let screen: Screen;
@@ -34,11 +34,11 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
       const adapter = createRankedSoloEngine(createPromptCountryIndex(countryIndex, [mode], flagPool), session);
       screen = createSoloGameScreen({ ...common, countryIndex: adapter.countryIndex, engine: adapter.engine, selectedGameMode: mode, run: "timed", flagPool,
         ranked: { session, prompt: adapter.prompt, subscribe: adapter.subscribe }, worldCountryFeatures: world, getAuthUser: options.getAuthUser,
-        onStateChange() {}, onReset() {}, onOpenCountry: shell.openCountry, onLeaderboard: () => shell.openCompete(mode, variant) });
+        onStateChange() {}, onReset() {}, onOpenCountry: shell.openCountry, onLeaderboard: () => shell.openLeaderboards(mode, variant) });
     } else if (isWorldMapGameModeId(mode)) {
       const { createCountryGuessingScreen } = await import("./CountryGuessingScreen");
       screen = createCountryGuessingScreen({ ...common, worldCountryFeatures: world, initialMode: mode, run: "timed", ...(mode === "puzzle" ? { puzzleContinent: variant } : {}), ranked: session,
-        getAuthUser: options.getAuthUser, onLeaderboard: () => shell.openCompete(mode, variant) });
+        getAuthUser: options.getAuthUser, onLeaderboard: () => shell.openLeaderboards(mode, variant) });
     } else if (mode === "flyover") {
       const { createFlyoverScreen } = await import("./FlyoverScreen");
       screen = createFlyoverScreen({ shell, storage, worldCountryFeatures: world, onHome: shell.goHome, ranked: session });

@@ -66,7 +66,6 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   /** Legacy header callbacks: the GameBar / FocusBar navigate through `shell` now. */
   readonly onHome?: () => void;
-  readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
   /** The daily's ✕ (App says the daily is saved). */
   readonly onExitDailyChallenge?: () => void;
@@ -402,7 +401,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       onPlayAgain: () => {
         missedCountryIds.clear();
         hideResultsIn(element, resultsHost);
-        resetRun(timed ? "New timed run. The clock starts on your first correct answer." : "Fresh run started.");
+        resetRun(timed ? `New timed run. The clock starts on your first ${options.ranked ? "guess" : "correct answer"}.` : "Fresh run started.");
       },
       shareText: timed
         ? `I cleared ${label} on Locato in ${formatRunTime(finalTimeMs ?? 0)} (timed run).`
@@ -498,7 +497,6 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   }
 
   function resetRun(message: string): void {
-    if (options.ranked) message = "New timed run. The server clock is running.";
     activeMapPromptKey = null;
     latestCapitalRecallCountryId = null;
     resetFreePlayProgress();
@@ -715,6 +713,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         const guessedCountry = countryForGuess(countryIndex, input.value);
         if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
       }
+      if (options.ranked && input.value.trim()) { options.ranked.session.noteGuess(); playTimer.startIfNeeded(); }
       dispatchAndRender(engine.dispatch({ type: "SUBMIT_GUESS", value: input.value, now: Date.now() }));
       if (engine.getState().lastResult?.type === "wrong" && shouldAutoFocusTextInput()) input.select();
     },
@@ -791,7 +790,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     dismissKeyboardIfTouchInput(input);
     void confirmWipeRun(timed ? "Restart this timed run?" : "Start a fresh run?", "Restart").then((confirmed) => {
       if (!confirmed || controller.signal.aborted) return;
-      resetRun(timed ? "Timer reset. The clock starts on your first correct answer." : "Fresh run started.");
+      resetRun(timed ? `Timer reset. The clock starts on your first ${options.ranked ? "guess" : "correct answer"}.` : "Fresh run started.");
     });
   }
   resetButton.addEventListener("click", restartFromMenu, { signal: controller.signal });
@@ -871,9 +870,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       gameMode: options.selectedGameMode,
       run: runType,
       ...(timed ? { clock: clockValue } : {}),
-      // A cold timed link backs out to its own board rather than the Compete landing tab.
-      onBack: () => shell.goBack(timed ? () => shell.openCompete(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
-      backLabel: timed ? "Back to Compete" : "Back",
+      // A cold timed link backs out to its own board rather than the first board.
+      onBack: () => shell.goBack(timed ? () => shell.openLeaderboards(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
+      backLabel: timed ? "Back to leaderboards" : "Back",
       onHowToPlay: () => showHintPopover("How to play", getGameModeOption(options.selectedGameMode).description),
       extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: restartFromMenu }],
       leaveGuard: () => (timedRunInProgress() ? "This timed run is still going — it won't be posted." : null),
@@ -912,17 +911,16 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   bindKeyboardAwareInput(element, input, controller.signal);
   if (timed) playTimer.setMode("count-up");
-  if (options.ranked) playTimer.startIfNeeded();
   const unsubscribeRanked = options.ranked?.subscribe((events) => {
     if (controller.signal.aborted) return;
-    if (events.some((e) => e.type === "GAME_RESET")) playTimer.startIfNeeded();
     dispatchAndRender(events);
     if (events.some((event) => event.type === "GUESS_WRONG") && shouldAutoFocusTextInput()) input.select();
-    if (!events.length && engine.getState().lastResult?.message) showFeedback(feedback, engine.getState().lastResult!.message, "bad");
+    const lastResult = engine.getState().lastResult;
+    if (!events.length && lastResult?.type === "wrong") showFeedback(feedback, lastResult.message, "bad");
   });
   render();
   if (initialState.lastResult?.message) showFeedback(feedback, initialState.lastResult.message, "neutral");
-  else if (timed) showFeedback(feedback, options.ranked ? "Timed run. The server clock is running." : "Timed run. The clock starts on your first correct answer.", "neutral");
+  else if (timed) showFeedback(feedback, `Timed run. The clock starts on your first ${options.ranked ? "guess" : "correct answer"}.`, "neutral");
   // A resumed run that had already finished opens on its results.
   if (!isDailyChallenge && initialState.status === "complete") showRunResults();
 

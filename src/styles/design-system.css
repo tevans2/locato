@@ -40,12 +40,12 @@ button:disabled { cursor: not-allowed; }
 .category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu,.game-mode-dropdown .category-dropdown-menu:has(.game-mode-group),.action-menu-panel { border-radius: 12px; border-color: var(--border); box-shadow: var(--shadow); }
 :root :is(.world-map-country-label,.world-map-control-button,.maptap-info-card,.hint-popover,.achievement-panel,.map-review-panel,.country-click-prompt) { border-radius: 9px; }
 :root[data-theme="dark"] .world-map-country-label { color: var(--text); }
-.multiplayer-setup { border-radius: 16px; border-color: var(--border); box-shadow: var(--shadow-panel); }
+
 /* Multiplayer surfaces follow the same theme tokens as solo play. Keep floating status/chat/modal
    UI out of the old always-dark palette so switching theme never leaves a mismatched overlay. */
-.multiplayer-status { border-color: var(--border); color: var(--muted); background: var(--surface-soft); }
+
 .multiplayer-feedback { border-color: var(--border); color: var(--text); background: var(--bg-elevated); }
-.player-row.is-local,.score-row.is-local,.maptap-mp-result-row.is-local { border-color: var(--brand); background: var(--accent-soft); }
+.score-row.is-local,.maptap-mp-result-row.is-local { border-color: var(--brand); background: var(--accent-soft); }
 .maptap-mp-result-dot { border-color: var(--surface); }
 .multiplayer-chat-panel { border-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: var(--shadow); backdrop-filter: none; }
 .multiplayer-chat-message,.multiplayer-chat-empty { border-color: var(--border); color: var(--text); background: var(--bg-elevated); }
@@ -54,11 +54,7 @@ button:disabled { cursor: not-allowed; }
 .multiplayer-chat-toggle { border-color: var(--border-strong); color: var(--brand); background: var(--surface); box-shadow: var(--shadow-panel); }
 .multiplayer-chat-toggle:hover,.multiplayer-chat-toggle:focus-visible { border-color: var(--text); color: var(--text); background: var(--surface-soft); }
 .multiplayer-chat-badge { border-color: var(--surface); color: var(--on-brand); background: var(--brand); }
-.multiplayer-modal-backdrop { z-index: 160; background: var(--multiplayer-scrim); }
-.multiplayer-modal { border-color: var(--border-strong); color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
-.multiplayer-modal .modal-headline,.leaderboard-score,.leaderboard-row.is-local .leaderboard-name { color: var(--brand); }
-.multiplayer-modal .eyebrow,.multiplayer-modal .modal-hint { color: var(--muted); }
-.leaderboard-row.is-winner { border-color: var(--brand); background: var(--accent-soft); }
+
 .flag-color-reveal-canvas {
   background:
     radial-gradient(ellipse at 25% 15%, color-mix(in srgb, var(--surface) 60%, var(--accent-soft)), transparent 70%),
@@ -68,11 +64,9 @@ button:disabled { cursor: not-allowed; }
 /* Country-outline SVG assets are white-filled. Solo uses the same luminance flip via its
    background-image renderer; multiplayer renders an <img>, so apply it here as well. */
 :root:not([data-theme="dark"]) .multiplayer-flag-slot .country-shape-image { filter: invert(1) hue-rotate(180deg); }
-.multiplayer-setup h1 { font-family: var(--font-editorial); font-weight: 450; letter-spacing: -.045em; line-height: 1.05; }
-.multiplayer-form-heading { border-bottom: 1px solid var(--border); }
-.multiplayer-form-heading strong { font-family: var(--font-editorial); font-size: 1.7rem; font-weight: 500; }
-.multiplayer-card,.lobby-panel,.stats-card,.stats-hero-card,.friend-section,.friend-profile-panel { border-color: var(--border); border-radius: 12px; }
-.stats-hero-card.is-highlight .stats-hero-value,.room-code { color: var(--brand); }
+
+.stats-card,.stats-hero-card,.friend-section,.friend-profile-panel { border-color: var(--border); border-radius: 12px; }
+.stats-hero-card.is-highlight .stats-hero-value { color: var(--brand); }
 :root .auth-panel { top: 76px; right: max(20px, calc((100vw - 1320px) / 2)); z-index: 200; padding: 25px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); backdrop-filter: none; }
 .auth-title { font-family: var(--font-editorial); font-size: 1.8rem; font-weight: 450; }
 .auth-panel :is(input,button) { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--bg-elevated); }
@@ -98,7 +92,7 @@ button:disabled { cursor: not-allowed; }
   .answer-panel,.country-guess-panel { padding: 15px; }
   .flag-slot,.world-map-panel,.world-globe-panel,.puzzle-board-shell,.streetview-stage,.maptap-map-panel { border-radius: 10px; }
   :root .auth-panel { top: 60px; right: 12px; width: calc(100vw - 24px); padding: 20px; max-height: calc(100dvh - 76px); }
-  .multiplayer-header .game-header-actions { top: 52px; right: 0; }
+
 }
 @media(prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
@@ -118,7 +112,7 @@ button:disabled { cursor: not-allowed; }
   :root body:not(:has(.landing-screen-shell)) .game-header .game-header-left { padding-right: 72px; }
   :root body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown { flex: 1 1 auto; min-width: 0; width: auto; max-width: none; }
   :root body:not(:has(.landing-screen-shell)) .game-header .game-header-actions { top: 44px; right: 0; width: 62px; padding: 0; }
-  :root body:not(:has(.landing-screen-shell)) .multiplayer-header .game-header-left { padding-right: 82px; }
+
 }
 .worldsplit-panel { border-radius: 14px; border-color: var(--border); padding: 24px; }
 .worldsplit-panel-title h1 { font-family: var(--font-editorial); font-weight: 450; font-size: 2.2rem; line-height: 1.08; }

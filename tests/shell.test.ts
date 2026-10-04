@@ -20,7 +20,7 @@ function makeContext(overrides: Partial<ShellContext> = {}): ShellContext & { re
     openGame: (mode, run, variant) => calls.push(`game:${mode}:${run ?? "practice"}${variant ? `:${variant}` : ""}`),
     openGamePicker: () => calls.push("picker"),
     openCountry: (code) => calls.push(`country:${code}`),
-    openCompete: (mode) => calls.push(`compete:${mode ?? ""}`),
+    openLeaderboards: (mode) => calls.push(`compete:${mode ?? ""}`),
     openAccount: () => calls.push("account"),
     controls: document.createElement("div"),
     confirmLeave: vi.fn(async () => true),
@@ -67,8 +67,9 @@ describe("SiteHeader and TabBar", () => {
     const nav = header.element.querySelector(".shell-site-nav")!;
     const current = [...nav.querySelectorAll("a[aria-current]")];
     expect(current.map((link) => link.textContent)).toEqual(["Learn"]);
-    expect([...nav.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["Play", "Daily", "Learn", "Compete", "You"]);
-    expect(nav.querySelector<HTMLAnchorElement>('a[data-section="compete"]')!.getAttribute("href")).toBe("/?view=compete");
+    expect([...nav.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Leaderboards", "You"]);
+    expect(nav.querySelector<HTMLAnchorElement>('a[data-section="multiplayer"]')!.getAttribute("href")).toBe("/?view=multiplayer");
+    expect(nav.querySelector<HTMLAnchorElement>('a[data-section="leaderboards"]')!.getAttribute("href")).toBe("/?view=leaderboards");
 
     nav.querySelector<HTMLAnchorElement>('a[data-section="daily"]')!.click();
     header.element.querySelector<HTMLButtonElement>(".shell-brand")!.click();
@@ -97,12 +98,14 @@ describe("SiteHeader and TabBar", () => {
     expect(createSiteHeader(makeContext(), { section: "play" }).heading).toBeNull();
   });
 
-  it("builds a tab bar with five labelled tabs and the current one marked", () => {
+  it("builds a tab bar with six labelled tabs and the current one marked", () => {
     const ctx = makeContext();
-    const tabs = createTabBar(ctx, "compete");
+    const tabs = createTabBar(ctx, "leaderboards");
     expect(tabs.element.getAttribute("aria-label")).toBe("Sections");
-    expect([...tabs.element.querySelectorAll(".shell-tab-label")].map((label) => label.textContent)).toEqual(["Play", "Daily", "Learn", "Compete", "You"]);
-    expect(tabs.element.querySelector('[aria-current="page"]')!.getAttribute("data-section")).toBe("compete");
+    // "Leaderboards" is too wide for a sixth of a phone; its tab says "Boards" and keeps the full name for screen readers.
+    expect([...tabs.element.querySelectorAll(".shell-tab-label")].map((label) => label.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Boards", "You"]);
+    expect(tabs.element.querySelector('[aria-current="page"]')!.getAttribute("data-section")).toBe("leaderboards");
+    expect(tabs.element.querySelector('[data-section="leaderboards"]')!.getAttribute("aria-label")).toBe("Leaderboards");
     tabs.element.querySelector<HTMLAnchorElement>('[data-section="play"]')!.click();
     expect(ctx.calls).toEqual(["section:play"]);
   });
@@ -117,10 +120,10 @@ describe("SiteHeader and TabBar", () => {
 
   it("wraps content in a site page marked for the shell", () => {
     const content = document.createElement("p");
-    const page = createSitePage(makeContext(), { section: "compete", title: "Compete", content: [content] });
+    const page = createSitePage(makeContext(), { section: "leaderboards", title: "Leaderboards", content: [content] });
     expect(page.element.dataset.shell).toBe("site");
     expect(page.main.contains(content)).toBe(true);
-    expect(page.main.querySelector("h1")!.textContent).toBe("Compete");
+    expect(page.main.querySelector("h1")!.textContent).toBe("Leaderboards");
   });
 });
 
@@ -183,7 +186,7 @@ describe("GameBar and game picker", () => {
     more.click();
     expect(menu.hidden).toBe(false);
     expect(more.getAttribute("aria-expanded")).toBe("true");
-    expect([...menu.querySelectorAll("[data-section]")].map((item) => item.textContent)).toEqual(["Play", "Daily", "Learn", "Compete", "You"]);
+    expect([...menu.querySelectorAll("[data-section]")].map((item) => item.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Leaderboards", "You"]);
     expect(menu.querySelectorAll('[role="menuitemcheckbox"]')).toHaveLength(2);
 
     menu.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click(); // How to play is first

@@ -1,5 +1,5 @@
 import { fetchAuthState, loginWithPassword, registerWithPassword, saveAvatarToServer, signInWithGitHub, signInWithGoogle, signOut, type AuthState, type UserStats } from "../../core/auth";
-import { AVATAR_OPTIONS, getStoredAvatar, storeAvatar } from "../../core/auth/avatars";
+import { AVATAR_OPTIONS, clearStoredAvatar, getStoredAvatar, storeAvatar } from "../../core/auth/avatars";
 import { el } from "../dom/createElement";
 
 // Inline SVG icons — no external requests, no asset pipeline needed.
@@ -265,8 +265,13 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
   }
 
   function applyState(state: AuthState): void {
-    // Server emoji always wins on sign-in — reflects the user's last pick on any device.
+    // Server emoji always wins on sign-in — reflects the user's last pick on any device. A pick
+    // that never reached the server is pushed up so friends and leaderboards see the same one.
     if (state.user?.avatarEmoji) storeAvatar(state.user.avatarEmoji);
+    else if (state.user) {
+      const local = getStoredAvatar();
+      if (local) saveAvatarToServer(local);
+    }
     currentState = state;
     renderTrigger(state);
     renderPanel(state);
@@ -370,6 +375,7 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
   async function signOutCurrentUser(): Promise<void> {
     signOutButton.disabled = true;
     await signOut();
+    clearStoredAvatar();
     clearFormFields();
     clearAccountDetails();
     signOutButton.disabled = false;

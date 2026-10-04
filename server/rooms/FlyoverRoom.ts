@@ -9,14 +9,12 @@ import {
   type FlyoverRoute,
 } from "../../src/core/flyover";
 import type { ProjectedPoint } from "../../src/core/map";
-import { filterProfanity } from "../../src/core/multiplayer/profanity";
-import type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
+import type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, PlayerId, PublicPlayerState, PublicRoomSettings, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
 import type { ServerMessage } from "../../src/core/multiplayer/protocol";
-import type { RoomResult } from "./Room";
 import { AuthoritativeFlight, parsePlaneInput } from "../ranked/AuthoritativeFlight";
+import { basePlayer, fail, ok, RoomBase, type RoomResult } from "./RoomBase";
 
 export const DEFAULT_FLYOVER_MAX_PLAYERS = 8;
-const MAX_CHAT_HISTORY = 50;
 
 /**
  * Flyover race: one flight per game. Everyone takes off together from the same place and flies
@@ -44,147 +42,74 @@ interface FlyoverFlight {
   readonly prompt: string;
 }
 
-type RoomStatus = PublicRoomState["status"];
-
-function ok(messages: readonly ServerMessage[] = [], reply: readonly ServerMessage[] = []): RoomResult {
-  return reply.length > 0 ? { ok: true, messages, reply } : { ok: true, messages };
-}
-
-function fail(code: string, message: string): RoomResult {
-  return { ok: false, code, message };
-}
-
-function createPlayer(id: PlayerId, name: string): FlyoverPlayerState {
-  return { id, name, connected: true, ready: false, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0, routeIndex: 0, skipped: 0, lastPoint: [0, 0], lastAt: 0, lastReachAt: null, holdUntil: 0 };
-}
-
-function toPublicPlayer(player: FlyoverPlayerState): PublicPlayerState {
-  const { skipped: _skipped, lastPoint: _point, lastAt: _at, lastReachAt: _reach, holdUntil: _hold, ...publicPlayer } = player;
-  return publicPlayer;
-}
-
 export function isFlyoverDuration(value: number): boolean {
   return (FLYOVER_MULTIPLAYER_DURATIONS_MS as readonly number[]).includes(value);
 }
 
-export class FlyoverRoom {
-  readonly code: RoomCode;
-  readonly seed: string;
-  readonly maxPlayers: number;
+export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
+  readonly kind = "flyover" as const;
   flightMs: number;
 
   private readonly countries: readonly FlyoverCountry[];
-  private hostPlayerId: PlayerId;
-  private status: RoomStatus = "lobby";
-  private players = new Map<PlayerId, FlyoverPlayerState>();
   private flight: FlyoverFlight | null = null;
   private gamesPlayed = 0;
   private engines = new Map<PlayerId, AuthoritativeFlight>();
   private positions = new Map<PlayerId, FlyoverPlanePosition>();
   private positionsDirty = false;
-  private touchedAt: number;
-  private chatMessages: PublicChatMessage[] = [];
-  private chatSequence = 0;
 
   constructor(options: {
     code: RoomCode;
     hostPlayerId: PlayerId;
     hostName: string;
+    hostAvatarEmoji?: string;
     countries: readonly FlyoverCountry[];
     seed: string;
     now: number;
     maxPlayers?: number;
     flightMs?: number;
   }) {
-    this.code = options.code;
-    this.seed = options.seed;
+    super({ ...options, maxPlayers: options.maxPlayers ?? DEFAULT_FLYOVER_MAX_PLAYERS });
     this.countries = options.countries;
-    this.maxPlayers = options.maxPlayers ?? DEFAULT_FLYOVER_MAX_PLAYERS;
     this.flightMs = options.flightMs !== undefined && isFlyoverDuration(options.flightMs) ? options.flightMs : DEFAULT_FLYOVER_MULTIPLAYER_DURATION_MS;
-    this.hostPlayerId = options.hostPlayerId;
-    this.players.set(options.hostPlayerId, createPlayer(options.hostPlayerId, options.hostName));
-    this.touchedAt = options.now;
   }
 
-  get state(): RoomStatus { return this.status; }
-  get isEmpty(): boolean { return this.players.size === 0 || [...this.players.values()].every((player) => !player.connected); }
-  get updatedAt(): number { return this.touchedAt; }
-  get pendingTransitionAt(): number | null { return this.status === "playing" ? (this.flight?.endsAt ?? null) : null; }
-
-  touch(now: number): void { this.touchedAt = now; }
-
-  snapshot(): PublicRoomState {
-    return {
-      roomCode: this.code,
-      hostPlayerId: this.hostPlayerId,
-      categoryIds: ["flyover"],
-      settings: { roundLimit: 1, roundDurationMs: this.flightMs },
-      status: this.status,
-      players: [...this.players.values()].map(toPublicPlayer),
-      round: this.publicRound,
-      skipVotes: [],
-      skipRequired: 0,
-      phaseStartedAt: this.status === "playing" ? (this.flight?.takeoffAt ?? null) : null,
-      phaseEndsAt: this.pendingTransitionAt,
-      chatMessages: this.chatMessages,
-    };
+  protected newPlayer(id: PlayerId, name: string, avatarEmoji?: string): FlyoverPlayerState {
+    return { ...basePlayer(id, name, avatarEmoji), routeIndex: 0, skipped: 0, lastPoint: [0, 0], lastAt: 0, lastReachAt: null, holdUntil: 0 };
   }
 
-  addPlayer(playerId: PlayerId, name: string, now: number): RoomResult {
-    this.touch(now);
-    if (this.status !== "lobby") return fail("room-in-progress", "This room has already started.");
-    if (this.players.size >= this.maxPlayers) return fail("room-full", "This room is full.");
-    if (this.players.has(playerId)) return fail("duplicate-player", "Player is already in this room.");
-    const player = createPlayer(playerId, name);
-    this.players.set(playerId, player);
-    return ok([{ type: "PLAYER_JOINED", player: toPublicPlayer(player) }, this.snapshotMessage()]);
+  protected snapshotCategoryIds(): readonly string[] {
+    return ["flyover"];
   }
 
-  removePlayer(playerId: PlayerId, now: number): RoomResult {
-    this.touch(now);
-    const player = this.players.get(playerId);
-    if (!player) return fail("not-in-room", "Player is not in this room.");
-    this.players.delete(playerId);
-    this.engines.delete(playerId);
-    this.dropPosition(playerId);
-    this.transferHostIfNeeded();
-    return ok([{ type: "PLAYER_LEFT", playerId, name: player.name }, this.snapshotMessage()]);
+  protected snapshotSettings(): PublicRoomSettings {
+    return { roundLimit: 1, roundDurationMs: this.flightMs };
+  }
+
+  protected skipState(): { readonly skipVotes: readonly PlayerId[]; readonly skipRequired: number } {
+    return { skipVotes: [], skipRequired: 0 };
   }
 
   reconnectPlayer(playerId: PlayerId, now: number): RoomResult {
-    this.touch(now);
+    const result = super.reconnectPlayer(playerId, now);
     const player = this.players.get(playerId);
-    if (!player) return fail("session-expired", "Your seat in this room is no longer available.");
-    this.players.set(playerId, { ...player, connected: true });
-    return ok([this.snapshotMessage(), this.progressMessage({ ...player, connected: true }, "sync")]);
+    // Hand the plane back its current target: progress broadcasts keep it private.
+    return result.ok && player && !player.spectator ? ok([...result.messages, this.progressMessage(player, "sync")]) : result;
   }
 
-  disconnectPlayer(playerId: PlayerId, now: number): RoomResult {
-    this.touch(now);
-    const player = this.players.get(playerId);
-    if (!player) return fail("not-in-room", "Player is not in this room.");
-    this.players.set(playerId, { ...player, connected: false, ready: false });
-    this.dropPosition(playerId);
-    this.transferHostIfNeeded();
-    return ok([this.snapshotMessage()]);
+  get pendingTransitionAt(): number | null {
+    return this.status === "playing" ? (this.flight?.endsAt ?? null) : null;
   }
 
-  setReady(playerId: PlayerId, ready: boolean, now: number): RoomResult {
-    this.touch(now);
-    if (this.status !== "lobby") return fail("game-started", "Ready state can only change in the lobby.");
-    const player = this.players.get(playerId);
-    if (!player) return fail("not-in-room", "Player is not in this room.");
-    this.players.set(playerId, { ...player, ready });
-    return ok([this.snapshotMessage()]);
+  protected get phaseStartedAt(): number | null {
+    return this.status === "playing" ? (this.flight?.takeoffAt ?? null) : null;
   }
 
-  startGame(playerId: PlayerId, now: number): RoomResult {
-    this.touch(now);
-    if (this.status !== "lobby") return fail("game-started", "The game has already started.");
-    if (playerId !== this.hostPlayerId) return fail("not-host", "Only the room host can start the game.");
-    if (![...this.players.values()].every((player) => player.id === this.hostPlayerId || !player.connected || player.ready)) {
-      return fail("players-not-ready", "All connected non-host players must be ready.");
-    }
+  get publicRound(): PublicRoundState | null {
+    if (!this.flight || this.status !== "playing") return null;
+    return { roundNumber: 1, prompt: { kind: "flyover-flight", value: this.flight.prompt }, startedAt: this.flight.takeoffAt, endsAt: this.flight.endsAt };
+  }
+
+  protected beginGame(now: number): RoomResult {
     this.gamesPlayed += 1;
     const route = buildFlyoverRoute(this.countries, createSeededRandom(`${this.seed}:${this.gamesPlayed}`));
     const takeoffAt = now + FLYOVER_TAKEOFF_COUNTDOWN_MS;
@@ -195,7 +120,7 @@ export class FlyoverRoom {
     this.flight = { route, takeoffAt, endsAt: takeoffAt + this.flightMs, prompt: JSON.stringify(prompt) };
     for (const [id, player] of this.players) {
       this.players.set(id, { ...player, lastPoint: [route.start.x, route.start.y], lastAt: takeoffAt });
-      this.engines.set(id, new AuthoritativeFlight(this.countries, createSeededRandom(this.seed), takeoffAt, takeoffAt + this.flightMs, route.start, route.route));
+      if (!player.spectator) this.engines.set(id, new AuthoritativeFlight(this.countries, createSeededRandom(this.seed), takeoffAt, takeoffAt + this.flightMs, route.start, route.route));
     }
     this.positions = new Map();
     this.positionsDirty = false;
@@ -203,30 +128,24 @@ export class FlyoverRoom {
     return ok([{ type: "GAME_STARTED", round: this.publicRound! }, this.snapshotMessage()]);
   }
 
-  restart(playerId: PlayerId, now: number): RoomResult {
-    this.touch(now);
-    if (this.status !== "complete") return fail("game-not-complete", "A rematch can only start after the game ends.");
-    if (playerId !== this.hostPlayerId) return fail("not-host", "Only the room host can start a rematch.");
-    for (const [id, player] of this.players) {
-      this.players.set(id, { ...createPlayer(id, player.name), connected: player.connected });
-    }
+  protected resetGame(): void {
     this.flight = null;
     this.engines.clear();
     this.positions = new Map();
-    this.status = "lobby";
-    return ok([this.snapshotMessage()]);
+    this.positionsDirty = false;
+  }
+
+  protected onPlayerGone(playerId: PlayerId): void {
+    if (this.positions.delete(playerId)) this.positionsDirty = true;
   }
 
   updateOptions(playerId: PlayerId, options: { readonly roundDurationMs?: number }, now: number): RoomResult {
     this.touch(now);
-    if (playerId !== this.hostPlayerId) return fail("not-host", "Only the room host can change room settings.");
+    if (playerId !== this.hostPlayerId) return fail("not-host", "Only the host can change room settings.");
     if (this.status !== "lobby") return fail("game-started", "Room settings can only change in the lobby.");
     if (options.roundDurationMs !== undefined) {
       if (!isFlyoverDuration(options.roundDurationMs)) return fail("invalid-room-settings", "That flight length isn't offered.");
       this.flightMs = options.roundDurationMs;
-    }
-    for (const [id, player] of this.players) {
-      if (id !== this.hostPlayerId) this.players.set(id, { ...player, ready: false });
     }
     return ok([this.snapshotMessage()]);
   }
@@ -272,9 +191,9 @@ export class FlyoverRoom {
   reach(playerId: PlayerId, index: number, x: number, y: number, now: number): RoomResult {
     this.touch(now);
     const flight = this.flight;
-    const player = this.players.get(playerId);
     if (this.status !== "playing" || !flight) return fail("round-not-open", "No flight is in progress.");
-    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
+    const player = this.activePlayer(playerId);
+    if ("ok" in player) return player;
     // A claimed reach is never evidence of movement. Only tick() can award points.
     return ok([], [this.progressMessage(player, "sync")]);
   }
@@ -283,9 +202,9 @@ export class FlyoverRoom {
     this.touch(now);
     const flight = this.flight;
     const progress = this.tick(now);
-    const player = this.players.get(playerId);
     if (this.status !== "playing" || !flight) return fail("round-not-open", "No flight is in progress.");
-    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
+    const player = this.activePlayer(playerId);
+    if ("ok" in player) return player;
     const engine = this.engines.get(playerId);
     if (!engine || index !== engine.index || index >= flight.route.route.length || now < flight.takeoffAt || now >= flight.endsAt || now < engine.holdUntil) {
       return ok(progress, [this.progressMessage(player, "sync")]);
@@ -325,19 +244,9 @@ export class FlyoverRoom {
     return fail("wrong-mode", "Skip a country from the plane instead.");
   }
 
-  sendChatMessage(playerId: PlayerId, text: string, now: number): RoomResult {
-    this.touch(now);
-    const player = this.players.get(playerId);
-    if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
-    this.chatSequence += 1;
-    const message: PublicChatMessage = { id: `${this.code}:${now}:${this.chatSequence}`, playerId: player.id, playerName: player.name, text: filterProfanity(text), sentAt: now };
-    this.chatMessages = [...this.chatMessages, message].slice(-MAX_CHAT_HISTORY);
-    return ok([this.snapshotMessage()]);
-  }
-
   /** Most countries first; on a tie, whoever reached their last country earliest. */
   finalResults(): readonly FinalResult[] {
-    const sorted = [...this.players.values()].sort((left, right) =>
+    const sorted = [...this.participants()].sort((left, right) =>
       right.score - left.score ||
       (left.lastReachAt ?? Infinity) - (right.lastReachAt ?? Infinity) ||
       left.name.localeCompare(right.name));
@@ -351,27 +260,8 @@ export class FlyoverRoom {
     }));
   }
 
-  private get publicRound(): PublicRoundState | null {
-    if (!this.flight || this.status !== "playing") return null;
-    return { roundNumber: 1, prompt: { kind: "flyover-flight", value: this.flight.prompt }, startedAt: this.flight.takeoffAt, endsAt: this.flight.endsAt };
-  }
-
   private progressMessage(player: FlyoverPlayerState, event: FlyoverProgressEvent): ServerMessage {
     return { type: "FLYOVER_PROGRESS", playerId: player.id, index: player.routeIndex, score: player.score, event, target: this.engines.get(player.id)?.target?.code ?? null };
-  }
-
-  private dropPosition(playerId: PlayerId): void {
-    if (this.positions.delete(playerId)) this.positionsDirty = true;
-  }
-
-  private transferHostIfNeeded(): void {
-    if (this.players.get(this.hostPlayerId)?.connected) return;
-    const next = [...this.players.values()].find((player) => player.connected);
-    if (next) this.hostPlayerId = next.id;
-  }
-
-  private snapshotMessage(): ServerMessage {
-    return { type: "ROOM_SNAPSHOT", room: this.snapshot() };
   }
 
   private completeGame(now: number): RoomResult {

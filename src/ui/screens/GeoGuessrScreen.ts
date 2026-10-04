@@ -20,7 +20,6 @@ export interface GeoGuessrScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
-  readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   /** Keeps the local best for a five-round total. */
   readonly storage?: Storage;

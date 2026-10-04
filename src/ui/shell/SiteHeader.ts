@@ -9,7 +9,8 @@ export const SECTION_ROUTES: Readonly<Record<SiteSection, AppRoute>> = {
   play: { type: "landing" },
   daily: { type: "daily-challenge" },
   learn: { type: "academy" },
-  compete: { type: "compete" },
+  multiplayer: { type: "multiplayer" },
+  leaderboards: { type: "leaderboards" },
   you: { type: "stats" },
 };
 
@@ -79,10 +80,10 @@ function isPlainClick(event: Event): boolean {
 function sectionLink(ctx: ShellContext, section: (typeof SITE_SECTIONS)[number], className: string, withIcon: boolean, check: LeaveCheck): HTMLAnchorElement {
   const link = el("a", {
     className,
-    attrs: { href: sectionHref(section.id), "data-section": section.id },
+    attrs: { href: sectionHref(section.id), "data-section": section.id, ...(withIcon && section.tabLabel ? { "aria-label": section.label } : {}) },
     children: [
       ...(withIcon ? [el("span", { className: "shell-tab-icon", children: [shellIcon(section.icon, 22, 1.7)] })] : []),
-      el("span", { className: withIcon ? "shell-tab-label" : "shell-nav-label", text: section.label }),
+      el("span", { className: withIcon ? "shell-tab-label" : "shell-nav-label", text: withIcon ? section.tabLabel ?? section.label : section.label }),
     ],
   });
   link.addEventListener("click", (event) => {
@@ -106,7 +107,7 @@ export interface TabBarHandle {
 }
 
 /**
- * The phone navigation: five sections with icons, fixed to the bottom with safe-area padding.
+ * The phone navigation: six sections with icons, fixed to the bottom with safe-area padding.
  * Hidden above 700px. While one is on the page, App's root reserves room for it so content
  * is never covered (see `#app:has(.shell-tabbar)` in shell.css).
  */
@@ -204,7 +205,7 @@ export function createSiteHeader(ctx: ShellContext, options: SiteHeaderOptions):
 }
 
 export interface SitePageOptions extends SiteHeaderOptions {
-  /** Extra class on the page root, e.g. "compete-page". */
+  /** Extra class on the page root, e.g. "leaderboards-page". */
   readonly className?: string;
   /** Optional id on the page root, handy for scoping page CSS above global button styles. */
   readonly id?: string;

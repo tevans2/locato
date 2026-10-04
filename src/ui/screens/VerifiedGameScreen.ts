@@ -64,7 +64,7 @@ export function createVerifiedGameScreen(options: Options): Screen {
 
   const clockTimer = setInterval(() => {
     if (!state) return;
-    const elapsed = (state.timeMs ?? (performance.now() + clockOffset - state.startedAt)) / 1000;
+    const elapsed = (state.timeMs ?? (state.startedAt === null ? 0 : performance.now() + clockOffset - state.startedAt)) / 1000;
     clock.textContent = `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, "0")}`;
   }, 100);
 
@@ -284,7 +284,7 @@ export function createVerifiedGameScreen(options: Options): Screen {
       kicker: label, title: "Run complete", subtitle: "Posting your result…",
       stats: [{ label: config?.metric === "time" ? "Time" : "Score", value: config?.metric === "time" ? `${(value / 1000).toFixed(1)}s` : String(value) }],
       primary: { label: mode === "daily" ? "View daily result" : "Play again", onClick: () => { if (mode === "daily") options.shell.openSection("daily"); else { state = null; renderedId = ""; finished = false; ready(); } } },
-      secondary: mode === "daily" ? [] : [{ label: "View leaderboard", onClick: () => options.shell.openCompete(mode, variant) }],
+      secondary: mode === "daily" ? [] : [{ label: "View leaderboard", onClick: () => options.shell.openLeaderboards(mode, variant) }],
     });
     content.replaceChildren(card.element);
     await postResult(card, submission);

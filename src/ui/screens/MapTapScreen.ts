@@ -34,7 +34,6 @@ export interface MapTapScreenOptions {
   readonly shell?: ShellContext;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
-  readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
   /**
    * "timed" (`&run=timed`) plays a ranked attempt: ${MAP_TAP_ATTEMPT_TARGETS} targets from every

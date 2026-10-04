@@ -20,7 +20,7 @@ function makeShell(): ShellContext & { readonly calls: string[] } {
     openGame: (mode, run, variant) => calls.push(`game:${mode}:${run ?? "practice"}${variant ? `:${variant}` : ""}`),
     openGamePicker: () => calls.push("picker"),
     openCountry: (code) => calls.push(`country:${code}`),
-    openCompete: (mode, variant) => calls.push(`compete:${mode ?? ""}${variant ? `:${variant}` : ""}`),
+    openLeaderboards: (mode, variant) => calls.push(`compete:${mode ?? ""}${variant ? `:${variant}` : ""}`),
     openAccount: () => calls.push("account"),
     controls: document.createElement("div"),
     confirmLeave: vi.fn(async () => true),

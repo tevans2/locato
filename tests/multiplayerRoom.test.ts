@@ -35,21 +35,20 @@ describe("multiplayer MapTap room", () => {
     expect(JSON.parse(round?.prompt.value ?? "{}")).toMatchObject({ category: "ocean" });
   });
 
-  it("lets only the host update MapTap categories and resets guest readiness", () => {
+  it("lets only the host update MapTap categories", () => {
     const room = new MapTapRoom({ code: "TAP02", hostPlayerId: "host", hostName: "Host", seed: "settings", now: 1000 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
     expect(room.updateOptions("guest", { mapTapCategories: ["city"] }, 1030).ok).toBe(false);
 
     const updated = room.updateOptions("host", { mapTapCategories: ["city", "region"] }, 1040);
     expect(updated.ok).toBe(true);
     expect(room.snapshot().settings.mapTapCategories).toEqual(["city", "region"]);
-    expect(room.snapshot().players.find((player) => player.id === "guest")?.ready).toBe(false);
   });
 });
 
 class TestConnection implements MultiplayerConnection {
   readonly authenticatedName: string | null = null;
+  authenticatedAvatar: string | null = null;
   readonly messages: ServerMessage[] = [];
 
   send(message: string): void {
@@ -110,7 +109,6 @@ describe("multiplayer room", () => {
       roundLimit: 1,
     });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
     const start = room.startGame("host", 1030);
     expect(start.ok).toBe(true);
 
@@ -163,8 +161,6 @@ describe("multiplayer room", () => {
     });
 
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.startGame("host", 1020).ok).toBe(false);
-    expect(room.setReady("guest", true, 1030).ok).toBe(true);
 
     const start = room.startGame("host", 1040);
     expect(start.ok).toBe(true);
@@ -244,7 +240,6 @@ describe("multiplayer room", () => {
   it("keeps a wrong answer private to the guesser", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundDurationMs: 30_000 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
     expect(room.startGame("host", 1030).ok).toBe(true);
 
     const wrong = room.submitAnswer("guest", "definitely-not-a-country", 1040);
@@ -285,7 +280,7 @@ describe("multiplayer room", () => {
     expect(room.reconnectPlayer("ghost", 1300).ok).toBe(false);
   });
 
-  it("restarts a finished game back to the lobby with reset scores", () => {
+  it("returns a finished game to the lobby with reset scores", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 1, roundDurationMs: 30_000 });
     expect(room.startGame("host", 1000).ok).toBe(true);
     const round = room.publicRound;
@@ -295,21 +290,83 @@ describe("multiplayer room", () => {
     expect(room.snapshot().status).toBe("complete");
     expect(room.snapshot().players[0]?.score).toBeGreaterThan(0);
 
-    const restart = room.restart("host", 3000);
-    expect(restart.ok).toBe(true);
+    const back = room.returnToLobby("host", 3000);
+    expect(back.ok).toBe(true);
     const snapshot = room.snapshot();
     expect(snapshot.status).toBe("lobby");
     expect(snapshot.round).toBeNull();
-    expect(snapshot.players.every((player) => player.score === 0 && !player.ready)).toBe(true);
+    expect(snapshot.players.every((player) => player.score === 0)).toBe(true);
     expect(room.startGame("host", 3100).ok).toBe(true);
+  });
+
+  it("plays again straight away with the same players and fresh scores", () => {
+    const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 1, roundDurationMs: 30_000 });
+    expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
+    expect(room.startGame("host", 1020).ok).toBe(true);
+    const round = room.publicRound;
+    if (!round) throw new Error("Expected active round.");
+    expect(room.submitAnswer("guest", countryNameForRound(round, room), 1100).ok).toBe(true);
+    expect(room.advanceAfterResult(2000).ok).toBe(true);
+
+    const again = room.playAgain("host", 3000);
+    expect(again.ok && again.messages.some((message) => message.type === "GAME_STARTED")).toBe(true);
+    const snapshot = room.snapshot();
+    expect(snapshot.status).toBe("playing");
+    expect(snapshot.players.map((player) => [player.id, player.score])).toEqual([["host", 0], ["guest", 0]]);
+  });
+
+  it("reveals the winner's time and everyone's latest guess, winner first", () => {
+    const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 2, roundDurationMs: 30_000 });
+    expect(room.addPlayer("guest", "Guest", 1001).ok).toBe(true);
+    expect(room.addPlayer("quiet", "Quiet", 1002).ok).toBe(true);
+    expect(room.startGame("host", 2000).ok).toBe(true);
+    const round = room.publicRound;
+    if (!round) throw new Error("Expected active round.");
+    expect(room.submitAnswer("guest", "atlantis", 2500).ok).toBe(true);
+    expect(room.submitAnswer("guest", "lemuria", 3000).ok).toBe(true);
+    expect(room.submitAnswer("host", "nowhere", 3500).ok).toBe(true);
+    const taken = room.submitAnswer("host", countryNameForRound(round, room), 6200);
+    const reveal = taken.ok ? taken.messages.find((message) => message.type === "ROUND_ENDED") : undefined;
+    if (reveal?.type !== "ROUND_ENDED") throw new Error("Expected a reveal.");
+    expect(reveal.results.map((result) => [result.playerId, result.correct, result.attempts, result.elapsedMs])).toEqual([
+      ["host", true, 2, 4200],
+      ["guest", false, 2, 1000],
+      ["quiet", false, 0, null],
+    ]);
+    expect(reveal.results[1]!.guess).toBe("lemuria");
+  });
+
+  it("starts without a ready check, even with guests who haven't done anything", () => {
+    const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000 });
+    expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
+    expect(room.startGame("guest", 1020)).toMatchObject({ ok: false, code: "not-host" });
+    expect(room.startGame("host", 1030).ok).toBe(true);
+  });
+
+  it("seats a mid-game joiner as a spectator who can't play until the next game", () => {
+    const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 1, roundDurationMs: 30_000 });
+    expect(room.startGame("host", 1010).ok).toBe(true);
+    expect(room.addPlayer("late", "Late", 1020).ok).toBe(true);
+    expect(room.snapshot().players.find((player) => player.id === "late")?.spectator).toBe(true);
+
+    const round = room.publicRound;
+    if (!round) throw new Error("Expected active round.");
+    expect(room.submitAnswer("late", countryNameForRound(round, room), 1030)).toMatchObject({ ok: false, code: "spectating" });
+    // The spectator doesn't hold the skip vote up: the host alone skipping closes the round.
+    expect(room.voteSkip("host", 1040).ok).toBe(true);
+    expect(room.snapshot().status).toBe("round-result");
+    expect(room.advanceAfterResult(2000).ok).toBe(true);
+    expect(room.finalResults().map((result) => result.playerId)).toEqual(["host"]);
+
+    expect(room.playAgain("host", 3000).ok).toBe(true);
+    expect(room.snapshot().players.find((player) => player.id === "late")?.spectator).toBeUndefined();
   });
 
   it("rejects a rematch from a non-host or before the game ends", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 1, roundDurationMs: 30_000 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.restart("host", 1020).ok).toBe(false);
+    expect(room.playAgain("host", 1020).ok).toBe(false);
 
-    expect(room.setReady("guest", true, 1030).ok).toBe(true);
     expect(room.startGame("host", 1040).ok).toBe(true);
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
@@ -317,14 +374,14 @@ describe("multiplayer room", () => {
     expect(room.advanceAfterResult(2000).ok).toBe(true);
     expect(room.snapshot().status).toBe("complete");
 
-    expect(room.restart("guest", 3000).ok).toBe(false);
-    expect(room.restart("host", 3000).ok).toBe(true);
+    expect(room.playAgain("guest", 3000).ok).toBe(false);
+    expect(room.returnToLobby("guest", 3000).ok).toBe(false);
+    expect(room.returnToLobby("host", 3000).ok).toBe(true);
   });
 
   it("embeds player names in round and final results so a later leave cannot blank them", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 1, roundDurationMs: 30_000 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
     expect(room.startGame("host", 1030).ok).toBe(true);
 
     const round = room.publicRound;
@@ -413,10 +470,7 @@ describe("room manager", () => {
     expect(hostSnapshot.room.players).toHaveLength(2);
     expect(guestSnapshot.room.players).toHaveLength(2);
 
-    manager.handleMessage(host, { type: "START_GAME" }, 1020);
-    expect(host.messages.at(-1)).toMatchObject({ type: "ERROR", code: "players-not-ready" });
 
-    manager.handleMessage(guest, { type: "SET_READY", ready: true }, 1030);
     manager.handleMessage(host, { type: "START_GAME" }, 1040);
     const hostStarted = host.messages.find((message) => message.type === "GAME_STARTED");
     const guestStarted = guest.messages.find((message) => message.type === "GAME_STARTED");
@@ -425,6 +479,27 @@ describe("room manager", () => {
     if (hostStarted?.type !== "GAME_STARTED" || guestStarted?.type !== "GAME_STARTED") throw new Error("Expected game start messages.");
     expect(hostStarted.round.prompt.value).toBe(guestStarted.round.prompt.value);
     expect(Object.keys(hostStarted.round).sort()).toEqual(["endsAt", "prompt", "roundNumber", "startedAt"]);
+  });
+
+  it("relays each player's chosen avatar to everyone in the room", () => {
+    const manager = new RoomManager({ countryIndex });
+    const host = new TestConnection();
+    const guest = new TestConnection();
+    guest.authenticatedAvatar = "🐬";
+    const late = new TestConnection();
+    late.authenticatedAvatar = "🐬";
+
+    manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", avatarEmoji: "🦊", categoryIds: ["flags"] }, 1000);
+    const assigned = host.messages.find((message) => message.type === "SESSION_ASSIGNED");
+    if (assigned?.type !== "SESSION_ASSIGNED") throw new Error("Expected assigned host session.");
+    // The client's current pick wins over the account avatar captured at socket open.
+    manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Guest", avatarEmoji: "🌵" }, 1010);
+    // Without a client pick, the account avatar is used.
+    manager.handleMessage(late, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Late" }, 1020);
+
+    const snapshot = latestRoomMessage(host);
+    if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(snapshot.room.players.map((player) => [player.name, player.avatarEmoji])).toEqual([["Host", "🦊"], ["Guest", "🌵"], ["Late", "🐬"]]);
   });
 
   it("applies host room settings to created rooms", () => {
@@ -461,7 +536,6 @@ describe("room manager", () => {
     if (assigned?.type !== "SESSION_ASSIGNED") throw new Error("Expected assigned host session.");
 
     manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Guest" }, 1010);
-    manager.handleMessage(guest, { type: "SET_READY", ready: true }, 1020);
     manager.handleMessage(host, { type: "START_GAME" }, 1030);
     manager.handleMessage(host, { type: "SUBMIT_ANSWER", answer: "definitely-not-a-country", clientSentAt: 1040 }, 1040);
 
@@ -536,10 +610,9 @@ describe("room manager", () => {
     expect(host.messages.some((message) => message.type === "ROUND_STARTED")).toBe(true);
   });
 
-  it("lets the host change room modes in the lobby and unreadies guests", () => {
+  it("lets the host change room modes in the lobby", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 3 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
 
     const update = room.updateOptions("host", { categoryIds: ["flags", "spot-country"], flagPool: "both", roundLimit: 2 }, 1030);
     expect(update.ok).toBe(true);
@@ -547,14 +620,12 @@ describe("room manager", () => {
     expect(snapshot.categoryIds).toEqual(["flags", "spot-country"]);
     expect(snapshot.settings.roundLimit).toBe(2);
     expect(snapshot.settings.flagPool).toBe("both");
-    expect(snapshot.players.find((player) => player.id === "guest")?.ready).toBe(false);
   });
 
   it("rejects non-host or in-progress room mode changes", () => {
     const room = new Room({ code: "ABCDE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "shared-seed", now: 1000, roundLimit: 3 });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
     expect(room.updateOptions("guest", { categoryIds: ["codes"] }, 1020).ok).toBe(false);
-    expect(room.setReady("guest", true, 1030).ok).toBe(true);
     expect(room.startGame("host", 1040).ok).toBe(true);
     expect(room.updateOptions("host", { categoryIds: ["codes"] }, 1050).ok).toBe(false);
   });
@@ -566,5 +637,49 @@ describe("room manager", () => {
     manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", categoryIds: ["flags"] }, 1000);
     manager.handleMessage(host, { type: "PLAY_AGAIN" }, 1010);
     expect(host.messages.at(-1)).toMatchObject({ type: "ERROR", code: "game-not-complete" });
+    manager.handleMessage(host, { type: "RETURN_TO_LOBBY" }, 1020);
+    expect(host.messages.at(-1)).toMatchObject({ type: "ERROR", code: "game-not-complete" });
+  });
+
+  it("switches the game type in the lobby, keeping everyone's seat", () => {
+    const manager = new RoomManager({ countryIndex });
+    const host = new TestConnection();
+    const guest = new TestConnection();
+    manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", avatarEmoji: "🦊", categoryIds: ["flags"] }, 1000);
+    const assigned = host.messages.find((message) => message.type === "SESSION_ASSIGNED");
+    if (assigned?.type !== "SESSION_ASSIGNED") throw new Error("Expected assigned host session.");
+    manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Guest" }, 1010);
+    manager.handleMessage(guest, { type: "SEND_CHAT_MESSAGE", text: "hi" }, 1015);
+
+    manager.handleMessage(guest, { type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"] }, 1020);
+    expect(guest.messages.at(-1)).toMatchObject({ type: "ERROR", code: "not-host" });
+
+    manager.handleMessage(host, { type: "SET_ROOM_OPTIONS", categoryIds: ["map-tap"] }, 1030);
+    const snapshot = latestRoomMessage(guest);
+    if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(snapshot.room).toMatchObject({ roomCode: assigned.roomCode, kind: "map-tap", hostPlayerId: assigned.playerId, categoryIds: ["map-tap"] });
+    // MapTap's own defaults, not the quiz's 30-second timer.
+    expect(snapshot.room.settings.roundDurationMs).toBe(45_000);
+    expect(snapshot.room.players.map((player) => [player.name, player.avatarEmoji])).toEqual([["Host", "🦊"], ["Guest", undefined]]);
+    expect(snapshot.room.chatMessages).toHaveLength(1);
+
+    manager.handleMessage(host, { type: "START_GAME" }, 1040);
+    expect(host.messages.some((message) => message.type === "GAME_STARTED" && message.round.prompt.kind === "maptap-globe")).toBe(true);
+  });
+
+  it("lets a late joiner watch a running game instead of turning them away", () => {
+    const manager = new RoomManager({ countryIndex });
+    const host = new TestConnection();
+    const late = new TestConnection();
+    manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", categoryIds: ["flags"] }, 1000);
+    const assigned = host.messages.find((message) => message.type === "SESSION_ASSIGNED");
+    if (assigned?.type !== "SESSION_ASSIGNED") throw new Error("Expected assigned host session.");
+    manager.handleMessage(host, { type: "START_GAME" }, 1010);
+    manager.handleMessage(late, { type: "JOIN_ROOM", roomCode: assigned.roomCode, playerName: "Late" }, 1020);
+    expect(late.messages.some((message) => message.type === "SESSION_ASSIGNED")).toBe(true);
+    const snapshot = latestRoomMessage(late);
+    if (snapshot?.type !== "ROOM_SNAPSHOT") throw new Error("Expected room snapshot.");
+    expect(snapshot.room.status).toBe("playing");
+    expect(snapshot.room.players.find((player) => player.name === "Late")?.spectator).toBe(true);
   });
 });

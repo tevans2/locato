@@ -22,6 +22,8 @@ export interface MultiplayerFlyoverGameViewState {
   readonly localPlayerId: PlayerId | null;
   readonly round: PublicRoundState | null;
   readonly canSubmit: boolean;
+  /** Joined mid-race: watch the standings instead of flying. */
+  readonly spectating?: boolean;
 }
 
 export interface MultiplayerFlyoverGameViewOptions {
@@ -116,8 +118,21 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
     ],
   });
 
+  // Someone who joined mid-race watches the standings; they fly in the next race.
+  const watchStandings = el("ol", { className: "flyover-standings flyover-watch-standings", attrs: { "aria-label": "Standings" } });
+  const watchCard = el("div", {
+    className: "flyover-watch",
+    attrs: { hidden: "" },
+    children: [
+      el("span", { className: "eyebrow", text: "Flyover race" }),
+      el("h2", { text: "Race in progress" }),
+      el("p", { text: "You joined mid-flight, so you're watching this one. You'll fly in the next race." }),
+      watchStandings,
+    ],
+  });
+
   let engine: FlyoverFlight | null = null;
-  const element = el("section", { className: "multiplayer-flyover-view", attrs: { "aria-label": "Flyover race" } });
+  const element = el("section", { className: "multiplayer-flyover-view", attrs: { "aria-label": "Flyover race" }, children: [watchCard] });
 
   function ensureEngine(): FlyoverFlight {
     if (engine) return engine;
@@ -220,7 +235,8 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
     const localRank = rows.findIndex((row) => row.player.id === localPlayerId);
     // The top few, plus you if you're further down.
     const shown = rows.filter((_, index) => index < STANDINGS_SHOWN || index === localRank);
-    standings.replaceChildren(...shown.map((row) => {
+    const target = watchCard.hidden ? standings : watchStandings;
+    target.replaceChildren(...shown.map((row) => {
       const rank = rows.indexOf(row) + 1;
       const colour = PLAYER_COLORS[Math.max(0, order.indexOf(row.player.id)) % PLAYER_COLORS.length]!;
       return el("li", {
@@ -291,6 +307,13 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
     localPlayerId = state.localPlayerId;
     const round = state.round;
     const prompt = round?.prompt.kind === "flyover-flight" ? parseFlyoverPrompt(round.prompt.value) : null;
+    const watching = Boolean(state.spectating) && state.room.status === "playing";
+    watchCard.hidden = !watching;
+    if (engine) engine.element.hidden = watching;
+    if (watching) {
+      renderStandings();
+      return;
+    }
     if (state.room.status === "playing" && round && prompt) {
       const key = `${round.startedAt}:${round.endsAt}`;
       if (flight?.key !== key) startFlight(round, prompt, key);
