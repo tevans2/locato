@@ -269,6 +269,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           activeFlagColorPromptSrc = null;
         }
         if (!isMapHighlightRound) {
+          mapView.element.querySelector(".anonymous-map-highlight")?.remove();
           focusedMapHighlightRoundKey = null;
           resetMapHighlightRoundKey = null;
         }
@@ -281,34 +282,50 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           attachMapTo(mapPrompt);
           flagSlot.replaceChildren(mapPrompt);
         } else if (visibleRound.prompt.kind === "map-highlight") {
-          const country = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase());
-          const countryId = country?.id ?? null;
+          setWorldMapTargetCountry(mapView, null);
+          mapView.element.querySelector(".anonymous-map-highlight")?.remove();
           if (intermission) {
-            setWorldMapTargetCountry(mapView, null);
             if (roundKey !== null && resetMapHighlightRoundKey !== roundKey) {
               resetMapHighlightRoundKey = roundKey;
               focusedMapHighlightRoundKey = null;
               mapView.resetView();
             }
+          } else if (visibleRound.prompt.value.startsWith("{")) {
+            try {
+              const { paths } = JSON.parse(visibleRound.prompt.value) as { paths: [number, number][][] };
+              const highlight = document.createElementNS("http://www.w3.org/2000/svg", "path");
+              highlight.setAttribute("class", "world-map-country is-target anonymous-map-highlight");
+              highlight.setAttribute("fill-rule", "evenodd");
+              highlight.setAttribute("d", paths.map((ring) => ring.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ") + " Z").join(" "));
+              mapView.element.querySelector("svg")?.append(highlight);
+              if (roundKey !== null && focusedMapHighlightRoundKey !== roundKey && paths.flat().length) {
+                const points = paths.flat(), xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+                mapView.focusBounds({ x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) });
+                focusedMapHighlightRoundKey = roundKey;
+                resetMapHighlightRoundKey = null;
+              }
+            } catch { /* An unavailable clue does not reveal an answer. */ }
           } else {
+            // Compatibility with existing practice fixtures / servers.
+            const countryId = options.countryIndex.byCode.get(visibleRound.prompt.value.toUpperCase())?.id ?? null;
             setWorldMapTargetCountry(mapView, countryId);
-            if (countryId !== null && roundKey !== null && focusedMapHighlightRoundKey !== roundKey) {
-              focusedMapHighlightRoundKey = roundKey;
-              resetMapHighlightRoundKey = null;
-              mapView.focusCountry(countryId);
-            }
+            if (countryId !== null) mapView.focusCountry(countryId);
           }
           attachMapTo(mapHighlightPrompt);
           flagSlot.replaceChildren(mapHighlightPrompt);
         } else if (visibleRound.prompt.kind === "flag-colors") {
           setWorldMapTargetCountry(mapView, null);
-          if (activeFlagColorRoundKey !== roundKey || activeFlagColorPromptSrc !== visibleRound.prompt.value) {
-            activeFlagColorRoundKey = roundKey;
-            activeFlagColorPromptSrc = visibleRound.prompt.value;
-            flagColorReveal.reset(visibleRound.prompt.value);
-          }
-          if (flagSlot.firstElementChild !== flagColorReveal.element) {
-            flagSlot.replaceChildren(flagColorReveal.element);
+          if (visibleRound.prompt.value.startsWith("/api/game-assets/")) {
+            flagSlot.replaceChildren(el("img", { className: "flag-image", attrs: { src: visibleRound.prompt.value, alt: "Revealed part of the hidden flag" } }));
+          } else {
+            if (activeFlagColorRoundKey !== roundKey || activeFlagColorPromptSrc !== visibleRound.prompt.value) {
+              activeFlagColorRoundKey = roundKey;
+              activeFlagColorPromptSrc = visibleRound.prompt.value;
+              flagColorReveal.reset(visibleRound.prompt.value);
+            }
+            if (flagSlot.firstElementChild !== flagColorReveal.element) {
+              flagSlot.replaceChildren(flagColorReveal.element);
+            }
           }
         } else {
           setWorldMapTargetCountry(mapView, null);

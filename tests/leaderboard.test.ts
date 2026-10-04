@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AuthService } from "../server/auth/AuthService";
 import { createMemoryUserStore } from "../server/auth/memoryStore";
 import { handleAuthRequest } from "../server/auth/routes";
@@ -17,6 +17,8 @@ function createService(initialNow = 1000) {
   const clock = { value: initialNow };
   const store = createMemoryUserStore();
   const service = new AuthService(store, fakeHasher, { sessionTtlMs: 60 * 60 * 1000, clock: () => clock.value });
+  // Trusted completed-game fixture for route formatting tests. rankedSecurity.test.ts uses real games.
+  vi.spyOn(service.ranked, "consume").mockImplementation((_user, _run, mode, variant, value) => ({ mode, variant, value: value as number }));
   return { store, service, clock };
 }
 
@@ -171,16 +173,16 @@ describe("leaderboard", () => {
     const [ann, ben, cat] = ids as [string, string, string];
 
     clock.value = 1_000;
-    expect(service.submitLeaderboardAttempt(ann, { gameMode: "geoguessr", variant: "", score: 18_000 })).toEqual({ accepted: true, isPersonalBest: true });
+    expect(service.submitBestTime(ann, { gameMode: "geoguessr", variant: "", score: 18_000 })).toEqual({ accepted: true, isPersonalBest: true });
     clock.value = 2_000;
-    expect(service.submitLeaderboardAttempt(ben, { gameMode: "geoguessr", score: 21_000 })).toEqual({ accepted: true, isPersonalBest: true });
+    expect(service.submitBestTime(ben, { gameMode: "geoguessr", score: 21_000 })).toEqual({ accepted: true, isPersonalBest: true });
     clock.value = 3_000;
     // Same score as ann, later: ann keeps the higher place.
-    expect(service.submitLeaderboardAttempt(cat, { gameMode: "geoguessr", score: 18_000 })).toEqual({ accepted: true, isPersonalBest: true });
+    expect(service.submitBestTime(cat, { gameMode: "geoguessr", score: 18_000 })).toEqual({ accepted: true, isPersonalBest: true });
     // Lower and equal scores never replace a best (and don't refresh achievedAt).
     clock.value = 4_000;
-    expect(service.submitLeaderboardAttempt(ann, { gameMode: "geoguessr", score: 12_000 })).toEqual({ accepted: false, isPersonalBest: false });
-    expect(service.submitLeaderboardAttempt(ann, { gameMode: "geoguessr", score: 18_000 })).toEqual({ accepted: false, isPersonalBest: false });
+    expect(service.submitBestTime(ann, { gameMode: "geoguessr", score: 12_000 })).toEqual({ accepted: false, isPersonalBest: false });
+    expect(service.submitBestTime(ann, { gameMode: "geoguessr", score: 18_000 })).toEqual({ accepted: false, isPersonalBest: false });
 
     const board = service.getLeaderboard({ gameMode: "geoguessr", variant: "" });
     if ("error" in board || board.metric !== "score") throw new Error("expected a score board");
@@ -193,7 +195,7 @@ describe("leaderboard", () => {
 
     // A better score replaces the best and moves up.
     clock.value = 5_000;
-    expect(service.submitLeaderboardAttempt(cat, { gameMode: "geoguessr", score: 25_000 })).toEqual({ accepted: true, isPersonalBest: true });
+    expect(service.submitBestTime(cat, { gameMode: "geoguessr", score: 25_000 })).toEqual({ accepted: true, isPersonalBest: true });
     expect(service.getUserLeaderboardRank(cat, "geoguessr", "")).toEqual({ rank: 1, score: 25_000 });
     // Boards are independent.
     expect(service.getLeaderboard({ gameMode: "map-tap", variant: "" })).toEqual({ metric: "score", entries: [] });
@@ -207,7 +209,7 @@ describe("leaderboard", () => {
     // Step past the per-player submission rate limit between attempts.
     const submit = (input: Record<string, unknown>) => {
       clock.value += 60_001;
-      return service.submitLeaderboardAttempt(id, input);
+      return service.submitBestTime(id, input);
     };
 
     expect(submit({ gameMode: "streetview-country", score: 15 })).toEqual({ accepted: true, isPersonalBest: true });
@@ -276,7 +278,7 @@ describe("leaderboard", () => {
     const { service, store } = createService();
     const registered = await service.register({ email: "gone@b.com", password: "supersecret", displayName: "gone" });
     if (!registered.ok) throw new Error("registration failed");
-    service.submitLeaderboardAttempt(registered.user.id, { gameMode: "worldsplit", score: 400 });
+    service.submitBestTime(registered.user.id, { gameMode: "worldsplit", score: 400 });
     expect(store.listUserBestScores(registered.user.id)).toHaveLength(1);
     expect(store.deleteUser(registered.user.id)).toBe(true);
     expect(store.getScoreLeaderboard({ gameMode: "worldsplit", variant: "", limit: 10, offset: 0 })).toEqual([]);

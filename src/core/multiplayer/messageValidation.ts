@@ -195,6 +195,9 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
     case "FLYOVER_POSITION":
       if (!isMapX(value.x) || !isMapY(value.y) || !isHeading(value.heading)) return reject("invalid-position", "Plane position is invalid.");
       return { ok: true, message: { type: "FLYOVER_POSITION", x: value.x, y: value.y, heading: value.heading } };
+    case "FLYOVER_INPUT":
+      if (![-1, 0, 1].includes(value.turn as number) || (value.towards !== undefined && value.towards !== null && (!isHeading(value.towards))) || (value.boost !== undefined && typeof value.boost !== "boolean") || !hasOnlyKeys(value, ["type", "turn", "towards", "boost"])) return reject("invalid-controls", "Flight controls are invalid.");
+      return { ok: true, message: { type: "FLYOVER_INPUT", turn: value.turn as number, towards: value.towards as number | null | undefined ?? null, boost: value.boost === true } };
     case "FLYOVER_REACHED":
       if (!isRouteIndex(value.index)) return reject("invalid-route-index", "Route index is invalid.");
       if (!isMapX(value.x) || !isMapY(value.y)) return reject("invalid-position", "Plane position is invalid.");
@@ -363,7 +366,8 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
       if (typeof value.playerId !== "string" || !isRouteIndex(value.index) || !isFiniteNumber(value.score) || (value.event !== "reached" && value.event !== "skipped" && value.event !== "sync")) {
         return reject("invalid-progress", "Flyover progress is invalid.");
       }
-      return { ok: true, message: { type: "FLYOVER_PROGRESS", playerId: value.playerId, index: value.index, score: value.score, event: value.event } };
+      if (value.target !== undefined && value.target !== null && typeof value.target !== "string") return reject("invalid-progress", "Flight target is invalid.");
+      return { ok: true, message: { type: "FLYOVER_PROGRESS", playerId: value.playerId, index: value.index, score: value.score, event: value.event, ...(value.target !== undefined ? { target: value.target as string | null } : {}) } };
     case "GAME_COMPLETED":
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");
       return { ok: true, message: { type: "GAME_COMPLETED", results: value.results } };

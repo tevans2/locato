@@ -1,0 +1,14 @@
+.verified-game { width: min(1200px, 100%); margin: 0 auto; }
+.verified-content { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1rem; }
+.verified-content h1 { text-align: center; font-size: clamp(1.3rem, 3vw, 2rem); }
+.verified-content form, .verified-frame-buttons { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
+.verified-content input, .verified-content select { padding: .7rem; border-radius: .5rem; border: 1px solid var(--border, #829080); background: var(--surface, #fffef8); color: inherit; }
+.verified-progress, .verified-feedback { text-align: center; min-height: 1.4rem; padding: .5rem; }
+.verified-prompt-image { width: min(500px, 90vw); height: 300px; object-fit: contain; }
+.verified-street-image { width: min(800px, 100%); min-height: 300px; object-fit: contain; border-radius: .75rem; }
+.verified-map { width: 100%; min-height: 260px; background: #c9e0df; border-radius: 1rem; touch-action: none; }
+.verified-map path { fill: #f7f5eb; stroke: #829080; stroke-width: .4; }
+.verified-map .verified-map-target { fill: #c39a28; stroke: #735c18; }
+.verified-split-line { stroke: #c39a28; stroke-width: 4; }
+.verified-content > .maptap-globe, .verified-content > .geo-panorama { width: 100%; min-height: 420px; }
+.verified-content > .flyover-stage { width: 100%; }

@@ -283,6 +283,8 @@ export function createApp(options: AppOptions): App {
   // A timed run (`&run=timed`, from Compete) always starts fresh and is never saved, so it can't
   // overwrite or clear the mode's practice run (see persistSoloRun).
   async function startSolo(categoryIds: readonly string[] | undefined, _continueSaved = false, requestedFlagPool?: FlagPool, requestedRun: RunType = "practice"): Promise<void> {
+    const verifiedMode = categoryIds?.length === 1 && isPromptGameModeId(categoryIds[0]!) ? categoryIds[0]! : null;
+    if (requestedRun === "timed" && verifiedMode && await startVerified(verifiedMode, verifiedMode === "flags" && requestedFlagPool !== "countries" ? requestedFlagPool ?? "" : "")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your game…"));
     const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
@@ -394,6 +396,8 @@ export function createApp(options: AppOptions): App {
         mountDailyResult(result);
         return;
       }
+
+      if (await startVerified("daily", challenge.date)) return;
 
       if (localResult) {
         mountDailyResult(localResult);
@@ -792,7 +796,19 @@ export function createApp(options: AppOptions): App {
     void task.catch((error: unknown) => { if (run === navigationRun) showLoadError(error); });
   }
 
+  async function startVerified(mode: GameModeId | "daily", variant = ""): Promise<boolean> {
+    const run = navigationRun;
+    await authResolved;
+    if (run !== navigationRun) return true;
+    if (!shell.signedIn()) return false;
+    mount(createLoadingScreen("Preparing your game…"));
+    const [world, { createVerifiedGameScreen }] = await Promise.all([loadWorldCountryFeatures(), import("../ui/screens/VerifiedGameScreen")]);
+    if (run === navigationRun) mount(createVerifiedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world }));
+    return true;
+  }
+
   async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all", runType: RunType = "practice", continent?: string): Promise<void> {
+    if (runType === "timed" && await startVerified(initialMode, continent ?? "")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Loading world map...");
     mount(loading);
@@ -834,6 +850,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startStreetViewCountry(): Promise<void> {
+    if (await startVerified("streetview-country")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Finding a street to explore…"));
     const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
@@ -851,6 +868,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startGeoGuessr(): Promise<void> {
+    if (await startVerified("geoguessr")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your first location..."));
 
@@ -870,6 +888,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startMapTap(runType: RunType = "practice"): Promise<void> {
+    if (runType === "timed" && await startVerified("map-tap")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Loading MapTap..."));
 
@@ -889,6 +908,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startWorldSplit(): Promise<void> {
+    if (await startVerified("worldsplit")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Loading Worldsplit...");
     mount(loading);
@@ -917,6 +937,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startFlyover(): Promise<void> {
+    if (await startVerified("flyover")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Fuelling the plane...");
     mount(loading);
