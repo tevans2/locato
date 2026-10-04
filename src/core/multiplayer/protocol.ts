@@ -19,6 +19,7 @@ export type ClientMessage =
   | { readonly type: "SUBMIT_MAPTAP_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "SUBMIT_GEOGUESSR_GUESS"; readonly lat: number; readonly lng: number; readonly clientSentAt: number }
   | { readonly type: "FLYOVER_POSITION"; readonly x: number; readonly y: number; readonly heading: number }
+  | { readonly type: "FLYOVER_INPUT"; readonly turn: number; readonly towards?: number | null; readonly boost?: boolean }
   | { readonly type: "FLYOVER_REACHED"; readonly index: number; readonly x: number; readonly y: number; readonly clientSentAt: number }
   | { readonly type: "FLYOVER_SKIP"; readonly index: number }
   | { readonly type: "VOTE_SKIP" }
@@ -42,7 +43,7 @@ export type ServerMessage =
    * A racer moved along the route: "reached" scores, "skipped" doesn't, and "sync" goes to one
    * player only, correcting a claim the server turned down.
    */
-  | { readonly type: "FLYOVER_PROGRESS"; readonly playerId: string; readonly index: number; readonly score: number; readonly event: FlyoverProgressEvent }
+  | { readonly type: "FLYOVER_PROGRESS"; readonly playerId: string; readonly index: number; readonly score: number; readonly event: FlyoverProgressEvent; readonly target?: string | null }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
 

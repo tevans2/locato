@@ -129,6 +129,7 @@ export class MapTapRoom extends RoomBase<MapTapPlayerState> {
   submitGuess(playerId: PlayerId, lat: number, lng: number, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round is accepting guesses.");
+    if (now < this.currentRound.startedAt || (this.currentRound.endsAt !== null && now >= this.currentRound.endsAt)) return fail("round-not-open", "This round has ended.");
     const player = this.activePlayer(playerId);
     if ("ok" in player) return player;
     if (this.playerGuesses.has(playerId)) return ok([], [{ type: "ERROR", code: "already-guessed", message: "You have already guessed this round." }]);

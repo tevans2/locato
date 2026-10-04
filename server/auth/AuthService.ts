@@ -14,6 +14,7 @@ import { validateAcademyProgress } from "../academy/validation";
 import { auditRun, isAuditedMode, parseRunTimeline, runVerdict, type RunFlag, type RunOutcome, type RunVerdict } from "../../src/core/runAudit";
 import { indexCountries, rawCountries } from "../../src/core/countries";
 import type { AcademyProgress } from "../../src/core/academy/types";
+import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
 import type {
   AuthUser,
   DailyChallengeResult,
@@ -65,6 +66,7 @@ export interface AuthServiceOptions {
    * audited and recorded, but only flagged (observe mode, used to set the thresholds).
    */
   readonly enforceRunAudit?: boolean;
+  readonly ranked?: Omit<RankedGamesOptions, "clock">;
 }
 
 /** Where a request came from, kept on the run for the audit trail. */
@@ -123,6 +125,7 @@ export type AcademySyncOutcome =
   | { readonly ok: false; readonly status: number; readonly error: string };
 
 export class AuthService {
+  readonly ranked: RankedGames;
   private readonly clock: () => number;
   private readonly ttlMs: number;
   private readonly submitTimestamps = new Map<string, number[]>();
@@ -134,6 +137,7 @@ export class AuthService {
   ) {
     this.clock = options.clock ?? (() => Date.now());
     this.ttlMs = options.sessionTtlMs;
+    this.ranked = new RankedGames({ ...options.ranked, clock: this.clock });
   }
 
   get sessionMaxAgeSeconds(): number {
@@ -319,35 +323,55 @@ export class AuthService {
   }
 
   /**
-   * Post a finished run to its board. Audited modes (src/core/runAudit) are checked first: the
-   * run's ticket, its timeline and its pace. The run and its flags are always recorded; the post
-   * is refused only when enforcing and a hard check failed.
+   * Only completed server-owned games authorize a ranked write. Browser timelines are
+   * diagnostic evidence, never authority to post a result, regardless of audit settings.
    */
   submitLeaderboardAttempt(
     userId: string,
     input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown; runId?: unknown; timeline?: unknown },
     meta: RunRequestMeta = { ip: null, userAgent: null },
   ): (SubmitBestTimeResult & { readonly audit?: RunAuditResult }) | { error: string; readonly audit?: RunAuditResult } {
-    const gameMode = typeof input.gameMode === "string" ? input.gameMode : "";
-    const variant = typeof input.variant === "string" ? input.variant : "";
-    if (!isAuditedMode(gameMode) || !isValidLeaderboardTime(input.timeMs) || "error" in resolveBoard(gameMode, variant)) {
-      return this.submitBestTime(userId, input);
+    const board = resolveBoard(input.gameMode, input.variant);
+    if ("error" in board) return board;
+    const claimed = board.metric === "time" ? input.timeMs : input.score;
+    if (board.metric === "time" ? !isValidLeaderboardTime(claimed) || input.score !== undefined : !isValidLeaderboardScore(board.gameMode, claimed) || input.timeMs !== undefined) return { error: "Invalid ranked result." };
+    const verified = this.ranked.consume(userId, input.runId, board.gameMode, board.variant, claimed);
+    if (!verified) {
+      const audit = isAuditedMode(board.gameMode) ? this.auditFinishedRun(userId, { gameMode: board.gameMode, variant: board.variant, timed: true, outcome: "complete", runId: input.runId, timeline: input.timeline, claimedMs: typeof claimed === "number" ? claimed : null, previousBestMs: null, posted: true }, meta, true) : undefined;
+      return { error: "This run couldn't be verified, so it wasn't posted.", ...(audit ? { audit } : {}) };
     }
-    const previousBestMs = this.store.getUserRank(userId, gameMode, variant)?.timeMs ?? null;
-    const audit = this.auditFinishedRun(userId, {
-      gameMode,
-      variant,
-      timed: true,
-      outcome: "complete",
-      runId: input.runId,
-      timeline: input.timeline,
-      claimedMs: input.timeMs,
-      previousBestMs,
-      posted: true,
-    }, meta);
-    if (audit.refused) return { error: "This run couldn't be verified, so it wasn't posted.", audit };
-    const result = this.submitBestTime(userId, input);
-    return "error" in result ? result : { ...result, audit };
+    // Only the server's completed state reaches storage. Legacy audit tickets and client timelines
+    // are not proof of play and cannot authorize a leaderboard write.
+    const posted = this.submitBestTime(userId, { gameMode: verified.mode, variant: verified.variant, ...(board.metric === "time" ? { timeMs: verified.value } : { score: verified.value }) });
+    const record = this.ranked.completedRecord(userId, input.runId);
+    const recordId = `ranked:${String(input.runId)}`;
+    if (!("error" in posted) && record && !this.store.findRun(recordId)) {
+      this.store.createRun({ id: recordId, userId, gameMode: verified.mode, variant: verified.variant, timed: true, startedAt: this.clock() - (record.durationMs ?? 0), ip: meta.ip, userAgent: meta.userAgent });
+      this.store.recordGame(userId, record, this.clock());
+      this.store.finishRun(recordId, { finishedAt: this.clock(), outcome: "complete", claimedMs: board.metric === "time" ? verified.value : null, countries: record.correctAnswers, timeline: null, flags: [], verdict: "ok", posted: true, refused: false });
+    }
+    return posted;
+  }
+
+  async startRankedGame(userId: string, input: { gameMode?: unknown; variant?: unknown }) {
+    if (!this.allowSubmit(`ranked:${userId}`, RUN_START_RATE_LIMIT)) return { error: "Too many games started. Try again shortly." };
+    if (input.gameMode === "daily" && typeof input.variant === "string" && this.store.getDailyResult(userId, input.variant)) return { error: "Today's challenge has already been completed." };
+    const dailyTicket = input.gameMode === "daily" && typeof input.variant === "string" ? `daily:${userId}:${input.variant}` : null;
+    const reservation = dailyTicket ? this.store.findRun(dailyTicket) : null;
+    if (reservation && !this.ranked.hasDaily(userId, String(input.variant))) return { error: "Today's attempt has ended or expired. A new challenge is available tomorrow." };
+    const result = await this.ranked.start(userId, input);
+    if (dailyTicket && !reservation && !("error" in result)) this.store.createRun({ id: dailyTicket, userId, gameMode: "daily", variant: result.variant, timed: true, startedAt: result.startedAt, ip: null, userAgent: null });
+    return result;
+  }
+
+  submitVerifiedDaily(userId: string, runId: unknown): DailyChallengeResult | { error: string } {
+    const result = this.ranked.consumeDaily(userId, runId);
+    if (!result) return { error: "This challenge couldn't be verified, so it wasn't posted." };
+    const previous = this.store.getDailyResult(userId, result.date);
+    if (previous) return previous;
+    const saved = this.store.saveDailyResult(userId, result);
+    this.store.finishRun(`daily:${userId}:${result.date}`, { finishedAt: result.completedAt, outcome: "complete", claimedMs: result.timeMs, countries: result.marks.length, timeline: null, flags: [], verdict: "ok", posted: true, refused: false });
+    return saved;
   }
 
   /** A ticket for a run that's just started (its first move): the server's own start time. */
@@ -397,6 +421,7 @@ export class AuthService {
     userId: string,
     input: { gameMode: string; variant: string; timed: boolean; outcome: RunOutcome; runId: unknown; timeline: unknown; claimedMs: number | null; previousBestMs: number | null; posted: boolean },
     meta: RunRequestMeta,
+    forceRefused = false,
   ): RunAuditResult {
     const now = this.clock();
     const ticket = typeof input.runId === "string" ? this.store.findRun(input.runId) : null;
@@ -416,7 +441,7 @@ export class AuthService {
       overlapsPreviousRun: run ? this.store.hasOverlappingRun(userId, run.id, run.startedAt) : false,
     });
     const verdict = runVerdict(flags);
-    const refused = input.posted && verdict === "reject" && this.options.enforceRunAudit === true;
+    const refused = forceRefused || (input.posted && verdict === "reject" && this.options.enforceRunAudit === true);
     // A post without a usable ticket still goes in the trail, as a run that started as it ended.
     const runId = run?.id ?? `run_${createSessionToken().slice(0, 24)}`;
     if (!run) {

@@ -13,7 +13,7 @@ import type { CountryIndex } from "../../../core/countries";
 import type { WorldCountryFeature } from "../../../core/map";
 import type { Screen } from "../../../app/router";
 import type { AuthControls } from "../../components/AuthPanel";
-import { inviteFriendToGame, recordGame } from "../../../core/auth";
+import { fetchFullStats, inviteFriendToGame } from "../../../core/auth";
 import { getLocalAvatar } from "../../../core/auth/avatars";
 import { readPlayerName } from "../../../core/multiplayer/localPlayer";
 import { el } from "../../dom/createElement";
@@ -187,6 +187,7 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     signal,
     worldCountryFeatures: options.worldCountryFeatures,
     onPosition: (plane) => session.send({ type: "FLYOVER_POSITION", x: plane.x, y: plane.y, heading: plane.heading }),
+    onInput: (input) => session.send({ type: "FLYOVER_INPUT", turn: input.turn, towards: input.towards ?? null, boost: input.boost === true }),
     onReach: (index, plane) => session.send({ type: "FLYOVER_REACHED", index, x: plane.x, y: plane.y, clientSentAt: Date.now() }),
     onSkip: (index) => session.send({ type: "FLYOVER_SKIP", index }),
   }));
@@ -368,22 +369,8 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
       }
       case "GAME_COMPLETED": {
         playVictory();
-        // Signed-in players get the game on their stats; the server already settled the results.
-        const mine = message.results.find((result) => result.playerId === me);
-        if (mine && before.room) {
-          void recordGame({
-            mode: "multiplayer",
-            categoryIds: before.room.categoryIds,
-            correctAnswers: mine.correctAnswers,
-            wrongAnswers: mine.wrongAnswers,
-            score: mine.score,
-            bestStreak: 0,
-            rank: mine.rank,
-            totalPlayers: message.results.length,
-          }).then((stats) => {
-            if (stats) options.authControls?.refreshStats(stats);
-          });
-        }
+        // Account records are written from server standings, never uploaded from this page.
+        void fetchFullStats().then((stats) => { if (stats) options.authControls?.refreshStats(stats); });
         return;
       }
       default:

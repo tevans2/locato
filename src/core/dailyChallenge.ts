@@ -69,6 +69,7 @@ export interface DailyChallenge {
   readonly promptSlots?: readonly PromptSlot[];
   readonly theme?: DailyTheme;
   readonly challengeVersion?: 2;
+  readonly themeScoped?: true;
 }
 
 export function getLocalDailyDate(date = new Date()): string {
@@ -98,17 +99,31 @@ export function createLegacyDailyChallenge(index: CountryIndex, date: string): D
 }
 
 export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate()): DailyChallenge {
-  const seed = `daily:${date}`;
+  return buildThemedDailyChallenge(index, date, true);
+}
+
+/** Preserve the questions of attempts started before every round followed its theme. */
+export function createMixedThemeDailyChallenge(index: CountryIndex, date: string): DailyChallenge {
+  return buildThemedDailyChallenge(index, date, false);
+}
+
+/** Server callers supply a private seed; the public date must not reveal the ranked queue. */
+export function createServerDailyChallenge(index: CountryIndex, date: string, seed: string): DailyChallenge {
+  return buildThemedDailyChallenge(index, date, true, seed);
+}
+
+function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`): DailyChallenge {
   const theme = dailyThemeForDate(date);
   const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"];
   const tiers: readonly FameTier[] = [1, 1, 2, 2, 1, 3, 2, 3];
   const used = new Set<CountryId>();
-  const candidates = shuffle(index.countries.filter((country) => !country.allowedCategoryIds), createSeededRandom(`${seed}:balanced`));
+  const candidates = shuffle(index.countries.filter((country) => !country.allowedCategoryIds &&
+    (!themeScoped || theme.countryCodes.includes(country.code))), createSeededRandom(`${seed}:balanced`));
   const promptSlots: PromptSlot[] = [];
   categories.forEach((categoryId, position) => {
     const eligible = candidates.filter((country) => !used.has(country.id) && getCategory(categoryId)?.eligible(country));
     const tier = eligible.filter((country) => fameTier(country.code) === tiers[position]);
-    const themed = position % 2 === 0;
+    const themed = !themeScoped && position % 2 === 0;
     const country = (themed ? tier.find((country) => theme.countryCodes.includes(country.code)) : undefined) ?? tier[0] ?? eligible[0];
     if (country) {
       used.add(country.id);
@@ -121,9 +136,12 @@ export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDa
   const streetRounds = streetViewCountryRounds.filter((round) => index.byCode.has(round.countryCode));
   const themedStreetRounds = streetRounds.filter((round) => theme.countryCodes.includes(round.countryCode));
   const mediumStreetRounds = themedStreetRounds.filter((round) => fameTier(round.countryCode) === 2);
-  const streetSource = mediumStreetRounds.length ? mediumStreetRounds : themedStreetRounds.length ? themedStreetRounds : streetRounds.length ? streetRounds : streetViewCountryRounds;
+  const streetSource = mediumStreetRounds.length ? mediumStreetRounds : themedStreetRounds.length ? themedStreetRounds
+    : themeScoped ? streetViewCountryRounds.filter((round) => theme.countryCodes.includes(round.countryCode))
+    : streetRounds.length ? streetRounds : streetViewCountryRounds;
   const streetViewCountryCode = shuffle(streetSource, createSeededRandom(`${seed}:streetview`))[0]?.countryCode ?? "";
-  return { date, seed, categoryIds: DAILY_CATEGORY_IDS, countryIds: promptSlots.map((slot) => slot.countryId), promptSlots, theme, challengeVersion: 2, mapTapTargetId, streetViewCountryCode };
+  return { date, seed, categoryIds: DAILY_CATEGORY_IDS, countryIds: promptSlots.map((slot) => slot.countryId), promptSlots, theme, challengeVersion: 2,
+    ...(themeScoped ? { themeScoped: true } : {}), mapTapTargetId, streetViewCountryCode };
 }
 
 export function formatDailyTime(milliseconds: number): string {

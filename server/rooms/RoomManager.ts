@@ -11,6 +11,7 @@ import type { FlyoverCountry } from "../../src/core/flyover";
 import { getCategory, resolveCategoryIds } from "../../src/core/categories";
 import type { MapTapCategory } from "../../src/core/maptap/types";
 import type { FlagPool } from "../../src/core/flagPools";
+import type { GameResult } from "../auth/types";
 
 
 export interface MultiplayerConnection {
@@ -23,6 +24,7 @@ export interface MultiplayerConnection {
   // The account's saved avatar at upgrade time. Only a fallback: the client sends its current pick
   // with CREATE_ROOM/JOIN_ROOM, which is fresher if the user changed it after the socket opened.
   readonly authenticatedAvatar?: string | null;
+  readonly authenticatedUserId?: string | null;
 }
 
 export interface PlayerSession {
@@ -46,6 +48,7 @@ export interface RoomManagerOptions {
   /** Country shapes for Flyover rooms; loaded from the built map on first use by default. */
   readonly flyoverCountries?: () => readonly FlyoverCountry[];
   readonly positionRateLimitPerSecond?: number;
+  readonly onGameComplete?: (userId: string, result: GameResult) => void;
 }
 
 export interface RoomManagerStats {
@@ -149,14 +152,16 @@ export class RoomManager {
   private readonly resultDisplayMs: number;
   private readonly flyoverCountries: () => readonly FlyoverCountry[];
   private readonly positionRateLimitPerSecond: number;
+  private readonly onGameComplete: RoomManagerOptions["onGameComplete"];
   private readonly rooms = new Map<RoomCode, AnyRoom>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
   private readonly connectionByPlayerId = new Map<string, MultiplayerConnection>();
   // Survives disconnects so a reconnecting client can reclaim its player slot/score within the
   // empty-room TTL window. Keyed by the opaque token handed out in SESSION_ASSIGNED.
-  private readonly sessionsByToken = new Map<string, { readonly playerId: string; readonly roomCode: RoomCode }>();
+  private readonly sessionsByToken = new Map<string, { readonly playerId: string; readonly roomCode: RoomCode; readonly userId: string | null }>();
 
   constructor(options: RoomManagerOptions = {}) {
+    this.onGameComplete = options.onGameComplete;
     this.countryIndex = options.countryIndex ?? defaultCountryIndex();
     this.maxRooms = options.maxRooms ?? DEFAULT_MAX_ROOMS;
     this.maxPlayersPerRoom = options.maxPlayersPerRoom ?? DEFAULT_MAX_PLAYERS_PER_ROOM;
@@ -238,6 +243,7 @@ export class RoomManager {
 
   sweep(now = Date.now()): void {
     for (const room of this.rooms.values()) {
+      if (isFlyoverRoom(room)) this.broadcastMessages(room, room.tick(now));
       // A single deadline drives both the round timeout and the result-display gap, so a fast
       // tick lands transitions within the tick interval instead of the old multi-second jitter.
       const dueAt = room.pendingTransitionAt;
@@ -348,6 +354,13 @@ export class RoomManager {
           this.sendRoomResult(connection, room, room.updatePosition(session.playerId, message.x, message.y, message.heading, now));
         });
         return;
+      case "FLYOVER_INPUT":
+        this.withSessionRoom(connection, (room, session) => {
+          if (!isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "This is not a Flyover room."); return; }
+          if (!this.allowPosition(connection, session, now)) return;
+          this.sendRoomResult(connection, room, room.steer(session.playerId, { turn: message.turn, towards: message.towards ?? null, boost: message.boost === true }, now));
+        });
+        return;
       case "FLYOVER_REACHED":
         this.withSessionRoom(connection, (room, session) => {
           if (!isFlyoverRoom(room)) { sendError(connection, "wrong-mode", "This is not a Flyover room."); return; }
@@ -409,7 +422,7 @@ export class RoomManager {
     }
     this.detach(connection, now);
     this.rooms.set(roomCode, room);
-    const sessionToken = this.issueToken(playerId, roomCode);
+    const sessionToken = this.issueToken(playerId, roomCode, connection.authenticatedUserId ?? null);
     this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
     send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
     send(connection, { type: "ROOM_SNAPSHOT", room: room.snapshot() });
@@ -495,7 +508,7 @@ export class RoomManager {
       return;
     }
 
-    const sessionToken = this.issueToken(playerId, roomCode);
+    const sessionToken = this.issueToken(playerId, roomCode, connection.authenticatedUserId ?? null);
     this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
     send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
     this.broadcastMessages(room, result.messages);
@@ -503,7 +516,7 @@ export class RoomManager {
 
   private rejoinRoom(connection: MultiplayerConnection, roomCode: RoomCode, playerId: string, sessionToken: string, now: number): void {
     const claim = this.sessionsByToken.get(sessionToken);
-    if (!claim || claim.playerId !== playerId || claim.roomCode !== roomCode) {
+    if (!claim || claim.playerId !== playerId || claim.roomCode !== roomCode || (claim.userId !== null && claim.userId !== connection.authenticatedUserId)) {
       sendError(connection, "session-expired", "Your previous session has expired. Rejoin with the room code.");
       return;
     }
@@ -546,9 +559,9 @@ export class RoomManager {
     this.connectionByPlayerId.set(session.playerId, connection);
   }
 
-  private issueToken(playerId: string, roomCode: RoomCode): string {
+  private issueToken(playerId: string, roomCode: RoomCode, userId: string | null): string {
     const token = createId("session");
-    this.sessionsByToken.set(token, { playerId, roomCode });
+    this.sessionsByToken.set(token, { playerId, roomCode, userId });
     return token;
   }
 
@@ -604,9 +617,20 @@ export class RoomManager {
 
   private broadcastMessages(room: AnyRoom, messages: readonly ServerMessage[]): void {
     for (const message of messages) {
+      if (message.type === "GAME_COMPLETED" && this.onGameComplete) {
+        for (const result of message.results) {
+          const seat = [...this.sessionsByToken.values()].find((s) => s.playerId === result.playerId && s.roomCode === room.code);
+          if (seat?.userId) this.onGameComplete(seat.userId, { mode: "multiplayer", categoryIds: room.snapshot().categoryIds, correctAnswers: result.correctAnswers, wrongAnswers: result.wrongAnswers, score: result.score, bestStreak: 0, rank: result.rank, totalPlayers: message.results.length });
+        }
+      }
       for (const player of room.snapshot().players) {
         const connection = this.connectionByPlayerId.get(player.id);
-        if (connection) send(connection, message);
+        if (connection) {
+          if (message.type === "FLYOVER_PROGRESS" && message.playerId !== player.id) {
+            const { target: _privateTarget, ...standing } = message;
+            send(connection, standing);
+          } else send(connection, message);
+        }
       }
     }
   }

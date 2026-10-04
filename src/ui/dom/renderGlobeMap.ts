@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { CountryId, CountryIndex } from "../../core/countries";
-import type { WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
+import type { ProjectedPoint, WorldCountryFeature, WorldMapPolygon, WorldMapPosition } from "../../core/map";
 import { LOCATO_THEME_EVENT, currentTheme } from "../theme";
 
 const GLOBE_RADIUS = 2;
@@ -97,6 +97,7 @@ export interface GlobeMapState {
   readonly targetCountryId: CountryId | null;
   readonly clickableCountryIds: ReadonlySet<CountryId> | null;
   readonly showMissingCountryIds?: ReadonlySet<CountryId>;
+  readonly targetPaths?: readonly (readonly ProjectedPoint[])[];
 }
 
 interface GlobeCountryObject {
@@ -244,6 +245,10 @@ function paintGlobeTexture(context: CanvasRenderingContext2D, features: readonly
     const fillStyle = fillStyleForCountry(palette, playableCountryId, state);
     const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
     for (const polygon of polygons) fillTexturePolygon(context, polygon, fillStyle);
+  }
+  if (state?.targetPaths?.length) {
+    const rings = state.targetPaths.map((r) => r.map(([x, y]) => [x / 1000 * 360 - 180, 85 - y / 500 * 145] as const));
+    fillTexturePolygon(context, rings, palette.targetFill);
   }
 }
 

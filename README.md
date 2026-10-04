@@ -10,7 +10,9 @@ The frontend is a vanilla-DOM/Vite app built on a browser-independent game engin
 - **Backend:** Bun (`Bun.serve` + `bun:sqlite` + `Bun.password`), WebSocket multiplayer.
 - **Deploy:** Fly.io (prod `locato`, staging `locato-staging`), SQLite on a persistent volume.
 
-No web framework and no runtime npm dependencies — only built-in Bun/Node APIs.
+The server uses Bun/Node APIs plus `@resvg/resvg-js` and `pngjs` to render private game clues.
+
+Ranked games are validated and scored on the server. See [anti-cheat architecture and deployment](docs/anti-cheat.md), including the one-time quarantine of historical leaderboard entries and the limits of bot detection.
 
 ## Run locally
 
@@ -80,7 +82,7 @@ All configuration is via environment variables (none required for basic local pl
 | `SESSION_TTL_DAYS` | `30` | Session lifetime. |
 | `NODE_ENV` | — | `production` marks session cookies `Secure`. |
 | `BASE_URL` | `http://localhost:$PORT` | Public origin; used to build OAuth callback URLs. |
-| `ALLOWED_ORIGINS` | _(allow all)_ | Comma-separated origin allowlist for the WebSocket upgrade. |
+| `ALLOWED_ORIGINS` | _(same origin)_ | Comma-separated origin allowlist for the WebSocket upgrade. |
 | `ADMIN_TOKEN` | _(unset → admin API disabled)_ | Credential for `/api/admin/*` (`Authorization: Bearer` or `x-admin-token`). |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | Enables GitHub OAuth. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Enables Google OAuth. |

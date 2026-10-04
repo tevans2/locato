@@ -33,6 +33,8 @@ import { DAILY_COUNTRY_COUNT, getLocalDailyDate } from "../../core/dailyChalleng
 import { dailyThemeForDate } from "../../core/dailyThemes";
 import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
+import type { CountryIndex } from "../../core/countries";
+import { LandingGlobe } from "../components/landing/LandingGlobe";
 
 /*
  * Play → the landing page (docs/navigation.md). Split modes start a PRACTICE run here: no clock,
@@ -44,6 +46,7 @@ import type { Screen } from "../../app/router";
 export interface LandingScreenOptions {
   /** Navigation shell (docs/navigation.md). */
   readonly shell: ShellContext;
+  readonly countryIndex: CountryIndex;
   readonly storage?: Storage;
   /** Clock override for tests. */
   readonly now?: () => Date;
@@ -69,28 +72,8 @@ const MODE_ICONS: Readonly<Record<GameModeId, LucideIcon>> = {
   "streetview-country": Binoculars,
 };
 
-const MODE_BADGES: Partial<Record<GameModeId, string>> = { flags: "Start here", worldsplit: "New", flyover: "New", geoguessr: "New" };
-
 const COUNTRY_COUNT = 196;
 const DAY_MS = 86_400_000;
-
-const MODE_PREVIEW_PROMPTS: Record<GameModeId, string> = {
-  flags: "Which country flies this flag?",
-  "flag-colors": "Reveal a colour. Name the country.",
-  shapes: "Recognise the outline?",
-  codes: "Which country uses this code?",
-  capitals: "Name the country, given its capital.",
-  "capital-recall": "Name this country’s capital.",
-  "name-all": "How many countries can you name?",
-  "click-country": "Find the country on the map.",
-  "spot-country": "Name the highlighted country.",
-  puzzle: "Put the countries back in place.",
-  "map-tap": "Find the landmark. Place your pin.",
-  worldsplit: "Draw a line. Split the population 50/50.",
-  flyover: "Steer the plane. Fly over the country.",
-  geoguessr: "Explore a street. Pin your location.",
-  "streetview-country": "Use the street clues to name the country.",
-};
 
 /** "42/196" for a mode's saved practice run, or null when there is nothing to resume. */
 export function modeResumeProgress(storage: Storage | undefined, mode: GameModeId): string | null {
@@ -143,24 +126,10 @@ export function readDailyStatus(storage: Storage | undefined, now = new Date()):
   return { done, roundsPlayed, streak };
 }
 
-function ModePreviewArtwork({ mode }: { readonly mode: GameModeId }) {
-  if (mode === "flags" || mode === "flag-colors") return <div className={`picker-flag ${mode === "flag-colors" ? "is-partial" : ""}`}><img src="/assets/flags/it.svg" alt="" width="300" height="200" /></div>;
-  if (mode === "shapes" || mode === "puzzle" || mode === "spot-country") return <img className={`picker-outline is-${mode}`} src="/assets/country-shapes/it.svg" alt="" width="260" height="260" />;
-  if (mode === "codes" || mode === "capitals" || mode === "capital-recall") return <span className={`picker-clue ${mode === "codes" ? "is-code" : ""}`}>{mode === "codes" ? "ITA" : mode === "capitals" ? "Rome" : "Italy"}</span>;
-  return <div className={`picker-globe is-${mode}`}>
-    <img src="/assets/landing/atlas-globe.svg" alt="" width="320" height="320" />
-    {mode === "flyover" ? <span className="picker-flyover-plane"><Plane size={34} strokeWidth={1.5} /></span> : null}
-    {mode === "worldsplit" ? <span className="picker-split-line"><span>50</span><span>50</span></span> : null}
-    {mode === "map-tap" || mode === "geoguessr" || mode === "streetview-country" ? <span className="picker-map-pin"><MapPin size={32} strokeWidth={1.5} /></span> : null}
-  </div>;
-}
-
-function LandingGamePicker({ shell, storage }: LandingScreenOptions) {
+function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOptions) {
   const [group, setGroup] = useState<GameModeGroup>(GAME_MODE_GROUPS[0]!);
   const [mode, setMode] = useState<GameModeCatalogueEntry>(GAME_MODE_GROUPS[0]!.modes[0]!);
   const allModes = GAME_MODE_GROUPS.flatMap((item) => item.modes);
-  const modeNumber = String(allModes.findIndex((item) => item.id === mode.id) + 1).padStart(2, "0");
-  const resume = modeResumeProgress(storage, mode.id);
   const latest = latestResume(storage);
   const play = (id: GameModeId) => shell.openGame(id, "practice");
 
@@ -179,7 +148,7 @@ function LandingGamePicker({ shell, storage }: LandingScreenOptions) {
         </button>)}
       </div>
       <div className="mode-picker-options" role="group" aria-label={`${group.label} games`}>
-        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} aria-controls="mode-preview" onClick={() => setMode(item)}>
+        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} onClick={() => { setMode(item); play(item.id); }}>
           <Icon size={19} strokeWidth={1.5} /><span className="mode-picker-option-label">{item.label}{saved ? <small className="mode-picker-saved" aria-label={`, saved run ${saved}`}>{saved}</small> : null}</span><span className="mode-picker-indicator" aria-hidden="true">{mode.id === item.id ? <Check size={12} /> : null}</span>
         </button>; })}
       </div>
@@ -187,13 +156,8 @@ function LandingGamePicker({ shell, storage }: LandingScreenOptions) {
         <button type="button" data-testid="button-resume-latest" onClick={() => play(latest.mode)} aria-label={`Resume ${latest.label}`}><RotateCcw size={15} /> Resume {latest.label} <ArrowRight size={15} /></button>
       </div> : null}
     </div>
-    <section className="mode-preview" id="mode-preview" aria-label="Selected game" aria-live="polite">
-      <div className="mode-preview-head"><span>{group.label}{MODE_BADGES[mode.id] ? <small className="mode-preview-badge">{MODE_BADGES[mode.id]}</small> : null}</span><span>{modeNumber} / {allModes.length}</span></div>
-      <div className={`mode-preview-art is-${mode.id}`} aria-hidden="true"><ModePreviewArtwork mode={mode.id} /><span className="mode-preview-caption">{isPromptGameModeId(mode.id) ? "Example clue" : "Game preview"}</span></div>
-      <div className="mode-preview-info"><h2>{mode.label}</h2><p>{MODE_PREVIEW_PROMPTS[mode.id]}</p></div>
-      <button type="button" className="mode-picker-play" data-testid="button-play-selected" onClick={() => play(mode.id)}>
-        <span>{resume ? `Resume ${mode.label}` : `Play ${mode.label}`}{resume ? <small>{resume}</small> : null}</span><ArrowRight size={19} />
-      </button>
+    <section className="mode-atlas-preview" id="mode-preview" aria-label="Explore the world">
+      <LandingGlobe countryIndex={countryIndex} onOpenCountry={shell.openCountry} />
     </section>
   </section>;
 }

@@ -10,6 +10,10 @@ import { StreetViewLocationPool } from "./streetview";
 import { createMapTapRoundResponse, validateMapTapGuessResponse } from "./maptap";
 import { AdminService } from "./admin/AdminService";
 import { logEvent, setEventSink } from "./admin/events";
+import { panoramaResolver } from "./ranked/panoramas";
+import { streetViewCountryRounds } from "../src/core/streetview";
+import { createSeededRandom, shuffle } from "../src/core/game";
+import { serveGameAsset } from "./ranked/GameAssets";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -51,7 +55,10 @@ function allowedOrigins(): ReadonlySet<string> | null {
 }
 
 function isAllowedOrigin(request: Request, origins: ReadonlySet<string> | null): boolean {
-  if (!origins) return true;
+  if (!origins) {
+    const origin = request.headers.get("origin");
+    return origin !== null && [new URL(request.url).origin, new URL(baseUrl).origin].includes(origin);
+  }
   const origin = request.headers.get("origin");
   return origin !== null && origins.has(origin);
 }
@@ -85,6 +92,7 @@ if (!validation.valid) throw new Error(validation.issues.map((issue) => issue.me
 
 const roomManager = new RoomManager({
   countryIndex,
+  onGameComplete: (userId, result) => { authService.recordGame(userId, result); },
   maxPlayersPerRoom: readIntegerEnv("MAX_PLAYERS_PER_ROOM", 8),
   maxRooms: readIntegerEnv("MAX_ROOMS", 500),
   roomTtlMs: readIntegerEnv("ROOM_TTL_SECONDS", 7200) * 1000,
@@ -97,10 +105,15 @@ setInterval(() => roomManager.sweep(Date.now()), TICK_INTERVAL_MS).unref?.();
 const SESSION_TTL_MS = readIntegerEnv("SESSION_TTL_DAYS", 30) * 24 * 60 * 60 * 1000;
 const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/locato.db");
 const userStore = new SqliteUserStore(openDatabase(databasePath));
-// RUN_AUDIT_ENFORCE=1 refuses leaderboard posts from runs that fail a hard check. Unset, runs are
-// audited and flagged only (observe mode), so thresholds can be checked against real play first.
+// Ranked verification is mandatory. Optional legacy telemetry cannot authorize results.
 const enforceRunAudit = process.env.RUN_AUDIT_ENFORCE === "1";
-const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit });
+const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit,
+  ranked: {
+    ...(process.env.RANKED_CHALLENGE_SECRET ? { challengeSecret: process.env.RANKED_CHALLENGE_SECRET } : {}),
+    streetRounds: () => streetViewPool.createRounds(5),
+    resolvePanorama: panoramaResolver(process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? ""),
+  },
+});
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
 // Out-of-band admin credential. When unset, the /api/admin surface is disabled entirely.
@@ -109,7 +122,7 @@ const adminToken = process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.length > 0
 const socialHub = new SocialHub((userId) => authService.friendIds(userId));
 const streetViewPool = new StreetViewLocationPool({
   storagePath: process.env.STREETVIEW_POOL_PATH ?? resolve(PROJECT_ROOT, ".data/streetview-country-pool.json"),
-  metadataApiKey: process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "",
+  metadataApiKey: process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "",
   maxEntries: readIntegerEnv("STREETVIEW_POOL_MAX_ENTRIES", 500),
   dailyGenerateCount: readIntegerEnv("STREETVIEW_DAILY_GENERATE_COUNT", 50),
   refreshHours: readIntegerEnv("STREETVIEW_REFRESH_HOURS", 24),
@@ -195,6 +208,9 @@ const server = Bun.serve<WebSocketData>({
     const { method } = request;
 
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    if (/^\/api\/game-assets\/[a-f0-9]{48}$/.test(url.pathname) && method === "GET") {
+      try { return await serveGameAsset(url); } catch { return json({ error: "Game artwork unavailable." }, 503); }
+    }
     // Assets are referenced relatively (vite base "./"), so the page must live at /admin, not /admin/.
     if (url.pathname === "/admin/" || url.pathname === "/admin.html") return new Response(null, { status: 301, headers: { Location: "/admin" } });
     if (url.pathname === "/admin") return serveAdminPage();
@@ -226,7 +242,7 @@ const server = Bun.serve<WebSocketData>({
 
     if (url.pathname === "/api/streetview-country/round" && method === "GET") {
       try {
-        return json(await streetViewPool.createRound());
+        return json(shuffle(streetViewCountryRounds, createSeededRandom(crypto.randomUUID()))[0]);
       } catch (error) {
         logEvent("warn", "streetview.round.failed", { error: error instanceof Error ? error.message : String(error) });
         return json({ error: "Street View round unavailable." }, 503);
@@ -238,7 +254,7 @@ const server = Bun.serve<WebSocketData>({
         const fallbackCount = readIntegerEnv("STREETVIEW_CLIENT_CACHE_SIZE", 5);
         const parsedCount = Number.parseInt(url.searchParams.get("count") ?? String(fallbackCount), 10);
         const count = Number.isFinite(parsedCount) ? parsedCount : fallbackCount;
-        return json(await streetViewPool.createRounds(count));
+        return json(shuffle(streetViewCountryRounds, createSeededRandom(crypto.randomUUID())).slice(0, Math.max(1, Math.min(20, count))));
       } catch (error) {
         logEvent("warn", "streetview.rounds.failed", { error: error instanceof Error ? error.message : String(error) });
         return json({ error: "Street View rounds unavailable." }, 503);
@@ -269,6 +285,7 @@ const server = Bun.serve<WebSocketData>({
         close: (code, reason) => socket.close(code, reason),
         authenticatedName: socket.data.user?.displayName ?? null,
         authenticatedAvatar: socket.data.user?.avatarEmoji ?? null,
+        authenticatedUserId: socket.data.user?.id ?? null,
       };
       connectionMap.set(socket, connection);
       roomManager.attach(connection);

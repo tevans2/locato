@@ -1,0 +1,5 @@
+/* The game layouts come from their existing screens. Only the private panorama surface differs. */
+.private-street-view { position: relative; overflow: hidden; background: var(--surface, #172b27); }
+.private-street-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.private-street-controls { position: absolute; bottom: 1rem; left: 1rem; display: flex; gap: .5rem; z-index: 2; }
+.streetview-stage > .private-street-view { position: absolute; inset: 0; }

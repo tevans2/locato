@@ -4,6 +4,7 @@ import { isValidLatLng, normalizeLongitude } from "../../src/core/maptap/distanc
 import type { FinalResult, GeoGuessrRoundResult, PlayerId, PublicPlayerState, PublicRoomSettings, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
 import type { ServerMessage } from "../../src/core/multiplayer/protocol";
 import { basePlayer, fail, ok, RoomBase, type RoomResult } from "./RoomBase";
+import { issueGameAsset, revokeGameAsset } from "../ranked/GameAssets";
 
 export const DEFAULT_GEOGUESSR_ROUND_DURATION_MS = 60_000;
 export const DEFAULT_GEOGUESSR_RESULT_DISPLAY_MS = 8_000;
@@ -32,6 +33,7 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
   private readonly countryIndex: CountryIndex;
   private locationQueue: GeoGuessrLocation[] = [];
   private currentRound: GeoGuessrPrivateRound | null = null;
+  private artwork: string | null = null;
   private playerGuesses = new Map<PlayerId, { lat: number; lng: number }>();
   private completedRounds = 0;
   private resultStartedAt: number | null = null;
@@ -84,10 +86,9 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
 
   get publicRound(): PublicRoundState | null {
     if (!this.currentRound) return null;
-    const { location } = this.currentRound;
     return {
       roundNumber: this.currentRound.roundNumber,
-      prompt: { kind: "geoguessr-streetview", value: JSON.stringify({ lat: location.lat, lng: location.lng, heading: location.heading, pitch: location.pitch ?? 0, fov: location.fov ?? 90 }) },
+      prompt: { kind: "geoguessr-streetview", value: JSON.stringify({ asset: this.artwork }) },
       startedAt: this.currentRound.startedAt,
       endsAt: this.currentRound.endsAt,
     };
@@ -125,6 +126,7 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
   submitGuess(playerId: PlayerId, lat: number, lng: number, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round is accepting guesses.");
+    if (now < this.currentRound.startedAt || (this.currentRound.endsAt !== null && now >= this.currentRound.endsAt)) return fail("round-not-open", "This round has ended.");
     const player = this.activePlayer(playerId);
     if ("ok" in player) return player;
     if (this.playerGuesses.has(playerId)) return ok([], [{ type: "ERROR", code: "already-guessed", message: "You have already guessed this round." }]);
@@ -181,6 +183,8 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
     this.resultEndsAt = null;
     this.status = "playing";
     this.currentRound = { roundNumber: this.completedRounds + 1, location, startedAt: now, endsAt: this.roundDurationMs > 0 ? now + this.roundDurationMs : null };
+    if (this.artwork) revokeGameAsset(this.artwork);
+    this.artwork = issueGameAsset({ frame: location });
     return this.publicRound;
   }
 
@@ -228,6 +232,8 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
   }
 
   private completeGame(now: number): RoomResult {
+    if (this.artwork) revokeGameAsset(this.artwork);
+    this.artwork = null;
     this.touch(now);
     this.status = "complete";
     this.currentRound = null;

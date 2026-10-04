@@ -42,8 +42,8 @@ export const GEOGUESSR_ATTEMPT_ROUNDS = 5;
 export const STREET_VIEW_ATTEMPT_COUNTRIES = 5;
 /** Flyover: one attempt is a run against this clock; the score is how many countries you reach. */
 export const FLYOVER_ATTEMPT_SECONDS = 90;
-/** No run can reach more countries than exist. */
-export const FLYOVER_MAX_SCORE = 196;
+/** Flyover excludes the 29 countries below its minimum target area in the shipped map. */
+export const FLYOVER_MAX_SCORE = 167;
 /** Street View country points per country: 3 for the first guess, 2 for the second, 1 for the third, 0 if missed. */
 export const STREET_VIEW_POINTS_BY_GUESS = [3, 2, 1] as const;
 

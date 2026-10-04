@@ -60,14 +60,10 @@ function latestRoomMessage(connection: TestConnection) {
   return [...connection.messages].reverse().find((message) => message.type === "ROOM_SNAPSHOT");
 }
 
-function countryNameForRound(round: PublicRoundState): string {
-  const country = countryIndex.countries.find((candidate) => {
-    if (round.prompt.kind === "image" || round.prompt.kind === "flag-colors") return candidate.flagSrc === round.prompt.value;
-    if (round.prompt.kind === "map-highlight") return candidate.code === round.prompt.value;
-    return candidate.code === round.prompt.value;
-  });
-  if (!country) throw new Error(`No fixture country for ${round.prompt.value}`);
-  return country.name;
+// Read a known fixture answer from server state, never from public artwork URLs.
+function countryNameForRound(_round: PublicRoundState, room: Room): string {
+  const state = room as unknown as { currentRound: { countryId: number }; promptCountryIndex: typeof countryIndex };
+  return state.promptCountryIndex.byId[state.currentRound.countryId]!.name;
 }
 
 describe("multiplayer room", () => {
@@ -88,10 +84,11 @@ describe("multiplayer room", () => {
     expect(start.ok).toBe(true);
     const startedRound = start.ok ? start.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
     expect(startedRound?.prompt.kind).toBe("map-highlight");
-    expect(startedRound?.prompt.value).toMatch(/^[A-Z]{2}$/);
-    expect(startedRound?.prompt.value).not.toBe(countryNameForRound(startedRound!));
+    expect(JSON.parse(startedRound!.prompt.value)).toHaveProperty("paths");
+    expect(startedRound!.prompt.value).not.toContain('"countryCode"');
+    expect(startedRound?.prompt.value).not.toBe(countryNameForRound(startedRound!, room));
 
-    const correctAnswer = countryNameForRound(startedRound!);
+    const correctAnswer = countryNameForRound(startedRound!, room);
     const correct = room.submitAnswer("host", correctAnswer, 1020);
     expect(correct.ok).toBe(true);
     const reveal = correct.ok ? correct.messages.find((message) => message.type === "ROUND_ENDED") : null;
@@ -175,7 +172,7 @@ describe("multiplayer room", () => {
     expect(wrong.ok).toBe(true);
     expect(wrong.ok ? wrong.messages.some((message) => message.type === "ROUND_ENDED") : false).toBe(false);
 
-    const correctAnswer = countryNameForRound(startedRound!);
+    const correctAnswer = countryNameForRound(startedRound!, room);
     const correct = room.submitAnswer("host", correctAnswer, 1060);
     expect(correct.ok).toBe(true);
     const reveal = correct.ok ? correct.messages.find((message) => message.type === "ROUND_ENDED") : null;
@@ -205,9 +202,9 @@ describe("multiplayer room", () => {
     expect(start.ok).toBe(true);
     const startedRound = start.ok ? start.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
     expect(startedRound?.prompt.kind).toBe("flag-colors");
-    expect(startedRound?.prompt.value).toMatch(/^assets\/flags\/[a-z]{2}\.svg$/);
+    expect(startedRound?.prompt.value).toMatch(/^\/api\/game-assets\/[a-f0-9]{48}$/);
 
-    const correctAnswer = countryNameForRound(startedRound!);
+    const correctAnswer = countryNameForRound(startedRound!, room);
     const correct = room.submitAnswer("host", correctAnswer, 1020);
     expect(correct.ok).toBe(true);
     const reveal = correct.ok ? correct.messages.find((message) => message.type === "ROUND_ENDED") : null;
@@ -232,7 +229,7 @@ describe("multiplayer room", () => {
     expect(room.startGame("host", 1010).ok).toBe(true);
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("host", countryNameForRound(round), 1020).ok).toBe(true);
+    expect(room.submitAnswer("host", countryNameForRound(round, room), 1020).ok).toBe(true);
     const complete = room.advanceAfterResult(6000);
     expect(complete.ok).toBe(true);
     expect(complete.ok ? complete.messages.some((message) => message.type === "GAME_COMPLETED") : false).toBe(true);
@@ -264,7 +261,7 @@ describe("multiplayer room", () => {
 
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("host", countryNameForRound(round), 5000).ok).toBe(true);
+    expect(room.submitAnswer("host", countryNameForRound(round, room), 5000).ok).toBe(true);
     const result = room.snapshot();
     expect(result.status).toBe("round-result");
     expect(result.phaseStartedAt).toBe(5000);
@@ -288,7 +285,7 @@ describe("multiplayer room", () => {
     expect(room.startGame("host", 1000).ok).toBe(true);
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("host", countryNameForRound(round), 1100).ok).toBe(true);
+    expect(room.submitAnswer("host", countryNameForRound(round, room), 1100).ok).toBe(true);
     expect(room.advanceAfterResult(2000).ok).toBe(true);
     expect(room.snapshot().status).toBe("complete");
     expect(room.snapshot().players[0]?.score).toBeGreaterThan(0);
@@ -308,7 +305,7 @@ describe("multiplayer room", () => {
     expect(room.startGame("host", 1020).ok).toBe(true);
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("guest", countryNameForRound(round), 1100).ok).toBe(true);
+    expect(room.submitAnswer("guest", countryNameForRound(round, room), 1100).ok).toBe(true);
     expect(room.advanceAfterResult(2000).ok).toBe(true);
 
     const again = room.playAgain("host", 3000);
@@ -328,7 +325,7 @@ describe("multiplayer room", () => {
     expect(room.submitAnswer("guest", "atlantis", 2500).ok).toBe(true);
     expect(room.submitAnswer("guest", "lemuria", 3000).ok).toBe(true);
     expect(room.submitAnswer("host", "nowhere", 3500).ok).toBe(true);
-    const taken = room.submitAnswer("host", countryNameForRound(round), 6200);
+    const taken = room.submitAnswer("host", countryNameForRound(round, room), 6200);
     const reveal = taken.ok ? taken.messages.find((message) => message.type === "ROUND_ENDED") : undefined;
     if (reveal?.type !== "ROUND_ENDED") throw new Error("Expected a reveal.");
     expect(reveal.results.map((result) => [result.playerId, result.correct, result.attempts, result.elapsedMs])).toEqual([
@@ -354,7 +351,7 @@ describe("multiplayer room", () => {
 
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("late", countryNameForRound(round), 1030)).toMatchObject({ ok: false, code: "spectating" });
+    expect(room.submitAnswer("late", countryNameForRound(round, room), 1030)).toMatchObject({ ok: false, code: "spectating" });
     // The spectator doesn't hold the skip vote up: the host alone skipping closes the round.
     expect(room.voteSkip("host", 1040).ok).toBe(true);
     expect(room.snapshot().status).toBe("round-result");
@@ -373,7 +370,7 @@ describe("multiplayer room", () => {
     expect(room.startGame("host", 1040).ok).toBe(true);
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    expect(room.submitAnswer("host", countryNameForRound(round), 1050).ok).toBe(true);
+    expect(room.submitAnswer("host", countryNameForRound(round, room), 1050).ok).toBe(true);
     expect(room.advanceAfterResult(2000).ok).toBe(true);
     expect(room.snapshot().status).toBe("complete");
 
@@ -389,7 +386,7 @@ describe("multiplayer room", () => {
 
     const round = room.publicRound;
     if (!round) throw new Error("Expected active round.");
-    const correct = room.submitAnswer("host", countryNameForRound(round), 1040);
+    const correct = room.submitAnswer("host", countryNameForRound(round, room), 1040);
     const ended = correct.ok ? correct.messages.find((message) => message.type === "ROUND_ENDED") : undefined;
     if (ended?.type !== "ROUND_ENDED") throw new Error("Expected ROUND_ENDED.");
     expect(ended.results.every((result) => typeof result.name === "string" && result.name.length > 0)).toBe(true);
@@ -423,9 +420,9 @@ describe("multiplayer room", () => {
     expect(room.startGame("host", 1010).ok).toBe(true);
     const round = room.publicRound;
     if (!round || round.prompt.kind !== "image") throw new Error("Expected territory flag round.");
-    expect(round.prompt.value).toMatch(/^assets\/flags\/territories\/.+\.svg$/);
+    expect(round.prompt.value).toMatch(/^\/api\/game-assets\/[a-f0-9]{48}$/);
 
-    const territory = territoryFlags.find((flag) => flag.flagSrc === round.prompt.value);
+    const territory = territoryFlags.find((flag) => flag.name === countryNameForRound(round, room));
     if (!territory) throw new Error(`No territory for ${round.prompt.value}`);
     const answer = room.submitAnswer("host", territory.name, 1020);
     expect(answer.ok).toBe(true);
@@ -603,7 +600,7 @@ describe("room manager", () => {
     const started = host.messages.find((message) => message.type === "GAME_STARTED");
     if (started?.type !== "GAME_STARTED") throw new Error("Expected game start.");
 
-    manager.handleMessage(host, { type: "SUBMIT_ANSWER", answer: countryNameForRound(started.round), clientSentAt: 1100 }, 1100);
+    manager.handleMessage(host, { type: "SUBMIT_ANSWER", answer: countryNameForRound(started.round, [...(manager as unknown as { rooms: Map<string, Room> }).rooms.values()][0]!), clientSentAt: 1100 }, 1100);
     expect(host.messages.some((message) => message.type === "ROUND_ENDED")).toBe(true);
 
     manager.sweep(2000);

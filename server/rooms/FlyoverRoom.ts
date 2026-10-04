@@ -2,33 +2,27 @@ import { createSeededRandom } from "../../src/core/game/random";
 import {
   DEFAULT_FLYOVER_MULTIPLAYER_DURATION_MS,
   FLYOVER_MULTIPLAYER_DURATIONS_MS,
-  FLYOVER_SKIP_HOLD_SECONDS,
   FLYOVER_TAKEOFF_COUNTDOWN_MS,
   buildFlyoverRoute,
-  isPlausibleReach,
+  type PlaneInput,
   type FlyoverCountry,
   type FlyoverRoute,
 } from "../../src/core/flyover";
 import type { ProjectedPoint } from "../../src/core/map";
 import type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, PlayerId, PublicPlayerState, PublicRoomSettings, PublicRoundState, RoomCode } from "../../src/core/multiplayer/roomTypes";
 import type { ServerMessage } from "../../src/core/multiplayer/protocol";
+import { AuthoritativeFlight, parsePlaneInput } from "../ranked/AuthoritativeFlight";
 import { basePlayer, fail, ok, RoomBase, type RoomResult } from "./RoomBase";
 
 export const DEFAULT_FLYOVER_MAX_PLAYERS = 8;
-// The client starts its holding pattern a network trip before the server hears about the skip,
-// so the server's hold ends a little early rather than turning down an honest reach.
-const SKIP_HOLD_SLACK_MS = 1_000;
-// A reach that lands this soon before take-off (clock skew) still counts from take-off.
-const TAKEOFF_SLACK_MS = 500;
 
 /**
  * Flyover race: one flight per game. Everyone takes off together from the same place and flies
  * the same seeded route; each country reached scores a point and the most countries when the
  * clock runs out wins (ties go to whoever got there first).
  *
- * The server never flies the planes: it can't, without every keypress. It checks each claimed
- * reach instead — the right next country, a position that touches it, and a time an honest plane
- * could have flown it in — and relays everyone's positions so racers see each other.
+ * The server simulates controls and awards touches with fixed physics. Client positions and
+ * reach claims are ignored; future targets remain private until the current one ends.
  */
 
 interface FlyoverPlayerState extends PublicPlayerState {
@@ -59,6 +53,7 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
   private readonly countries: readonly FlyoverCountry[];
   private flight: FlyoverFlight | null = null;
   private gamesPlayed = 0;
+  private engines = new Map<PlayerId, AuthoritativeFlight>();
   private positions = new Map<PlayerId, FlyoverPlanePosition>();
   private positionsDirty = false;
 
@@ -94,6 +89,13 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
     return { skipVotes: [], skipRequired: 0 };
   }
 
+  reconnectPlayer(playerId: PlayerId, now: number): RoomResult {
+    const result = super.reconnectPlayer(playerId, now);
+    const player = this.players.get(playerId);
+    // Hand the plane back its current target: progress broadcasts keep it private.
+    return result.ok && player && !player.spectator ? ok([...result.messages, this.progressMessage(player, "sync")]) : result;
+  }
+
   get pendingTransitionAt(): number | null {
     return this.status === "playing" ? (this.flight?.endsAt ?? null) : null;
   }
@@ -113,11 +115,12 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
     const takeoffAt = now + FLYOVER_TAKEOFF_COUNTDOWN_MS;
     const prompt: FlyoverFlightPrompt = {
       start: { x: route.start.x, y: route.start.y, heading: route.start.heading },
-      route: route.route.map((country) => country.code),
+      target: route.route[0]?.code ?? null,
     };
     this.flight = { route, takeoffAt, endsAt: takeoffAt + this.flightMs, prompt: JSON.stringify(prompt) };
     for (const [id, player] of this.players) {
       this.players.set(id, { ...player, lastPoint: [route.start.x, route.start.y], lastAt: takeoffAt });
+      if (!player.spectator) this.engines.set(id, new AuthoritativeFlight(this.countries, createSeededRandom(this.seed), takeoffAt, takeoffAt + this.flightMs, route.start, route.route));
     }
     this.positions = new Map();
     this.positionsDirty = false;
@@ -127,6 +130,7 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
 
   protected resetGame(): void {
     this.flight = null;
+    this.engines.clear();
     this.positions = new Map();
     this.positionsDirty = false;
   }
@@ -148,11 +152,33 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
 
   /** Latest plane position, relayed to the room on the next tick. Quietly ignored off-flight. */
   updatePosition(playerId: PlayerId, x: number, y: number, heading: number, now: number): RoomResult {
-    const player = this.players.get(playerId);
-    if (this.status !== "playing" || !this.flight || now < this.flight.takeoffAt || !player?.connected || player.spectator) return ok();
-    this.positions.set(playerId, { playerId, x, y, heading });
-    this.positionsDirty = true;
+    // Old clients and console scripts cannot set authoritative positions.
     return ok();
+  }
+
+  steer(playerId: PlayerId, input: PlaneInput, now: number): RoomResult {
+    const engine = this.engines.get(playerId);
+    if (this.status !== "playing" || !this.flight || now < this.flight.takeoffAt || now >= this.flight.endsAt || !this.players.get(playerId)?.connected) return ok();
+    if (!engine || !parsePlaneInput(input)) return fail("invalid-controls", "Invalid flight controls.");
+    engine.steer(input, now);
+    return ok(this.tick(now));
+  }
+
+  tick(now: number): readonly ServerMessage[] {
+    if (this.status !== "playing" || !this.flight || now < this.flight.takeoffAt) return [];
+    const messages: ServerMessage[] = [];
+    for (const [id, engine] of this.engines) {
+      const player = this.players.get(id);
+      if (!player?.connected) continue;
+      engine.advance(now);
+      const changed = player.routeIndex !== engine.index;
+      const next = { ...player, routeIndex: engine.index, score: engine.score, correctAnswers: engine.score, lastReachAt: engine.lastReachAt };
+      this.players.set(id, next);
+      this.positions.set(id, { playerId: id, ...engine.plane });
+      this.positionsDirty = true;
+      if (changed) messages.push(this.progressMessage(next, "reached"));
+    }
+    return messages;
   }
 
   /** Everyone's latest position, once per change: the manager broadcasts it on its tick. */
@@ -168,57 +194,43 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
     if (this.status !== "playing" || !flight) return fail("round-not-open", "No flight is in progress.");
     const player = this.activePlayer(playerId);
     if ("ok" in player) return player;
-    const country = flight.route.route[index];
-    const at: ProjectedPoint = [x, y];
-    const elapsedSeconds = (Math.max(now, flight.takeoffAt) - player.lastAt) / 1000;
-    if (
-      index !== player.routeIndex ||
-      !country ||
-      now < flight.takeoffAt - TAKEOFF_SLACK_MS ||
-      now < player.holdUntil ||
-      !isPlausibleReach(country, at, player.lastPoint, elapsedSeconds)
-    ) {
-      return ok([], [this.progressMessage(player, "sync")]);
-    }
-    const next: FlyoverPlayerState = {
-      ...player,
-      routeIndex: player.routeIndex + 1,
-      score: player.score + 1,
-      correctAnswers: player.correctAnswers + 1,
-      streak: player.streak + 1,
-      lastPoint: at,
-      lastAt: Math.max(now, flight.takeoffAt),
-      lastReachAt: now,
-    };
-    this.players.set(playerId, next);
-    return ok([this.progressMessage(next, "reached")]);
+    // A claimed reach is never evidence of movement. Only tick() can award points.
+    return ok([], [this.progressMessage(player, "sync")]);
   }
 
   skip(playerId: PlayerId, index: number, now: number): RoomResult {
     this.touch(now);
     const flight = this.flight;
+    const progress = this.tick(now);
     if (this.status !== "playing" || !flight) return fail("round-not-open", "No flight is in progress.");
     const player = this.activePlayer(playerId);
     if ("ok" in player) return player;
-    if (index !== player.routeIndex || index >= flight.route.route.length || now < flight.takeoffAt - TAKEOFF_SLACK_MS) {
-      return ok([], [this.progressMessage(player, "sync")]);
+    const engine = this.engines.get(playerId);
+    if (!engine || index !== engine.index || index >= flight.route.route.length || now < flight.takeoffAt || now >= flight.endsAt || now < engine.holdUntil) {
+      return ok(progress, [this.progressMessage(player, "sync")]);
     }
+    engine.skip(now, true);
     const next: FlyoverPlayerState = {
       ...player,
-      routeIndex: player.routeIndex + 1,
+      routeIndex: engine.index,
+      score: engine.score,
+      correctAnswers: engine.score,
+      lastReachAt: engine.lastReachAt,
       skipped: player.skipped + 1,
       wrongAnswers: player.wrongAnswers + 1,
       streak: 0,
-      holdUntil: now + FLYOVER_SKIP_HOLD_SECONDS * 1000 - SKIP_HOLD_SLACK_MS,
+      holdUntil: engine.holdUntil,
     };
     this.players.set(playerId, next);
-    return ok([this.progressMessage(next, "skipped")]);
+    return ok([...progress, this.progressMessage(next, "skipped")]);
   }
 
   endRound(now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing") return fail("round-not-open", "No flight is in progress.");
-    return this.completeGame(now);
+    const progress = this.tick(now);
+    const result = this.completeGame(now);
+    return result.ok ? ok([...progress, ...result.messages]) : result;
   }
 
   /** Flyover has no results gap between rounds: one flight, then the podium. */
@@ -249,7 +261,7 @@ export class FlyoverRoom extends RoomBase<FlyoverPlayerState> {
   }
 
   private progressMessage(player: FlyoverPlayerState, event: FlyoverProgressEvent): ServerMessage {
-    return { type: "FLYOVER_PROGRESS", playerId: player.id, index: player.routeIndex, score: player.score, event };
+    return { type: "FLYOVER_PROGRESS", playerId: player.id, index: player.routeIndex, score: player.score, event, target: this.engines.get(player.id)?.target?.code ?? null };
   }
 
   private completeGame(now: number): RoomResult {

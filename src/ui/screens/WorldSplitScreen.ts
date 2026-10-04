@@ -30,6 +30,7 @@ import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createResultsStage, createRunList, formatNumber, insertIntoResults, shareSquare, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import type { RankedSession } from "./RankedSession";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MIN_DRAW_LENGTH = 24;
@@ -42,6 +43,7 @@ export interface WorldSplitScreenOptions {
   readonly onGameModeChange: (mode: GameModeId) => void;
   readonly onHome: () => void;
   readonly onDailyChallenge?: () => void;
+  readonly ranked?: RankedSession;
 }
 
 export interface WorldSplitScreenServices {
@@ -328,9 +330,17 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
     renderLine();
   }
 
-  function submitRound(): void {
-    if (!line || splitLineLength(line) < MIN_DRAW_LENGTH || submittedResult || finished) return;
-    submittedResult = scoreWorldSplit(countries, currentRound(), line);
+  let submitting = false;
+  async function submitRound(): Promise<void> {
+    if (!line || splitLineLength(line) < MIN_DRAW_LENGTH || submittedResult || finished || submitting) return;
+    if (options.ranked) {
+      submitting = true;
+      lockButton.disabled = true;
+      try { submittedResult = (await options.ranked.move({ type: "line", line })).result!.split!; }
+      catch (error) { if (!controller.signal.aborted) statusText.textContent = (error as Error).message; return; }
+      finally { submitting = false; lockButton.disabled = false; }
+      if (controller.signal.aborted) return;
+    } else submittedResult = scoreWorldSplit(countries, currentRound(), line);
     scores.push(submittedResult.score);
     sideAValue.textContent = `${submittedResult.sideAPercent.toFixed(1)}%`;
     sideBValue.textContent = `${submittedResult.sideBPercent.toFixed(1)}%`;
@@ -370,7 +380,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
 
     // Every finished run counts: it posts, and the board keeps your best.
     const previousBest = readSingleBest(options.storage, "worldsplit");
-    const posting = submitRankedAttempt({ shell, mode: "worldsplit", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    const posting = submitRankedAttempt({ shell, mode: "worldsplit", total: score, storage: options.storage, ...(options.ranked ? { post: options.ranked.post } : services.postAttempt ? { post: services.postAttempt } : {}) });
     bar.refreshBest();
     const isNewBest = score > previousBest;
     const card = createRankedResults(shell, {
@@ -402,7 +412,11 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
     renderRound();
   }
 
-  function playAgain(): void {
+  async function playAgain(): Promise<void> {
+    if (options.ranked) {
+      try { await options.ranked.start(); } catch (error) { statusText.textContent = (error as Error).message; return; }
+      if (controller.signal.aborted) return;
+    }
     scores.splice(0, scores.length);
     roundIndex = 0;
     resultsStage.hide();

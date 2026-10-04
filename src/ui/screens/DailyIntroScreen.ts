@@ -34,8 +34,8 @@ export function createDailyIntroScreen(options: {
       el("section", { className: "daily-format", attrs: { "aria-label": "Today's round order" }, children: format.map((stage) => el("article", { children: [
         shellIcon(stage.icon, 21, 1.7), el("span", { text: `Round${stage.rounds.includes("–") ? "s" : ""} ${stage.rounds}` }), el("strong", { text: stage.label }),
       ] })) }),
-      el("p", { className: "daily-intro-balance", text: challenge.challengeVersion === 2
-        ? "Start with familiar flags, build through moderate questions, and take on two tougher country questions. Four country rounds and both final rounds follow today's theme."
+      el("p", { className: "daily-intro-balance", text: challenge.themeScoped
+        ? "Start with familiar flags, then build through country questions and two final rounds. All ten rounds follow today's theme."
         : "Your saved challenge continues with its original questions and order." }),
       el("section", { className: "daily-scoring", children: [
         el("h2", { text: "How scoring works" }),

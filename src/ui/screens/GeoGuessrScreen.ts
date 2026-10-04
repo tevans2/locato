@@ -7,6 +7,8 @@ import type { LngLatPoint } from "../../core/maptap/distance";
 import { streetViewCountryRounds, type StreetViewCountryRound } from "../../core/streetview";
 import { createGeoGuessMap, googleMapsJavaScriptApiKey } from "../components/GeoGuessMap";
 import { createGeoStreetView } from "../components/GeoStreetView";
+import { createPrivateStreetView } from "../components/PrivateStreetView";
+import type { RankedSession } from "./RankedSession";
 import { el } from "../dom/createElement";
 import { createRunList, formatKm, formatNumber, insertIntoResults, shareSquare, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
@@ -21,6 +23,7 @@ export interface GeoGuessrScreenOptions {
   readonly onDailyChallenge: () => void;
   /** Keeps the local best for a five-round total. */
   readonly storage?: Storage;
+  readonly ranked?: RankedSession;
 }
 
 /** Injectable surfaces keep the full game flow testable without Google credentials. */
@@ -101,8 +104,9 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
   let requestId = 0;
   let results: GeoGuessrGuessResult[] = [];
   let retry: () => void;
+  let rankedLoaded = false;
 
-  const panorama = services.createPanorama(signal);
+  const panorama = options.ranked ? createPrivateStreetView(options.ranked, signal) : services.createPanorama(signal);
   const roundLabel = el("strong", { text: "01", className: "geo-round-number" });
   const scoreLabel = el("strong", { text: "0", className: "geo-total-score" });
   const steps = el("ol", { className: "geo-round-steps", attrs: { "aria-label": "Round progress" }, children: Array.from({ length: GEOGUESSR_ROUND_LIMIT }, (_, i) => el("li", { text: String(i + 1), attrs: { "aria-label": `Round ${i + 1}` } })) });
@@ -159,7 +163,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     storage: bestStorage,
     extraMenuItems: [
       ...fullscreenItems,
-      { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (services.isConfigured()) void loadGame(); } },
+      { label: "Restart run", icon: "rotate-ccw", onSelect: () => { if (options.ranked || services.isConfigured()) void loadGame(); } },
     ],
   });
   bar.element.classList.add("geo-gamebar");
@@ -178,6 +182,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     resultPanel.setAttribute("aria-label", next === "complete" ? "Game results" : "Round result");
     mapReveal.disabled = next !== "playing";
     resetButton.disabled = next !== "playing";
+    if (options.ranked) for (const button of panorama.element.querySelectorAll<HTMLButtonElement>("button")) button.disabled = next !== "playing";
     mapDock.inert = next === "loading" || next === "error" || next === "unconfigured" || (next === "playing" && mapSize === "collapsed");
   }
   function setMapSize(next: MapSize): void {
@@ -241,20 +246,28 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     roundIndex += 1;
     void startRound();
   }
-  function submitGuess(): void {
+  async function submitGuess(): Promise<void> {
     const location = locations[roundIndex];
     if (status !== "playing" || !guess || !location) return;
-    const result = scoreGeoGuessrGuess(guess, location);
+    let result: GeoGuessrGuessResult;
+    const id = requestId;
+    if (options.ranked) {
+      status = "loading"; submitButton.disabled = true;
+      try { result = (await options.ranked.move({ type: "pin", ...guess })).result!.geo!; }
+      catch { if (!signal.aborted && id === requestId) { status = "playing"; submitButton.disabled = false; pinStatus.textContent = "Could not check your pin. Try again."; } return; }
+      if (signal.aborted || id !== requestId) return;
+      locations[roundIndex] = result.target;
+    } else result = scoreGeoGuessrGuess(guess, location);
     results.push(result);
     setPhase("result");
     setMapSize("expanded");
     map.setAcceptingGuesses(false);
     updateHud();
     revealResult(result, roundIndex);
-    const heading = el("h2", { text: countryName(location), attrs: { tabindex: "-1" } });
+    const heading = el("h2", { text: countryName(result.target), attrs: { tabindex: "-1" } });
     const progress = el("div", { className: "geo-result-meter", children: [el("span", { attrs: { style: `width:${result.score / GEOGUESSR_MAX_ROUND_SCORE * 100}%` } })] });
     const nextButton = el("button", { className: "geo-button geo-primary", attrs: { type: "button" }, children: [el("span", { text: roundIndex === GEOGUESSR_ROUND_LIMIT - 1 ? "See final score" : "Next round" }), icon("arrow")], on: { click: nextRound } });
-    resultPanel.replaceChildren(el("span", { className: "geo-label", text: `Round ${roundIndex + 1} result` }), el("img", { className: "geo-result-flag", attrs: { src: `/assets/flags/${location.countryCode.toLowerCase()}.svg`, alt: "", width: "44", height: "30" } }), heading,
+    resultPanel.replaceChildren(el("span", { className: "geo-label", text: `Round ${roundIndex + 1} result` }), el("img", { className: "geo-result-flag", attrs: { src: `/assets/flags/${result.target.countryCode.toLowerCase()}.svg`, alt: "", width: "44", height: "30" } }), heading,
       el("div", { className: "geo-result-distance", children: [el("strong", { text: formatDistance(result.distanceKm) }), el("span", { text: "from the location" })] }),
       el("div", { className: "geo-round-points", children: [el("strong", { text: `+${formatNumber(result.score)}` }), el("span", { text: `/ ${formatNumber(GEOGUESSR_MAX_ROUND_SCORE)} pts` })] }), progress, nextButton);
     heading.focus();
@@ -277,7 +290,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     const tone = ratio >= 0.4 ? "celebrate" : "neutral";
     // Every finished trip counts: it posts, and the board keeps your best.
     const previousBest = readSingleBest(bestStorage, "geoguessr");
-    const posting = submitRankedAttempt({ shell, mode: "geoguessr", total, storage: bestStorage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    const posting = submitRankedAttempt({ shell, mode: "geoguessr", total, storage: bestStorage, ...(options.ranked ? { post: options.ranked.post } : services.postAttempt ? { post: services.postAttempt } : {}) });
     bar.refreshBest();
     const isNewBest = total > previousBest;
     const card = createRankedResults(shell, {
@@ -319,7 +332,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     loadingText.textContent = "GeoGuessr needs Google Street View, which isn’t available on this copy of Locato. These play right away:";
   }
   async function loadGame(): Promise<void> {
-    if (!services.isConfigured()) { showUnconfigured(); return; }
+    if (!options.ranked && !services.isConfigured()) { showUnconfigured(); return; }
     const id = ++requestId;
     setPhase("loading");
     results = [];
@@ -329,7 +342,8 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     loadingText.textContent = "Five rounds. Up to 5,000 points each.";
     retry = () => { void loadGame(); };
     try {
-      const online = await services.loadLocations(signal);
+      if (options.ranked) { if (rankedLoaded) await options.ranked.start(); rankedLoaded = true; }
+      const online = options.ranked ? Array.from({ length: GEOGUESSR_ROUND_LIMIT }, () => ({ lat: 0, lng: 0, heading: 0, label: "Mystery location", countryCode: "" })) : await services.loadLocations(signal);
       if (signal.aborted || id !== requestId) return;
       locations = online.length >= GEOGUESSR_ROUND_LIMIT ? online : fallbackLocations();
       await startRound();

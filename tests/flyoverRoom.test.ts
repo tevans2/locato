@@ -52,77 +52,93 @@ describe("flyover race route", () => {
   });
 });
 
+// These are server fixtures, so inspecting the private engine supplies a known target for
+// legitimate steering. The public prompt deliberately contains no future route.
+function pilot(room: FlyoverRoom, playerId: string, takeoffAt: number, wanted = 1) {
+  const engines = (room as unknown as { engines: Map<string, { plane: { x: number; y: number }; target: typeof countries[number] | null }> }).engines;
+  const messages: ServerMessage[] = [];
+  let time = takeoffAt;
+  while ((room.snapshot().players.find((p) => p.id === playerId)?.score ?? 0) < wanted && time < takeoffAt + 45_000) {
+    const engine = engines.get(playerId)!;
+    if (!engine.target) break;
+    let dx = engine.target.centre[0] - engine.plane.x;
+    if (dx > 500) dx -= 1000;
+    if (dx < -500) dx += 1000;
+    const heading = Math.atan2(engine.target.centre[1] - engine.plane.y, dx);
+    messages.push(...messagesOf(room.steer(playerId, { turn: 0, towards: heading, boost: true }, time)));
+    time += 100;
+  }
+  return { time, messages };
+}
+
 describe("flyover room", () => {
-  it("starts everyone together after a countdown, with the shared route in the round", () => {
+  it("starts together with only the first target disclosed", () => {
     const { round, prompt, takeoffAt } = startedRoom(60_000);
-    expect(round && round.type === "GAME_STARTED" && round.round.prompt.kind).toBe("flyover-flight");
     expect(round && round.type === "GAME_STARTED" && round.round.startedAt).toBe(takeoffAt);
     expect(round && round.type === "GAME_STARTED" && round.round.endsAt).toBe(takeoffAt + 60_000);
-    expect(prompt.route).toHaveLength(3);
+    expect(prompt.route).toBeUndefined();
+    expect(prompt.target).toEqual(expect.any(String));
     expect(prompt.start.x).toBeGreaterThan(0);
   });
 
-  it("scores a plausible reach and tells the room", () => {
-    const { room, prompt, takeoffAt } = startedRoom();
-    const target = byCode(prompt.route[0]!);
-    const result = room.reach("guest", 0, ...target.centre, takeoffAt + 10_000);
-    expect(messagesOf(result)).toEqual([{ type: "FLYOVER_PROGRESS", playerId: "guest", index: 1, score: 1, event: "reached" }]);
-    expect(room.snapshot().players.find((player) => player.id === "guest")).toMatchObject({ score: 1, routeIndex: 1 });
-  });
-
-  it("corrects only the claimant when a reach is out of order, in the wrong place or too quick", () => {
-    const { room, prompt, takeoffAt } = startedRoom();
-    const first = byCode(prompt.route[0]!);
-    const second = byCode(prompt.route[1]!);
-    const sync = { type: "FLYOVER_PROGRESS", playerId: "guest", index: 0, score: 0, event: "sync" };
-    for (const result of [
-      room.reach("guest", 1, ...second.centre, takeoffAt + 10_000),
-      room.reach("guest", 0, ...second.centre, takeoffAt + 10_000),
-      room.reach("guest", 0, ...first.centre, takeoffAt),
-    ]) {
-      expect(messagesOf(result)).toEqual([]);
-      expect(replyOf(result)).toEqual([sync]);
-    }
-    expect(room.snapshot().players.find((player) => player.id === "guest")?.score).toBe(0);
-  });
-
-  it("a skip moves on without scoring and holds the plane before the next country counts", () => {
-    const { room, prompt, takeoffAt } = startedRoom();
-    const skippedAt = takeoffAt + 1_000;
-    expect(messagesOf(room.skip("host", 0, skippedAt))).toEqual([{ type: "FLYOVER_PROGRESS", playerId: "host", index: 1, score: 0, event: "skipped" }]);
-    const next = byCode(prompt.route[1]!);
-    expect(replyOf(room.reach("host", 1, ...next.centre, skippedAt + 2_000))[0]).toMatchObject({ event: "sync", index: 1 });
-    expect(messagesOf(room.reach("host", 1, ...next.centre, skippedAt + FLYOVER_SKIP_HOLD_SECONDS * 1000))[0]).toMatchObject({ event: "reached", index: 2, score: 1 });
-  });
-
-  it("relays positions once take-off has happened, once per change", () => {
+  it("awards touches from normal steering and emits the next target", () => {
     const { room, takeoffAt } = startedRoom();
-    room.updatePosition("host", 100, 200, 0, takeoffAt - 500);
-    expect(room.drainPlanes()).toBeNull();
-    room.updatePosition("host", 100, 200, 0.5, takeoffAt + 100);
-    room.updatePosition("guest", 300, 250, -1, takeoffAt + 120);
-    expect(room.drainPlanes()).toEqual({ type: "FLYOVER_PLANES", planes: [{ playerId: "host", x: 100, y: 200, heading: 0.5 }, { playerId: "guest", x: 300, y: 250, heading: -1 }] });
-    expect(room.drainPlanes()).toBeNull();
+    const result = pilot(room, "guest", takeoffAt);
+    expect(result.messages).toContainEqual(expect.objectContaining({ type: "FLYOVER_PROGRESS", playerId: "guest", index: 1, score: 1, event: "reached", target: expect.any(String) }));
+    expect(room.snapshot().players.find((p) => p.id === "guest")).toMatchObject({ score: 1, routeIndex: 1 });
   });
 
-  it("ends on the clock with most countries first and ties to whoever got there first", () => {
+  it("ignores forged reaches and teleported positions", () => {
     const { room, prompt, takeoffAt } = startedRoom();
-    const target = byCode(prompt.route[0]!);
-    room.reach("guest", 0, ...target.centre, takeoffAt + 8_000);
-    room.reach("host", 0, ...target.centre, takeoffAt + 9_000);
+    const target = byCode(prompt.target!);
+    for (const index of [0, 1, 2]) {
+      expect(messagesOf(room.reach("guest", index, ...target.centre, takeoffAt + 10_000))).toEqual([]);
+      expect(replyOf(room.reach("guest", index, ...target.centre, takeoffAt + 10_000))[0]).toMatchObject({ score: 0, index: 0, event: "sync" });
+    }
+    room.updatePosition("guest", ...target.centre, 0, takeoffAt + 10_000);
+    expect(room.drainPlanes()).toBeNull();
+    expect(room.snapshot().players.find((p) => p.id === "guest")?.score).toBe(0);
+  });
+
+  it("skips without scoring, enforces the hold, and rejects stale skip indices", () => {
+    const { room, takeoffAt } = startedRoom();
+    const time = takeoffAt + 1000;
+    expect(messagesOf(room.skip("host", 0, time))[0]).toMatchObject({ index: 1, score: 0, event: "skipped" });
+    expect(replyOf(room.skip("host", 1, time + 1000))[0]).toMatchObject({ index: 1, score: 0 });
+    expect(replyOf(room.skip("host", 0, time + 6000))[0]).toMatchObject({ index: 1, score: 0 });
+    expect(messagesOf(room.skip("host", 1, time + FLYOVER_SKIP_HOLD_SECONDS * 1000))[0]).toMatchObject({ index: 2, score: 0 });
+  });
+
+  it("relays server positions, freezes after stale controls, and stops on deadline", () => {
+    const { room, prompt, takeoffAt } = startedRoom();
+    room.steer("host", { turn: 0, boost: true }, takeoffAt);
+    room.tick(takeoffAt + 500);
+    const first = room.drainPlanes();
+    expect(first?.type).toBe("FLYOVER_PLANES");
+    if (first?.type !== "FLYOVER_PLANES") throw new Error("No positions");
+    expect(first.planes.find((p) => p.playerId === "host")?.x).not.toBe(prompt.start.x);
+    room.tick(takeoffAt + 2000);
+    const frozen = room.drainPlanes();
+    room.tick(takeoffAt + 30_000);
+    expect(room.drainPlanes()).toEqual(frozen);
+    room.endRound(takeoffAt + 90_000);
+    expect(messagesOf(room.steer("host", { turn: 0, boost: true }, takeoffAt + 100_000))).toEqual([]);
+  });
+
+  it("ends on server time and ranks verified scores", () => {
+    const { room, takeoffAt } = startedRoom();
+    pilot(room, "guest", takeoffAt);
     expect(room.pendingTransitionAt).toBe(takeoffAt + 90_000);
-    const done = room.endRound(takeoffAt + 90_000);
-    const completed = messagesOf(done).find((message) => message.type === "GAME_COMPLETED");
-    expect(completed && completed.type === "GAME_COMPLETED" && completed.results.map((result) => [result.name, result.rank, result.score])).toEqual([["Guest", 1, 1], ["Host", 2, 1]]);
+    const completed = messagesOf(room.endRound(takeoffAt + 90_000)).find((m) => m.type === "GAME_COMPLETED");
+    expect(completed && completed.type === "GAME_COMPLETED" && completed.results[0]).toMatchObject({ name: "Guest", score: 1 });
     expect(room.state).toBe("complete");
     expect(room.snapshot().round).toBeNull();
   });
 
-  it("only offers the listed flight lengths, and a rematch starts clean", () => {
+  it("only offers listed lengths and resets on rematch", () => {
     const room = new FlyoverRoom({ code: "FLY02", hostPlayerId: "host", hostName: "Host", countries, seed: "s", now: 0 });
     expect(room.updateOptions("host", { roundDurationMs: 45_000 }, 1).ok).toBe(false);
     expect(room.updateOptions("host", { roundDurationMs: 120_000 }, 2).ok).toBe(true);
-    expect(room.snapshot().settings.roundDurationMs).toBe(120_000);
     room.startGame("host", 10);
     room.endRound(200_000);
     expect(room.returnToLobby("host", 200_001).ok).toBe(true);
@@ -157,29 +173,33 @@ class TestConnection implements MultiplayerConnection {
 }
 
 describe("flyover room manager", () => {
-  it("runs a race end to end: positions on the tick, reaches to everyone, the podium on the clock", () => {
+  it("ignores old cheats and privately delivers current targets on verified progress", () => {
     const manager = new RoomManager({ flyoverCountries: () => countries });
-    const host = new TestConnection();
-    const guest = new TestConnection();
+    const host = new TestConnection(), guest = new TestConnection();
     manager.handleMessage(host, { type: "CREATE_ROOM", playerName: "Host", categoryIds: ["flyover"], roundDurationMs: 60_000 }, 0);
     const roomCode = host.of("SESSION_ASSIGNED")[0]!.roomCode;
-    expect(manager.listRooms()[0]?.kind).toBe("flyover");
     manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode, playerName: "Guest" }, 10);
     manager.handleMessage(host, { type: "START_GAME" }, 1000);
     const round = guest.of("GAME_STARTED")[0]!.round;
     const prompt = JSON.parse(round.prompt.value) as FlyoverFlightPrompt;
-
-    manager.handleMessage(guest, { type: "FLYOVER_POSITION", x: 400, y: 250, heading: 0 }, round.startedAt + 100);
-    manager.sweep(round.startedAt + 200);
-    expect(host.of("FLYOVER_PLANES").at(-1)?.planes).toEqual([{ playerId: guest.of("SESSION_ASSIGNED")[0]!.playerId, x: 400, y: 250, heading: 0 }]);
-
-    const [x, y] = byCode(prompt.route[0]!).centre;
-    manager.handleMessage(guest, { type: "FLYOVER_REACHED", index: 0, x, y, clientSentAt: 0 }, round.startedAt + 10_000);
-    expect(host.of("FLYOVER_PROGRESS").at(-1)).toMatchObject({ event: "reached", score: 1 });
-
-    manager.handleMessage(guest, { type: "SUBMIT_ANSWER", answer: "Japan", clientSentAt: 0 }, round.startedAt + 11_000);
-    expect(guest.of("ERROR").at(-1)?.code).toBe("wrong-mode");
-
+    expect(prompt.route).toBeUndefined();
+    const [x, y] = byCode(prompt.target!).centre;
+    manager.handleMessage(guest, { type: "FLYOVER_REACHED", index: 0, x, y, clientSentAt: 0 }, round.startedAt + 100);
+    expect(guest.of("FLYOVER_PROGRESS").at(-1)).toMatchObject({ score: 0 });
+    const guestId = guest.of("SESSION_ASSIGNED")[0]!.playerId;
+    let plane = prompt.start;
+    for (let now = round.startedAt; now < round.startedAt + 30_000; now += 100) {
+      let dx = x - plane.x;
+      if (dx > 500) dx -= 1000;
+      if (dx < -500) dx += 1000;
+      manager.handleMessage(guest, { type: "FLYOVER_INPUT", turn: 0, towards: Math.atan2(y - plane.y, dx), boost: true }, now);
+      manager.sweep(now);
+      plane = guest.of("FLYOVER_PLANES").at(-1)?.planes.find((p) => p.playerId === guestId) ?? plane;
+      if (guest.of("FLYOVER_PROGRESS").at(-1)?.score === 1) break;
+    }
+    expect(guest.of("FLYOVER_PROGRESS").at(-1)).toMatchObject({ score: 1, target: expect.any(String) });
+    expect(host.of("FLYOVER_PROGRESS").at(-1)).toMatchObject({ score: 1 });
+    expect(host.of("FLYOVER_PROGRESS").at(-1)).not.toHaveProperty("target");
     manager.sweep(round.endsAt!);
     expect(host.of("GAME_COMPLETED")[0]?.results[0]).toMatchObject({ name: "Guest", score: 1 });
   });

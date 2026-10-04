@@ -11,6 +11,8 @@ import { bindKeyboardAwareInput, shouldAutoFocusTextInput } from "../dom/mobileK
 import { createDailyStageBar, createResultsStage, createRunList, insertIntoResults, shellOrFallback, type DailyStageProgress } from "./practiceRun";
 import { scoreDailyRound } from "../../core/dailyChallenge";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import type { RankedSession } from "./RankedSession";
+import { createPrivateStreetView } from "../components/PrivateStreetView";
 
 /** A practice run is this many countries; then the results screen. */
 export const STREETVIEW_RUN_LENGTH = 5;
@@ -24,6 +26,7 @@ export interface StreetViewCountryScreenOptions {
   readonly onDailyChallenge: () => void;
   /** Keeps the device best. */
   readonly storage?: Storage;
+  readonly ranked?: RankedSession;
   readonly dailyChallenge?: {
     readonly date: string;
     readonly title?: string;
@@ -187,7 +190,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   };
   const controller = new AbortController();
   const shell = shellOrFallback(options.shell, options.onHome);
-  const apiKey = services.apiKey;
+  const apiKey = options.ranked ? "server-owned" : services.apiKey;
   const runRounds: RunRound[] = [];
   let runFinished = false;
   const isDailyChallenge = options.dailyChallenge !== undefined;
@@ -200,7 +203,8 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const roundCache: StreetViewCountryRound[] = [];
   let status: RoundStatus = "playing";
   let attemptIndex = 0;
-  let round = options.dailyChallenge?.round ?? chooseRound(options.countryIndex);
+  const privateRound = (): StreetViewCountryRound => ({ countryCode: "", frames: Array.from({ length: 3 }, (_, i) => ({ lat: 0, lng: 0, heading: 0, label: `Frame ${i + 1}` })) });
+  let round = options.ranked ? privateRound() : options.dailyChallenge?.round ?? chooseRound(options.countryIndex);
   let pendingDailyResult: DailyStreetViewResult | null = null;
   let dailyCompleted = false;
   let loadingRound = false;
@@ -224,6 +228,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     return { iframe, url: "", ready: false, loadSequence: 0, warmupTimer: null, loadTimeout: null };
   });
   let activeIframe = initialStreetViewFrame;
+  const privateView = options.ranked ? createPrivateStreetView(options.ranked, controller.signal, () => attemptIndex) : null;
   const missingKeyPanel = el("div", {
     className: "streetview-missing-key",
     children: [
@@ -377,7 +382,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     loadingOverlay.setAttribute("aria-hidden", String(!showLoader));
     streetViewPanel.classList.toggle("is-loading", showLoader);
     streetViewPanel.setAttribute("aria-busy", String(showLoader));
-    for (const iframe of streetViewIframes) iframe.hidden = !apiKey;
+    for (const iframe of streetViewIframes) iframe.hidden = Boolean(options.ranked) || !apiKey;
   }
 
   function setStreetViewLoading(isLoading: boolean): void {
@@ -586,6 +591,13 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   }
 
   function renderStreetView(): void {
+    if (privateView) {
+      const stage = initialStreetViewFrame.parentElement;
+      if (stage && privateView.element.parentElement !== stage) stage.prepend(privateView.element);
+      for (const button of privateView.element.querySelectorAll<HTMLButtonElement>("button")) button.disabled = status !== "playing";
+      if (status === "playing") void privateView.show({ lat: 0, lng: 0, heading: 0, label: "", countryCode: "" });
+      return;
+    }
     if (!apiKey) {
       resetStreetViewFrames();
       return;
@@ -613,6 +625,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   }
 
   async function fillRoundCache(): Promise<void> {
+    if (options.ranked) return;
     if (isDailyChallenge || !apiKey || controller.signal.aborted) return;
     if (cachePromise) return cachePromise;
 
@@ -648,6 +661,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   }
 
   function startNextRound(message = "Next country loaded.", tone: "neutral" | "good" | "bad" = "neutral"): void {
+    if (options.ranked) { round = privateRound(); resetCurrentCountry(message, tone); return; }
     const cachedRound = takeCachedRound();
     round = cachedRound ?? chooseRound(options.countryIndex);
     lastStreetViewCountryCode = round.countryCode;
@@ -714,7 +728,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     const maximum = runLength * STREET_VIEW_POINTS_BY_GUESS[0];
     const storage = options.storage ?? shell.storage ?? null;
     const previousBest = readSingleBest(storage, "streetview-country");
-    const posting = submitRankedAttempt({ shell, mode: "streetview-country", total, storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    const posting = submitRankedAttempt({ shell, mode: "streetview-country", total, storage, ...(options.ranked ? { post: options.ranked.post } : services.postAttempt ? { post: services.postAttempt } : {}) });
     if ("refreshBest" in bar) bar.refreshBest();
     const isNewBest = total > previousBest;
     const card = createRankedResults(shell, {
@@ -739,14 +753,20 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     resultsStage.show(card);
   }
 
-  function restartRun(): void {
+  async function restartRun(): Promise<void> {
+    if (options.ranked) {
+      loadingRound = true; render();
+      try { await options.ranked.start(); } catch (error) { showFeedback(feedback, (error as Error).message, "bad"); return; }
+      finally { loadingRound = false; }
+      if (controller.signal.aborted) return;
+    }
     runRounds.splice(0);
     runFinished = false;
     resultsStage.hide();
     startNextRound("New run. Five fresh countries.");
   }
 
-  function handleGuess(): void {
+  async function handleGuess(): Promise<void> {
     if (status !== "playing" || loadingRound) return;
     const guess = submitCountryGuess(options.countryIndex, input.value, guessedCountryIds);
     if (!guess) {
@@ -757,6 +777,25 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
 
     guessedCountryIds.add(guess.id);
     input.value = "";
+
+    if (options.ranked) {
+      loadingRound = true; updateControls();
+      try {
+        const state = await options.ranked.move({ type: "answer", answer: guess.name });
+        if (controller.signal.aborted) return;
+        loadingRound = false;
+        const detail = state.result;
+        if (detail?.countryCode) {
+          round = { ...round, countryCode: detail.countryCode };
+          const correct = detail.kind === "correct";
+          recordRunRound(correct, guessedCountryIds.size);
+          if (!correct) { status = "lost"; render(); showFeedback(feedback, `Answer — ${targetCountry().name}.`, "bad"); }
+          else if (runRounds.length >= runLength) { status = "won"; render(); showResults(); }
+          else startNextRound(`Correct — ${targetCountry().name}. Next country loaded.`, "good");
+        } else { attemptIndex++; render(); showFeedback(feedback, `Not ${guess.name}. New frame loaded.`, "bad"); }
+      } catch (error) { loadingRound = false; guessedCountryIds.delete(guess.id); render(); showFeedback(feedback, (error as Error).message, "bad"); }
+      return;
+    }
 
     if (guess.code === round.countryCode) {
       const countryName = targetCountry().name;
@@ -828,8 +867,17 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   }, { signal: controller.signal });
   revealButton.addEventListener(
     "click",
-    () => {
+    async () => {
       if (loadingRound) return;
+      if (options.ranked) {
+        loadingRound = true; updateControls();
+        try {
+          const state = await options.ranked.move({ type: "skip" });
+          if (controller.signal.aborted) return;
+          round = { ...round, countryCode: state.result!.countryCode! };
+        } catch (error) { showFeedback(feedback, (error as Error).message, "bad"); return; }
+        finally { loadingRound = false; }
+      }
       status = "lost";
       recordRunRound(false, guessedCountryIds.size);
       queueDailyStreetViewResult({ missed: true, wrongGuesses: attemptIndex });
@@ -849,6 +897,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     element,
     destroy: () => {
       controller.abort();
+      privateView?.destroy();
       resetStreetViewFrames();
     },
   };
