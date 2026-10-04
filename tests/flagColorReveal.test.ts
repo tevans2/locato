@@ -154,7 +154,7 @@ it("uses the same full-detail reveal in multiplayer, retaining it through room u
   const round = { roundNumber: 1, startedAt: 1000, endsAt: null, prompt: { kind: "flag-colors", value: "fine-detail" } } as const;
   const state: MultiplayerGameViewState = {
     room: {
-      roomCode: "FLAGS", hostPlayerId: "one", categoryIds: ["flag-colors"],
+      roomCode: "FLAGS", kind: "quiz", hostPlayerId: "one", categoryIds: ["flag-colors"],
       settings: { roundLimit: 10, roundDurationMs: 30000 }, status: "playing",
       players: [], round, skipVotes: [], skipRequired: 0,
       phaseStartedAt: null, phaseEndsAt: null, chatMessages: [],

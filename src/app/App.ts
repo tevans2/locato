@@ -122,7 +122,7 @@ export function createApp(options: AppOptions): App {
       });
     },
     openCountry: (code) => navigate({ type: "country-profile", code: code.toUpperCase() }),
-    openCompete: (mode, variant) => navigate({ type: "compete", ...(mode ? { mode } : {}), ...(variant ? { variant } : {}) }),
+    openLeaderboards: (mode, variant) => navigate({ type: "leaderboards", ...(mode ? { mode } : {}), ...(variant ? { variant } : {}) }),
     openAccount: () => authControls.openPanel(),
     controls: shellControls.element,
     confirmLeave: (message, confirmOptions) => shellConfirmDialog(message, confirmOptions),
@@ -164,16 +164,24 @@ export function createApp(options: AppOptions): App {
     return state && typeof state === "object" && state.route ? (state as HistoryState) : null;
   }
 
+  /** The history entry on screen, so a guarded Back can put it back while it asks. */
+  let shownEntry: { readonly state: unknown; readonly url: string } | null = null;
+  function rememberEntry(): void {
+    shownEntry = { state: window.history.state, url: window.location.href };
+  }
+
   function pushRoute(route: AppRoute): void {
     const current = historyState();
     // Re-selecting the current screen shouldn't stack duplicate history entries.
     if (current && JSON.stringify(current.route) === JSON.stringify(route)) return;
     window.history.pushState({ route, idx: (current?.idx ?? 0) + 1, ...(current ? { prev: current.route } : {}) } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+    rememberEntry();
   }
 
   function replaceRoute(route: AppRoute): void {
     const current = historyState();
     window.history.replaceState({ route, idx: current?.idx ?? 0, ...(current?.prev ? { prev: current.prev } : {}) } satisfies HistoryState, "", buildRouteUrl(route, window.location));
+    rememberEntry();
   }
 
   /** Return to a screen of this type: pop history when we came straight from it, else push it. */
@@ -353,13 +361,12 @@ export function createApp(options: AppOptions): App {
           // Also record the moment a run is fully completed.
           if (state.status === "complete") void recordSoloSession(state);
         },
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         onViewStats: () => navigate({ type: "stats" }),
         onViewFriends: () => navigate({ type: "friends" }),
         onLeaderboard: () =>
           navigate({
-            type: "leaderboard",
+            type: "leaderboards",
             mode: promptGameModeFromCategoryIds(activeCategories),
             ...(activeCategories.length === 1 && activeCategories[0] === "flags" && activeFlagPool !== "countries" ? { variant: activeFlagPool } : {}),
           }),
@@ -516,7 +523,6 @@ export function createApp(options: AppOptions): App {
     const dailyStageNav = {
       onGameModeChange: (gameMode: GameModeId) => leaveDaily(() => handleGameModeChange(gameMode)),
       onHome: () => leaveDaily(() => navigate({ type: "landing" })),
-      onMultiplayer: () => leaveDaily(() => navigate({ type: "multiplayer" })),
       onDailyChallenge: () => undefined,
     };
 
@@ -640,11 +646,10 @@ export function createApp(options: AppOptions): App {
         onHome: dailyStageNav.onHome,
         onReset: () => undefined,
         onStateChange: () => undefined,
-        onMultiplayer: dailyStageNav.onMultiplayer,
         onDailyChallenge: () => undefined,
         // "Back to modes": the game list. The daily is saved and resumes on return.
         onExitDailyChallenge: () => leaveDaily(() => navigate({ type: "landing" })),
-        onLeaderboard: () => leaveDaily(() => navigate({ type: "leaderboard", mode: "flags" })),
+        onLeaderboard: () => leaveDaily(() => navigate({ type: "leaderboards", mode: "flags" })),
         getAuthUser: () => authControls.getUser(),
         authControls,
         dailyChallenge: {
@@ -710,7 +715,7 @@ export function createApp(options: AppOptions): App {
       } else if (round.categoryId === "streetview-country") {
         const streetRound = streetViewCountryRounds.find((candidate) => candidate.countryCode === round.countryCode);
         if (!streetRound) { onComplete(); return; }
-        mount(createStreetViewCountryScreen({ ...nav, countryIndex: options.countryIndex, onMultiplayer: () => navigate({ type: "multiplayer" }),
+        mount(createStreetViewCountryScreen({ ...nav, countryIndex: options.countryIndex,
           dailyChallenge: { date, title, practice: true, round: streetRound, progress: { round: position + 1, total: rounds.length }, onComplete } }));
       } else {
         const country = options.countryIndex.byCode.get(round.countryCode!)!;
@@ -812,13 +817,12 @@ export function createApp(options: AppOptions): App {
           ...(continent ? { puzzleContinent: continent } : {}),
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
-          onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onRecordGame: (r) => void recordWorldMapGame(r),
           onViewStats: () => navigate({ type: "stats" }),
           onViewFriends: () => navigate({ type: "friends" }),
           authControls,
-          onLeaderboard: () => navigate({ type: "leaderboard", mode: initialMode }),
+          onLeaderboard: () => navigate({ type: "leaderboards", mode: initialMode }),
           getAuthUser: () => authControls.getUser(),
         }),
       );
@@ -842,7 +846,6 @@ export function createApp(options: AppOptions): App {
         storage: options.storage,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
     );
@@ -861,7 +864,6 @@ export function createApp(options: AppOptions): App {
         storage: options.storage,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
       }),
     );
@@ -879,7 +881,6 @@ export function createApp(options: AppOptions): App {
         run: runType,
         onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
         onHome: () => navigate({ type: "landing" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
         onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         storage: options.storage,
       }),
@@ -904,7 +905,6 @@ export function createApp(options: AppOptions): App {
           storage: options.storage,
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
-          onMultiplayer: () => navigate({ type: "multiplayer" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         }),
       );
@@ -939,41 +939,43 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  async function startMultiplayer(joinCode?: string, quickCreate?: { readonly create: true; readonly inviteUserId?: string }): Promise<void> {
+  async function startMultiplayer(joinCode?: string, quickCreate?: { readonly inviteUserId?: string }): Promise<void> {
     const run = navigationRun;
-    const loading = createLoadingScreen("Loading multiplayer...");
-    mount(loading);
+    mount(createLoadingScreen("Loading multiplayer..."));
 
     let worldCountryFeatures: readonly WorldCountryFeature[];
     try {
-      worldCountryFeatures = await loadWorldCountryFeatures();
+      // Wait (briefly) for the session check too, so a signed-in player opening an invite link
+      // joins under their account rather than being asked for a name.
+      [worldCountryFeatures] = await Promise.all([loadWorldCountryFeatures(), Promise.race([authResolved, new Promise((resolve) => setTimeout(resolve, 1500))])]);
     } catch (error) {
       if (run !== navigationRun) return;
       showLoadError(error);
       return;
     }
-
     if (run !== navigationRun) return;
 
-    const { createMultiplayerLobbyScreen } = await import("../ui/screens/MultiplayerLobbyScreen");
+    const { createMultiplayerScreen } = await import("../ui/screens/multiplayer/MultiplayerScreen");
     if (run !== navigationRun) return;
     mount(
-      createMultiplayerLobbyScreen({ shell,
+      createMultiplayerScreen({
+        shell,
         // In a room the URL is its invite link, so a refresh or a copied address lands back in it.
-        // Only while the lobby is still on screen, so leaving a room on the way out can't rewrite the next page's URL.
+        // Only while this page is still on screen, so leaving a room on the way out can't rewrite the next page's URL.
         onRoomCodeChange: (roomCode) => {
           if (run === navigationRun) replaceRoute(roomCode ? { type: "multiplayer", joinCode: roomCode } : { type: "multiplayer" });
         },
         countryIndex: options.countryIndex,
         worldCountryFeatures,
         createOnlineTransport: createDefaultOnlineTransport,
-        onBackToSolo: () => goBack(),
-        onHome: () => navigate({ type: "landing" }),
-        onDailyChallenge: () => navigate({ type: "daily-challenge" }),
         authControls,
         storage: options.storage,
         ...(joinCode ? { initialJoinCode: joinCode } : {}),
-        ...(quickCreate ? { autoCreate: true, ...(quickCreate.inviteUserId ? { inviteUserId: quickCreate.inviteUserId } : {}) } : {}),
+        ...(quickCreate ? { autoCreate: quickCreate.inviteUserId ? { inviteUserId: quickCreate.inviteUserId } : {} } : {}),
+        onFriends: () => navigate({ type: "friends" }),
+        subscribeFriends: (listener) => social.subscribe((message: SocialServerMessage) => {
+          if (message.type !== "GAME_INVITE" && message.type !== "FRIEND_REQUEST") listener();
+        }),
       }),
     );
   }
@@ -1049,29 +1051,18 @@ export function createApp(options: AppOptions): App {
     mount(createAtlasScreen({ shell, countryIndex: options.countryIndex, progressStore: academyProgress, onOpenAcademy: () => navigate({ type: "academy" }) }));
   }
 
-  /** Compete (also the legacy `leaderboard` route). Picking a board replaces the URL, it doesn't push. */
-  async function startCompete(mode?: GameModeId, variant?: string, tab?: "leaderboards"): Promise<void> {
+  /** Leaderboards. Picking a board replaces the URL, it doesn't push. */
+  async function startLeaderboards(mode?: GameModeId, variant?: string): Promise<void> {
     const run = navigationRun;
-    const { createCompeteScreen } = await import("../ui/screens/CompeteScreen");
+    const { createLeaderboardsScreen } = await import("../ui/screens/LeaderboardsScreen");
     if (run !== navigationRun) return;
-    const boardRoute = (nextMode: GameModeId, nextVariant: string): AppRoute => ({ type: "compete", tab: "leaderboards", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) });
     mount(
-      createCompeteScreen({
+      createLeaderboardsScreen({
         shell,
         storage: options.storage,
         ...(mode ? { mode } : {}),
         ...(variant ? { variant } : {}),
-        ...(tab ? { tab } : {}),
-        onSelect: (nextMode, nextVariant) => replaceRoute(boardRoute(nextMode, nextVariant)),
-        onTab: (nextTab, nextMode, nextVariant) => replaceRoute(nextTab === "leaderboards" ? boardRoute(nextMode, nextVariant) : { type: "compete" }),
-        onMultiplayer: () => navigate({ type: "multiplayer" }),
-        onCreateRoom: (request) => navigate({ type: "multiplayer", create: true, ...(request?.inviteUserId ? { invite: request.inviteUserId } : {}) }),
-        onJoinRoom: (code) => navigate({ type: "multiplayer", joinCode: code }),
-        onRejoinRoom: () => navigate({ type: "multiplayer" }),
-        onFriends: () => navigate({ type: "friends" }),
-        subscribeFriends: (listener) => social.subscribe((message: SocialServerMessage) => {
-          if (message.type !== "GAME_INVITE" && message.type !== "FRIEND_REQUEST") listener();
-        }),
+        onSelect: (nextMode, nextVariant) => replaceRoute({ type: "leaderboards", mode: nextMode, ...(nextVariant ? { variant: nextVariant } : {}) }),
       }),
     );
   }
@@ -1092,8 +1083,8 @@ export function createApp(options: AppOptions): App {
     }
     const leavingSolo = recordSoloSession(lastSoloState);
     lastSoloState = null;
-    if (route.type === "compete" || route.type === "leaderboard") {
-      runNavigation(startCompete(route.mode, route.variant, route.type === "compete" ? route.tab : route.mode ? "leaderboards" : undefined));
+    if (route.type === "leaderboards") {
+      runNavigation(startLeaderboards(route.mode, route.variant));
       return;
     }
     // `flag-gallery` is the legacy name for the Atlas (`?view=flags`).
@@ -1138,7 +1129,7 @@ export function createApp(options: AppOptions): App {
       // A quick-create link makes one room; afterwards the entry is the plain lobby, so Back/Forward
       // or a refresh (after leaving the room) never opens a second one.
       if (route.create) replaceRoute({ type: "multiplayer" });
-      runNavigation(startMultiplayer(route.joinCode, route.create ? { create: true, ...(route.invite ? { inviteUserId: route.invite } : {}) } : undefined));
+      runNavigation(startMultiplayer(route.joinCode, route.create ? (route.invite ? { inviteUserId: route.invite } : {}) : undefined));
       return;
     }
     if (route.type === "stats") {
@@ -1175,6 +1166,7 @@ export function createApp(options: AppOptions): App {
       },
       ...(username ? { initialUsername: username } : {}),
       getCurrentUsername: () => authControls.getUser()?.displayName ?? null,
+      onInviteToGame: (friend) => navigate({ type: "multiplayer", create: true, invite: friend.id }),
       appOrigin: window.location.origin,
       subscribe: (listener) => social.subscribe((message: SocialServerMessage) => {
         if (message.type !== "GAME_INVITE") listener();
@@ -1210,11 +1202,27 @@ export function createApp(options: AppOptions): App {
       const initialRoute = routeFromLocation(window.location) ?? { type: "landing" };
       const initialHash = initialRoute.type === "landing" && ["#games", "#landing-title"].includes(window.location.hash) ? window.location.hash : "";
       window.history.replaceState({ route: initialRoute, idx: 0 } satisfies HistoryState, "", `${buildRouteUrl(initialRoute, window.location)}${initialHash}`);
+      rememberEntry();
+      // Back/Forward out of a screen that would lose something (a multiplayer room, a lesson)
+      // asks first. The browser has already moved, so the page's entry goes back while it asks.
+      let leaveConfirmed = false;
       window.addEventListener("popstate", (event) => {
         const state = event.state as Partial<HistoryState> | null;
         // Native in-page anchors keep the landing page mounted and preserve scrolling.
         if (!state?.route && !window.location.search && activeScreen?.element.classList.contains("landing-screen-shell")) return;
+        const message = activeScreen?.element.dataset.leaveConfirm;
+        if (message && !leaveConfirmed && shownEntry) {
+          window.history.pushState(shownEntry.state, "", shownEntry.url);
+          void shellConfirmDialog(message, { confirmLabel: "Leave", cancelLabel: "Stay" }).then((leave) => {
+            if (!leave) return;
+            leaveConfirmed = true;
+            window.history.back();
+          });
+          return;
+        }
+        leaveConfirmed = false;
         navigate(state?.route ?? routeFromLocation(window.location) ?? { type: "landing" }, { push: false });
+        rememberEntry();
       });
       navigate(initialRoute, { push: false });
     },

@@ -42,7 +42,6 @@ export interface WorldSplitScreenOptions {
   readonly onGameModeChange: (mode: GameModeId) => void;
   readonly onHome: () => void;
   readonly onDailyChallenge?: () => void;
-  readonly onMultiplayer?: () => void;
 }
 
 export interface WorldSplitScreenServices {

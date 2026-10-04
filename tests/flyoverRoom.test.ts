@@ -27,7 +27,6 @@ function replyOf(result: ReturnType<FlyoverRoom["startGame"]>): readonly ServerM
 function startedRoom(flightMs?: number) {
   const room = new FlyoverRoom({ code: "FLY01", hostPlayerId: "host", hostName: "Host", countries, seed: "seed", now: 0, ...(flightMs ? { flightMs } : {}) });
   room.addPlayer("guest", "Guest", 10);
-  room.setReady("guest", true, 20);
   const started = room.startGame("host", 1000);
   const round = messagesOf(started).find((message) => message.type === "GAME_STARTED");
   const prompt = JSON.parse(round && round.type === "GAME_STARTED" ? round.round.prompt.value : "{}") as FlyoverFlightPrompt;
@@ -126,7 +125,7 @@ describe("flyover room", () => {
     expect(room.snapshot().settings.roundDurationMs).toBe(120_000);
     room.startGame("host", 10);
     room.endRound(200_000);
-    expect(room.restart("host", 200_001).ok).toBe(true);
+    expect(room.returnToLobby("host", 200_001).ok).toBe(true);
     expect(room.snapshot()).toMatchObject({ status: "lobby", round: null });
     expect(room.snapshot().players[0]).toMatchObject({ score: 0, routeIndex: 0 });
   });
@@ -166,7 +165,6 @@ describe("flyover room manager", () => {
     const roomCode = host.of("SESSION_ASSIGNED")[0]!.roomCode;
     expect(manager.listRooms()[0]?.kind).toBe("flyover");
     manager.handleMessage(guest, { type: "JOIN_ROOM", roomCode, playerName: "Guest" }, 10);
-    manager.handleMessage(guest, { type: "SET_READY", ready: true }, 20);
     manager.handleMessage(host, { type: "START_GAME" }, 1000);
     const round = guest.of("GAME_STARTED")[0]!.round;
     const prompt = JSON.parse(round.prompt.value) as FlyoverFlightPrompt;

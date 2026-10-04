@@ -28,7 +28,6 @@ describe("Street View Country frame loading", () => {
       countryIndex: indexCountries(rawCountries),
       onGameModeChange: vi.fn(),
       onHome: vi.fn(),
-      onMultiplayer: vi.fn(),
       onDailyChallenge: vi.fn(),
       dailyChallenge: { date: "2026-09-22", round, onComplete: vi.fn() },
     });
@@ -54,7 +53,6 @@ describe("Street View Country frame loading", () => {
       countryIndex: indexCountries(rawCountries),
       onGameModeChange: vi.fn(),
       onHome: vi.fn(),
-      onMultiplayer: vi.fn(),
       onDailyChallenge: vi.fn(),
       ...(mode === "daily" ? { dailyChallenge: { date: "2026-09-25", round: streetViewCountryRounds[0]!, onComplete: vi.fn() } } : {}),
     });

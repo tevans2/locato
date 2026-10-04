@@ -173,7 +173,7 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
         className: player.id === localPlayerId ? "score-row is-local" : "score-row",
         children: [
           el("span", { className: "score-rank", text: `#${index + 1}` }),
-          el("span", { className: "player-emoji score-emoji", text: getPlayerEmoji(player.id, player.id === localPlayerId), attrs: { "aria-hidden": "true" } }),
+          el("span", { className: "player-emoji score-emoji", text: getPlayerEmoji(player, player.id === localPlayerId), attrs: { "aria-hidden": "true" } }),
           el("span", { className: "score-name", text: player.name }),
           el("span", { className: "score-value", text: player.score.toLocaleString() }),
         ],

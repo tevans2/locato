@@ -2,7 +2,7 @@ import type { GameModeId } from "./gameModes";
 
 /**
  * Every game mode has a leaderboard. The server (server/leaderboard/validation.ts), the game
- * screens that post attempts, and Compete all read this table, so it is the one place to add a
+ * screens that post attempts, and Leaderboards all read this table, so it is the one place to add a
  * mode or change how a board ranks.
  *
  * - "time" boards rank the fastest completed run (lower is better) — the modes you finish.

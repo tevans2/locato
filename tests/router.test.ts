@@ -44,10 +44,9 @@ describe("shareable game routes", () => {
     { type: "atlas" },
     { type: "friends" },
     { type: "multiplayer" },
-    { type: "compete" },
-    { type: "compete", mode: "flags", variant: "timer" },
-    { type: "compete", tab: "leaderboards" },
-    { type: "compete", tab: "leaderboards", mode: "puzzle", variant: "Europe" },
+    { type: "leaderboards" },
+    { type: "leaderboards", mode: "flags", variant: "timer" },
+    { type: "leaderboards", mode: "puzzle", variant: "Europe" },
     { type: "multiplayer", create: true },
     { type: "multiplayer", create: true, invite: "u-42" },
     { type: "country-guessing", mode: "puzzle", run: "timed", continent: "Africa" },
@@ -65,30 +64,27 @@ describe("shareable game routes", () => {
     expect(parse("/?game=unknown")).toBeNull();
     expect(parse("/?view=unknown")).toBeNull();
     expect(parse("/?room=%20")).toBeNull();
-    expect(parse("/?view=leaderboard&mode=unknown")).toEqual({ type: "compete", tab: "leaderboards" });
+    expect(parse("/?view=leaderboards&mode=unknown")).toEqual({ type: "leaderboards" });
     expect(parse("/?country=france")).toBeNull();
     expect(parse("/?view=academy&group=Bad%20Id")).toEqual({ type: "academy" });
     expect(buildRouteUrl({ type: "landing" }, { pathname: "/" })).toBe("/");
   });
 
-  it("keeps old leaderboard and flag links working as Compete and Atlas", () => {
-    expect(parse("/?view=leaderboard")).toEqual({ type: "compete", tab: "leaderboards" });
-    expect(parse("/?view=leaderboard&mode=capitals&variant=Europe")).toEqual({ type: "compete", tab: "leaderboards", mode: "capitals", variant: "Europe" });
+  it("keeps old leaderboard and flag links working as Leaderboards and Atlas", () => {
+    expect(parse("/?view=leaderboard")).toEqual({ type: "leaderboards" });
+    expect(parse("/?view=leaderboard&mode=capitals&variant=Europe")).toEqual({ type: "leaderboards", mode: "capitals", variant: "Europe" });
     expect(parse("/?view=flags")).toEqual({ type: "atlas" });
-    // Legacy route types still build the new URLs.
-    expect(buildRouteUrl({ type: "leaderboard", mode: "flags" }, { pathname: "/" })).toBe("/?view=compete&mode=flags");
     expect(buildRouteUrl({ type: "flag-gallery" }, { pathname: "/" })).toBe("/?view=atlas");
+    expect(buildRouteUrl({ type: "leaderboards", mode: "flags" }, { pathname: "/" })).toBe("/?view=leaderboards&mode=flags");
   });
 
-  it("opens Compete on Multiplayer unless the Leaderboards tab (or a board) is named", () => {
-    expect(parse("/?view=compete")).toEqual({ type: "compete" });
-    expect(parse("/?view=compete&tab=multiplayer")).toEqual({ type: "compete" });
-    expect(parse("/?view=compete&tab=bogus")).toEqual({ type: "compete" });
-    expect(parse("/?view=compete&tab=leaderboards")).toEqual({ type: "compete", tab: "leaderboards" });
-    // Old board links carry only a mode; the screen reads a mode as the Leaderboards tab.
-    expect(parse("/?view=compete&mode=flags")).toEqual({ type: "compete", mode: "flags" });
-    expect(buildRouteUrl({ type: "compete", tab: "leaderboards", mode: "flags" }, { pathname: "/" })).toBe("/?view=compete&tab=leaderboards&mode=flags");
-    expect(buildRouteUrl({ type: "compete" }, { pathname: "/" })).toBe("/?view=compete");
+  it("sends retired Compete links to Multiplayer, or to Leaderboards when they named a board", () => {
+    expect(parse("/?view=compete")).toEqual({ type: "multiplayer" });
+    expect(parse("/?view=compete&tab=multiplayer")).toEqual({ type: "multiplayer" });
+    expect(parse("/?view=compete&tab=bogus")).toEqual({ type: "multiplayer" });
+    expect(parse("/?view=compete&tab=leaderboards")).toEqual({ type: "leaderboards" });
+    expect(parse("/?view=compete&mode=flags")).toEqual({ type: "leaderboards", mode: "flags" });
+    expect(parse("/?view=compete&tab=leaderboards&mode=puzzle&variant=Europe")).toEqual({ type: "leaderboards", mode: "puzzle", variant: "Europe" });
   });
 
   it("builds quick-create multiplayer links and validates the invite id", () => {

@@ -12,7 +12,7 @@ const screens: ReturnType<typeof createStreetViewCountryScreen>[] = [];
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
 
 function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
-  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, ...overrides };
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, ...overrides };
 }
 
 const services = {
@@ -32,7 +32,6 @@ function setup(options: { shell?: Partial<ShellContext>; daily?: boolean; postAt
     countryIndex,
     onGameModeChange() {},
     onHome: vi.fn(),
-    onMultiplayer() {},
     onDailyChallenge() {},
     ...(options.daily ? { dailyChallenge: { date: "2026-09-27", round: dailyRound, onComplete, progress: { round: 10, total: 10 } } } : {}),
   }, { ...services, postAttempt: options.postAttempt ?? (async () => ({ serverAccepted: null, rank: null })), ...(options.apiKey !== undefined ? { apiKey: options.apiKey } : {}) });
@@ -149,7 +148,7 @@ describe("Street View country run", () => {
     const onComplete = vi.fn();
     const dailyRound = streetViewCountryRounds.find((round) => round.frames.length === 3 && countryIndex.byCode.has(round.countryCode))!;
     const screen = createStreetViewCountryScreen({
-      shell: stubShell(), countryIndex, onGameModeChange() {}, onHome() {}, onMultiplayer() {}, onDailyChallenge() {},
+      shell: stubShell(), countryIndex, onGameModeChange() {}, onHome() {}, onDailyChallenge() {},
       dailyChallenge: { date: "2026-09-27", round: dailyRound, onComplete, progress: { round: 4, total: 10 } },
     }, services);
     screens.push(screen);
@@ -166,7 +165,7 @@ describe("Street View country run", () => {
 
   it("explains a missing Street View key inside the GameBar layout", () => {
     const openGame = vi.fn();
-    const screen = createStreetViewCountryScreen({ shell: stubShell({ openGame }), countryIndex, onGameModeChange() {}, onHome() {}, onMultiplayer() {}, onDailyChallenge() {} }, { ...services, apiKey: "" });
+    const screen = createStreetViewCountryScreen({ shell: stubShell({ openGame }), countryIndex, onGameModeChange() {}, onHome() {}, onDailyChallenge() {} }, { ...services, apiKey: "" });
     screens.push(screen);
     expect(screen.element.dataset.shell).toBe("game");
     expect(screen.element.querySelector<HTMLElement>(".streetview-missing-key")?.hidden).toBe(false);
@@ -183,8 +182,8 @@ describe("Street View country scoring (single-run: every run counts)", () => {
 
   it("plays five countries for points and posts every finished run", async () => {
     const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: true, rank: 5 }));
-    const openCompete = vi.fn();
-    const ui = setup({ postAttempt, shell: { openCompete, signedIn: () => true } });
+    const openLeaderboards = vi.fn();
+    const ui = setup({ postAttempt, shell: { openLeaderboards, signedIn: () => true } });
     expect(ui.$(".streetview-rules")?.textContent).toContain("3 / 2 / 1 points");
 
     // Country 1: first guess (3). Country 2: second guess (2). Country 3: third guess (1).
@@ -213,7 +212,7 @@ describe("Street View country scoring (single-run: every run counts)", () => {
     expect(stage.querySelector(".shell-results-cross")).toBeNull();
     expect(ui.$(".shell-run-best-value")?.textContent).toBe("9");
     [...stage.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
-    expect(openCompete).toHaveBeenCalledWith("streetview-country");
+    expect(openLeaderboards).toHaveBeenCalledWith("streetview-country");
     expect(STREET_VIEW_ATTEMPT_COUNTRIES).toBe(5);
   });
 

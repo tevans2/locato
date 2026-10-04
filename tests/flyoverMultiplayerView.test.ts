@@ -20,7 +20,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-const player = (id: string, name: string, extra: Partial<PublicPlayerState> = {}): PublicPlayerState => ({ id, name, connected: true, ready: true, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0, ...extra });
+const player = (id: string, name: string, extra: Partial<PublicPlayerState> = {}): PublicPlayerState => ({ id, name, connected: true, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0, ...extra });
 
 function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), player("rival", "Rival")]) {
   let time = 100_000;
@@ -44,6 +44,7 @@ function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), play
   const takeoffAt = time + FLYOVER_TAKEOFF_COUNTDOWN_MS;
   const room: PublicRoomState = {
     roomCode: "FLY01",
+    kind: "flyover",
     hostPlayerId: "me",
     categoryIds: ["flyover"],
     settings: { roundLimit: 1, roundDurationMs: 60_000 },

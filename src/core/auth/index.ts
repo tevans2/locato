@@ -157,7 +157,7 @@ export interface SubmitBestTimeResponse {
   readonly isPersonalBest: boolean;
   /**
    * The player's rank on this board after the submission (for their best time, which may be an
-   * earlier, faster run when `accepted` is false). Absent from servers older than Compete.
+   * earlier, faster run when `accepted` is false). Absent from servers older than the leaderboards.
    */
   readonly rank?: number | null;
   /** Time boards: the player's best time on this board after the submission. */
@@ -478,4 +478,4 @@ export function saveAvatarToServer(emoji: string): void {
   void fetch("/auth/avatar", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ emoji }) }).catch(() => undefined);
 }
 
-export { AVATAR_OPTIONS, getPlayerEmoji, getStoredAvatar, storeAvatar } from "./avatars";
+export { AVATAR_OPTIONS, clearStoredAvatar, getLocalAvatar, getPlayerEmoji, getStoredAvatar, isAvatarEmoji, storeAvatar } from "./avatars";

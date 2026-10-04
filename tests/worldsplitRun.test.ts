@@ -27,7 +27,7 @@ const screens: ReturnType<typeof createWorldSplitScreen>[] = [];
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
 
 function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
-  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
 }
 
 function setup(options: { shell?: Partial<ShellContext>; postAttempt?: PostRankedAttempt } = {}) {
@@ -79,8 +79,8 @@ describe("Worldsplit (single-run: every run counts)", () => {
 
   it("posts every finished run and ends on the results card", async () => {
     const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 11 }));
-    const openCompete = vi.fn();
-    const ui = setup({ postAttempt, shell: { openCompete } });
+    const openLeaderboards = vi.fn();
+    const ui = setup({ postAttempt, shell: { openLeaderboards } });
     let total = 0;
     for (let i = 0; i < WORLD_SPLIT_ATTEMPT_ROUNDS; i++) total += ui.playRound();
     const stage = ui.$(".gb-results-stage")!;
@@ -92,7 +92,7 @@ describe("Worldsplit (single-run: every run counts)", () => {
     expect(stage.querySelectorAll(".gb-run-row")).toHaveLength(WORLD_SPLIT_ATTEMPT_ROUNDS);
     expect(stage.querySelector(".shell-results-cross")).toBeNull();
     [...stage.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
-    expect(openCompete).toHaveBeenCalledWith("worldsplit");
+    expect(openLeaderboards).toHaveBeenCalledWith("worldsplit");
     expect(ui.$(".shell-run-best-value")?.textContent).toBe(total > 0 ? String(total) : "—");
 
     const again = stage.querySelector<HTMLButtonElement>(".shell-results-primary")!;

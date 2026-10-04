@@ -37,7 +37,7 @@ import type { Screen } from "../../app/router";
 /*
  * Play → the landing page (docs/navigation.md). Split modes start a PRACTICE run here: no clock,
  * nothing posted. Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one
- * way to play, so they open the real thing. Timed runs live in Compete; the daily in Daily. The shared SiteHeader carries
+ * way to play, so they open the real thing. Timed runs live in Leaderboards, live games in Multiplayer; the daily in Daily. The shared SiteHeader carries
  * the navigation, so the page itself has no nav links of its own.
  */
 
@@ -213,9 +213,9 @@ function LandingMoreWays({ shell, storage, now }: LandingScreenOptions) {
       {daily.streak > 0 ? <span className="landing-more-streak" aria-label={`${daily.streak}-day streak`}>{daily.streak}<small>day{daily.streak === 1 ? "" : "s"}</small></span> : null}
       <ArrowRight className="landing-more-arrow" size={18} />
     </button>
-    <button type="button" className="landing-more-card is-compete" data-testid="card-compete" onClick={() => shell.openSection("compete")}>
+    <button type="button" className="landing-more-card is-compete" data-testid="card-multiplayer" onClick={() => shell.openSection("multiplayer")}>
       <span className="landing-more-icon" aria-hidden="true"><Users size={22} strokeWidth={1.6} /></span>
-      <span className="landing-more-copy"><strong>Play friends live</strong><span>A real-time multiplayer race for up to 8, or a solo timed run for the leaderboards.</span></span>
+      <span className="landing-more-copy"><strong>Play friends live</strong><span>Open a room, share the link, and race up to 7 friends in real time.</span></span>
       <ArrowRight className="landing-more-arrow" size={18} />
     </button>
   </section>;

@@ -82,8 +82,7 @@ body:not(:has(.landing-screen-shell)) .brand-name {
   width: min(332px, 100%);
 }
 
-body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary,
-.multiplayer-mode-dropdown .category-dropdown-summary {
+body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category-dropdown-summary {
   min-height: 50px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -482,102 +481,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 }
 
 /* Multiplayer: an explanation on the left, one clean setup form on the right. */
-.multiplayer-layout {
-  overflow: auto;
-}
-
-.multiplayer-setup {
-  width: min(1120px, 100%);
-  display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(480px, 1.1fr);
-  align-self: center;
-  justify-self: center;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  background: var(--surface);
-  box-shadow: 0 28px 72px rgba(25, 35, 31, .12);
-}
-
-.multiplayer-setup-intro {
-  min-width: 0;
-  padding: clamp(34px, 5vw, 64px);
-  background: var(--accent-soft);
-  border-right: 1px solid var(--border-strong);
-}
-
-.multiplayer-setup h1 {
-  max-width: 10ch;
-  margin: 13px 0 18px;
-  font-size: clamp(2.5rem, 4.2vw, 4.6rem);
-  line-height: .94;
-  letter-spacing: -.065em;
-}
-
-.multiplayer-setup-intro > .muted {
-  max-width: 42ch;
-  margin-bottom: 30px;
-  color: var(--muted);
-}
-
-.multiplayer-feature-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0;
-  border-top: 1px solid var(--border-strong);
-}
-
-.multiplayer-feature-list li {
-  display: grid;
-  gap: 3px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.multiplayer-feature-list strong {
-  font-size: .86rem;
-}
-
-.multiplayer-feature-list span {
-  color: var(--muted);
-  font-size: .78rem;
-}
-
-.multiplayer-setup-form {
-  min-width: 0;
-  padding: clamp(28px, 4vw, 52px);
-}
-
-.multiplayer-form-heading {
-  display: grid;
-  gap: 5px;
-  margin-bottom: 22px;
-  padding-bottom: 14px;
-  border-bottom: 2px solid var(--text);
-}
-
-.multiplayer-form-heading strong {
-  font-size: 1.3rem;
-  letter-spacing: -.03em;
-}
-
-.multiplayer-form-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px;
-  margin: 0 0 18px;
-}
-
-.multiplayer-form-grid > .multiplayer-field {
-  grid-column: auto;
-}
-
-.multiplayer-form-grid > .multiplayer-name-field,
-.multiplayer-form-grid > .multiplayer-mode-field {
-  grid-column: 1 / -1;
-}
 
 .multiplayer-field {
   min-width: 0;
@@ -600,107 +503,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   font-size: .9rem;
   letter-spacing: 0;
   text-transform: none;
-}
-
-.multiplayer-mode-dropdown {
-  width: 100%;
-}
-
-.multiplayer-mode-dropdown .category-dropdown-summary {
-  min-height: 56px;
-}
-
-.multiplayer-mode-dropdown .category-dropdown-selected-description {
-  display: none;
-}
-
-.multiplayer-mode-dropdown .category-dropdown-menu,
-.multiplayer-mode-dropdown .category-dropdown-menu:has(.game-mode-group) {
-  width: var(--dropdown-width, min(640px, calc(100vw - 24px)));
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 18px;
-  padding: 16px 18px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.multiplayer-mode-dropdown .game-mode-group-label {
-  grid-column: 1 / -1;
-  margin: 8px 0 2px;
-  padding: 8px 0;
-}
-
-.multiplayer-mode-dropdown .game-mode-group-label:first-child {
-  margin-top: 0;
-}
-
-.multiplayer-mode-dropdown .game-mode-option {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
-  min-height: 58px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.multiplayer-mode-dropdown .game-mode-option input {
-  width: 16px;
-  height: 16px;
-}
-
-.multiplayer-create-row .primary-action {
-  width: 100%;
-  min-height: 52px;
-  border: 0;
-  border-radius: 2px;
-  background: var(--text);
-  color: #fff;
-}
-
-.multiplayer-join-block {
-  display: grid;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.multiplayer-join-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--muted);
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.multiplayer-join-divider::after {
-  content: "";
-  height: 1px;
-  flex: 1;
-  background: var(--border);
-}
-
-.multiplayer-join-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.multiplayer-join-row input,
-.multiplayer-join-row button {
-  min-height: 48px;
-  border-radius: 2px;
-}
-
-.lobby-panel {
-  width: min(900px, 100%);
-  border-radius: 2px;
-}
-
-.room-code-row {
-  padding-bottom: 18px;
-  border-bottom: 2px solid var(--text);
 }
 
 /* Supporting pages share the same wide, editorial rhythm. */
@@ -764,10 +566,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   box-shadow: none;
 }
 
-.leaderboard-row {
-  border-radius: 0;
-}
-
 .daily-result-panel {
   width: min(760px, 100%);
 }
@@ -784,8 +582,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 :root[data-theme="dark"] .category-dropdown-menu,
 :root[data-theme="dark"] .action-menu-panel,
-:root[data-theme="dark"] .multiplayer-setup,
-:root[data-theme="dark"] .multiplayer-card,
 :root[data-theme="dark"] .stats-card,
 :root[data-theme="dark"] .stats-hero-card,
 :root[data-theme="dark"] .friend-section,
@@ -800,8 +596,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 :root[data-theme="dark"] body:not(:has(.landing-screen-shell)) select,
 :root[data-theme="dark"] .guess-form input,
 :root[data-theme="dark"] .multiplayer-field > input,
-:root[data-theme="dark"] .multiplayer-field > select,
-:root[data-theme="dark"] .multiplayer-join-row input {
+:root[data-theme="dark"] .multiplayer-field > select {
   color: var(--text);
   background-color: var(--surface);
 }
@@ -860,15 +655,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   background: rgba(20, 29, 23, .94);
 }
 
-:root[data-theme="dark"] .multiplayer-setup-intro {
-  background: #25361f;
-}
-
-:root[data-theme="dark"] .multiplayer-setup-intro > .muted,
-:root[data-theme="dark"] .multiplayer-feature-list span {
-  color: var(--muted);
-}
-
 :root[data-theme="dark"] .feedback.good,
 :root[data-theme="dark"] .achievement-panel {
   color: var(--good);
@@ -888,9 +674,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
     gap: 20px;
   }
 
-  .multiplayer-setup {
-    grid-template-columns: minmax(0, .82fr) minmax(420px, 1.18fr);
-  }
 }
 
 @media (max-width: 900px) {
@@ -909,25 +692,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
     padding: 20px 0 0;
     border-left: 0;
     border-top: 1px solid var(--border-strong);
-  }
-
-  .multiplayer-setup {
-    width: min(720px, 100%);
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .multiplayer-setup-intro {
-    border-right: 0;
-    border-bottom: 1px solid var(--border-strong);
-  }
-
-  .multiplayer-feature-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .multiplayer-feature-list li {
-    padding-right: 14px;
-    border-right: 1px solid rgba(25, 35, 31, .18);
   }
 
   .friends-screen {
@@ -955,19 +719,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
     min-height: 48px;
     margin-bottom: 10px;
     padding: 0 54px 9px 0;
-  }
-
-  .multiplayer-header .game-header-actions {
-    right: 58px;
-    width: auto;
-  }
-
-  .multiplayer-header .game-header-actions > .screen-back-button {
-    width: auto;
-    display: inline-flex;
-    padding-inline: 10px;
-    border: 0;
-    background: transparent;
   }
 
   body:not(:has(.landing-screen-shell)) .game-header-left {
@@ -1020,35 +771,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   .input-row button,
   .guess-submit-action {
     width: auto;
-  }
-
-  .multiplayer-setup-intro,
-  .multiplayer-setup-form {
-    padding: 24px 20px;
-  }
-
-  .multiplayer-setup h1 {
-    font-size: 2.6rem;
-  }
-
-  .multiplayer-feature-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .multiplayer-feature-list li {
-    border-right: 0;
-  }
-
-  .multiplayer-form-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .multiplayer-form-grid > .multiplayer-field {
-    grid-column: 1;
-  }
-
-  .multiplayer-join-row {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .stats-hero {

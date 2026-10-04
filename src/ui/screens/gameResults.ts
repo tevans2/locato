@@ -60,7 +60,7 @@ export function timedPostingLine(outcome: TimedPostOutcome, metric: LeaderboardM
   if (outcome.failed) {
     return metric === "score"
       ? `${best}Couldn't post this score — check your connection, then try another attempt.`
-      : `${best}Couldn't post this ${noun} — it's saved on this device; post it from Compete later.`;
+      : `${best}Couldn't post this ${noun} — it's saved on this device; post it from Leaderboards later.`;
   }
   if (outcome.serverAccepted) return `${best}Posted to the leaderboard${rank ? ` — you're #${rank}` : ""}.`;
   return metric === "score"
@@ -105,7 +105,7 @@ function missedChips(countries: readonly Country[]): ResultsMissedCountry[] {
 
 /**
  * The end-of-run card for the prompt and world-map screens: practice runs cross-link to the
- * timed board in Compete, timed runs show the time, the submission result and "Practise this mode".
+ * timed board in Leaderboards, timed runs show the time, the submission result and "Practise this mode".
  */
 export function createRunResults(shell: ShellContext, input: RunResultsInput): RunResultsHandle {
   const timed = input.run === "timed";
@@ -114,7 +114,7 @@ export function createRunResults(shell: ShellContext, input: RunResultsInput): R
   const missed = input.missed ?? [];
   const more = missed.length - RESULTS_MISSED_LIMIT;
   const secondary: ResultsAction[] = [];
-  if (timed) secondary.push({ label: "View leaderboard", icon: "trophy", onClick: () => shell.openCompete(input.mode, input.variant || undefined) });
+  if (timed) secondary.push({ label: "View leaderboard", icon: "trophy", onClick: () => shell.openLeaderboards(input.mode, input.variant || undefined) });
   secondary.push(...(input.extraActions ?? []));
 
   const card = createResultsCard(shell, {
@@ -133,7 +133,7 @@ export function createRunResults(shell: ShellContext, input: RunResultsInput): R
       ? {
           crossLink: timed
             ? { label: "Practise this mode", onClick: () => shell.openGame(input.mode, "practice") }
-            : { label: "Try it timed →", onClick: () => shell.openCompete(input.mode, input.variant || undefined) },
+            : { label: "Try it timed →", onClick: () => shell.openLeaderboards(input.mode, input.variant || undefined) },
         }
       : {}),
     tone: input.tone ?? "celebrate",

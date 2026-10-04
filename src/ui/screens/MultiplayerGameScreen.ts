@@ -43,7 +43,7 @@ function sortPlayers(room: PublicRoomState) {
 
 function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null): readonly HTMLElement[] {
   return sortPlayers(room).map((player, index) => {
-    const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
+    const emoji = getPlayerEmoji(player, player.id === localPlayerId);
     return el("li", {
       className: player.id === localPlayerId ? "score-row is-local" : "score-row",
       attrs: { "data-player-id": player.id },
@@ -58,13 +58,56 @@ function createScoreRows(room: PublicRoomState, localPlayerId: PlayerId | null):
   });
 }
 
-function createResultRows(results: readonly RoundResult[]): readonly HTMLElement[] {
+function formatSeconds(ms: number): string {
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+}
+
+/** The answer, and who took the round: "Ana got it in 4.2s · +128" (or that nobody did). */
+function createRevealCard(answer: string, results: readonly RoundResult[], room: PublicRoomState, localPlayerId: PlayerId | null): HTMLElement {
+  const winner = results.find((result) => result.correct);
+  const guessed = results.filter((result) => result.attempts > 0).length;
+  const winnerPlayer = winner ? room.players.find((player) => player.id === winner.playerId) : undefined;
+  const line = winner
+    ? [
+        el("span", { className: "round-reveal-avatar", text: getPlayerEmoji(winnerPlayer ?? { id: winner.playerId }, winner.playerId === localPlayerId), attrs: { "aria-hidden": "true" } }),
+        el("span", { text: `${winner.playerId === localPlayerId ? "You" : winner.name} got it${winner.elapsedMs !== null ? ` in ${formatSeconds(winner.elapsedMs)}` : ""}${winner.attempts > 1 ? ` on try ${winner.attempts}` : ""}` }),
+        el("strong", { className: "round-reveal-points", text: `+${winner.points}` }),
+      ]
+    : [el("span", { text: guessed === 0 ? "Nobody guessed this one." : `Nobody got it. ${guessed === 1 ? "1 player" : `${guessed} players`} tried.` })];
+  return el("li", {
+    className: `round-reveal ${winner ? "is-taken" : "is-missed"}${winner?.playerId === localPlayerId ? " is-yours" : ""}`,
+    attrs: { role: "status" },
+    children: [
+      el("span", { className: "round-reveal-label", text: "The answer" }),
+      el("strong", { className: "round-reveal-answer", text: answer }),
+      el("span", { className: "round-reveal-line", children: line }),
+    ],
+  });
+}
+
+/** One row per player: their latest guess (struck through when wrong) and how many tries it took. */
+function createResultRows(results: readonly RoundResult[], room: PublicRoomState, localPlayerId: PlayerId | null): readonly HTMLElement[] {
   return results.map((result) => {
-    const guess = result.guess ? ` guessed ${result.guess}` : " did not answer";
-    const outcome = result.correct ? `+${result.points}` : "missed";
+    const player = room.players.find((candidate) => candidate.id === result.playerId);
+    const isYou = result.playerId === localPlayerId;
+    const state = result.correct ? "good" : result.attempts > 0 ? "miss" : "none";
+    const detail = result.correct
+      ? `${result.elapsedMs !== null ? formatSeconds(result.elapsedMs) : "Correct"}${result.attempts > 1 ? ` · ${result.attempts} tries` : ""}`
+      : result.attempts > 1 ? `${result.attempts} tries` : result.attempts === 1 ? "1 try" : "";
     return el("li", {
-      className: result.correct ? "result-row good" : "result-row miss",
-      text: `${result.name}${guess} · ${outcome}`,
+      className: `result-row round-result is-${state}${isYou ? " is-local" : ""}`,
+      children: [
+        el("span", { className: "player-emoji round-result-emoji", text: getPlayerEmoji(player ?? { id: result.playerId }, isYou), attrs: { "aria-hidden": "true" } }),
+        el("span", { className: "round-result-name", text: isYou ? `${result.name} (you)` : result.name }),
+        el("span", {
+          className: "round-result-guess",
+          children: result.guess
+            ? [el("span", { className: "round-result-mark", text: result.correct ? "✓" : "✗", attrs: { "aria-label": result.correct ? "Right:" : "Last guess, wrong:" } }), el(result.correct ? "span" : "s", { text: result.guess })]
+            : [el("span", { className: "round-result-none", text: "No guess" })],
+        }),
+        el("span", { className: "round-result-meta", text: detail }),
+        el("span", { className: "round-result-points", text: result.correct ? `+${result.points}` : "" }),
+      ],
     });
   });
 }
@@ -335,10 +378,14 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       if (state.finalResults) resultList.replaceChildren(...createFinalRows(state.finalResults));
       else if (state.roundResult) {
         resultList.replaceChildren(
-          el("li", { className: "result-row reveal", text: state.roundResult.answer }),
-          ...createResultRows(state.roundResult.results),
+          createRevealCard(state.roundResult.answer, state.roundResult.results, state.room, state.localPlayerId),
+          // The card already shows the winner; the rows are everyone else's last guess.
+          ...createResultRows(state.roundResult.results.filter((result) => !result.correct), state.room, state.localPlayerId),
         );
-      } else resultList.replaceChildren(el("li", { className: "result-row", text: "No result yet." }));
+      } else resultList.replaceChildren();
+      resultList.hidden = resultList.childElementCount === 0;
+      // During a reveal the card says it all; the line above it would only repeat it.
+      feedback.hidden = state.roundResult !== null && !state.finalResults;
 
       scoreList.replaceChildren(...createScoreRows(state.room, state.localPlayerId));
       const bumpWinner = state.roundResult?.results.find((result) => result.correct);

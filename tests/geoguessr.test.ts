@@ -36,7 +36,6 @@ describe("GeoGuessr multiplayer room", () => {
       resultDisplayMs: 1000,
     });
     expect(room.addPlayer("guest", "Guest", 1010).ok).toBe(true);
-    expect(room.setReady("guest", true, 1020).ok).toBe(true);
     const started = room.startGame("host", 1030);
     expect(started.ok).toBe(true);
     const round = started.ok ? started.messages.find((message) => message.type === "GAME_STARTED")?.round : null;

@@ -47,7 +47,6 @@ export interface CountryGuessingScreenOptions {
   /** Legacy callbacks; the GameBar navigates through `shell` now. */
   readonly onGameModeChange?: (gameMode: GameModeId) => void;
   readonly onHome?: () => void;
-  readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
   // Called once per world-map run when it ends (completion, restart, mode change, or leaving).
   readonly onRecordGame?: (result: WorldMapRunResult) => void;
@@ -908,9 +907,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         gameMode: playMode,
         run: runType,
         ...(timed ? { clock: clockValue } : {}),
-        // A cold timed link backs out to its own board rather than the Compete landing tab.
-        onBack: () => shell.goBack(timed ? () => shell.openCompete(playMode, playMode === "puzzle" ? puzzleContinent : undefined) : "play"),
-        backLabel: timed ? "Back to Compete" : "Back",
+        // A cold timed link backs out to its own board rather than the first board.
+        onBack: () => shell.goBack(timed ? () => shell.openLeaderboards(playMode, playMode === "puzzle" ? puzzleContinent : undefined) : "play"),
+        backLabel: timed ? "Back to leaderboards" : "Back",
         onHowToPlay: () => showFeedback(feedback, getGameModeOption(playMode).description, "neutral"),
         extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: () => resetButton.click() }],
         leaveGuard: () => (timed && !roundEnded() && progressOfRun() > 0 ? "This timed run is still going — it won't be posted." : null),

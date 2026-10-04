@@ -268,6 +268,7 @@ const server = Bun.serve<WebSocketData>({
         send: (msg) => socket.send(msg),
         close: (code, reason) => socket.close(code, reason),
         authenticatedName: socket.data.user?.displayName ?? null,
+        authenticatedAvatar: socket.data.user?.avatarEmoji ?? null,
       };
       connectionMap.set(socket, connection);
       roomManager.attach(connection);

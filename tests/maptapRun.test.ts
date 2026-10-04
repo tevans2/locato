@@ -11,7 +11,7 @@ const screens: ReturnType<typeof createMapTapScreen>[] = [];
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
 
 function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
-  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
 }
 
 const target = (i: number): MapTapLocation => ({ id: `t${i}`, name: `Target ${i}`, category: "city", lat: i, lng: i, difficulty: "easy", wikiSlug: `T${i}` });
@@ -285,9 +285,9 @@ describe("MapTap ranked attempt", () => {
 
   it("ends on the ranked results card: total posted, guest rank, Try again, View leaderboard, Practise", async () => {
     const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 4 }));
-    const openCompete = vi.fn();
+    const openLeaderboards = vi.fn();
     const openGame = vi.fn();
-    const ui = setup({ ranked: true, postAttempt, shell: { openCompete, openGame } });
+    const ui = setup({ ranked: true, postAttempt, shell: { openLeaderboards, openGame } });
     await playAll(ui);
     const stage = ui.$(".gb-results-stage")!;
     expect(stage.hidden).toBe(false);
@@ -301,7 +301,7 @@ describe("MapTap ranked attempt", () => {
     expect(stage.textContent).not.toContain("Change categories");
 
     [...stage.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("View leaderboard"))!.click();
-    expect(openCompete).toHaveBeenCalledWith("map-tap");
+    expect(openLeaderboards).toHaveBeenCalledWith("map-tap");
     const cross = stage.querySelector<HTMLButtonElement>(".shell-results-cross")!;
     expect(cross.textContent).toContain("Practise this mode");
     cross.click();
@@ -324,12 +324,12 @@ describe("MapTap ranked attempt", () => {
   });
 
   it("practice results cross-link to a ranked attempt", async () => {
-    const openCompete = vi.fn();
-    const ui = setup({ shell: { openCompete } });
+    const openLeaderboards = vi.fn();
+    const ui = setup({ shell: { openLeaderboards } });
     await playAll(ui);
     const cross = ui.$<HTMLButtonElement>(".gb-results-stage .shell-results-cross")!;
     expect(cross.textContent).toBe("Play a ranked attempt");
     cross.click();
-    expect(openCompete).toHaveBeenCalledWith("map-tap");
+    expect(openLeaderboards).toHaveBeenCalledWith("map-tap");
   });
 });

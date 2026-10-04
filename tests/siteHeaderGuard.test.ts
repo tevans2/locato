@@ -13,7 +13,7 @@ function makeContext(answer: boolean): ShellContext & { readonly calls: string[]
     openGame: () => calls.push("game"),
     openGamePicker: () => calls.push("picker"),
     openCountry: (code) => calls.push(`country:${code}`),
-    openCompete: () => calls.push("compete"),
+    openLeaderboards: () => calls.push("compete"),
     openAccount: () => calls.push("account"),
     controls: document.createElement("div"),
     confirmLeave: vi.fn(async () => answer),
@@ -27,7 +27,7 @@ afterEach(() => document.body.replaceChildren());
 describe("SiteHeader leave guard", () => {
   it("asks before leaving a page whose root has data-leave-confirm", async () => {
     const stay = makeContext(false);
-    const page = createSitePage(stay, { section: "compete" });
+    const page = createSitePage(stay, { section: "multiplayer" });
     page.element.dataset.leaveConfirm = "Leave room ABCD?";
     document.body.append(page.element);
     page.element.querySelector<HTMLAnchorElement>('.shell-nav-link[data-section="play"]')!.click();
@@ -36,7 +36,7 @@ describe("SiteHeader leave guard", () => {
     expect(stay.calls).toEqual([]);
 
     const leave = makeContext(true);
-    const other = createSitePage(leave, { section: "compete" });
+    const other = createSitePage(leave, { section: "multiplayer" });
     other.element.dataset.leaveConfirm = "Leave room ABCD?";
     document.body.append(other.element);
     other.element.querySelector<HTMLButtonElement>(".shell-brand")!.click();
@@ -58,7 +58,7 @@ describe("SiteHeader leave guard", () => {
     const ctx = makeContext(true);
     const onLeave = vi.fn();
     let message: string | null = null;
-    const header = createSiteHeader(ctx, { section: "compete", leaveGuard: () => message, onLeave });
+    const header = createSiteHeader(ctx, { section: "multiplayer", leaveGuard: () => message, onLeave });
     document.body.append(header.element);
     header.element.querySelector<HTMLAnchorElement>('.shell-nav-link[data-section="learn"]')!.click();
     expect(onLeave).toHaveBeenCalledTimes(1);

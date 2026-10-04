@@ -18,7 +18,7 @@ const screens: ReturnType<typeof createFlyoverScreen>[] = [];
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
 
 function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
-  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
 }
 
 function setup(options: { shell?: Partial<ShellContext>; postAttempt?: PostRankedAttempt } = {}) {
@@ -93,9 +93,9 @@ describe("Flyover", () => {
   it("posts every finished flight and keeps the best in the bar, never asking before leaving", async () => {
     const confirmLeave = vi.fn(async () => true);
     const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 4 }));
-    const openCompete = vi.fn();
+    const openLeaderboards = vi.fn();
     localStorage.setItem("locato:flyover:best-score:v1", "3");
-    const ui = setup({ postAttempt, shell: { confirmLeave, openCompete } });
+    const ui = setup({ postAttempt, shell: { confirmLeave, openLeaderboards } });
     expect(ui.$(".shell-run-option")).toBeNull();
     expect(ui.$(".shell-run-best-value")?.textContent).toBe("3");
     ui.$<HTMLButtonElement>(".flyover-start")!.click();
@@ -114,7 +114,7 @@ describe("Flyover", () => {
     expect(stage.querySelector(".shell-results-cross")).toBeNull();
     await vi.waitFor(() => expect(stage.querySelector(".shell-results-sub")?.textContent).toContain("#4"));
     [...stage.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
-    expect(openCompete).toHaveBeenCalledWith("flyover");
+    expect(openLeaderboards).toHaveBeenCalledWith("flyover");
 
     const again = stage.querySelector<HTMLButtonElement>(".shell-results-primary")!;
     expect(again.textContent).toBe("Play again");

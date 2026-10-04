@@ -126,7 +126,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 .flag-card,
 .answer-panel,
 .country-guess-panel,
-.multiplayer-card,
 .stats-card,
 .stats-hero-card,
 .friend-section,
@@ -170,10 +169,8 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 .maptap-result-score,
 .maptap-result-stat,
 .maptap-mp-result-row,
-.player-row,
 .score-row,
 .result-row,
-.leaderboard-row,
 .friend-row,
 .puzzle-piece-card {
   border-color: var(--border);
@@ -269,8 +266,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 .puzzle-piece-card:focus-visible,
 .puzzle-piece-card.is-in-play,
 .map-review-country.is-active,
-.leaderboard-row.is-winner,
-.player-row.is-local,
 .score-row.is-local {
   border-color: #8fbb52;
   background: var(--accent-soft);
@@ -285,16 +280,6 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 .streetview-loader { background: rgba(243,244,237,.86); }
 .streetview-loader-status { color: var(--text); }
-
-.multiplayer-status {
-  border-color: var(--border-strong);
-  color: var(--muted);
-  background: var(--surface);
-}
-
-.multiplayer-card,
-.lobby-panel { background: var(--surface); }
-.room-code { color: #5f9328; text-shadow: none; }
 
 .auth-panel {
   border-color: var(--border-strong);

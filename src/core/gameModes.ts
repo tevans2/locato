@@ -144,7 +144,7 @@ export function promptGameModeFromCategoryIds(categoryIds: readonly string[]): P
 }
 
 // ---------------------------------------------------------------------------------------------
-// Catalogue used by the navigation shell (landing, game switcher, Compete). docs/navigation.md
+// Catalogue used by the navigation shell (landing, game switcher, Leaderboards). docs/navigation.md
 // fixes the grouping: the same three groups, in the same order, everywhere.
 
 export type GameModeGroupId = "clues" | "map" | "street-view";
@@ -156,12 +156,12 @@ export type GameModeIcon =
 
 export interface GameModeCatalogueEntry {
   readonly id: GameModeId;
-  /** Sentence-case name shown in the switcher, picker and Compete. */
+  /** Sentence-case name shown in the switcher, picker and Leaderboards. */
   readonly label: string;
   /** One short line (under ~50 characters). */
   readonly blurb: string;
   readonly icon: GameModeIcon;
-  /** Has a Compete leaderboard (every mode does; see src/core/leaderboards.ts for how it ranks). */
+  /** Has a leaderboard (every mode does; see src/core/leaderboards.ts for how it ranks). */
   readonly leaderboard: boolean;
 }
 

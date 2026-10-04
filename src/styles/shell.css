@@ -377,7 +377,7 @@
     bottom: 0;
     z-index: 90;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     padding: 5px max(6px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
@@ -398,7 +398,7 @@
   }
 
   #app .shell-tab-icon {
-    width: 50px;
+    width: 44px;
     height: 28px;
     display: grid;
     place-items: center;
