@@ -52,7 +52,7 @@ function createCapitalHint(country: Country, level: number): Hint {
   };
 }
 
-function createHint(country: Country, level: number, categoryId: string): Hint {
+export function createHint(country: Country, level: number, categoryId: string): Hint {
   if (categoryId === "capital-recall") return createCapitalHint(country, level);
 
   const hintLevel = Math.min(level, TOTAL_HINTS - 1);

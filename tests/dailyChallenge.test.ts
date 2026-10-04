@@ -1,27 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createDailyChallenge, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, formatDailyTime, scoreDailyMapTapRound, scoreDailyRound, parseDailyRoundResults } from "../src/core/dailyChallenge";
-import { indexCountries, rawCountries, type RawCountry } from "../src/core/countries";
+import { indexCountries, rawCountries } from "../src/core/countries";
 import { fameTier } from "../src/core/countries/fame";
 import { createGameEngine } from "../src/core/game";
 import { createSoloSave, hydrateGameState } from "../src/storage/localSave";
+import { streetViewCountryRounds } from "../src/core/streetview";
 import { findMapTapLocation } from "../src/core/maptap/locations";
-
-const fixtureCountries = Array.from({ length: 14 }, (_, index) => {
-  const number = index + 1;
-  return {
-    name: `Country ${number}`,
-    code: `C${String.fromCharCode(65 + index)}`,
-    aliases: [],
-    continent: "Europe",
-    flagSrc: `assets/flags/c${number}.svg`,
-    capital: `Capital ${number}`,
-    capitalAliases: [],
-  };
-}) satisfies readonly RawCountry[];
 
 describe("daily challenge", () => {
   it("selects the same daily rounds for the same date", () => {
-    const index = indexCountries(fixtureCountries);
+    const index = indexCountries(rawCountries);
     const first = createDailyChallenge(index, "2026-06-11");
     const second = createDailyChallenge(index, "2026-06-11");
 
@@ -34,29 +22,44 @@ describe("daily challenge", () => {
   });
 
   it("changes the selection when the date changes", () => {
-    const index = indexCountries(fixtureCountries);
+    const index = indexCountries(rawCountries);
     const first = createDailyChallenge(index, "2026-06-11");
     const second = createDailyChallenge(index, "2026-06-12");
 
     expect([second.countryIds, second.mapTapTargetId, second.streetViewCountryCode]).not.toEqual([first.countryIds, first.mapTapTargetId, first.streetViewCountryCode]);
   });
 
-  it("keeps a fixed format, difficulty balance and thematic connection across a month", () => {
+  it("keeps all ten rounds within the theme with distinct countries across a month", () => {
     const index = indexCountries(rawCountries);
     const themes = new Set<string>();
     for (let day = 1; day <= 31; day++) {
       const challenge = createDailyChallenge(index, `2026-10-${String(day).padStart(2, "0")}`);
       themes.add(challenge.theme!.id);
       expect(challenge.promptSlots!.map((slot) => slot.categoryId)).toEqual(["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"]);
-      expect(challenge.countryIds.map((id) => fameTier(index.byId[id]!.code))).toEqual([1, 1, 2, 2, 1, 3, 2, 3]);
+      expect(challenge.themeScoped).toBe(true);
+      expect(challenge.countryIds.slice(0, 5).map((id) => fameTier(index.byId[id]!.code))).toEqual([1, 1, 2, 2, 1]);
       expect(new Set(challenge.countryIds).size).toBe(8);
-      for (const position of [0, 2, 4, 6]) expect(challenge.theme!.countryCodes).toContain(index.byId[challenge.countryIds[position]!]!.code);
+      for (const id of challenge.countryIds) expect(challenge.theme!.countryCodes).toContain(index.byId[id]!.code);
       expect(challenge.theme!.mapTapTargetIds).toContain(challenge.mapTapTargetId);
       expect(findMapTapLocation(challenge.mapTapTargetId)!.difficulty).not.toBe("hard");
       expect(challenge.theme!.countryCodes).toContain(challenge.streetViewCountryCode);
       expect(index.byCode.has(challenge.streetViewCountryCode)).toBe(true);
     }
     expect(themes.size).toBe(7);
+  });
+
+  it("keeps southern hemisphere countries and both location finales south of the equator", () => {
+    const index = indexCountries(rawCountries);
+    for (let day = 4; day <= 365; day += 7) {
+      const date = new Date(Date.UTC(2026, 9, day)).toISOString().slice(0, 10);
+      const challenge = createDailyChallenge(index, date);
+      expect(challenge.theme!.id).toBe("southern");
+      expect(challenge.countryIds).toHaveLength(8);
+      for (const id of challenge.countryIds) expect(challenge.theme!.countryCodes).toContain(index.byId[id]!.code);
+      expect(findMapTapLocation(challenge.mapTapTargetId)!.lat).toBeLessThan(0);
+      const streetRound = streetViewCountryRounds.find((round) => round.countryCode === challenge.streetViewCountryCode)!;
+      for (const frame of streetRound.frames) expect(frame.lat).toBeLessThan(0);
+    }
   });
 
   it("plays and resumes the explicit daily categories instead of reassigning them", () => {

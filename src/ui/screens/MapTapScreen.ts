@@ -67,6 +67,7 @@ export interface MapTapScreenServices {
   readonly fetchSummary: typeof fetchWikipediaSummary;
   /** Posts a ranked attempt's total (defaults to the leaderboard API). */
   readonly postAttempt?: PostRankedAttempt;
+  readonly restartRun?: () => Promise<unknown>;
 }
 
 const CATEGORIES = MAP_TAP_CATEGORY_OPTIONS;
@@ -474,8 +475,19 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
   }
 
   /** A fresh run with the current selection ("Play again" keeps the same categories; "Try again" starts a new ranked attempt). */
-  function startRun(): void {
+  let restarting = false;
+  async function startRun(): Promise<void> {
     if (!isDailyChallenge && selectedCategoryIds.size === 0) return;
+    if (restarting) return;
+    if (services.restartRun) {
+      restarting = true;
+      loadSequence += 1;
+      globe.setAcceptingGuesses(false);
+      try { await services.restartRun(); }
+      catch { statusText.textContent = "Could not restart this run. Try again."; return; }
+      finally { restarting = false; }
+      if (controller.signal.aborted) return;
+    }
     hasStarted = true;
     runResults.splice(0);
     runFinished = false;

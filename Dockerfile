@@ -11,6 +11,11 @@ ENV VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY=$VITE_GOOGLE_MAPS_JAVASCRIPT_API_KEY
 
 RUN npm run build
 
+FROM node:22-slim AS runtime-deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
 FROM oven/bun:1-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
@@ -18,5 +23,6 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/src ./src
+COPY --from=runtime-deps /app/node_modules ./node_modules
 EXPOSE 3000
 CMD ["bun", "server/index.ts"]

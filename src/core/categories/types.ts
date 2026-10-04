@@ -3,6 +3,7 @@ import type { Country, CountryId } from "../countries";
 export interface PromptContent {
   readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors";
   readonly value: string;
+  readonly presentation?: "shape" | "flag-colors";
 }
 
 // A category is "a type of prompt you're shown". It knows how to render a country as a prompt,

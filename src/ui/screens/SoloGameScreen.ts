@@ -1,7 +1,8 @@
 import type { AuthUser } from "../../core/auth";
 import type { RunType, ShellContext } from "../shell/types";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
-import { buildPromptSlots, getCategory, type PromptSlot } from "../../core/categories";
+import { buildPromptSlots, getCategory, type PromptSlot, type PromptContent } from "../../core/categories";
+import type { RankedSession } from "./RankedSession";
 import { matchesCapitalName } from "../../core/categories/matching";
 import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
 import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
@@ -50,6 +51,7 @@ export interface SoloGameScreenOptions {
   readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
   readonly engine: GameEngine;
+  readonly ranked?: { readonly session: RankedSession; readonly prompt: () => PromptContent | null; readonly subscribe: (callback: (events: readonly GameEvent[]) => void) => () => void };
   readonly selectedGameMode: PromptGameModeId;
   /**
    * From the route: "timed" runs show the clock in the GameBar and post to the leaderboard
@@ -255,7 +257,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   function renderTimer(): void {
     if (!timed) return;
-    clockValue.textContent = formatElapsedTime(playTimer.currentElapsedMs());
+    clockValue.textContent = formatElapsedTime(options.ranked?.session.elapsedMs() ?? playTimer.currentElapsedMs());
     timerLast.textContent = formatStoredTime(playTimer.readLast());
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
@@ -272,6 +274,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
+    if (options.ranked) return { isNewLocalBest, ...await options.ranked.session.post() };
     const posting = await postTimedRun({
       gameMode: options.selectedGameMode,
       variant: leaderboardVariant,
@@ -349,7 +352,8 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         }
         if (isDailyChallenge) continue;
         if (timed) {
-          const finalTimeMs = playTimer.stop();
+          const localTimeMs = playTimer.stop();
+          const finalTimeMs = options.ranked?.session.state.timeMs ?? localTimeMs;
           const posting = finishTimerRun(finalTimeMs);
           void posting.then((result) => {
             showFeedback(views.feedback, `Complete. Every prompt solved in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`, "good");
@@ -494,6 +498,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   }
 
   function resetRun(message: string): void {
+    if (options.ranked) message = "New timed run. The server clock is running.";
     activeMapPromptKey = null;
     latestCapitalRecallCountryId = null;
     resetFreePlayProgress();
@@ -513,7 +518,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     const current = getCurrentCountry(countryIndex, state);
     const displayRound = state.roundNumber + (options.dailyChallenge?.roundOffset ?? 0);
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
-    const content = current && category ? category.prompt(current) : null;
+    const content = options.ranked ? options.ranked.prompt() : current && category ? category.prompt(current) : null;
     const isCapitalRecallMode = options.selectedGameMode === "capital-recall";
     if (dailyMap) dailyMap.element.classList.toggle("is-click-country-mode", content?.kind === "map-click" && state.status === "playing");
     freePlayToggle.hidden = capitalRecallMap === null || timed;
@@ -706,7 +711,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         handleFreePlayGuess(false);
         return;
       }
-      if (engine.getState().currentCategoryId === "flag-colors") {
+      if (!options.ranked && engine.getState().currentCategoryId === "flag-colors") {
         const guessedCountry = countryForGuess(countryIndex, input.value);
         if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
       }
@@ -907,15 +912,24 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   bindKeyboardAwareInput(element, input, controller.signal);
   if (timed) playTimer.setMode("count-up");
+  if (options.ranked) playTimer.startIfNeeded();
+  const unsubscribeRanked = options.ranked?.subscribe((events) => {
+    if (controller.signal.aborted) return;
+    if (events.some((e) => e.type === "GAME_RESET")) playTimer.startIfNeeded();
+    dispatchAndRender(events);
+    if (events.some((event) => event.type === "GUESS_WRONG") && shouldAutoFocusTextInput()) input.select();
+    if (!events.length && engine.getState().lastResult?.message) showFeedback(feedback, engine.getState().lastResult!.message, "bad");
+  });
   render();
   if (initialState.lastResult?.message) showFeedback(feedback, initialState.lastResult.message, "neutral");
-  else if (timed) showFeedback(feedback, "Timed run. The clock starts on your first correct answer.", "neutral");
+  else if (timed) showFeedback(feedback, options.ranked ? "Timed run. The server clock is running." : "Timed run. The clock starts on your first correct answer.", "neutral");
   // A resumed run that had already finished opens on its results.
   if (!isDailyChallenge && initialState.status === "complete") showRunResults();
 
   return {
     element,
     destroy: () => {
+      unsubscribeRanked?.();
       playTimer.destroy();
       gameBar?.destroy();
       controller.abort();

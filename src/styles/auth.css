@@ -312,11 +312,9 @@
   display: grid;
   gap: 3px;
   padding: 10px;
-  border: 1px solid rgba(184, 227, 109, 0.14);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.014)),
-    rgba(8, 12, 8, 0.52);
+  background: var(--accent-soft);
 }
 
 .auth-stat-grid strong {

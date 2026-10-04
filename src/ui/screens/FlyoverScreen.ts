@@ -7,7 +7,9 @@ import {
   startingPlane,
   type FlyoverCountry,
   type Rng,
+  type PlaneInput,
 } from "../../core/flyover";
+import type { RankedSession } from "./RankedSession";
 import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
@@ -21,6 +23,7 @@ export interface FlyoverScreenOptions {
   readonly worldCountryFeatures: readonly WorldCountryFeature[];
   readonly storage: Storage;
   readonly onHome: () => void;
+  readonly ranked?: RankedSession;
 }
 
 export interface FlyoverScreenServices {
@@ -56,7 +59,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   const { signal } = controller;
   const shell = shellOrFallback(options.shell, options.onHome);
   const rng = services.rng ?? Math.random;
-  const now = services.now ?? (() => performance.now());
+  const now = services.now ?? (options.ranked ? () => options.ranked!.now() : () => performance.now());
   const requestFrame = services.requestFrame ?? ((callback: () => void) => requestAnimationFrame(callback));
   const cancelFrame = services.cancelFrame ?? ((handle: number) => cancelAnimationFrame(handle));
   const countries = buildFlyoverCountries(options.worldCountryFeatures);
@@ -66,6 +69,10 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   const reached: Reached[] = [];
   const skipped: FlyoverCountry[] = [];
   const visitedCodes = new Set<string>();
+  let controls: PlaneInput = { turn: 0, boost: false };
+  let polling: ReturnType<typeof setInterval> | undefined;
+  let requesting = false;
+  let starting = false;
 
   // --- DOM ---------------------------------------------------------------------------------
   const scoreValue = el("strong", { className: "flyover-score-value", text: "0" });
@@ -105,12 +112,14 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     requestFrame,
     cancelFrame,
     signal,
+    authoritative: Boolean(options.ranked),
+    onInput: (input) => { controls = input; },
     onSteerWhileGrounded: () => {
       if (phase === "ready") start();
     },
-    onReach: reach,
-    onSkip: skip,
-    onTimeUp: finish,
+    onReach: options.ranked ? () => {} : reach,
+    onSkip: options.ranked ? () => void serverMove(true) : skip,
+    onTimeUp: options.ranked ? () => void serverMove() : finish,
   });
   flight.reset(startingPlane(countries, rng));
 
@@ -154,8 +163,49 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     if (!next || flight.endsAt() <= now()) finish();
   }
 
-  function start(): void {
+  async function serverMove(skipping = false): Promise<void> {
+    if (!options.ranked || phase !== "flying" || requesting) return;
+    requesting = true;
+    const previous = flight.target();
+    const before = options.ranked.state;
+    try {
+      const state = await options.ranked.move(skipping ? { type: "skip" } : { type: "input", input: controls });
+      if (signal.aborted) return;
+      for (const { code, seconds } of state.reaches ?? []) {
+        if (visitedCodes.has(code)) continue;
+        const country = countries.find((c) => c.code === code);
+        if (!country) continue;
+        reached.push({ country, seconds });
+        visitedCodes.add(code); flight.markVisited(code); flight.showToast(`+1 ${country.name}`);
+      }
+      if (skipping && previous && state.index > before.index && state.score === before.score) {
+        skipped.push(previous); flight.showToast(`Skipped ${previous.name} · −${FLYOVER_SKIP_PENALTY_SECONDS}s`);
+      }
+      updateScore();
+      if (state.plane) flight.setPlane(state.plane);
+      if (state.endsAt) flight.setEndsAt(state.endsAt);
+      flight.setTarget(countries.find((c) => c.name === state.question?.text) ?? null);
+      if (state.status === "complete") finish();
+    } catch (error) { if (!signal.aborted) flight.showToast((error as Error).message); }
+    finally { requesting = false; }
+  }
+
+  async function start(): Promise<void> {
     if (phase !== "ready") return;
+    if (starting) return;
+    if (options.ranked) {
+      starting = true; startButton.disabled = true;
+      try {
+        const state = await options.ranked.start();
+        if (signal.aborted) return;
+        phase = "flying"; readyOverlay.hidden = true;
+        flight.reset(state.plane!); flight.setTarget(countries.find((c) => c.name === state.question?.text) ?? null); flight.fly(state.endsAt!);
+        if (document.activeElement instanceof HTMLElement && element.contains(document.activeElement)) document.activeElement.blur();
+        polling = setInterval(() => void serverMove(), 150);
+      } catch (error) { if (!signal.aborted) flight.showToast((error as Error).message); }
+      finally { starting = false; startButton.disabled = false; }
+      return;
+    }
     phase = "flying";
     readyOverlay.hidden = true;
     flight.setTarget(nextTarget());
@@ -165,6 +215,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   }
 
   function reset(): void {
+    clearInterval(polling);
     phase = "ready";
     reached.splice(0);
     skipped.splice(0);
@@ -180,6 +231,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   function finish(): void {
     if (phase === "done") return;
     phase = "done";
+    clearInterval(polling);
     flight.land();
     const score = reached.length;
     const fastest = reached.reduce<Reached | null>((best, item) => (!best || item.seconds < best.seconds ? item : best), null);
@@ -202,7 +254,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
 
     // Every finished flight counts: it posts, and the board keeps your best.
     const previousBest = readSingleBest(options.storage, "flyover");
-    const posting = submitRankedAttempt({ shell, mode: "flyover", total: score, storage: options.storage, ...(services.postAttempt ? { post: services.postAttempt } : {}) });
+    const posting = submitRankedAttempt({ shell, mode: "flyover", total: score, storage: options.storage, ...(options.ranked ? { post: options.ranked.post } : services.postAttempt ? { post: services.postAttempt } : {}) });
     bar.refreshBest();
     const isNewBest = score > previousBest;
     const card = createRankedResults(shell, {
@@ -247,6 +299,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     element,
     destroy: () => {
       controller.abort();
+      clearInterval(polling);
       flight.destroy();
       bar.destroy();
     },

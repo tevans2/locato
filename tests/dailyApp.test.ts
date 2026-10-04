@@ -2,8 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app/App";
 import { indexCountries, rawCountries } from "../src/core/countries";
-import { createDailyChallenge, getLocalDailyDate, scoreDailyRound, type DailyRoundResult } from "../src/core/dailyChallenge";
-import { createDailyResultSave, readDailyProgress, readDailyResult, saveDailyResult } from "../src/storage/dailySave";
+import { createDailyChallenge, createMixedThemeDailyChallenge, getLocalDailyDate, scoreDailyRound, type DailyRoundResult } from "../src/core/dailyChallenge";
+import { createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult } from "../src/storage/dailySave";
+import { createGameEngine } from "../src/core/game";
+import { createSoloSave } from "../src/storage/localSave";
 import type { SoloGameScreenOptions } from "../src/ui/screens/SoloGameScreen";
 import type { MapTapScreenOptions } from "../src/ui/screens/MapTapScreen";
 import type { StreetViewCountryScreenOptions } from "../src/ui/screens/StreetViewCountryScreen";
@@ -53,6 +55,7 @@ describe("daily app orchestration", () => {
     });
     first.dailyChallenge!.onProgress!({ score: 17, hintsUsed: 1, marks, rounds, roundHintsUsed: 0, roundWrongGuesses: 0 });
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.rounds).toEqual(rounds);
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.themeScoped).toBe(true);
     app.navigate({ type: "landing" });
     app.navigate({ type: "daily-challenge" });
     await vi.waitFor(() => expect(root.querySelector("#daily-intro")).not.toBeNull());
@@ -82,6 +85,29 @@ describe("daily app orchestration", () => {
     expect(result.rounds!.map((round) => round.points)).toEqual([7, 10, 10, 10, 10, 10, 10, 10, 5, 8]);
     expect(root.querySelectorAll(".daily-recap-row")).toHaveLength(10);
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)).toBeNull();
+  });
+
+  it("resumes an earlier mixed-theme attempt with its original assignments", async () => {
+    const challenge = createMixedThemeDailyChallenge(index, getLocalDailyDate());
+    const engine = createGameEngine({ countryIndex: index, categoryIds: challenge.categoryIds, seed: challenge.seed,
+      promptSlots: challenge.promptSlots!, poolOrdering: "fixed" });
+    const slot = challenge.promptSlots![0]!;
+    const country = index.byId[slot.countryId]!;
+    engine.dispatch({ type: "SUBMIT_GUESS", value: country.name, now: Date.now() });
+    saveDailyProgress(window.localStorage, { version: 1, date: challenge.date, seed: challenge.seed,
+      stage: "prompt", roundIndex: 1, score: 10, marks: ["correct"], hintsUsed: 0, elapsedMs: 1000,
+      engine: createSoloSave(index, engine.getState(), Date.now()), roundHintsUsed: 0, roundWrongGuesses: 0,
+      updatedAt: Date.now(), challengeVersion: 2,
+      rounds: [{ categoryId: slot.categoryId, countryCode: country.code, points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false }] });
+    const { root, app } = setup();
+    app.navigate({ type: "daily-challenge" });
+    await vi.waitFor(() => expect(root.querySelector("#daily-intro")).not.toBeNull());
+    expect(root.textContent).toContain("original questions and order");
+    root.querySelector<HTMLButtonElement>('[data-action="start-daily"]')!.click();
+    await vi.waitFor(() => expect(captured.solo).toHaveLength(1));
+    expect(captured.solo[0]!.dailyChallenge!.promptSlots).toEqual(challenge.promptSlots);
+    expect(captured.solo[0]!.engine.getState().currentCountryId).toBe(challenge.countryIds[1]);
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.themeScoped).toBeUndefined();
   });
 
   it("replays only losses across all modes without changing the daily result or other practice saves", async () => {

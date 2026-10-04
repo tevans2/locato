@@ -1,6 +1,6 @@
 import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
-import { createDailyChallenge, createLegacyDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
+import { createDailyChallenge, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
@@ -283,6 +283,8 @@ export function createApp(options: AppOptions): App {
   // A timed run (`&run=timed`, from Compete) always starts fresh and is never saved, so it can't
   // overwrite or clear the mode's practice run (see persistSoloRun).
   async function startSolo(categoryIds: readonly string[] | undefined, _continueSaved = false, requestedFlagPool?: FlagPool, requestedRun: RunType = "practice"): Promise<void> {
+    const verifiedMode = categoryIds?.length === 1 && isPromptGameModeId(categoryIds[0]!) ? categoryIds[0]! : null;
+    if (requestedRun === "timed" && verifiedMode && await startVerified(verifiedMode, verifiedMode === "flags" && requestedFlagPool !== "countries" ? requestedFlagPool ?? "" : "")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your game…"));
     const { createSoloGameScreen } = await import("../ui/screens/SoloGameScreen");
@@ -395,6 +397,8 @@ export function createApp(options: AppOptions): App {
         return;
       }
 
+      if (await startVerified("daily", challenge.date)) return;
+
       if (localResult) {
         mountDailyResult(localResult);
         void saveDailyChallengeResult(dailyLocalResultToAccount(localResult)).then((synced) => {
@@ -414,6 +418,7 @@ export function createApp(options: AppOptions): App {
     const progressUserId = activeUserId;
     const saved = readDailyProgress(options.storage, challenge.date, challenge.seed, progressUserId);
     if (saved && saved.challengeVersion !== 2) challenge = createLegacyDailyChallenge(options.countryIndex, challenge.date);
+    else if (saved && saved.themeScoped !== true) challenge = createMixedThemeDailyChallenge(options.countryIndex, challenge.date);
     if (!play && saved?.marks.length !== DAILY_COUNTRY_COUNT) {
       mount(createDailyIntroScreen({ shell, challenge, roundsPlayed: saved?.roundIndex ?? 0,
         onStart: () => runNavigation(startDailyChallenge(true)) }));
@@ -467,6 +472,7 @@ export function createApp(options: AppOptions): App {
         roundWrongGuesses: prompt?.roundWrongGuesses ?? 0,
         updatedAt: now,
         ...(challenge.challengeVersion === 2 ? { challengeVersion: 2, rounds: [...(prompt?.rounds ?? dailyRounds)] } : {}),
+        ...(challenge.themeScoped ? { themeScoped: true } : {}),
       }, progressUserId);
     }
 
@@ -790,7 +796,24 @@ export function createApp(options: AppOptions): App {
     void task.catch((error: unknown) => { if (run === navigationRun) showLoadError(error); });
   }
 
+  async function startVerified(mode: GameModeId | "daily", variant = ""): Promise<boolean> {
+    const run = navigationRun;
+    await authResolved;
+    if (run !== navigationRun) return true;
+    if (!shell.signedIn()) return false;
+    mount(createLoadingScreen("Preparing your game…"));
+    const world = await loadWorldCountryFeatures();
+    if (run !== navigationRun) return true;
+    const screen = mode === "daily"
+      ? (await import("../ui/screens/VerifiedGameScreen")).createVerifiedGameScreen({ mode, variant, shell, world })
+      : await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser() });
+    if (run === navigationRun) mount(screen);
+    else screen.destroy();
+    return true;
+  }
+
   async function startCountryGuessing(initialMode: WorldMapGameModeId = "name-all", runType: RunType = "practice", continent?: string): Promise<void> {
+    if (runType === "timed" && await startVerified(initialMode, continent ?? "")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Loading world map...");
     mount(loading);
@@ -832,6 +855,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startStreetViewCountry(): Promise<void> {
+    if (await startVerified("streetview-country")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Finding a street to explore…"));
     const { createStreetViewCountryScreen } = await import("../ui/screens/StreetViewCountryScreen");
@@ -849,6 +873,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startGeoGuessr(): Promise<void> {
+    if (await startVerified("geoguessr")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Preparing your first location..."));
 
@@ -868,6 +893,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startMapTap(runType: RunType = "practice"): Promise<void> {
+    if (runType === "timed" && await startVerified("map-tap")) return;
     const run = navigationRun;
     mount(createLoadingScreen("Loading MapTap..."));
 
@@ -887,6 +913,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startWorldSplit(): Promise<void> {
+    if (await startVerified("worldsplit")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Loading Worldsplit...");
     mount(loading);
@@ -915,6 +942,7 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startFlyover(): Promise<void> {
+    if (await startVerified("flyover")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Fuelling the plane...");
     mount(loading);
@@ -1083,7 +1111,7 @@ export function createApp(options: AppOptions): App {
     if (navigateOptions?.replace) replaceRoute(route);
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {
-      mount(createLandingScreen({ shell, storage: options.storage }));
+      mount(createLandingScreen({ shell, storage: options.storage, countryIndex: options.countryIndex }));
       return;
     }
     if (route.type === "solo-game") {

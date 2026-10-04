@@ -3,7 +3,7 @@ import { AuthService } from "../server/auth/AuthService";
 import { createMemoryUserStore } from "../server/auth/memoryStore";
 import { handleAuthRequest } from "../server/auth/routes";
 import { parseCookieHeader, SESSION_COOKIE_NAME } from "../server/auth/cookies";
-import type { PasswordHasher } from "../server/auth/types";
+import type { DailyChallengeResult, PasswordHasher } from "../server/auth/types";
 
 const fakeHasher: PasswordHasher = {
   hash: async (password) => `hashed:${password}`,
@@ -194,7 +194,7 @@ describe("auth routes", () => {
     expect((await resp!.json()).stats).toMatchObject({ totalGames: 1, totalCorrect: 7, soloGames: 1 });
   });
 
-  it("stores daily challenge results on the authenticated account", async () => {
+  it("rejects client-reported daily results", async () => {
     const { service } = createService();
     const r = await route(service, jsonRequest("/auth/register", "POST", { email: "daily@b.com", password: "supersecret", displayName: "daily" }));
     const token = tokenFrom(r!);
@@ -210,19 +210,13 @@ describe("auth routes", () => {
     };
 
     const save = await route(service, jsonRequest("/api/daily", "POST", result, token));
-    expect(save?.status).toBe(200);
-    const savedBody = await save!.json();
-    expect(savedBody.result).toMatchObject({ date: "2026-06-12", score: 80, hintsUsed: 1 });
-    expect(savedBody.result.shareText).toContain("Locato Daily 2026-06-12");
-    expect(savedBody.result.shareText).toContain("Score: 80/100");
-
-    const fetch = await route(service, jsonRequest("/api/daily/2026-06-12", "GET", undefined, token));
-    expect(fetch?.status).toBe(200);
-    expect((await fetch!.json()).result.score).toBe(80);
+    expect(save?.status).toBe(400);
+    const fetched = await route(service, jsonRequest("/api/daily/2026-06-12", "GET", undefined, token));
+    expect((await fetched!.json()).result).toBeNull();
   });
 
   it("does not overwrite an existing daily result for the same account and date", async () => {
-    const { service } = createService();
+    const { service, store } = createService();
     const r = await route(service, jsonRequest("/auth/register", "POST", { email: "once@b.com", password: "supersecret", displayName: "once" }));
     const token = tokenFrom(r!);
     const base = {
@@ -236,16 +230,16 @@ describe("auth routes", () => {
       completedAt: 1_797_000_000_000,
     };
 
-    await route(service, jsonRequest("/api/daily", "POST", base, token));
+    store.saveDailyResult(service.authenticate(token)!.id, base as DailyChallengeResult);
     const replay = await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 100, timeMs: 90_000, hintsUsed: 0, marks: Array(10).fill("correct") }, token));
-    expect(replay?.status).toBe(200);
-    const body = await replay!.json();
+    expect(replay?.status).toBe(400);
+    const body = await (await route(service, jsonRequest("/api/daily/2026-06-12", "GET", undefined, token)))!.json();
     expect(body.result.score).toBe(80);
     expect(body.result.timeMs).toBe(134_000);
   });
 
   it("syncs daily review details privately and rejects inconsistent totals", async () => {
-    const { service } = createService();
+    const { service, store } = createService();
     const registration = await route(service, jsonRequest("/auth/register", "POST", { email: "review@b.com", password: "supersecret", displayName: "review" }));
     const token = tokenFrom(registration!);
     const rounds = Array.from({ length: 10 }, () => ({ categoryId: "flags", countryCode: "JP", points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false }));
@@ -254,7 +248,8 @@ describe("auth routes", () => {
     const invalid = await route(service, jsonRequest("/api/daily", "POST", { ...result, score: 100 }, token));
     expect(invalid?.status).toBe(400);
     const save = await route(service, jsonRequest("/api/daily", "POST", result, token));
-    expect(save?.status).toBe(200);
+    expect(save?.status).toBe(400);
+    store.saveDailyResult(service.authenticate(token)!.id, { ...result, shareText: "server fixture", completedAt: 1_000 } as DailyChallengeResult);
     const fetched = await route(service, jsonRequest("/api/daily/2026-10-01", "GET", undefined, token));
     expect((await fetched!.json()).result).toMatchObject({ rounds, challengeVersion: 2, score: 95 });
     const leaderboard = await route(service, jsonRequest("/api/daily/leaderboard?date=2026-10-01", "GET"));
@@ -262,7 +257,7 @@ describe("auth routes", () => {
   });
 
   it("returns daily retention summary with streak and friends who finished today", async () => {
-    const { service } = createService();
+    const { service, store } = createService();
     const user = await route(service, jsonRequest("/auth/register", "POST", { email: "daily-summary@b.com", password: "supersecret", displayName: "daily_summary" }));
     const friend = await route(service, jsonRequest("/auth/register", "POST", { email: "daily-pal@b.com", password: "supersecret", displayName: "daily_pal" }));
     const userToken = tokenFrom(user!);
@@ -283,9 +278,9 @@ describe("auth routes", () => {
       completedAt: 1_797_000_000_000,
     };
 
-    await route(service, jsonRequest("/api/daily", "POST", { ...base, date: "2026-06-11", seed: "daily:2026-06-11" }, userToken));
-    await route(service, jsonRequest("/api/daily", "POST", base, userToken));
-    await route(service, jsonRequest("/api/daily", "POST", { ...base, score: 70, timeMs: 150_000 }, friendToken));
+    store.saveDailyResult(service.authenticate(userToken)!.id, { ...base, date: "2026-06-11", seed: "daily:2026-06-11" } as DailyChallengeResult);
+    store.saveDailyResult(service.authenticate(userToken)!.id, base as DailyChallengeResult);
+    store.saveDailyResult(service.authenticate(friendToken)!.id, { ...base, score: 70, timeMs: 150_000 } as DailyChallengeResult);
 
     const summary = await route(service, jsonRequest("/api/daily/summary?date=2026-06-12", "GET", undefined, userToken));
     expect(summary?.status).toBe(200);

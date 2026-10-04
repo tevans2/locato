@@ -41,7 +41,11 @@ describe("GeoGuessr multiplayer room", () => {
     expect(started.ok).toBe(true);
     const round = started.ok ? started.messages.find((message) => message.type === "GAME_STARTED")?.round : null;
     expect(round?.prompt.kind).toBe("geoguessr-streetview");
-    const target = JSON.parse(round?.prompt.value ?? "{}") as { lat: number; lng: number };
+    const prompt = JSON.parse(round?.prompt.value ?? "{}");
+    expect(prompt).not.toHaveProperty("lat");
+    expect(prompt).not.toHaveProperty("lng");
+    expect(prompt.asset).toMatch(/^\/api\/game-assets\/[a-f0-9]{48}$/);
+    const target = (room as unknown as { currentRound: { location: { lat: number; lng: number } } }).currentRound.location;
 
     const firstGuess = room.submitGuess("host", target.lat, target.lng, 1040);
     expect(firstGuess.ok).toBe(true);

@@ -113,6 +113,8 @@ export interface DailyProgressSave {
   readonly roundHintsUsed: number;
   readonly roundWrongGuesses: number;
   readonly updatedAt: number;
+  /** Preserve the generator used when an attempt began. */
+  readonly themeScoped?: true;
   readonly challengeVersion?: 2;
   readonly rounds?: readonly DailyRoundResult[];
 }

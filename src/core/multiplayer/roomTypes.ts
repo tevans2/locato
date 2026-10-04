@@ -103,8 +103,10 @@ export interface FinalResult {
 /** The `flyover-flight` prompt value (JSON): where every plane takes off and the shared route. */
 export interface FlyoverFlightPrompt {
   readonly start: { readonly x: number; readonly y: number; readonly heading: number };
-  /** Country codes, in order. */
-  readonly route: readonly string[];
+  /** Only the first target. Each racer's next target is sent privately after server verification. */
+  readonly target?: string | null;
+  /** Legacy fixtures only; servers never publish a full route. */
+  readonly route?: readonly string[];
 }
 
 export interface FlyoverPlanePosition {
