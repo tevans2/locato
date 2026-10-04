@@ -44,10 +44,17 @@ export function updatePromptView(view: PromptView, content: PromptContent | null
   }
 
   if (content.kind === "image") {
-    if (isCountryShapePrompt(content.value)) {
+    if (content.presentation === "shape" || isCountryShapePrompt(content.value)) {
       const shapePrompt = el("div", { className: "country-shape-prompt", attrs: { role: "img", "aria-label": "Country outline prompt" } });
       setBackgroundImage(shapePrompt, content.value);
       view.imageSlot.replaceChildren(shapePrompt);
+      return;
+    }
+    if (content.presentation === "flag-colors") {
+      view.imageSlot.replaceChildren(el("div", { className: "flag-color-reveal", children: [
+        el("img", { className: "flag-image flag-color-reveal-canvas", attrs: { src: content.value, alt: "Revealed part of the hidden flag" } }),
+        el("p", { className: "flag-color-reveal-meta", text: "Guess flags to reveal matching colours in matching positions." }),
+      ] }));
       return;
     }
 

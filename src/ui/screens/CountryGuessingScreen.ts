@@ -22,6 +22,8 @@ import { bindKeyboardAwareInput, dismissKeyboardIfTouchInput, shouldAutoFocusTex
 import "../../styles/game-screens.css";
 import { createGameBar, type GameBarHandle } from "../shell/GameBar";
 import { createRunResults, formatRunTime, formatTimeSpent, hideResultsIn, showResultsIn, type RunResultsHandle, type TimedPostOutcome } from "./gameResults";
+import type { RankedSession } from "./RankedSession";
+import type { RankedAction } from "../../core/ranked";
 
 export interface WorldMapRunResult {
   readonly playMode: WorldMapGameModeId;
@@ -33,6 +35,7 @@ export interface WorldMapRunResult {
 }
 
 export interface CountryGuessingScreenOptions {
+  readonly ranked?: RankedSession;
   /** Navigation shell (docs/navigation.md). */
   readonly shell?: ShellContext;
   readonly countryIndex: CountryIndex;
@@ -94,7 +97,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let lastResults: RunResultsHandle | null = null;
   // Run audit (src/core/runAudit): when each country was found and how it was typed, plus the
   // server's ticket for the run, so a posted time can be checked. Name all countries only.
-  const audited = isAuditedMode(playMode);
+  const audited = !options.ranked && isAuditedMode(playMode);
+  let rankedRequesting = false;
+  let autoTimer: ReturnType<typeof setTimeout> | undefined;
+  let anonymousHighlightId: string | null = null;
+  let spotTransition = false;
   let recorder: RunRecorder | null = null;
   let auditTicket: Promise<string | null> | null = null;
   let auditEnded = false;
@@ -107,6 +114,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     return runGivenUp || complete();
   }
   function recordCurrentRun(completed: boolean): void {
+    if (options.ranked) return;
     // A finished timed run sends its timeline with the leaderboard post instead.
     if (!(timed && completed)) endAuditedRun(completed ? "complete" : "abandoned");
     const countriesFound = playMode === "puzzle" ? puzzlePlacedCount : guessedCountryIds.size;
@@ -133,6 +141,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   }
 
   function chooseNextTargetCountryId(): CountryId | null {
+    if (options.ranked) {
+      if (playMode !== "click-country") return null;
+      const name = options.ranked.state.question?.text.replace(/^Click /, "").replace(/\.$/, "");
+      return countryIndex.countries.find((c) => c.name === name)?.id ?? null;
+    }
     const remainingCountries = countryIndex.countries.filter((country) => !guessedCountryIds.has(country.id));
     if (remainingCountries.length === 0) return null;
     return remainingCountries[Math.floor(Math.random() * remainingCountries.length)]!.id;
@@ -205,18 +218,20 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       targetCountryId: playMode === "spot-country" && !roundEnded() ? targetCountryId : null,
       clickableCountryIds: runGivenUp ? activeSet : playMode === "click-country" ? null : new Set<CountryId>(),
       showMissingCountryIds: visibleMissingCountryIds,
+      ...(options.ranked && playMode === "spot-country" && !spotTransition && !roundEnded() ? { targetPaths: options.ranked.state.question?.paths ?? [] } : {}),
     });
   }
 
   function renderTimer(): void {
     if (!timed) return;
-    clockValue.textContent = formatElapsedTime(playTimer.currentElapsedMs());
+    clockValue.textContent = formatElapsedTime(options.ranked?.elapsedMs() ?? playTimer.currentElapsedMs());
     timerLast.textContent = formatStoredTime(playTimer.readLast());
     timerBest.textContent = formatStoredTime(playTimer.readBest());
   }
 
   async function finishTimerRun(finalTimeMs: number): Promise<TimedPostOutcome> {
     const isNewLocalBest = playTimer.writeCompletion(finalTimeMs);
+    if (options.ranked) return { isNewLocalBest, ...await options.ranked.post() };
     let run: { readonly runId: string | null; readonly timeline: ReturnType<RunRecorder["timeline"]> } | undefined;
     if (audited && recorder && !auditEnded) {
       auditEnded = true;
@@ -247,6 +262,21 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const finished = roundEnded();
     const targetActive = (playMode === "click-country" || playMode === "spot-country") && !finished;
     setWorldMapTargetCountry(map, playMode === "spot-country" && targetCountryId !== null && targetActive ? targetCountryId : null);
+    if (options.ranked && playMode === "spot-country") {
+      const question = spotTransition ? null : options.ranked.state.question;
+      if (anonymousHighlightId !== question?.id) {
+        map.element.querySelector(".anonymous-map-highlight")?.remove();
+        anonymousHighlightId = question?.id ?? null;
+        if (question?.paths?.length) {
+          const highlight = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          highlight.setAttribute("class", "world-map-country is-target anonymous-map-highlight"); highlight.setAttribute("fill-rule", "evenodd");
+          highlight.setAttribute("d", question.paths.map((r) => r.map(([x,y],i) => `${i ? "L" : "M"}${x} ${y}`).join(" ") + " Z").join(" "));
+          map.element.querySelector("svg")?.append(highlight);
+          const xs = question.paths.flat().map((p) => p[0]), ys = question.paths.flat().map((p) => p[1]);
+          map.focusBounds({ x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) });
+        }
+      }
+    }
     updateAtlasView(atlas, countryIndex.countries, guessedCountryIds);
     const namingModeActive = playMode === "name-all";
     const spotCountryModeActive = playMode === "spot-country";
@@ -296,12 +326,18 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     focusSpotTargetIfNeeded();
   }
 
-  function resetGame(feedbackMessage: string, captureReview = true): void {
+  function resetGame(feedbackMessage: string, captureReview = true, serverReady = false): void {
+    if (options.ranked && !serverReady) {
+      void options.ranked.start().then(() => { if (!controller.signal.aborted) resetGame(feedbackMessage, captureReview, true); }).catch((error) => showFeedback(feedback, error.message, "bad"));
+      return;
+    }
+    if (options.ranked) feedbackMessage = "New timed run. The server clock is running.";
     if (captureReview && !runGivenUp) captureReviewForCurrentRun();
     recordCurrentRun(false); // record the run being abandoned before clearing it
     resetAuditedRun();
     clearSpotFocusTimeout();
     lastFocusedSpotTargetId = null;
+    spotTransition = false;
     setAtlasOpen(atlas, false);
     guessedCountryIds.clear();
     runGivenUp = false;
@@ -328,6 +364,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       puzzleTotalCount = initialPuzzleState.totalCount;
     }
     playTimer.reset();
+    if (options.ranked) playTimer.startIfNeeded();
     render();
     showFeedback(feedback, feedbackMessage, "neutral");
     if ((playMode === "name-all" || playMode === "spot-country") && shouldAutoFocusTextInput()) input.focus();
@@ -335,7 +372,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   /** Every country found: record it, post a timed run, and show the results card. */
   function finishWorldRun(): void {
-    const finalTimeMs = timed ? playTimer.stop() : 0;
+    const localTimeMs = timed ? playTimer.stop() : 0;
+    const finalTimeMs = timed ? options.ranked?.state.timeMs ?? localTimeMs : 0;
     recordCurrentRun(true);
     recordWorldProgress(true);
     if (timed) {
@@ -388,6 +426,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     recordWorldProgress(false);
 
     if (playMode === "spot-country") {
+      if (options.ranked) spotTransition = true;
       targetCountryId = null;
       lastFocusedSpotTargetId = null;
       render();
@@ -403,6 +442,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       clearSpotFocusTimeout();
       spotFocusTimeoutId = window.setTimeout(() => {
         spotFocusTimeoutId = null;
+        spotTransition = false;
         setNextTargetCountry();
         render();
       }, 520);
@@ -429,6 +469,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   function checkSpotCountryInput(showMiss = false): void {
     if (playMode !== "spot-country" || roundEnded()) return;
+    if (options.ranked) { requestRankedAnswer(showMiss); return; }
 
     const targetCountry = getTargetCountry();
     if (!targetCountry) return;
@@ -456,8 +497,34 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     }
   }
 
+  function requestRankedAnswer(manual: boolean): void {
+    clearTimeout(autoTimer);
+    const value = input.value.trim();
+    if (!value) return;
+    const action = { type: "answer" as const, answer: value, auto: !manual };
+    if (manual) void rankedMove(action);
+    else autoTimer = setTimeout(() => void rankedMove(action), 220);
+  }
+
+  async function rankedMove(action: Omit<RankedAction, "runId" | "questionId">): Promise<void> {
+    if (!options.ranked || rankedRequesting || roundEnded()) return;
+    rankedRequesting = true;
+    const questionId = options.ranked.state.question?.id;
+    try {
+      const state = await options.ranked.move(action);
+      if (controller.signal.aborted) return;
+      const detail = state.result;
+      if (detail && detail.questionId === questionId && detail.kind === "correct" && detail.countryCode) {
+        const country = countryIndex.byCode.get(detail.countryCode);
+        if (country && !guessedCountryIds.has(country.id)) recordGuess(country);
+      } else if (!action.auto) { runWrongGuesses++; showFeedback(feedback, state.feedback ?? "Try again.", "bad"); }
+    } catch (error) { if (!controller.signal.aborted) showFeedback(feedback, (error as Error).message, "bad"); }
+    finally { rankedRequesting = false; }
+  }
+
   function checkInput(showMiss = false): void {
     if (playMode !== "name-all" || roundEnded()) return;
+    if (options.ranked) { requestRankedAnswer(showMiss); return; }
 
     const country = showMiss
       ? submitCountryGuess(countryIndex, input.value, guessedCountryIds)
@@ -486,6 +553,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     }
 
     if (playMode !== "click-country" || roundEnded()) return;
+    if (options.ranked) {
+      const country = countryIndex.byId[countryId];
+      if (country) void rankedMove({ type: "place", countryCode: country.code });
+      return;
+    }
 
     const clickedCountry = countryIndex.byId[countryId];
     const targetCountry = getTargetCountry();
@@ -531,7 +603,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     render();
   }
 
-  function handlePuzzleCheck(): void {
+  async function handlePuzzleCheck(): Promise<void> {
     if (playMode !== "puzzle") return;
 
     const accuracy = puzzle.checkAccuracy();
@@ -544,6 +616,13 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       return;
     }
 
+    if (options.ranked && !puzzleChecked) {
+      checkPuzzleButton.disabled = true;
+      try { await options.ranked.move({ type: "puzzle-check" }); }
+      catch (error) { if (!controller.signal.aborted) showFeedback(feedback, (error as Error).message, "bad"); return; }
+      finally { checkPuzzleButton.disabled = false; }
+      if (controller.signal.aborted) return;
+    }
     const alreadyChecked = puzzleChecked;
     puzzleChecked = true;
     puzzleAccuracyPercent = accuracy.accuracyPercent;
@@ -553,7 +632,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
     const puzzleStats = { accuracyPercent: accuracy.accuracyPercent, closeCount: accuracy.closeCount, totalCount: accuracy.totalCount };
     if (timed && !alreadyChecked) {
-      const finalTimeMs = playTimer.stop();
+      const localTimeMs = playTimer.stop();
+      const finalTimeMs = options.ranked?.state.timeMs ?? localTimeMs;
       const posting = finishTimerRun(finalTimeMs);
       void posting.then((result) => {
         render();
@@ -744,9 +824,11 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     onTick: renderTimer,
   });
   if (timed) playTimer.setMode("count-up");
+  if (options.ranked) playTimer.startIfNeeded();
 
   const puzzle = createPuzzleMapView(options.worldCountryFeatures, countryIndex, puzzleContinent, {
     signal: controller.signal,
+    ...(options.ranked ? { onPlacement: (p: { code: string; dx: number; dy: number }) => { void options.ranked!.move({ type: "puzzle-piece", countryCode: p.code, dx: p.dx, dy: p.dy }).catch((error) => { if (!controller.signal.aborted) showFeedback(feedback, error.message, "bad"); }); } } : {}),
     onFirstPlacement: () => {
       playTimer.startIfNeeded();
       noteRunStarted();
@@ -958,7 +1040,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   showFeedback(
     feedback,
     timed
-      ? "Timed run. The clock starts on your first correct move."
+      ? options.ranked ? "Timed run. The server clock is running." : "Timed run. The clock starts on your first correct move."
       : playMode === "click-country"
       ? "Click mode ready. Click the named country on the map."
       : playMode === "spot-country"
@@ -974,6 +1056,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   return {
     element,
     destroy: () => {
+      clearTimeout(autoTimer);
       recordCurrentRun(false); // leaving the screen ends the run; record progress so it isn't lost
       playTimer.destroy();
       clearSpotFocusTimeout();

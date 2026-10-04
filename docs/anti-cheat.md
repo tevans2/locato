@@ -18,8 +18,10 @@ It does **not** prove that a human supplied the accepted controls or answers.
 | Daily | Private themed daily queue; server answers/pins; wrong-guess penalties; one reserved account attempt per date |
 | Multiplayer | Existing server answer/pin scoring plus strict deadlines; server-simulated Flyover; private next targets; server-written account results |
 
-Signed-in ranked play uses `VerifiedGameScreen`. Guest/practice play continues locally and cannot
-upload its final values to ranked boards. Educational country data, public practice assets, and
+Signed-in ranked play uses the original gameplay screens through `RankedGameScreen` and
+`RankedSession`. Practice and timed games share their layouts, controls and results views;
+ranked actions and result posting remain server-owned. Daily uses `VerifiedGameScreen`.
+Guest/practice play continues locally and cannot upload its final values to ranked boards. Educational country data, public practice assets, and
 map geography remain public: a browser needs visible geography to render a playable game.
 
 ## API boundaries
@@ -27,7 +29,9 @@ map geography remain public: a browser needs visible geography to render a playa
 - `POST /api/ranked/start` validates mode/variant and creates a cryptographically random,
   account-bound game. Its queue and private random seed remain on the server.
 - `POST /api/ranked/action` accepts the current question ID and a move. A server checks the
-  answer, pin, placement, split line or flight controls. Stale question IDs, invalid moves and
+  answer, pin, placement, split line or flight controls. Hint, Pass and Reveal are also
+  server actions. Puzzle drops record each piece offset; Check accuracy only completes a
+  timed game after every piece is within the permitted placement tolerance. Stale question IDs, invalid moves and
   excessive requests fail. A flight never accepts client position, radius, speed or score.
 - `POST /api/leaderboard` requires a completed, unexpired, account-owned run and the exact
   server result for that mode/variant. Changing final numbers or using an old audit ticket
@@ -71,8 +75,8 @@ Before deploying:
    daily queue remains stable across restarts. Do not set a `VITE_` variable for this secret.
 3. Enable Google Street View Static API and configure the server-only
    `GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY`. The metadata key can use the same server credential.
-   Retain browser keys only for practice views / the existing multiplayer pin map. The new
-   ranked pin globe does not need a browser key. Image requests use the billable static API;
+   Retain the browser key for the original GeoGuessr guess map, practice views and the
+   multiplayer pin map. MapTap uses its existing satellite globe without a Google browser key. Image requests use the billable static API;
    configure the Google project's quota as appropriate for traffic.
 4. Run type checking, the full test suite and a production build. On Node 26, use
    `NODE_OPTIONS=--no-experimental-webstorage npm test` for Happy DOM tests.
@@ -108,7 +112,8 @@ behavioral signals, review and moderation, with false positives considered. Obfu
 `rankedSecurity.test.ts` completes real server games across every ranked mode, rejects raw
 submissions, verifies ownership/expiry/variant/result matching and private clue payloads, and
 checks daily scoring/reservation. `rankedUI.test.ts` plays through the actual frontend and HTTP
-handler. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
+handler in every regular mode, including original controls, Hint/Pass, restarts and score
+posting. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
 Flight/room tests enforce stock movement, silence/deadlines and private targets. Earlier cheat
 scripts remain isolated reproduction fixtures; their browser-only score cannot post a ranked result.
 

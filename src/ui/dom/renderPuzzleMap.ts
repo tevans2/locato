@@ -86,6 +86,7 @@ export interface PuzzleMapViewOptions {
   readonly onFirstPlacement?: () => void;
   readonly onProgress?: (progress: PuzzleMapProgress) => void;
   readonly onComplete?: (progress: PuzzleMapProgress) => void;
+  readonly onPlacement?: (placement: { readonly code: string; readonly dx: number; readonly dy: number }) => void;
 }
 
 export interface PuzzleMapView {
@@ -522,6 +523,7 @@ export function createPuzzleMapView(
     lastCountry = piece.country;
 
     if (!wasPlaced) options.onFirstPlacement?.();
+    options.onPlacement?.({ code: piece.country.code, dx: piece.dx, dy: piece.dy });
     emitProgress(piece.country);
   }
 
