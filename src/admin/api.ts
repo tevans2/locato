@@ -4,44 +4,25 @@ import type { AdminRoomSummary } from "../../server/rooms/RoomManager";
 
 export type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
 
-const TOKEN_KEY = "locato.admin.token";
-
 export class AdminApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
   }
 }
 
-// The token lives in sessionStorage so it's gone when the tab closes; never localStorage.
-export function loadToken(): string | null {
-  try {
-    return window.sessionStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function saveToken(token: string | null): void {
-  try {
-    if (token) window.sessionStorage.setItem(TOKEN_KEY, token);
-    else window.sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Storage blocked: the session just won't survive a reload.
-  }
-}
-
 export interface AdminClient {
   get<T>(path: string): Promise<T>;
-  send<T>(method: "PATCH" | "DELETE" | "POST", path: string, body?: unknown): Promise<T>;
+  send<T>(method: "PATCH" | "DELETE" | "POST" | "PUT", path: string, body?: unknown): Promise<T>;
 }
 
-export function createClient(token: string, onUnauthorized: () => void): AdminClient {
+// The console rides on the player's own session cookie (HttpOnly, same origin): no token in JS.
+export function createClient(onSignedOut: (status: 401 | 403) => void): AdminClient {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    const headers: Record<string, string> = {};
     if (body !== undefined) headers["content-type"] = "application/json";
-    const response = await fetch(`/api/admin${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    const response = await fetch(`/api/admin${path}`, { method, headers, credentials: "same-origin", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
     const data = (await response.json().catch(() => ({}))) as { error?: string };
-    if (response.status === 403) onUnauthorized();
+    if (response.status === 401 || response.status === 403) onSignedOut(response.status);
     if (!response.ok) throw new AdminApiError(response.status, data.error ?? `Request failed (${response.status}).`);
     return data as T;
   }
@@ -51,17 +32,46 @@ export function createClient(token: string, onUnauthorized: () => void): AdminCl
   };
 }
 
-// Verifies a token before the console opens, without keeping a client around.
-export async function checkToken(token: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export interface AdminIdentity {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly avatarEmoji: string | null;
+}
+
+export type AdminSessionState =
+  | { readonly kind: "admin"; readonly user: AdminIdentity }
+  | { readonly kind: "signed-out" }
+  | { readonly kind: "not-admin" }
+  | { readonly kind: "error"; readonly error: string };
+
+/** Who the current session belongs to, and whether they may use the console. */
+export async function checkSession(): Promise<AdminSessionState> {
   try {
-    const response = await fetch("/api/admin/session", { headers: { authorization: `Bearer ${token}` } });
-    if (response.ok) return { ok: true };
-    if (response.status === 404) return { ok: false, error: "The admin console is disabled on this server (ADMIN_TOKEN is not set)." };
+    const response = await fetch("/api/admin/session", { credentials: "same-origin" });
+    if (response.ok) return { kind: "admin", user: ((await response.json()) as { user: AdminIdentity }).user };
+    if (response.status === 401) return { kind: "signed-out" };
+    if (response.status === 403) return { kind: "not-admin" };
     const data = (await response.json().catch(() => ({}))) as { error?: string };
-    return { ok: false, error: response.status === 403 ? "That token was not accepted." : data.error ?? "Sign-in failed." };
+    return { kind: "error", error: data.error ?? `The server answered ${response.status}.` };
+  } catch {
+    return { kind: "error", error: "Could not reach the server." };
+  }
+}
+
+export async function signIn(email: string, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await fetch("/auth/login", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
+    if (response.ok) return { ok: true };
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: data.error ?? "Sign-in failed." };
   } catch {
     return { ok: false, error: "Could not reach the server." };
   }
+}
+
+export async function signOut(): Promise<void> {
+  await fetch("/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
 }
 
 export interface AdminSystem {
@@ -78,4 +88,5 @@ export interface AdminSystem {
 }
 
 export type AdminUserUpdate = { displayName?: string; clearAvatar?: true };
+export type { AdminAccess } from "../../server/auth/types";
 export type { AuthUser };

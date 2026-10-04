@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Eraser, LogOut, Pencil, RotateCcw, Search, Trash2, X } from "lucide-react";
-import type { AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../api";
+import { Eraser, LogOut, Pencil, RotateCcw, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import type { AdminAccess, AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../api";
 import { formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
 import { EventRow } from "./Events";
@@ -17,12 +17,17 @@ function authLabel(user: { hasPassword: boolean; providers: readonly string[] })
   return [...(user.hasPassword ? ["password"] : []), ...user.providers].join(", ") || "—";
 }
 
+function AdminBadge({ access }: { access: AdminAccess }) {
+  if (!access) return null;
+  return <Badge tone="good" title={access === "config" ? "Admin through ADMIN_EMAILS" : "Admin access granted in the console"}>admin</Badge>;
+}
+
 // Heuristic only: helps spot automated / test signups at a glance.
 function looksLikeTestAccount(email: string, name: string): boolean {
   return /@example\.(com|org|net)$/i.test(email) || /pentest|^ptest|^test/i.test(name) || /pentest/i.test(email);
 }
 
-export function UsersView({ client, selectedId, onSelect, helpers }: { client: AdminClient; selectedId: string | null; onSelect: (id: string | null) => void; helpers: ActionHelpers }) {
+export function UsersView({ client, currentAdminId, selectedId, onSelect, helpers }: { client: AdminClient; currentAdminId: string; selectedId: string | null; onSelect: (id: string | null) => void; helpers: ActionHelpers }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [offset, setOffset] = useState(0);
@@ -64,6 +69,7 @@ export function UsersView({ client, selectedId, onSelect, helpers }: { client: A
                       <span className="adm-user-cell">
                         {user.avatarEmoji && <span aria-hidden>{user.avatarEmoji}</span>}
                         <strong>{user.displayName}</strong>
+                        <AdminBadge access={user.admin} />
                         {looksLikeTestAccount(user.email, user.displayName) && <Badge tone="warn" title="Looks like an automated or test account">test?</Badge>}
                       </span>
                     </td>
@@ -87,12 +93,12 @@ export function UsersView({ client, selectedId, onSelect, helpers }: { client: A
           </div>
         )}
       </Panel>
-      {selectedId && <UserDrawer key={selectedId} client={client} id={selectedId} onClose={() => onSelect(null)} onChanged={list.refresh} helpers={helpers} />}
+      {selectedId && <UserDrawer key={selectedId} client={client} currentAdminId={currentAdminId} id={selectedId} onClose={() => onSelect(null)} onChanged={list.refresh} helpers={helpers} />}
     </>
   );
 }
 
-function UserDrawer({ client, id, onClose, onChanged, helpers }: { client: AdminClient; id: string; onClose: () => void; onChanged: () => void; helpers: ActionHelpers }) {
+function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }: { client: AdminClient; currentAdminId: string; id: string; onClose: () => void; onChanged: () => void; helpers: ActionHelpers }) {
   const detail = useResource(() => client.get<AdminUserDetail>(`/users/${encodeURIComponent(id)}`), [client, id]);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
@@ -135,6 +141,7 @@ function UserDrawer({ client, id, onClose, onChanged, helpers }: { client: Admin
           <div className="adm-drawer-body">
             <div className="adm-chips">
               {d.online ? <Badge tone="good">Online</Badge> : <Badge>Offline</Badge>}
+              <AdminBadge access={d.user.admin} />
               <Badge>{authLabel({ hasPassword: d.user.hasPassword, providers: d.providers })}</Badge>
               <Badge>Joined {formatDate(d.user.createdAt)}</Badge>
               <Badge>{d.sessions.length} active session{d.sessions.length === 1 ? "" : "s"}</Badge>
@@ -156,6 +163,22 @@ function UserDrawer({ client, id, onClose, onChanged, helpers }: { client: Admin
                   try { await client.send("PATCH", path, { clearAvatar: true }); helpers.notify("Avatar cleared."); afterChange(); } catch (err) { helpers.notify(err instanceof Error ? err.message : String(err), "bad"); }
                 }}><Eraser size={14} aria-hidden /> Clear avatar</button>
               )}
+              {d.user.admin === null ? (
+                <button type="button" className="adm-btn is-small" onClick={() => helpers.confirm({
+                  title: "Make this user an admin?",
+                  body: <p><strong>{d.user.displayName}</strong> ({d.user.email}) will be able to sign in here and see every account, edit and delete users, and remove leaderboard entries.</p>,
+                  confirmLabel: "Make admin",
+                  run: async () => { await client.send("PUT", `${path}/admin`, { admin: true }); helpers.notify(`${d.user.displayName} is now an admin.`); afterChange(); },
+                })}><ShieldCheck size={14} aria-hidden /> Make admin</button>
+              ) : d.user.admin === "granted" && d.user.id !== currentAdminId ? (
+                <button type="button" className="adm-btn is-small" onClick={() => helpers.confirm({
+                  title: "Remove admin access?",
+                  body: <p><strong>{d.user.displayName}</strong> will lose access to this console. Their account is otherwise unchanged.</p>,
+                  confirmLabel: "Remove admin",
+                  tone: "danger",
+                  run: async () => { await client.send("PUT", `${path}/admin`, { admin: false }); helpers.notify(`Removed admin access from ${d.user.displayName}.`); afterChange(); },
+                })}><ShieldOff size={14} aria-hidden /> Remove admin</button>
+              ) : null}
               <button type="button" className="adm-btn is-small" disabled={d.sessions.length === 0} onClick={() => helpers.confirm({
                 title: "Sign this user out everywhere?",
                 body: <p>Revokes all {d.sessions.length} active session{d.sessions.length === 1 ? "" : "s"} for <strong>{d.user.displayName}</strong>. They can sign in again.</p>,

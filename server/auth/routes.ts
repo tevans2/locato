@@ -42,47 +42,10 @@ function logRunAudit(request: Request, userId: string, audit: RunAuditResult, ex
   });
 }
 
-// Constant-time string comparison so the admin token can't be recovered via response timing.
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-// Admin requests authenticate with the out-of-band ADMIN_TOKEN, not a user session. Accepts
-// either `Authorization: Bearer <token>` or `x-admin-token: <token>`.
-function isAuthorizedAdmin(request: Request, adminToken: string): boolean {
-  const header = request.headers.get("authorization");
-  const bearer = header && header.startsWith("Bearer ") ? header.slice(7) : null;
-  const provided = bearer ?? request.headers.get("x-admin-token");
-  return provided !== null && safeEqual(provided, adminToken);
-}
-
-// Per-IP lockout for wrong admin tokens: brute-forcing the token gets 429s after a handful of
-// misses. In-memory and single-machine, like the other rate limits here.
-const ADMIN_MAX_FAILURES = 10;
-const ADMIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
-const adminFailures = new Map<string, number[]>();
-
-function recentAdminFailures(callerIp: string, now: number): number[] {
-  const recent = (adminFailures.get(callerIp) ?? []).filter((at) => now - at < ADMIN_FAILURE_WINDOW_MS);
-  if (recent.length === 0) adminFailures.delete(callerIp);
-  else adminFailures.set(callerIp, recent);
-  return recent;
-}
-
-function isAdminLockedOut(callerIp: string, now: number): boolean {
-  return recentAdminFailures(callerIp, now).length >= ADMIN_MAX_FAILURES;
-}
-
-function recordAdminFailure(callerIp: string, now: number): void {
-  adminFailures.set(callerIp, [...recentAdminFailures(callerIp, now), now]);
-}
-
-// Test hook: the lockout map is module state shared across route calls.
-export function resetAdminLockouts(): void {
-  adminFailures.clear();
+// Admin requests authenticate like any other request, with the player's session cookie; the
+// account must then be an admin (listed in ADMIN_EMAILS or granted from the console).
+function isAuthorizedAdmin(user: AuthUser, admin: AdminRouteContext): boolean {
+  return admin.service.isAdmin(user);
 }
 
 function intParam(url: URL, name: string): number | undefined {
@@ -210,7 +173,7 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
 
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
-export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, adminToken: string | null = null, social: SocialBridge = NOOP_SOCIAL, admin: AdminRouteContext | null = null): Promise<Response | null> {
+export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, social: SocialBridge = NOOP_SOCIAL, admin: AdminRouteContext | null = null): Promise<Response | null> {
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
     const origin = request.headers.get("origin");
     if (request.headers.get("sec-fetch-site") === "cross-site" || (origin && ![url.origin, new URL(baseUrl).origin].includes(origin))) return json({ error: "Forbidden origin." }, 403);
@@ -440,22 +403,17 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json({ progress: result.progress });
   }
 
-  // --- Admin console (gated by ADMIN_TOKEN; the surface stays hidden when unset) ---
+  // --- Admin console (signed-in accounts with admin access only) ---
   if (pathname.startsWith("/api/admin/")) {
-    if (!adminToken) return null; // not configured → fall through to static (404), surface hidden
-    const callerIp = ip(request);
-    if (isAdminLockedOut(callerIp, Date.now())) {
-      log("warn", "admin.locked_out", { ip: callerIp, path: pathname });
-      return json({ error: "Too many failed admin attempts. Try again later." }, 429);
-    }
-    if (!isAuthorizedAdmin(request, adminToken)) {
-      recordAdminFailure(callerIp, Date.now());
-      log("warn", "admin.unauthorized", { ip: callerIp, path: pathname });
-      return json({ error: "Forbidden." }, 403);
-    }
-    // Only an authorized request reaches the admin routes.
     if (!admin) return json({ error: "Admin console is not configured." }, 503);
-    return handleAdminRoutes(request, url, admin);
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Sign in to use the admin console." }, 401);
+    if (!isAuthorizedAdmin(user, admin)) {
+      log("warn", "admin.unauthorized", { ip: ip(request), userId: user.id, path: pathname });
+      return json({ error: "This account doesn't have admin access." }, 403);
+    }
+    // Only an admin's request reaches the admin routes.
+    return handleAdminRoutes(request, url, admin, user);
   }
 
   // --- Friends ---

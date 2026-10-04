@@ -56,7 +56,7 @@ Non-secret config (`NODE_ENV`, room limits, `DATABASE_PATH`) lives in each `[env
 | Secret | Purpose |
 | --- | --- |
 | `BASE_URL` | Public origin (e.g. `https://locato.quest`); used to build OAuth callback URLs. |
-| `ADMIN_TOKEN` | Enables the admin console at `/admin` and the `/api/admin/*` API. Unset ⇒ both are hidden. Use a long random value (`openssl rand -hex 32`). |
+| `ADMIN_EMAILS` | Comma-separated emails of accounts that are always admins of the console at `/admin` (`fly secrets set ADMIN_EMAILS=you@example.com`). They sign in with their normal account and can grant admin to others from Users. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth (optional). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional). |
 

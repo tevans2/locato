@@ -1,5 +1,6 @@
 import { logEvent } from "./events";
 import type { AdminService } from "./AdminService";
+import type { AuthUser } from "../auth/types";
 
 export interface AdminRouteContext {
   readonly service: AdminService;
@@ -34,15 +35,18 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-// Routes for an already-authorized admin request. The ADMIN_TOKEN check lives in
-// handleAuthRequest, which only delegates here once the caller has proven the token.
-export async function handleAdminRoutes(request: Request, url: URL, context: AdminRouteContext): Promise<Response> {
+// Routes for an already-authorized admin request. The admin check lives in handleAuthRequest,
+// which only delegates here once the caller's session belongs to an admin (`actor`).
+export async function handleAdminRoutes(request: Request, url: URL, context: AdminRouteContext, actor: AuthUser): Promise<Response> {
   const { pathname } = url;
   const { method } = request;
   const { service } = context;
-  const audit = (action: string, details: Record<string, unknown>) => logEvent("info", action, { ip: ip(request), ...details });
+  // Every admin action records which admin took it.
+  const audit = (action: string, details: Record<string, unknown>) => logEvent("info", action, { ip: ip(request), adminId: actor.id, adminName: actor.displayName, ...details });
 
-  if (pathname === "/api/admin/session" && method === "GET") return json({ ok: true });
+  if (pathname === "/api/admin/session" && method === "GET") {
+    return json({ user: { id: actor.id, email: actor.email, displayName: actor.displayName, avatarEmoji: actor.avatarEmoji }, access: service.adminAccess(actor) });
+  }
 
   if (pathname === "/api/admin/overview" && method === "GET") return json(service.overview());
 
@@ -86,6 +90,17 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
       audit("admin.user.delete", { targetUserId: id, deleted });
       return deleted ? json({ ok: true, deleted: id }) : json({ error: "User not found." }, 404);
     }
+  }
+
+  const adminMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/admin$/);
+  if (adminMatch && method === "PUT") {
+    const id = decodeURIComponent(adminMatch[1]!);
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.setAdmin(actor.id, id, body.admin);
+    if (!result.ok) return json({ error: result.error }, result.status);
+    audit(body.admin === true ? "admin.user.grant_admin" : "admin.user.revoke_admin", { targetUserId: id });
+    return json({ admin: result.value });
   }
 
   const sessionsMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/sessions$/);
