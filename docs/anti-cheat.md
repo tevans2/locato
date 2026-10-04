@@ -9,8 +9,8 @@ It does **not** prove that a human supplied the accepted controls or answers.
 
 | Modes | Server verifies |
 | --- | --- |
-| Flags (countries, territories, both), Flag Colours, Shapes, Codes, Capitals, Capital Recall | One private current country; matching answers; elapsed server time; completed set |
-| Name All | Unique valid country names; full set; elapsed server time |
+| Flags (countries, territories, both), Flag Colours, Shapes, Codes, Capitals, Capital Recall | Server-chosen current country; original answer matching; elapsed server time; completed set |
+| Name All | Unique valid country names, aliases and country-code shortcuts; full set; elapsed server time |
 | Click Country, Spot Country, Puzzle (all continents) | Private current challenge; click containment / puzzle placement / typed name; full set; elapsed server time |
 | Map Tap, GeoGuessr | Fixed challenge count; valid pin; private scoring origin; recomputed distance/points |
 | WorldSplit | Fixed rounds; valid line; server population split and points |
@@ -21,6 +21,21 @@ It does **not** prove that a human supplied the accepted controls or answers.
 Signed-in ranked play uses the original gameplay screens through `RankedGameScreen` and
 `RankedSession`. Practice and timed games share their layouts, controls and results views;
 ranked actions and result posting remain server-owned. Daily uses `VerifiedGameScreen`.
+Timed completion games stay at zero until the first submitted guess (including a wrong
+manual guess) or first map/puzzle placement. Partial automatic input, Hint and Pass do not
+start the clock. The backend uses its receipt time; browser timestamps never set the result.
+Score games retain their original start/deadline rules, including Flyover's Take off.
+
+Correct answers and map finds update the screen synchronously using the original practice
+matchers. No typing debounce, transport spacing or minimum guess delay is added; requests
+still have an abuse rate limit. Name All queues rapid answers without dropping them.
+The current clue includes an `answerToken` fingerprint for that immediate feedback.
+**This is dictionary-recoverable current-answer information, not a secret or an anti-bot
+boundary.** It exposes no future questions and never authorizes a move, timing or score.
+The backend independently rechecks every action; rejected predictions roll back and cannot
+finish or post a run. The next private clue and completed result still require a server
+response. Keeping every current answer secret from JavaScript would require waiting for
+server validation before correct-answer feedback.
 Guest/practice play continues locally and cannot upload its final values to ranked boards. Educational country data, public practice assets, and
 map geography remain public: a browser needs visible geography to render a playable game.
 
@@ -106,6 +121,9 @@ skilled person. Private future questions remove advance knowledge; visible clues
 made secret from the person or software displaying them. Bot detection needs additional
 behavioral signals, review and moderation, with false positives considered. Obfuscation or
 "private" JavaScript variables are not an anti-cheat boundary.
+The immediate-feedback fingerprint also allows a script to identify the current answer
+without image recognition. Server authority prevents fabricated results and altered physics;
+it does not prevent a bot from submitting valid answers quickly.
 
 ## Regression checks
 
@@ -113,11 +131,13 @@ behavioral signals, review and moderation, with false positives considered. Obfu
 submissions, verifies ownership/expiry/variant/result matching and private clue payloads, and
 checks daily scoring/reservation. `rankedUI.test.ts` plays through the actual frontend and HTTP
 handler in every regular mode, including original controls, Hint/Pass, restarts and score
-posting. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
+posting, idle timers, country shortcuts, rapid answers, and immediate feedback while server
+responses are held back. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
 Flight/room tests enforce stock movement, silence/deadlines and private targets. Earlier cheat
 scripts remain isolated reproduction fixtures; their browser-only score cannot post a ranked result.
 
-Local validation passed all 637 tests and the production build. A separate native Bun/SQLite
+Local validation, including the gameplay regression fixes, passed all 687 tests and the
+production build. A separate native Bun/SQLite
 HTTP run rejected forged Flyover scores of 93, 159 and 196, rendered a private PNG clue, and
 accepted/persisted a completed 196-answer Codes game using its server receipt. This also
 demonstrates the remaining boundary: software can still submit valid answers under the rules.

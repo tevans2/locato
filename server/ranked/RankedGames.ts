@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { indexCountries, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
 import { getCategory, matchesCountryName } from "../../src/core/categories";
-import { matchesCapitalName } from "../../src/core/categories/matching";
+import { rankedAnswerToken } from "../../src/core/rankedPresentation";
+import { detectCountryGuess, submitCountryGuess } from "../../src/core/map/countryGuessing";
 import { createPromptCountryIndex } from "../../src/core/flagPools";
 import { createSeededRandom, shuffle } from "../../src/core/game";
 import { createHint } from "../../src/core/game/GameEngine";
@@ -26,7 +27,6 @@ const id = () => randomBytes(24).toString("hex");
 const LIFETIME_MS = 2 * 60 * 60 * 1000;
 const RECEIPT_LIFETIME_MS = 5 * 60 * 1000;
 const MAX_RUNS = 2000;
-const MIN_ACTION_GAP_MS = 150;
 const INDEX = indexCountries(rawCountries);
 
 interface Challenge {
@@ -43,7 +43,8 @@ interface Run {
   readonly userId: string;
   readonly mode: GameModeId | "daily";
   readonly variant: string;
-  readonly startedAt: number;
+  readonly createdAt: number;
+  startedAt: number | null;
   readonly queue: Challenge[];
   questionId: string;
   questionAt: number;
@@ -157,7 +158,7 @@ export class RankedGames {
       catch { return { error: "Street View is unavailable. Please try again later." }; }
     }
     const now = this.clock();
-    const run: Run = { id: id(), userId, mode: mode as Run["mode"], variant, startedAt: now, queue, questionId: id(), questionAt: now, index: 0, score: 0, wrong: 0, wrongTotal: 0, revision: 0, finishedAt: null, busy: false, found: new Set(), marks: [], rounds: [], hints: 0, placements: new Map() };
+    const run: Run = { id: id(), userId, mode: mode as Run["mode"], variant, createdAt: now, startedAt: config?.metric === "time" ? null : now, queue, questionId: id(), questionAt: now, index: 0, score: 0, wrong: 0, wrongTotal: 0, revision: 0, finishedAt: null, busy: false, found: new Set(), marks: [], rounds: [], hints: 0, placements: new Map() };
     if (mode === "flyover") run.flight = new AuthoritativeFlight(this.map, rng, now, now + 90_000);
     this.runs.set(run.id, run);
     try { await this.prepare(run); } catch { this.runs.delete(run.id); return { error: "Street View is unavailable. Please try again later." }; }
@@ -194,11 +195,11 @@ export class RankedGames {
     }
     if (raw.type === "poll") return this.view(run);
     if (raw.questionId !== run.questionId) return { error: "That challenge is no longer active." };
-    if (now - run.questionAt < MIN_ACTION_GAP_MS) return { error: "Please try your move again." };
     run.busy = true;
     try {
       const result = await this.check(run, raw as unknown as RankedAction);
       if (result.error) return { error: result.error };
+      if (run.startedAt === null && ((raw.type === "answer" && typeof raw.answer === "string" && raw.answer.trim() && (raw.auto !== true || result.advance)) || raw.type === "place" || raw.type === "puzzle-piece")) run.startedAt = now;
       if (result.advance) {
         if (run.mode === "daily") {
           const current = run.queue[run.index]!;
@@ -301,7 +302,8 @@ export class RankedGames {
     if (action.type === "skip" && current.mode === "streetview-country") { detail("revealed", { countryCode: current.street!.countryCode }); run.feedback = "Country skipped."; return { advance: true, points: 0 }; }
     if (action.type !== "answer" || typeof action.answer !== "string" || action.answer.length > 200) return no("Invalid answer.");
     if (current.mode === "name-all") {
-      const match = this.countries.countries.find((c) => !run.found.has(c.code) && matchesCountryName(c, action.answer!, action.auto === true, false));
+      const foundIds = new Set([...run.found].map((code) => this.countries.byCode.get(code)!.id));
+      const match = (action.auto ? detectCountryGuess : submitCountryGuess)(this.countries, action.answer, foundIds);
       if (!match) { run.feedback = "Not a new country. Try again."; return { advance: false, points: 0 }; }
       run.found.add(match.code);
       detail("correct", { countryCode: match.code });
@@ -309,7 +311,8 @@ export class RankedGames {
       return correct();
     }
     const country = current.street ? this.countries.byCode.get(current.street.countryCode)! : current.country!;
-    const accepted = current.mode === "capital-recall" ? matchesCapitalName(country, action.answer, action.auto === true) : matchesCountryName(country, action.answer, action.auto === true, current.mode !== "codes" && current.mode !== "capitals");
+    const category = getCategory(current.mode);
+    const accepted = category ? category.accepts(country, action.answer, action.auto === true) : matchesCountryName(country, action.answer, action.auto === true, true);
     if (accepted) {
       detail("correct", { countryCode: country.code });
       run.found.add(country.code);
@@ -366,17 +369,21 @@ export class RankedGames {
           question = prompt.kind === "text" ? { ...common, kind: "text", text: prompt.value } : { ...common, kind: current.mode === "flag-colors" ? "flag-colors" : "image", asset: `${asset}?v=${run.revision}` };
         }
       }
+      if (run.mode !== "daily" && question) {
+        if (current?.country && (getCategory(current.mode) || current.mode === "spot-country")) question = { ...question, answerToken: rankedAnswerToken(run.questionId, current.country.code) };
+        else if (current?.street) question = { ...question, answerToken: rankedAnswerToken(run.questionId, current.street.countryCode) };
+      }
     }
     return { runId: run.id, mode: run.mode, variant: run.variant, status: run.finishedAt === null ? "playing" : "complete", startedAt: run.startedAt, serverNow: this.clock(), endsAt: run.flight?.endsAt ?? null,
       index: run.index, total: run.flight ? this.map.filter((c) => c.targetable).length : run.queue.length, score: run.score,
-      timeMs: run.finishedAt === null ? null : Math.round(run.finishedAt - run.startedAt), question,
+      timeMs: run.finishedAt === null ? null : this.elapsed(run), question,
       ...(run.flight ? { plane: run.flight.plane, reaches: run.flight.reaches } : {}), found: [...(run.flight?.visited ?? run.found)], hints: run.hints, wrongAnswers: run.wrongTotal, ...(run.result ? { result: run.result } : {}), ...(run.feedback ? { feedback: run.feedback } : {}) };
   }
 
   consume(userId: string, runId: unknown, mode: string, variant: string, claimed: unknown): VerifiedResult | null {
     const run = this.find(userId, runId);
     if (!run || run.finishedAt === null || run.mode !== mode || run.variant !== variant) return null;
-    const value = leaderboardConfig(mode)?.metric === "time" ? Math.round(run.finishedAt - run.startedAt) : run.score;
+    const value = leaderboardConfig(mode)?.metric === "time" ? this.elapsed(run) : run.score;
     if (claimed !== value) return null;
     return { mode, variant, value };
   }
@@ -384,7 +391,7 @@ export class RankedGames {
   consumeDaily(userId: string, runId: unknown): DailyChallengeResult | null {
     const run = this.find(userId, runId);
     if (!run || run.mode !== "daily" || run.finishedAt === null) return null;
-    const timeMs = Math.round(run.finishedAt - run.startedAt);
+    const timeMs = this.elapsed(run);
     return { date: run.variant, seed: `verified-daily:${run.variant}`, completedAt: run.finishedAt, score: run.score, timeMs, hintsUsed: 0, marks: run.marks, rounds: run.rounds, challengeVersion: 2, shareText: createDailyShareText(run.variant, run.score, timeMs, run.marks) };
   }
 
@@ -393,7 +400,7 @@ export class RankedGames {
     if (!run || run.finishedAt === null || run.mode === "daily") return null;
     const mapMode = ["name-all", "click-country", "spot-country", "puzzle"].includes(run.mode);
     return { mode: mapMode ? "world-map" : "solo", categoryIds: [run.mode], score: run.score, correctAnswers: run.flight?.score ?? run.found.size, wrongAnswers: run.wrongTotal, bestStreak: 0,
-      ...(mapMode ? { durationMs: Math.round(run.finishedAt - run.startedAt), completed: true, countriesFound: run.found.size, countriesTotal: run.queue.length, playMode: run.mode } : {}) };
+      ...(mapMode ? { durationMs: this.elapsed(run), completed: true, countriesFound: run.found.size, countriesTotal: run.queue.length, playMode: run.mode } : {}) };
   }
 
   async asset(userId: string, runId: string, questionId: string, url: URL): Promise<Response> {
@@ -416,12 +423,13 @@ export class RankedGames {
   private find(userId: string, runId: unknown): Run | null {
     const run = typeof runId === "string" ? this.runs.get(runId) : null;
     const now = this.clock();
-    if (!run || run.userId !== userId || now - run.startedAt > LIFETIME_MS || (run.finishedAt !== null && now - run.finishedAt > RECEIPT_LIFETIME_MS)) return null;
+    if (!run || run.userId !== userId || now - run.createdAt > LIFETIME_MS || (run.finishedAt !== null && now - run.finishedAt > RECEIPT_LIFETIME_MS)) return null;
     return run;
   }
   private sweep(): void {
     const now = this.clock();
-    for (const [key, run] of this.runs) if (now - run.startedAt > LIFETIME_MS || (run.finishedAt !== null && now - run.finishedAt > RECEIPT_LIFETIME_MS)) this.runs.delete(key);
+    for (const [key, run] of this.runs) if (now - run.createdAt > LIFETIME_MS || (run.finishedAt !== null && now - run.finishedAt > RECEIPT_LIFETIME_MS)) this.runs.delete(key);
     for (const [userId, times] of this.rates) if (times.at(-1)! < now - 1000) this.rates.delete(userId);
   }
+  private elapsed(run: Run): number { return Math.max(1, Math.round((run.finishedAt ?? this.clock()) - (run.startedAt ?? run.finishedAt ?? this.clock()))); }
 }

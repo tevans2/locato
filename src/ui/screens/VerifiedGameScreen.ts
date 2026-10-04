@@ -64,7 +64,7 @@ export function createVerifiedGameScreen(options: Options): Screen {
 
   const clockTimer = setInterval(() => {
     if (!state) return;
-    const elapsed = (state.timeMs ?? (performance.now() + clockOffset - state.startedAt)) / 1000;
+    const elapsed = (state.timeMs ?? (state.startedAt === null ? 0 : performance.now() + clockOffset - state.startedAt)) / 1000;
     clock.textContent = `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, "0")}`;
   }, 100);
 
