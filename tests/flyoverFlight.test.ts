@@ -99,6 +99,12 @@ describe("authoritative Flyover presentation", () => {
     expect(ui.flight.plane().heading).toBe(0);
   });
 
+  it("ignores key-release events without a key value", () => {
+    const ui = setup();
+    expect(() => window.dispatchEvent(new Event("keyup"))).not.toThrow();
+    expect(ui.frame().heading).toBe(0);
+  });
+
   it("uses a steady animation clock when server clock estimates change", () => {
     const ui = setup();
     const before = ui.frame();

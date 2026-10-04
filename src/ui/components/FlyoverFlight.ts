@@ -704,6 +704,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     }
   }, { signal });
   window.addEventListener("keyup", (event) => {
+    if (typeof event.key !== "string") return;
     heldKeys.delete(event.key);
     // Shift changes the reported key of letters; clear the pair so nothing sticks.
     if (event.key.length === 1) {
