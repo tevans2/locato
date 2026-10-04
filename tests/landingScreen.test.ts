@@ -57,9 +57,31 @@ afterEach(async () => {
   await act(async () => { screens.splice(0).forEach((screen) => screen.destroy()); });
   document.body.replaceChildren();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("Landing globe and game launcher", () => {
+  it("shows a sourced daily fact, opens its profile, and updates an open page at UTC midnight", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date("2026-10-04T23:59:59Z"));
+    globeMock.create.mockImplementation((_host, _features, options: { featuredCountryCode: string; onHover: (hover: AtlasHover) => void }) => {
+      options.onHover({ country: countryIndex.byCode.get(options.featuredCountryCode)!, x: 180, y: 200, visible: true });
+      return globeMock;
+    });
+    const { navigation } = await mount();
+    expect(globeMock.create.mock.calls[0]![2].featuredCountryCode).toBe("BW");
+    const card = document.querySelector('[data-testid="atlas-daily-card"]')!;
+    expect(card.textContent).toContain("Okavango Delta floods during the dry season");
+    expect(card.querySelector("a")?.href).toBe("https://whc.unesco.org/en/list/1432/");
+    await click('[aria-label="Explore Botswana"]');
+    expect(navigation.openCountry).toHaveBeenCalledWith("BW");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(document.querySelector('[data-testid="atlas-daily-card"]')?.textContent).toContain("Yakushima");
+    expect(document.querySelector(".atlas-heading-actions time")?.getAttribute("datetime")).toBe("2026-10-05");
+    expect(globeMock.destroy).toHaveBeenCalledOnce();
+    expect(globeMock.create.mock.calls[1]![2].featuredCountryCode).toBe("JP");
+  });
+
   it("opens real country profiles from the hover card and disposes the globe on exit", async () => {
     const { navigation, screen } = await mount();
     expect(document.querySelector('[data-testid="atlas-country-card"]')?.textContent).toContain("Capital · Pretoria");
@@ -88,6 +110,7 @@ describe("Landing globe and game launcher", () => {
     globeMock.load.mockRejectedValueOnce(new Error("Offline"));
     const { navigation } = await mount();
     expect(document.querySelector('.atlas-keyboard-picker')?.classList.contains("is-visible")).toBe(true);
+    expect(document.querySelector('[data-testid="atlas-daily-card"] a')).not.toBeNull();
     const picker = document.querySelector<HTMLSelectElement>('#atlas-country-picker')!;
     await act(async () => { picker.value = "JP"; picker.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(navigation.openCountry).toHaveBeenCalledWith("JP");
