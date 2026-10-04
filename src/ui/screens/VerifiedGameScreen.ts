@@ -267,7 +267,7 @@ export function createVerifiedGameScreen(options: Options): Screen {
     const countries = mapCountries;
     const score = el("strong", { className: "flyover-score-value", text: "0" });
     flight = createFlyoverFlight({ countries, hudRight: score, overlay: el("div"), skipLabel: "Skip · −5s", flightSeconds: 90,
-      now: () => performance.now() + clockOffset, requestFrame: (cb) => requestAnimationFrame(cb), cancelFrame: (id) => cancelAnimationFrame(id), signal,
+      now: () => performance.now() + clockOffset, animationNow: () => performance.now(), requestFrame: (cb) => requestAnimationFrame(cb), cancelFrame: (id) => cancelAnimationFrame(id), signal,
       authoritative: true, onReach: () => {}, onSkip: () => void move({ type: "skip" }), onTimeUp: () => void move({ type: "poll" }), onInput: (input) => { latestInput = input; } });
     content.replaceChildren(flight.element);
     flight.reset(state!.plane!);

@@ -107,6 +107,22 @@ describe("Flyover race view", () => {
     expect(rows).toEqual(["1Rival2", "2You0"]);
   });
 
+  it("leaves the target card alone on repeated race progress messages", () => {
+    const ui = setup();
+    ui.fly(3.1);
+    const card = ui.$(".flyover-target")!;
+    const restartAnimation = vi.spyOn(card.classList, "remove");
+    for (let i = 0; i < 10; i++) {
+      ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 0, score: 0, event: "sync", target: "BB" });
+      ui.frame();
+    }
+    expect(restartAnimation).not.toHaveBeenCalled();
+    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 1, event: "reached", target: "CC" });
+    expect(restartAnimation).toHaveBeenCalledOnce();
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
+    restartAnimation.mockRestore();
+  });
+
   it("skips into a holding pattern and reports the skipped route position", () => {
     const ui = setup();
     ui.fly(3.1);

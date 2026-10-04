@@ -26,6 +26,12 @@ manual guess) or first map/puzzle placement. Partial automatic input, Hint and P
 start the clock. The backend uses its receipt time; browser timestamps never set the result.
 Score games retain their original start/deadline rules, including Flyover's Take off.
 
+Flyover predicts motion every animation frame on a steady local clock. Server snapshots
+correct that prediction with a short camera ease, rather than snapping back to an older
+position on each poll. Solo snapshots account for estimated return latency. Repeated
+targets leave the country card animation and hint clock alone. This applies to solo and
+multiplayer presentation; touches, targets, speed, radius and final scores remain server-owned.
+
 Correct answers and map finds update the screen synchronously using the original practice
 matchers. No typing debounce, transport spacing or minimum guess delay is added; requests
 still have an abuse rate limit. Name All queues rapid answers without dropping them.

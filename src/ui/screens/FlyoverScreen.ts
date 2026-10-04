@@ -60,6 +60,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
   const shell = shellOrFallback(options.shell, options.onHome);
   const rng = services.rng ?? Math.random;
   const now = services.now ?? (options.ranked ? () => options.ranked!.now() : () => performance.now());
+  const animationNow = services.now ?? (() => performance.now());
   const requestFrame = services.requestFrame ?? ((callback: () => void) => requestAnimationFrame(callback));
   const cancelFrame = services.cancelFrame ?? ((handle: number) => cancelAnimationFrame(handle));
   const countries = buildFlyoverCountries(options.worldCountryFeatures);
@@ -109,6 +110,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     skipLabel: `Skip · −${FLYOVER_SKIP_PENALTY_SECONDS}s`,
     flightSeconds: FLYOVER_RUN_SECONDS,
     now,
+    animationNow,
     requestFrame,
     cancelFrame,
     signal,
@@ -168,8 +170,10 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     requesting = true;
     const previous = flight.target();
     const before = options.ranked.state;
+    const sentAt = animationNow();
+    const input = controls;
     try {
-      const state = await options.ranked.move(skipping ? { type: "skip" } : { type: "input", input: controls });
+      const state = await options.ranked.move(skipping ? { type: "skip" } : { type: "input", input });
       if (signal.aborted) return;
       for (const { code, seconds } of state.reaches ?? []) {
         if (visitedCodes.has(code)) continue;
@@ -182,7 +186,9 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
         skipped.push(previous); flight.showToast(`Skipped ${previous.name} · −${FLYOVER_SKIP_PENALTY_SECONDS}s`);
       }
       updateScore();
-      if (state.plane) flight.setPlane(state.plane);
+      // HTTP snapshots are already in the past when they arrive. Half the round trip is an
+      // estimate of their return journey; it affects presentation only, never scoring.
+      if (state.plane) flight.setPlane(state.plane, (animationNow() - sentAt) / 2, input);
       if (state.endsAt) flight.setEndsAt(state.endsAt);
       flight.setTarget(countries.find((c) => c.name === state.question?.text) ?? null);
       if (state.status === "complete") finish();

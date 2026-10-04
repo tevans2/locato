@@ -6,8 +6,8 @@ import { createFlyoverFlight, isTypingTarget, type FlyoverFlight } from "./Flyov
 
 /**
  * Flyover race: the solo flight with everyone else's planes on the map and live standings in the
- * corner. Every racer flies the same route from the same take-off; this view flies it locally
- * (a reach shows straight away), tells the server, and rolls back if the server turns one down.
+ * corner. Every racer flies the same route from the same take-off. This view predicts movement
+ * for smooth steering; the server owns positions, targets and scores.
  */
 
 const PLAYER_COLORS = ["#38bdf8", "#fb923c", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#60a5fa", "#f87171"];
@@ -145,6 +145,7 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
       skipLabel: `Skip · ${FLYOVER_SKIP_HOLD_SECONDS}s hold`,
       flightSeconds: (room?.settings.roundDurationMs ?? 90_000) / 1000,
       now,
+      animationNow: options.now ?? (() => performance.now()),
       requestFrame,
       cancelFrame,
       signal,
