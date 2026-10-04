@@ -1,6 +1,6 @@
 import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
-import { createDailyChallenge, createLegacyDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
+import { createDailyChallenge, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
@@ -414,6 +414,7 @@ export function createApp(options: AppOptions): App {
     const progressUserId = activeUserId;
     const saved = readDailyProgress(options.storage, challenge.date, challenge.seed, progressUserId);
     if (saved && saved.challengeVersion !== 2) challenge = createLegacyDailyChallenge(options.countryIndex, challenge.date);
+    else if (saved && saved.themeScoped !== true) challenge = createMixedThemeDailyChallenge(options.countryIndex, challenge.date);
     if (!play && saved?.marks.length !== DAILY_COUNTRY_COUNT) {
       mount(createDailyIntroScreen({ shell, challenge, roundsPlayed: saved?.roundIndex ?? 0,
         onStart: () => runNavigation(startDailyChallenge(true)) }));
@@ -467,6 +468,7 @@ export function createApp(options: AppOptions): App {
         roundWrongGuesses: prompt?.roundWrongGuesses ?? 0,
         updatedAt: now,
         ...(challenge.challengeVersion === 2 ? { challengeVersion: 2, rounds: [...(prompt?.rounds ?? dailyRounds)] } : {}),
+        ...(challenge.themeScoped ? { themeScoped: true } : {}),
       }, progressUserId);
     }
 
