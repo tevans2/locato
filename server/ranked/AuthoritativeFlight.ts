@@ -9,6 +9,8 @@ export class AuthoritativeFlight {
   index = 0;
   holdUntil = 0;
   readonly visited = new Set<string>();
+  readonly reaches: { readonly code: string; readonly seconds: number }[] = [];
+  private targetNamedAt: number;
   private excluded = new Set<string>();
   private input: PlaneInput = { turn: 0, boost: false };
   private advancedAt: number;
@@ -18,6 +20,7 @@ export class AuthoritativeFlight {
     this.plane = start ?? startingPlane(countries, rng);
     this.advancedAt = startedAt;
     this.lastInputAt = startedAt;
+    this.targetNamedAt = startedAt;
     this.target = this.nextTarget();
   }
 
@@ -31,11 +34,13 @@ export class AuthoritativeFlight {
       this.plane = stepPlane(this.plane, this.input, dt / 1000);
       if (this.target && this.advancedAt >= this.holdUntil && planeTouchesCountry(this.target, this.plane.x, this.plane.y)) {
         this.visited.add(this.target.code);
+        this.reaches.push({ code: this.target.code, seconds: (this.advancedAt - this.targetNamedAt) / 1000 });
         this.excluded.add(this.target.code);
         this.score += 1;
         this.lastReachAt = this.advancedAt;
         this.index += 1;
         this.target = this.nextTarget();
+        this.targetNamedAt = this.advancedAt;
       }
     }
   }
@@ -54,6 +59,7 @@ export class AuthoritativeFlight {
     if (multiplayer) this.holdUntil = now + FLYOVER_SKIP_HOLD_SECONDS * 1000;
     else this.endsAt -= FLYOVER_SKIP_PENALTY_SECONDS * 1000;
     this.target = this.nextTarget();
+    this.targetNamedAt = now;
   }
 
   private nextTarget(): FlyoverCountry | null {

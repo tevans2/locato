@@ -802,8 +802,13 @@ export function createApp(options: AppOptions): App {
     if (run !== navigationRun) return true;
     if (!shell.signedIn()) return false;
     mount(createLoadingScreen("Preparing your game…"));
-    const [world, { createVerifiedGameScreen }] = await Promise.all([loadWorldCountryFeatures(), import("../ui/screens/VerifiedGameScreen")]);
-    if (run === navigationRun) mount(createVerifiedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world }));
+    const world = await loadWorldCountryFeatures();
+    if (run !== navigationRun) return true;
+    const screen = mode === "daily"
+      ? (await import("../ui/screens/VerifiedGameScreen")).createVerifiedGameScreen({ mode, variant, shell, world })
+      : await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser() });
+    if (run === navigationRun) mount(screen);
+    else screen.destroy();
     return true;
   }
 

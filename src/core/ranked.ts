@@ -1,6 +1,10 @@
 import type { GameModeId } from "./gameModes";
 import type { PlaneInput, PlaneState } from "./flyover";
 import type { ProjectedPoint } from "./map";
+import type { Hint } from "./game";
+import type { MapTapGuessResult, MapTapRoundTarget } from "./maptap/types";
+import type { GeoGuessrGuessResult } from "./geoguessr";
+import type { WorldSplitResult } from "./worldsplit";
 
 /** Only the current challenge crosses the wire. Answers and queues stay on the server. */
 export interface RankedQuestion {
@@ -10,6 +14,18 @@ export interface RankedQuestion {
   readonly asset?: string;
   readonly paths?: readonly (readonly ProjectedPoint[])[];
   readonly frames?: readonly { readonly asset: string }[];
+  readonly mapTap?: MapTapRoundTarget;
+}
+
+/** Answer details are revealed only after the corresponding move has been checked. */
+export interface RankedMoveResult {
+  readonly questionId: string;
+  readonly kind: "correct" | "wrong" | "hint" | "skipped" | "revealed" | "pin" | "line" | "placement";
+  readonly countryCode?: string;
+  readonly hint?: Hint;
+  readonly mapTap?: MapTapGuessResult;
+  readonly geo?: GeoGuessrGuessResult;
+  readonly split?: WorldSplitResult;
 }
 
 export interface RankedState {
@@ -26,15 +42,23 @@ export interface RankedState {
   readonly timeMs: number | null;
   readonly question: RankedQuestion | null;
   readonly plane?: PlaneState;
+  readonly reaches?: readonly { readonly code: string; readonly seconds: number }[];
   readonly found?: readonly string[];
   readonly feedback?: string;
+  readonly result?: RankedMoveResult;
+  readonly hints?: number;
+  readonly wrongAnswers?: number;
 }
 
 export interface RankedAction {
   readonly runId: string;
   readonly questionId?: string;
-  readonly type: "answer" | "pin" | "place" | "line" | "input" | "skip" | "poll";
+  readonly type: "answer" | "pin" | "place" | "line" | "input" | "skip" | "poll" | "hint" | "reveal" | "puzzle-piece" | "puzzle-check";
   readonly answer?: string;
+  readonly auto?: boolean;
+  readonly countryCode?: string;
+  readonly dx?: number;
+  readonly dy?: number;
   readonly lat?: number;
   readonly lng?: number;
   readonly x?: number;
