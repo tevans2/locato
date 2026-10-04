@@ -144,7 +144,7 @@ export function createVerifiedGameScreen(options: Options): Screen {
     stopViews(); field = null; image = null; chosenPin = null;
     content.replaceChildren(el("h1", { text: question.text }));
     if (question.asset) {
-      image = el("img", { className: "verified-prompt-image", attrs: { src: question.asset, alt: "Country clue" } }) as HTMLImageElement;
+      image = el("img", { className: question.presentation === "shape" ? "verified-prompt-image is-shape" : "verified-prompt-image", attrs: { src: question.asset, alt: question.presentation === "shape" ? "Country outline clue" : "Country clue" } }) as HTMLImageElement;
       content.append(image);
     }
     if (question.kind === "flag-colors") content.append(el("p", { text: "Guess flags to reveal matching colours in matching positions." }));

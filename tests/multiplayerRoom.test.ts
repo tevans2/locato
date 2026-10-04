@@ -683,3 +683,27 @@ describe("room manager", () => {
     expect(snapshot.room.players.find((player) => player.name === "Late")?.spectator).toBe(true);
   });
 });
+
+describe("multiplayer prompt answers and presentation", () => {
+  it("marks Shapes rounds as outlines after the asset link replaces the outline path", () => {
+    const room = new Room({ code: "SHAPE", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["shapes"], seed: "outline-seed", now: 1000, roundLimit: 1 });
+    expect(room.startGame("host", 1010).ok).toBe(true);
+    const round = room.publicRound;
+    expect(round?.prompt).toMatchObject({ kind: "image", presentation: "shape" });
+    expect(round?.prompt.value).toMatch(/^\/api\/game-assets\/[a-f0-9]{48}$/);
+  });
+
+  it("leaves flag rounds as plain images", () => {
+    const room = new Room({ code: "FLAGS", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["flags"], seed: "flag-seed", now: 1000, roundLimit: 1 });
+    expect(room.startGame("host", 1010).ok).toBe(true);
+    expect(room.publicRound?.prompt.presentation).toBeUndefined();
+  });
+
+  it("accepts a country code for a Capitals round", () => {
+    const room = new Room({ code: "CAPIT", hostPlayerId: "host", hostName: "Host", countryIndex, categoryIds: ["capitals"], seed: "capital-seed", now: 1000, roundLimit: 1 });
+    expect(room.startGame("host", 1010).ok).toBe(true);
+    const country = countryIndex.countries.find((item) => item.capital === room.publicRound?.prompt.value)!;
+    const answered = room.submitAnswer("host", country.code.toLowerCase(), 1020);
+    expect(answered.ok && answered.messages.some((message) => message.type === "ROUND_ENDED")).toBe(true);
+  });
+});

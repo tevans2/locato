@@ -103,5 +103,5 @@ export function createRankedSoloEngine(index: CountryIndex, session: RankedSessi
   } };
   return { engine, countryIndex, subscribe(callback: (events: readonly GameEvent[]) => void) { listener = callback; return () => { generation++; listener = null; }; },
     prompt(): PromptContent | null { const q = session.state.question; return q ? { kind: q.kind === "image" || q.kind === "flag-colors" ? "image" : "text", value: q.asset ?? q.text,
-      ...(session.mode === "shapes" ? { presentation: "shape" as const } : session.mode === "flag-colors" ? { presentation: "flag-colors" as const } : {}) } : null; } };
+      ...(q.presentation === "shape" || session.mode === "shapes" ? { presentation: "shape" as const } : session.mode === "flag-colors" ? { presentation: "flag-colors" as const } : {}) } : null; } };
 }

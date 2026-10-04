@@ -229,7 +229,7 @@ it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"
   expect(ui.state().startedAt).toBeNull();
 });
 
-it.each(["flags", "flag-colors", "shapes", "name-all", "spot-country"] as const)("accepts Enter with country-code shortcuts immediately in %s", async (mode) => {
+it.each(["flags", "flag-colors", "shapes", "capitals", "name-all", "spot-country"] as const)("accepts Enter with country-code shortcuts immediately in %s", async (mode) => {
   const ui = await setup(mode, ["CA", "ZA"]);
   for (let i = 0; i < 2; i++) {
     const challenge = privateChallenge(ui.service.ranked, ui.state());

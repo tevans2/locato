@@ -17,8 +17,8 @@ function setBackgroundImage(element: HTMLElement, src: string): void {
   element.style.backgroundImage = `url("${src.replace(/["\\]/g, "\\$&")}")`;
 }
 
-export function promptImageClass(src: string): string {
-  return isCountryShapePrompt(src) ? "flag-image country-shape-image" : "flag-image";
+export function promptImageClass(src: string, presentation?: PromptContent["presentation"]): string {
+  return presentation === "shape" || isCountryShapePrompt(src) ? "flag-image country-shape-image" : "flag-image";
 }
 
 export function createPromptView(): PromptView {

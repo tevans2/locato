@@ -318,7 +318,7 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
         }
         if (visibleRound.prompt.kind === "image") {
           setWorldMapTargetCountry(mapView, null);
-          flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
+          flagSlot.replaceChildren(el("img", { className: promptImageClass(visibleRound.prompt.value, visibleRound.prompt.presentation), attrs: { src: visibleRound.prompt.value, alt: "Prompt to guess" } }));
         } else if (visibleRound.prompt.kind === "map-click") {
           setWorldMapTargetCountry(mapView, null);
           mapTargetName.textContent = visibleRound.prompt.value;

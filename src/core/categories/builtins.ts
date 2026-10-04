@@ -26,7 +26,9 @@ export const shapesCategory: PromptCategory = {
   label: "Country outlines",
   description: "Name the country from its outline.",
   eligible: () => true,
-  prompt: (country) => ({ kind: "image", value: `assets/country-shapes/${country.code.toLowerCase()}.svg` }),
+  // `presentation` survives the asset links ranked and multiplayer swap in for this path, so the
+  // white outline still gets the outline styling (it's invisible as a plain flag image).
+  prompt: (country) => ({ kind: "image", value: `assets/country-shapes/${country.code.toLowerCase()}.svg`, presentation: "shape" }),
   accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, true),
   reveal: (country) => country.name,
 };
@@ -68,8 +70,8 @@ export const capitalsCategory: PromptCategory = {
   description: "Name the country whose capital city is shown.",
   eligible: (country) => country.capital.length > 0,
   prompt: (country) => ({ kind: "text", value: country.capital }),
-  // The capital city is the prompt — only accept the country name, not the city itself.
-  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto, false),
+  // The capital city is the prompt; the country's name or its code (ZA) answers it.
+  accepts: (country, guess, auto) => matchesCountryName(country, guess, auto),
   reveal: (country) => `${country.name} (capital: ${country.capital})`,
 };
 
