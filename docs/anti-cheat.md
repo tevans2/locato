@@ -102,15 +102,19 @@ Before deploying:
 6. Check a real signed-in round, private imagery, score posting and multiplayer reconnection
    in staging before deploying production.
 
-The additive migration adds `verified` flags to saved best times, best scores and daily results.
-All existing entries start unverified and are excluded from competitive standings. This includes
-honest entries: their play cannot be established retroactively. Snapshot tables
-`legacy_mode_best_times`, `legacy_mode_best_scores`, and `legacy_daily_challenge_results` retain
-the original rows for administrator review. Valid new results can replace an old impossible best,
-including a slower time or lower score. Account deletion also removes its archived rows.
+Historical results remain visible on leaderboards, personal ranks, placement previews and daily
+history. The `verified` field preserves provenance: historical entries are not retroactively
+marked as server-verified. New submissions still require a completed server-owned game.
+Only improvements replace existing best scores/times, and completed daily results stay immutable.
 
-Do not restore old standings merely by setting `verified = 1`; that flag means the backend
-actually validated a game. A rollback to the old accepting backend also restores the vulnerability.
+The earlier quarantine migration hid all old results and allowed weaker verified results to
+replace them. A one-time transactional repair restores historical bests and original daily
+results from `legacy_mode_best_times`, `legacy_mode_best_scores`, and
+`legacy_daily_challenge_results`, preserving stronger new results and original timestamps.
+Its migration marker prevents later restarts from undoing administrator corrections; deleted
+accounts are excluded. Snapshot rows remain available for review and are removed on account
+deletion. Historical scores, including previously cheated scores, are restored as requested;
+server verification applies to new submissions, not retroactively to old records.
 
 ## Remaining automation
 
@@ -133,6 +137,8 @@ checks daily scoring/reservation. `rankedUI.test.ts` plays through the actual fr
 handler in every regular mode, including original controls, Hint/Pass, restarts and score
 posting, idle timers, country shortcuts, rapid answers, and immediate feedback while server
 responses are held back. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
+It also verifies historical restoration, original timestamps, preservation of better new
+results, pagination/variants, daily history, and one-time repair after restarts.
 Flight/room tests enforce stock movement, silence/deadlines and private targets. Earlier cheat
 scripts remain isolated reproduction fixtures; their browser-only score cannot post a ranked result.
 
