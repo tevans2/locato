@@ -13,7 +13,7 @@ function makeShell(signedIn = false): ShellContext {
     openGame: vi.fn(),
     openGamePicker: vi.fn(),
     openCountry: vi.fn(),
-    openCompete: vi.fn(),
+    openLeaderboards: vi.fn(),
     openAccount: vi.fn(),
     controls: document.createElement("div"),
     confirmLeave: vi.fn(async () => true),

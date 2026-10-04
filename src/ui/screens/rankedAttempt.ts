@@ -21,7 +21,7 @@ export const RANKED_LEAVE_MESSAGE = "Leave this ranked attempt? It won't be post
 
 /** "Practice results → play for keeps": the cross-link on a score mode's practice results card. */
 export function rankedCrossLink(shell: ShellContext, mode: GameModeId): ResultsAction {
-  return { label: "Play a ranked attempt →", onClick: () => shell.openCompete(mode) };
+  return { label: "Play a ranked attempt →", onClick: () => shell.openLeaderboards(mode) };
 }
 
 export interface RankedBarOptions {
@@ -38,9 +38,9 @@ export function createRankedBar(root: HTMLElement, shell: ShellContext, options:
   return createGameBar(shell, {
     gameMode: options.gameMode,
     run: "timed",
-    // A cold ranked link backs out to its own board rather than the Compete landing tab.
-    onBack: () => shell.goBack(() => shell.openCompete(options.gameMode)),
-    backLabel: "Back to Compete",
+    // A cold ranked link backs out to its own board rather than the first board.
+    onBack: () => shell.goBack(() => shell.openLeaderboards(options.gameMode)),
+    backLabel: "Back to leaderboards",
     leaveGuard: () => (options.inProgress() ? RANKED_LEAVE_MESSAGE : null),
     ...(options.onHowToPlay ? { onHowToPlay: options.onHowToPlay } : {}),
     ...(options.extraMenuItems ? { extraMenuItems: options.extraMenuItems } : {}),
@@ -153,7 +153,7 @@ export function createRankedResults(shell: ShellContext, input: RankedResultsInp
     ...(input.missed ? { missed: input.missed } : {}),
     ...(input.missedTitle ? { missedTitle: input.missedTitle } : {}),
     primary: { label: single ? "Play again" : "Try again", icon: "rotate-ccw", onClick: input.onTryAgain },
-    secondary: [{ label: "View leaderboard", icon: "trophy", onClick: () => shell.openCompete(input.mode) }],
+    secondary: [{ label: "View leaderboard", icon: "trophy", onClick: () => shell.openLeaderboards(input.mode) }],
     share: {
       title: input.shareTitle,
       text: input.shareText,

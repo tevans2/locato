@@ -113,7 +113,7 @@ export function createMultiplayerMapTapGameView(options: MultiplayerMapTapGameVi
     return [...room.players]
       .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
       .map((player, index) => {
-        const emoji = getPlayerEmoji(player.id, player.id === localPlayerId);
+        const emoji = getPlayerEmoji(player, player.id === localPlayerId);
         return el("li", {
           className: player.id === localPlayerId ? "score-row is-local" : "score-row",
           children: [

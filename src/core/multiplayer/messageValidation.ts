@@ -3,6 +3,8 @@ import type { ClientMessage, ServerMessage } from "./protocol";
 import type { FinalResult, FlyoverPlanePosition, GeoGuessrRoundResult, MapTapRoundResult, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 import { isMapTapCategory } from "../maptap/locations";
 import type { MapTapCategory } from "../maptap/types";
+import { isAvatarEmoji } from "../auth/avatars";
+import { isRoomKind } from "./roomTypes";
 
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
@@ -116,6 +118,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
   switch (value.type) {
     case "CREATE_ROOM": {
       if (!isNonEmptyString(value.playerName, MAX_PLAYER_NAME_LENGTH)) return reject("invalid-player-name", "Player name is required.");
+      if (value.avatarEmoji !== undefined && !isAvatarEmoji(value.avatarEmoji)) return reject("invalid-avatar", "Avatar is invalid.");
       if (!isCategoryIdList(value.categoryIds)) return reject("invalid-category", "At least one category is required.");
       const roundLimit = clampInteger(value.roundLimit, MIN_ROOM_ROUND_LIMIT, MAX_ROOM_ROUND_LIMIT);
       const roundDurationMs = clampInteger(value.roundDurationMs, MIN_ROOM_ROUND_DURATION_MS, MAX_ROOM_ROUND_DURATION_MS);
@@ -129,6 +132,7 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
         message: {
           type: "CREATE_ROOM",
           playerName: normalizePlayerName(value.playerName),
+          ...(isAvatarEmoji(value.avatarEmoji) ? { avatarEmoji: value.avatarEmoji } : {}),
           categoryIds: value.categoryIds.map((id) => id.trim()),
           ...(value.mapTapCategories !== undefined ? { mapTapCategories: [...value.mapTapCategories] } : {}),
           ...(roundLimit !== null ? { roundLimit } : {}),
@@ -140,7 +144,8 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
     case "JOIN_ROOM": {
       if (!isNonEmptyString(value.roomCode, MAX_ROOM_CODE_LENGTH)) return reject("invalid-room-code", "Room code is required.");
       if (!isNonEmptyString(value.playerName, MAX_PLAYER_NAME_LENGTH)) return reject("invalid-player-name", "Player name is required.");
-      return { ok: true, message: { type: "JOIN_ROOM", roomCode: normalizeRoomCode(value.roomCode), playerName: normalizePlayerName(value.playerName) } };
+      if (value.avatarEmoji !== undefined && !isAvatarEmoji(value.avatarEmoji)) return reject("invalid-avatar", "Avatar is invalid.");
+      return { ok: true, message: { type: "JOIN_ROOM", roomCode: normalizeRoomCode(value.roomCode), playerName: normalizePlayerName(value.playerName), ...(isAvatarEmoji(value.avatarEmoji) ? { avatarEmoji: value.avatarEmoji } : {}) } };
     }
     case "REJOIN_ROOM": {
       if (!isNonEmptyString(value.roomCode, MAX_ROOM_CODE_LENGTH)) return reject("invalid-room-code", "Room code is required.");
@@ -150,9 +155,6 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
     }
     case "LEAVE_ROOM":
       return { ok: true, message: { type: "LEAVE_ROOM" } };
-    case "SET_READY":
-      if (!isBoolean(value.ready)) return reject("invalid-ready", "Ready must be a boolean.");
-      return { ok: true, message: { type: "SET_READY", ready: value.ready } };
     case "SET_ROOM_OPTIONS": {
       if (!isCategoryIdList(value.categoryIds)) return reject("invalid-category", "At least one category is required.");
       const roundLimit = clampInteger(value.roundLimit, MIN_ROOM_ROUND_LIMIT, MAX_ROOM_ROUND_LIMIT);
@@ -178,6 +180,8 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       return { ok: true, message: { type: "START_GAME" } };
     case "PLAY_AGAIN":
       return { ok: true, message: { type: "PLAY_AGAIN" } };
+    case "RETURN_TO_LOBBY":
+      return { ok: true, message: { type: "RETURN_TO_LOBBY" } };
     case "SUBMIT_ANSWER":
       if (!isNonEmptyString(value.answer, MAX_ANSWER_LENGTH)) return reject("invalid-answer", "Answer is required.");
       if (!isFiniteNumber(value.clientSentAt)) return reject("invalid-client-time", "Client sent timestamp is required.");
@@ -223,8 +227,9 @@ function isPlayer(value: unknown): value is PublicPlayerState {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.name === "string" &&
+    (value.avatarEmoji === undefined || typeof value.avatarEmoji === "string") &&
     typeof value.connected === "boolean" &&
-    typeof value.ready === "boolean" &&
+    (value.spectator === undefined || value.spectator === true) &&
     isFiniteNumber(value.score) &&
     isFiniteNumber(value.streak) &&
     isFiniteNumber(value.correctAnswers) &&
@@ -259,6 +264,7 @@ function isRoom(value: unknown): value is PublicRoomState {
   return (
     isRecord(value) &&
     typeof value.roomCode === "string" &&
+    isRoomKind(value.kind) &&
     typeof value.hostPlayerId === "string" &&
     isCategoryIdList(value.categoryIds) &&
     isRecord(value.settings) &&
@@ -289,7 +295,9 @@ function isRoundResult(value: unknown): value is RoundResult {
     typeof value.correct === "boolean" &&
     isFiniteNumber(value.points) &&
     (value.answeredAt === null || isFiniteNumber(value.answeredAt)) &&
-    (value.guess === null || typeof value.guess === "string")
+    (value.guess === null || typeof value.guess === "string") &&
+    isFiniteNumber(value.attempts) &&
+    (value.elapsedMs === null || isFiniteNumber(value.elapsedMs))
   );
 }
 

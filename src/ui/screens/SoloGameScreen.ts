@@ -66,7 +66,6 @@ export interface SoloGameScreenOptions {
   readonly onReset: () => void;
   /** Legacy header callbacks: the GameBar / FocusBar navigate through `shell` now. */
   readonly onHome?: () => void;
-  readonly onMultiplayer?: () => void;
   readonly onDailyChallenge?: () => void;
   /** The daily's ✕ (App says the daily is saved). */
   readonly onExitDailyChallenge?: () => void;
@@ -871,9 +870,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
       gameMode: options.selectedGameMode,
       run: runType,
       ...(timed ? { clock: clockValue } : {}),
-      // A cold timed link backs out to its own board rather than the Compete landing tab.
-      onBack: () => shell.goBack(timed ? () => shell.openCompete(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
-      backLabel: timed ? "Back to Compete" : "Back",
+      // A cold timed link backs out to its own board rather than the first board.
+      onBack: () => shell.goBack(timed ? () => shell.openLeaderboards(options.selectedGameMode, leaderboardVariant || undefined) : "play"),
+      backLabel: timed ? "Back to leaderboards" : "Back",
       onHowToPlay: () => showHintPopover("How to play", getGameModeOption(options.selectedGameMode).description),
       extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: restartFromMenu }],
       leaveGuard: () => (timedRunInProgress() ? "This timed run is still going — it won't be posted." : null),

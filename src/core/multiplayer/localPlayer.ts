@@ -1,6 +1,6 @@
 /*
- * Small, dependency-free multiplayer bits shared by Compete (eager) and the lobby (lazy-loaded):
- * the name a guest last played under, and the room this tab is still seated in.
+ * Small, dependency-free multiplayer bits: the name a guest last played under, where a seat's
+ * reconnect credentials live, and reading a pasted room code.
  */
 
 import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from "./messageValidation";
@@ -8,10 +8,7 @@ import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from "./messageValidation
 /** The name a player last used in a room (guests; signed-in players get their account name). */
 export const PLAYER_NAME_STORAGE_KEY = "locato.mp.name";
 
-/**
- * Reconnect credentials for the room this tab is seated in (sessionStorage). The lobby owns the
- * value; Compete only reads the room code to offer "Back to room".
- */
+/** Reconnect credentials for the room this tab is seated in (sessionStorage), so a reload keeps the seat. */
 export const MULTIPLAYER_SESSION_KEY = "locato.mp.session";
 
 export { MAX_PLAYER_NAME_LENGTH };
@@ -32,18 +29,6 @@ export function writePlayerName(storage: Storage | undefined, name: string): voi
     storage?.setItem(PLAYER_NAME_STORAGE_KEY, value);
   } catch {
     // Storage unavailable (private mode): the name just isn't remembered.
-  }
-}
-
-/** The room this tab can reconnect to, if any. */
-export function readActiveRoomCode(): string | null {
-  try {
-    const raw = window.sessionStorage.getItem(MULTIPLAYER_SESSION_KEY);
-    if (!raw) return null;
-    const code = (JSON.parse(raw) as { roomCode?: unknown }).roomCode;
-    return typeof code === "string" && code ? code : null;
-  } catch {
-    return null;
   }
 }
 

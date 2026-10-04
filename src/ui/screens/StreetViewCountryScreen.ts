@@ -24,7 +24,6 @@ export interface StreetViewCountryScreenOptions {
   readonly countryIndex: CountryIndex;
   readonly onGameModeChange: (gameMode: GameModeId) => void;
   readonly onHome: () => void;
-  readonly onMultiplayer: () => void;
   readonly onDailyChallenge: () => void;
   /** Keeps the device best. */
   readonly storage?: Storage;

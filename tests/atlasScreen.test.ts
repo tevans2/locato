@@ -16,7 +16,7 @@ function makeShell(): ShellContext & { readonly openCountry: ReturnType<typeof v
     openGame: vi.fn(),
     openGamePicker: vi.fn(),
     openCountry: vi.fn(),
-    openCompete: vi.fn(),
+    openLeaderboards: vi.fn(),
     openAccount: vi.fn(),
     controls: document.createElement("div"),
     confirmLeave: vi.fn(async () => true),

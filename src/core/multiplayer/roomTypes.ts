@@ -5,11 +5,32 @@ import type { FlagPool } from "../flagPools";
 export type PlayerId = string;
 export type RoomCode = string;
 
+/**
+ * What a room plays. "quiz" races typed/clicked answers across a mix of prompt modes; the others
+ * each play one mode their own way. The host can switch it in the lobby.
+ */
+export type RoomKind = "quiz" | "map-tap" | "geoguessr" | "flyover";
+
+export const ROOM_KINDS: readonly RoomKind[] = ["quiz", "map-tap", "geoguessr", "flyover"];
+
+export function isRoomKind(value: unknown): value is RoomKind {
+  return typeof value === "string" && (ROOM_KINDS as readonly string[]).includes(value);
+}
+
+/** The room kind a category selection needs: an exclusive mode's own room, or the mixed quiz. */
+export function roomKindForCategories(categoryIds: readonly string[]): RoomKind {
+  const only = categoryIds.length === 1 ? categoryIds[0] : undefined;
+  return only === "map-tap" || only === "geoguessr" || only === "flyover" ? only : "quiz";
+}
+
 export interface PublicPlayerState {
   readonly id: PlayerId;
   readonly name: string;
+  /** The player's chosen avatar (one of AVATAR_OPTIONS); absent for clients that never sent one. */
+  readonly avatarEmoji?: string;
   readonly connected: boolean;
-  readonly ready: boolean;
+  /** Joined while a game was running: watches it, and plays from the next game. */
+  readonly spectator?: true;
   readonly score: number;
   readonly streak: number;
   readonly correctAnswers: number;
@@ -48,13 +69,14 @@ export interface PublicChatMessage {
 
 export interface PublicRoomState {
   readonly roomCode: RoomCode;
+  readonly kind: RoomKind;
   readonly hostPlayerId: PlayerId;
   readonly categoryIds: readonly string[];
   readonly settings: PublicRoomSettings;
   readonly status: "lobby" | "playing" | "round-result" | "complete";
   readonly players: readonly PublicPlayerState[];
   readonly round: PublicRoundState | null;
-  // Skip votes for the active round. When every connected player has voted, the server reveals
+  // Skip votes for the active round. When every connected (non-spectating) player has voted, the server reveals
   // the answer and advances using the normal round-result flow.
   readonly skipVotes: readonly PlayerId[];
   readonly skipRequired: number;
@@ -72,7 +94,12 @@ export interface RoundResult {
   readonly correct: boolean;
   readonly points: number;
   readonly answeredAt: number | null;
+  /** The player's latest guess this round (the right one, for the winner). */
   readonly guess: string | null;
+  /** How many answers they sent this round. */
+  readonly attempts: number;
+  /** Time from the round opening to their latest answer. */
+  readonly elapsedMs: number | null;
 }
 
 export interface MapTapRoundResult {

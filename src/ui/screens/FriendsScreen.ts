@@ -27,7 +27,7 @@ export interface FriendsScreenOptions {
   /** Read the signed-in username live (it can resolve after mount); falls back to `currentUsername`. */
   readonly getCurrentUsername?: () => string | null;
   readonly appOrigin?: string;
-  // Invite an online friend to a multiplayer game (wired once presence/invites land).
+  // Invite an online friend: opens a new multiplayer room and sends them the link.
   readonly onInviteToGame?: (friend: PublicUser) => void;
   // Optional live-update hook: called with a listener, returns an unsubscribe fn.
   readonly subscribe?: (listener: () => void) => () => void;

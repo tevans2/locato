@@ -289,9 +289,6 @@
   }
 
   /* Multiplayer in-game: stack the round + scoreboard panels and let the view grow/scroll. */
-  .multiplayer-layout {
-    overflow: visible;
-  }
 
   .multiplayer-game-layout {
     height: auto;
@@ -314,11 +311,6 @@
 
   .multiplayer-map-prompt {
     min-height: clamp(330px, 58dvh, 480px);
-  }
-
-  .multiplayer-modal {
-    width: 100%;
-    max-height: 88dvh;
   }
 
   .atlas-open {

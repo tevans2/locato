@@ -1,7 +1,8 @@
 import { rawCountries, indexCountries, type CountryIndex } from "../../src/core/countries";
-import { MAX_ANSWER_LENGTH, parseClientMessage, type ClientMessage, type MessageParseResult, type RoomCode, type ServerMessage } from "../../src/core/multiplayer";
+import { MAX_ANSWER_LENGTH, parseClientMessage, roomKindForCategories, type ClientMessage, type MessageParseResult, type PublicPlayerState, type RoomCode, type RoomKind, type ServerMessage } from "../../src/core/multiplayer";
 import { parseRawClientMessage } from "../protocol/parseMessage";
 import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type RoomResult } from "./Room";
+import type { RoomBase } from "./RoomBase";
 import { MapTapRoom } from "./MapTapRoom";
 import { GeoGuessrRoom } from "./GeoGuessrRoom";
 import { FlyoverRoom } from "./FlyoverRoom";
@@ -20,6 +21,9 @@ export interface MultiplayerConnection {
   // Guests supply a name via CREATE_ROOM/JOIN_ROOM; authenticated users have
   // their account display name used instead so it can't be spoofed by the client.
   readonly authenticatedName: string | null;
+  // The account's saved avatar at upgrade time. Only a fallback: the client sends its current pick
+  // with CREATE_ROOM/JOIN_ROOM, which is fresher if the user changed it after the socket opened.
+  readonly authenticatedAvatar?: string | null;
   readonly authenticatedUserId?: string | null;
 }
 
@@ -55,7 +59,7 @@ export interface RoomManagerStats {
 // Admin-facing room view: no session tokens, chat, or prompt answers.
 export interface AdminRoomSummary {
   readonly code: RoomCode;
-  readonly kind: "quiz" | "map-tap" | "geoguessr" | "flyover";
+  readonly kind: RoomKind;
   readonly status: string;
   readonly categoryIds: readonly string[];
   readonly roundNumber: number | null;
@@ -73,6 +77,10 @@ const DEFAULT_ANSWER_RATE_LIMIT_PER_SECOND = 5;
 // Flyover clients report their plane five times a second; leave room for timer jitter.
 const DEFAULT_POSITION_RATE_LIMIT_PER_SECOND = 12;
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function playerAvatar(connection: MultiplayerConnection, requested: string | undefined): string | undefined {
+  return requested ?? connection.authenticatedAvatar ?? undefined;
+}
 
 function createId(prefix: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -120,12 +128,18 @@ function isFlyoverRoom(room: AnyRoom): room is FlyoverRoom {
   return room instanceof FlyoverRoom;
 }
 
-/** Rooms with their own way to play: one mode only, chosen when the room is made. */
-function roomKind(room: AnyRoom): AdminRoomSummary["kind"] {
-  if (isMapTapRoom(room)) return "map-tap";
-  if (isGeoGuessrRoom(room)) return "geoguessr";
-  if (isFlyoverRoom(room)) return "flyover";
-  return "quiz";
+interface RoomSettingsRequest {
+  readonly categoryIds: readonly string[];
+  readonly roundLimit?: number;
+  readonly roundDurationMs?: number;
+  readonly mapTapCategories?: readonly MapTapCategory[];
+  readonly flagPool?: FlagPool;
+}
+
+interface RoomHost {
+  readonly hostPlayerId: string;
+  readonly hostName: string;
+  readonly hostAvatarEmoji?: string;
 }
 
 export class RoomManager {
@@ -169,7 +183,7 @@ export class RoomManager {
         const snapshot = room.snapshot();
         return {
           code: room.code,
-          kind: roomKind(room),
+          kind: room.kind,
           status: snapshot.status,
           categoryIds: snapshot.categoryIds,
           roundNumber: snapshot.round?.roundNumber ?? null,
@@ -250,7 +264,7 @@ export class RoomManager {
   private handleClientMessage(connection: MultiplayerConnection, message: ClientMessage, now: number): void {
     switch (message.type) {
       case "CREATE_ROOM":
-        this.createRoom(connection, message.playerName, message.categoryIds, now, {
+        this.createRoom(connection, message.playerName, message.avatarEmoji, message.categoryIds, now, {
           ...(message.mapTapCategories !== undefined ? { mapTapCategories: message.mapTapCategories } : {}),
           ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}),
           ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}),
@@ -258,7 +272,7 @@ export class RoomManager {
         });
         return;
       case "JOIN_ROOM":
-        this.joinRoom(connection, message.roomCode, message.playerName, now);
+        this.joinRoom(connection, message.roomCode, message.playerName, message.avatarEmoji, now);
         return;
       case "REJOIN_ROOM":
         this.rejoinRoom(connection, message.roomCode, message.playerId, message.sessionToken, now);
@@ -266,16 +280,15 @@ export class RoomManager {
       case "LEAVE_ROOM":
         this.leaveRoom(connection, now);
         return;
-      case "SET_READY":
-        this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.setReady(session.playerId, message.ready, now)));
-        return;
       case "SET_ROOM_OPTIONS":
         if (!hasSupportedCategory(message.categoryIds)) {
           sendError(connection, "invalid-category", "Unsupported category selection.");
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (isMapTapRoom(room)) {
+          if (roomKindForCategories(message.categoryIds) !== room.kind) {
+            this.switchRoomKind(connection, room, session.playerId, message, now);
+          } else if (isMapTapRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.mapTapCategories !== undefined ? { mapTapCategories: message.mapTapCategories } : {}), ...(message.roundLimit !== undefined ? { roundLimit: message.roundLimit } : {}), ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
           } else if (isFlyoverRoom(room)) {
             this.sendRoomResult(connection, room, room.updateOptions(session.playerId, { ...(message.roundDurationMs !== undefined ? { roundDurationMs: message.roundDurationMs } : {}) }, now));
@@ -304,7 +317,10 @@ export class RoomManager {
         this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.startGame(session.playerId, now)));
         return;
       case "PLAY_AGAIN":
-        this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.restart(session.playerId, now)));
+        this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.playAgain(session.playerId, now)));
+        return;
+      case "RETURN_TO_LOBBY":
+        this.withSessionRoom(connection, (room, session) => this.sendRoomResult(connection, room, room.returnToLobby(session.playerId, now)));
         return;
       case "SUBMIT_ANSWER":
         if (message.answer.length > MAX_ANSWER_LENGTH) {
@@ -376,85 +392,35 @@ export class RoomManager {
   private createRoom(
     connection: MultiplayerConnection,
     playerName: string,
+    requestedAvatar: string | undefined,
     categoryIds: readonly string[],
     now: number,
-    settings: { readonly roundLimit?: number; readonly roundDurationMs?: number; readonly mapTapCategories?: readonly MapTapCategory[]; readonly flagPool?: FlagPool },
+    settings: Omit<RoomSettingsRequest, "categoryIds">,
   ): void {
-
+    if (!hasSupportedCategory(categoryIds)) {
+      sendError(connection, "invalid-category", "Unsupported category selection.");
+      return;
+    }
     if (this.rooms.size >= this.maxRooms) {
       sendError(connection, "too-many-rooms", "The server is at room capacity.");
       return;
     }
 
-    if (!hasSupportedCategory(categoryIds)) {
-      sendError(connection, "invalid-category", "Unsupported category selection.");
-      return;
-    }
-
-    this.detach(connection, now);
     const roomCode = createRoomCode(new Set(this.rooms.keys()));
     const playerId = createId("player");
-    const isMapTap = categoryIds.length === 1 && categoryIds[0] === "map-tap";
-    const isGeoGuessr = categoryIds.length === 1 && categoryIds[0] === "geoguessr";
-    const isFlyover = categoryIds.length === 1 && categoryIds[0] === "flyover";
-    let flyoverCountries: readonly FlyoverCountry[] = [];
-    if (isFlyover) {
-      try {
-        flyoverCountries = this.flyoverCountries();
-      } catch {
-        sendError(connection, "mode-unavailable", "Flyover rooms aren't available right now.");
-        return;
-      }
+    const hostAvatar = playerAvatar(connection, requestedAvatar);
+    const room = this.buildRoom(
+      roomKindForCategories(categoryIds),
+      roomCode,
+      { hostPlayerId: playerId, hostName: connection.authenticatedName ?? playerName, ...(hostAvatar ? { hostAvatarEmoji: hostAvatar } : {}) },
+      { ...settings, categoryIds },
+      now,
+    );
+    if (!room) {
+      sendError(connection, "mode-unavailable", "Flyover rooms aren't available right now.");
+      return;
     }
-    const room: AnyRoom = isFlyover
-      ? new FlyoverRoom({
-          code: roomCode,
-          hostPlayerId: playerId,
-          hostName: connection.authenticatedName ?? playerName,
-          countries: flyoverCountries,
-          seed: createId("seed"),
-          now,
-          maxPlayers: this.maxPlayersPerRoom,
-          ...(settings.roundDurationMs !== undefined ? { flightMs: settings.roundDurationMs } : {}),
-        })
-      : isMapTap
-      ? new MapTapRoom({
-          code: roomCode,
-          hostPlayerId: playerId,
-          hostName: connection.authenticatedName ?? playerName,
-          seed: createId("seed"),
-          now,
-          maxPlayers: this.maxPlayersPerRoom,
-          ...(settings.mapTapCategories !== undefined ? { mapTapCategories: settings.mapTapCategories } : {}),
-          ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
-          ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
-        })
-      : isGeoGuessr
-        ? new GeoGuessrRoom({
-            code: roomCode,
-            hostPlayerId: playerId,
-            hostName: connection.authenticatedName ?? playerName,
-            countryIndex: this.countryIndex,
-            seed: createId("seed"),
-            now,
-            maxPlayers: this.maxPlayersPerRoom,
-            ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
-            ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
-          })
-      : new Room({
-          code: roomCode,
-          hostPlayerId: playerId,
-          hostName: connection.authenticatedName ?? playerName,
-          countryIndex: this.countryIndex,
-          categoryIds: resolveCategoryIds(categoryIds),
-          seed: createId("seed"),
-          now,
-          maxPlayers: this.maxPlayersPerRoom,
-          ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
-          ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
-          ...(settings.flagPool !== undefined ? { flagPool: settings.flagPool } : {}),
-          resultDisplayMs: this.resultDisplayMs,
-        });
+    this.detach(connection, now);
     this.rooms.set(roomCode, room);
     const sessionToken = this.issueToken(playerId, roomCode, connection.authenticatedUserId ?? null);
     this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
@@ -462,7 +428,72 @@ export class RoomManager {
     send(connection, { type: "ROOM_SNAPSHOT", room: room.snapshot() });
   }
 
-  private joinRoom(connection: MultiplayerConnection, roomCode: RoomCode, playerName: string, now: number): void {
+  /** A new room of `kind` with these settings (each kind keeps its own defaults for the rest). */
+  private buildRoom(kind: RoomKind, code: RoomCode, host: RoomHost, settings: RoomSettingsRequest, now: number): AnyRoom | null {
+    const base = { code, ...host, seed: createId("seed"), now, maxPlayers: this.maxPlayersPerRoom };
+    const rounds = {
+      ...(settings.roundLimit !== undefined ? { roundLimit: settings.roundLimit } : {}),
+      ...(settings.roundDurationMs !== undefined ? { roundDurationMs: settings.roundDurationMs } : {}),
+    };
+    switch (kind) {
+      case "flyover": {
+        let countries: readonly FlyoverCountry[];
+        try {
+          countries = this.flyoverCountries();
+        } catch {
+          return null;
+        }
+        return new FlyoverRoom({ ...base, countries, ...(settings.roundDurationMs !== undefined ? { flightMs: settings.roundDurationMs } : {}) });
+      }
+      case "map-tap":
+        return new MapTapRoom({ ...base, ...rounds, ...(settings.mapTapCategories !== undefined ? { mapTapCategories: settings.mapTapCategories } : {}) });
+      case "geoguessr":
+        return new GeoGuessrRoom({ ...base, ...rounds, countryIndex: this.countryIndex });
+      case "quiz":
+        return new Room({
+          ...base,
+          ...rounds,
+          countryIndex: this.countryIndex,
+          categoryIds: resolveCategoryIds(settings.categoryIds),
+          ...(settings.flagPool !== undefined ? { flagPool: settings.flagPool } : {}),
+          resultDisplayMs: this.resultDisplayMs,
+        });
+    }
+  }
+
+  /**
+   * The host picked a different game type in the lobby: swap in a room of that kind under the
+   * same code, keeping everyone's seat (ids and reconnect tokens) and the chat.
+   */
+  private switchRoomKind(connection: MultiplayerConnection, room: AnyRoom, playerId: string, request: RoomSettingsRequest, now: number): void {
+    if (playerId !== room.host) {
+      sendError(connection, "not-host", "Only the host can change room settings.");
+      return;
+    }
+    if (room.state !== "lobby") {
+      sendError(connection, "game-started", "Room settings can only change in the lobby.");
+      return;
+    }
+    const host = room.snapshot().players.find((player) => player.id === room.host);
+    // Only the categories and the kind's own settings carry over; rounds and timers start from the
+    // new kind's defaults (a 30-second quiz timer would be far too short for Street View).
+    const next = this.buildRoom(
+      roomKindForCategories(request.categoryIds),
+      room.code,
+      { hostPlayerId: room.host, hostName: host?.name ?? "Host" },
+      { categoryIds: request.categoryIds, ...(request.mapTapCategories !== undefined ? { mapTapCategories: request.mapTapCategories } : {}), ...(request.flagPool !== undefined ? { flagPool: request.flagPool } : {}) },
+      now,
+    );
+    if (!next) {
+      sendError(connection, "mode-unavailable", "Flyover rooms aren't available right now.");
+      return;
+    }
+    next.adoptRoster(room as RoomBase<PublicPlayerState>);
+    this.rooms.set(room.code, next);
+    this.broadcastMessages(next, [{ type: "ROOM_SNAPSHOT", room: next.snapshot() }]);
+  }
+
+  private joinRoom(connection: MultiplayerConnection, roomCode: RoomCode, playerName: string, requestedAvatar: string | undefined, now: number): void {
     const room = this.rooms.get(roomCode);
     if (!room) {
       sendError(connection, "room-not-found", "No room exists with that code.");
@@ -471,7 +502,7 @@ export class RoomManager {
 
     this.detach(connection, now);
     const playerId = createId("player");
-    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now);
+    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now, playerAvatar(connection, requestedAvatar));
     if (!result.ok) {
       sendError(connection, result.code, result.message);
       return;

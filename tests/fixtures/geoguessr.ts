@@ -71,7 +71,7 @@ function fixtureMap(options: GeoGuessMapOptions) {
     marker(target, "#ef6a45");
   } };
 }
-const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome: () => { location.href = "/"; }, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, {
+const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome: () => { location.href = "/"; }, onGameModeChange() {}, onDailyChallenge() {} }, {
   createMap: fixtureMap,
   loadLocations: async () => locations,
   createPanorama(signal) {

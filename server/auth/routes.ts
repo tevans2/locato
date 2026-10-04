@@ -9,6 +9,7 @@ import { MAX_ACADEMY_PAYLOAD_BYTES } from "../academy/validation";
 import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 import { parseDailyRoundResults, scoreDailyRound } from "../../src/core/dailyChallenge";
+import { isAvatarEmoji } from "../../src/core/auth/avatars";
 
 const MAX_STAT_VALUE = 1_000_000;
 const DAILY_COUNTRY_COUNT = 10;
@@ -253,7 +254,9 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const user = service.authenticate(readSessionToken(request));
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
-    const emoji = typeof body?.emoji === "string" && body.emoji.length > 0 ? body.emoji : null;
+    const requested = body?.emoji;
+    if (requested !== null && !isAvatarEmoji(requested)) return json({ error: "Unknown avatar." }, 400);
+    const emoji = requested;
     service.updateAvatarEmoji(user.id, emoji);
     log("info", "avatar.update", { ip: ip(request), userId: user.id });
     return json({ ok: true });

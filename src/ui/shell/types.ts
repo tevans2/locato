@@ -2,10 +2,10 @@ import type { GameModeId } from "../../core/gameModes";
 import type { ShellIconName } from "./icons";
 
 /**
- * The five places the site is organised into (docs/navigation.md → "Sections").
+ * The six places the site is organised into (docs/navigation.md → "Sections").
  * Every screen belongs to exactly one; SiteHeader/TabBar mark it with `aria-current`.
  */
-export type SiteSection = "play" | "daily" | "learn" | "compete" | "you";
+export type SiteSection = "play" | "daily" | "learn" | "multiplayer" | "leaderboards" | "you";
 
 /** Practice runs have no clock and post nothing; timed runs post to a leaderboard. */
 export type RunType = "practice" | "timed";
@@ -14,6 +14,8 @@ export interface SiteSectionInfo {
   readonly id: SiteSection;
   /** Sentence-case label used in the header, tab bar and ⋯ menu. */
   readonly label: string;
+  /** The phone TabBar's narrower label, when `label` won't fit a sixth of the screen. */
+  readonly tabLabel?: string;
   readonly icon: ShellIconName;
 }
 
@@ -21,7 +23,8 @@ export const SITE_SECTIONS: readonly SiteSectionInfo[] = [
   { id: "play", label: "Play", icon: "gamepad-2" },
   { id: "daily", label: "Daily", icon: "calendar-days" },
   { id: "learn", label: "Learn", icon: "graduation-cap" },
-  { id: "compete", label: "Compete", icon: "trophy" },
+  { id: "multiplayer", label: "Multiplayer", icon: "users" },
+  { id: "leaderboards", label: "Leaderboards", tabLabel: "Boards", icon: "trophy" },
   { id: "you", label: "You", icon: "user-round" },
 ];
 
@@ -45,7 +48,7 @@ export interface ConfirmOptions {
  * progress (GameBar does this for you through its `leaveGuard` option).
  */
 export interface ShellContext {
-  /** Open a section's home: play → landing, daily → Daily challenge, learn → Academy, compete → Compete, you → Stats. */
+  /** Open a section's home: play → landing, daily → Daily challenge, learn → Academy, multiplayer → Multiplayer, leaderboards → the boards, you → Stats. */
   readonly openSection: (section: SiteSection) => void;
   /** The logo's target. Always `/`. */
   readonly goHome: () => void;
@@ -64,8 +67,8 @@ export interface ShellContext {
   readonly openGamePicker: (options?: { readonly current?: GameModeId; readonly run?: RunType }) => void;
   /** Open a country's Atlas profile (`?country=xx`). */
   readonly openCountry: (code: string) => void;
-  /** Open Compete, optionally focused on one mode's board (and variant, e.g. a flag set or continent). */
-  readonly openCompete: (mode?: GameModeId, variant?: string) => void;
+  /** Open Leaderboards, optionally focused on one mode's board (and variant, e.g. a flag set or continent). */
+  readonly openLeaderboards: (mode?: GameModeId, variant?: string) => void;
   /** Open the sign-in / account panel. */
   readonly openAccount: () => void;
   /**

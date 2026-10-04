@@ -35,6 +35,15 @@ describe("multiplayer public protocol", () => {
     expect(message.ok ? message.message : null).toEqual({ type: "JOIN_ROOM", roomCode: "PIN42", playerName: "Ada Lovelace" });
   });
 
+  it("accepts only known avatar emoji on create and join", () => {
+    const join = parseClientMessage({ type: "JOIN_ROOM", roomCode: "PIN42", playerName: "Ada", avatarEmoji: "🦊" });
+    expect(join.ok ? join.message : null).toEqual({ type: "JOIN_ROOM", roomCode: "PIN42", playerName: "Ada", avatarEmoji: "🦊" });
+    const create = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], avatarEmoji: "🌋" });
+    expect(create.ok ? create.message : null).toMatchObject({ avatarEmoji: "🌋" });
+    expect(parseClientMessage({ type: "JOIN_ROOM", roomCode: "PIN42", playerName: "Ada", avatarEmoji: "<b>hi</b>" }).ok).toBe(false);
+    expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags"], avatarEmoji: "🍕" }).ok).toBe(false);
+  });
+
   it("requires at least one category to create a room", () => {
     expect(parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: [] }).ok).toBe(false);
     const message = parseClientMessage({ type: "CREATE_ROOM", playerName: "Ada", categoryIds: ["flags", "codes"] });

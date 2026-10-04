@@ -1,4 +1,3 @@
-export { createMockMultiplayerTransport } from "./mockTransport";
 export {
   MAX_ANSWER_LENGTH,
   MAX_CHAT_MESSAGE_LENGTH,
@@ -15,4 +14,5 @@ export { filterProfanity } from "./profanity";
 export { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl } from "./webSocketTransport";
 export type { MessageParseResult } from "./messageValidation";
 export type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
-export type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomState, PublicRoundState, RoomCode, RoundResult } from "./roomTypes";
+export type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomSettings, PublicRoomState, PublicRoundState, RoomCode, RoomKind, RoundResult } from "./roomTypes";
+export { ROOM_KINDS, isRoomKind, roomKindForCategories } from "./roomTypes";

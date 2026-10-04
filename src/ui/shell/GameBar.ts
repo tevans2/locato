@@ -19,7 +19,7 @@ export interface GameBarOptions {
   readonly run: RunType;
   /** Live clock for timed runs (shown in the run pill). Swap it later with `setClock`. */
   readonly clock?: HTMLElement;
-  /** ← Back. Usually `() => ctx.goBack("play")` (or "compete" for timed runs). */
+  /** ← Back. Usually `() => ctx.goBack("play")` (or "leaderboards" for timed runs). */
   readonly onBack: () => void;
   /** Accessible name for ←, saying where it goes. Default "Back". */
   readonly backLabel?: string;

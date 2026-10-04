@@ -40,7 +40,7 @@ async function setup(mode: GameModeId, full: boolean | readonly string[] = false
     return response;
   });
   vi.stubGlobal("fetch", fetcher);
-  const shell: ShellContext = { signedIn: () => true, controls: document.createElement("div"), openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, confirmLeave: async () => true };
+  const shell: ShellContext = { signedIn: () => true, controls: document.createElement("div"), openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, confirmLeave: async () => true };
   const screen = await createRankedGameScreen({ mode, shell, world: rankedWorld(), storage: localStorage, countryIndex: countries, getAuthUser: () => registration.user }); screens.push(screen); document.body.append(screen.element);
   expect(screen.element.querySelector(".verified-content")).toBeNull();
   const $ = <T extends Element = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector)!;

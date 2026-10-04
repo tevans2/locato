@@ -18,9 +18,9 @@ export type AppRoute =
   | { readonly type: "worldsplit" }
   | { readonly type: "flyover" }
   /**
-   * Compete › Multiplayer. `joinCode` joins that room (`?room=`); `create` opens straight into a
-   * new room with the default settings (`?view=multiplayer&create=1`), optionally inviting one
-   * friend by user id once it exists (`&invite=`).
+   * Multiplayer (`?view=multiplayer`). `joinCode` joins that room (`?room=`, the invite link);
+   * `create` opens straight into a new room (`&create=1`), optionally inviting one friend by user
+   * id once it exists (`&invite=`).
    */
   | { readonly type: "multiplayer"; readonly joinCode?: string; readonly create?: true; readonly invite?: string }
   | { readonly type: "stats" }
@@ -29,13 +29,11 @@ export type AppRoute =
   /** Learn → Atlas: the index of every country (`?view=atlas`). */
   | { readonly type: "atlas" }
   | { readonly type: "friends"; readonly username?: string }
-  /** Legacy: `?view=leaderboard` now parses to `compete`. Kept while App still renders the old screen. */
-  | { readonly type: "leaderboard"; readonly mode?: GameModeId; readonly variant?: string }
   /**
-   * Compete (`?view=compete[&tab=leaderboards][&mode=&variant=]`). Opens on the Multiplayer tab;
-   * `tab: "leaderboards"` (or any `mode`) opens the solo timed-run boards.
+   * Leaderboards (`?view=leaderboards[&mode=&variant=]`): every mode's board. The old
+   * `?view=leaderboard` and `?view=compete&tab=leaderboards` links land here too.
    */
-  | { readonly type: "compete"; readonly tab?: "leaderboards"; readonly mode?: GameModeId; readonly variant?: string }
+  | { readonly type: "leaderboards"; readonly mode?: GameModeId; readonly variant?: string }
   | { readonly type: "academy"; readonly groupId?: string }
   | { readonly type: "academy-lesson"; readonly lessonId: string }
   | { readonly type: "academy-placement" }
@@ -91,13 +89,13 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     return { type: "multiplayer", create: true, ...(invite && /^[A-Za-z0-9_-]{1,64}$/.test(invite) ? { invite } : {}) };
   }
   if (view === "daily-challenge" || view === "stats" || view === "friends") return { type: view };
-  if (view === "compete" || view === "leaderboard") {
+  if (view === "leaderboards" || view === "leaderboard" || view === "compete") {
     const mode = params.get("mode");
     const validMode = mode && (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || ["worldsplit", "flyover", "map-tap", "geoguessr", "streetview-country"].includes(mode));
+    // Compete (retired) opened on its Multiplayer tab unless it named a board.
+    if (view === "compete" && params.get("tab") !== "leaderboards" && !mode) return { type: "multiplayer" };
     const variant = params.get("variant");
-    // The old `?view=leaderboard` page was the boards, so it lands on the Leaderboards tab.
-    const tab = params.get("tab") === "leaderboards" || view === "leaderboard" ? ({ tab: "leaderboards" } as const) : {};
-    return { type: "compete", ...tab, ...(validMode ? { mode: mode as GameModeId } : {}), ...(variant ? { variant } : {}) };
+    return { type: "leaderboards", ...(validMode ? { mode: mode as GameModeId } : {}), ...(variant ? { variant } : {}) };
   }
   return null;
 }
@@ -139,9 +137,8 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     if (route.type === "academy-placement") params.set("lesson", "placement");
   }
   else if (route.type !== "landing") {
-    params.set("view", route.type === "flag-gallery" ? "atlas" : route.type === "leaderboard" ? "compete" : route.type);
-    if (route.type === "leaderboard" || route.type === "compete") {
-      if (route.type === "compete" && route.tab === "leaderboards") params.set("tab", "leaderboards");
+    params.set("view", route.type === "flag-gallery" ? "atlas" : route.type);
+    if (route.type === "leaderboards") {
       if (route.mode) params.set("mode", route.mode);
       if (route.variant) params.set("variant", route.variant);
     }

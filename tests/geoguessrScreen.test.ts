@@ -12,14 +12,14 @@ import type { PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
 const locations = ["IT", "JP", "ZA", "BR", "CA"].map((countryCode, i) => ({ countryCode, lat: i, lng: i, heading: 0, label: "Round" }));
 const screens: ReturnType<typeof createGeoGuessrScreen>[] = [];
 function stubShell(): ShellContext {
-  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openCompete() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false };
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false };
 }
 afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); vi.restoreAllMocks(); localStorage.clear(); });
 async function setup(overrides: Partial<GeoGuessrScreenServices> = {}) {
   let choose: (point: LngLatPoint) => void = () => {};
   const map = { element: document.createElement("div"), reset: vi.fn(), reveal: vi.fn(), setAcceptingGuesses: vi.fn(), resize: vi.fn(), destroy: vi.fn() };
   const panorama = { element: document.createElement("div"), show: vi.fn(async (p: LngLatPoint) => p), reset: vi.fn(), destroy: vi.fn() };
-  const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome: vi.fn(), onGameModeChange: vi.fn(), onDailyChallenge: vi.fn(), onMultiplayer: vi.fn() }, {
+  const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome: vi.fn(), onGameModeChange: vi.fn(), onDailyChallenge: vi.fn() }, {
     createMap: (options: GeoGuessMapOptions) => { choose = options.onGuessChange; return map; }, createPanorama: () => panorama, loadLocations: async () => locations, ...overrides,
   });
   screens.push(screen); document.body.append(screen.element);
@@ -85,7 +85,7 @@ describe("GeoGuessr play surface", () => {
   });
   it("renders inside the GameBar layout and explains when Street View isn't configured", async () => {
     const shell = { openGame: vi.fn(), openGamePicker: vi.fn(), goBack: vi.fn() };
-    const screen = createGeoGuessrScreen({ shell: { ...stubShell(), ...shell }, countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, { isConfigured: () => false, createMap: () => ({ element: document.createElement("div"), reset() {}, reveal() {}, resize() {}, destroy() {}, setAcceptingGuesses() {} }) });
+    const screen = createGeoGuessrScreen({ shell: { ...stubShell(), ...shell }, countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {} }, { isConfigured: () => false, createMap: () => ({ element: document.createElement("div"), reset() {}, reveal() {}, resize() {}, destroy() {}, setAcceptingGuesses() {} }) });
     screens.push(screen);
     expect(screen.element.dataset.shell).toBe("game");
     expect(screen.element.querySelector(".shell-gamebar .shell-switcher-name")?.textContent).toBe("GeoGuessr");
@@ -96,7 +96,7 @@ describe("GeoGuessr play surface", () => {
   it("does not restore an asynchronously loaded screen after navigation away", async () => {
     let finish!: (p: LngLatPoint) => void;
     const show = () => new Promise<LngLatPoint>(resolve => { finish = resolve; });
-    const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, {
+    const screen = createGeoGuessrScreen({ countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {} }, {
       createMap: () => ({ element: document.createElement("div"), reset() {}, reveal() {}, resize() {}, destroy() {}, setAcceptingGuesses() {} }),
       createPanorama: () => ({ element: document.createElement("div"), show, reset() {}, destroy() {} }), loadLocations: async () => locations,
     });
@@ -111,8 +111,8 @@ describe("GeoGuessr (single-run: every trip counts)", () => {
     let choose: (point: LngLatPoint) => void = () => {};
     const map = { element: document.createElement("div"), reset: vi.fn(), reveal: vi.fn(), setAcceptingGuesses: vi.fn(), resize: vi.fn(), destroy: vi.fn() };
     const panorama = { element: document.createElement("div"), show: vi.fn(async (p: LngLatPoint) => p), reset: vi.fn(), destroy: vi.fn() };
-    const shell = { ...stubShell(), openCompete: vi.fn(), openGame: vi.fn(), confirmLeave: vi.fn(async () => false), ...shellOverrides };
-    const screen = createGeoGuessrScreen({ shell, storage: localStorage, countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {}, onMultiplayer() {} }, {
+    const shell = { ...stubShell(), openLeaderboards: vi.fn(), openGame: vi.fn(), confirmLeave: vi.fn(async () => false), ...shellOverrides };
+    const screen = createGeoGuessrScreen({ shell, storage: localStorage, countryIndex: indexCountries(rawCountries), onHome() {}, onGameModeChange() {}, onDailyChallenge() {} }, {
       createMap: (options: GeoGuessMapOptions) => { choose = options.onGuessChange; return map; }, createPanorama: () => panorama, loadLocations: async () => locations, postAttempt,
     });
     screens.push(screen); document.body.append(screen.element);
@@ -142,7 +142,7 @@ describe("GeoGuessr (single-run: every trip counts)", () => {
     expect(card.querySelector(".shell-results-cross")).toBeNull();
     expect(ui.screen.element.querySelector(".shell-run-best-value")?.textContent).toBe("25,000");
     [...card.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("View leaderboard"))!.click();
-    expect(ui.shell.openCompete).toHaveBeenCalledWith("geoguessr");
+    expect(ui.shell.openLeaderboards).toHaveBeenCalledWith("geoguessr");
   });
 
   it("never asks before leaving mid-trip", async () => {
