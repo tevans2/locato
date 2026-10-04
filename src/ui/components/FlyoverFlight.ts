@@ -1,6 +1,7 @@
 import {
   FLYOVER_HINT_AFTER_SECONDS,
   FLYOVER_SPEED,
+  FLYOVER_TURN_RATE,
   countryUnderPoint,
   headingTowards,
   planeTouchesCountry,
@@ -32,6 +33,9 @@ const MINIMAP_WIDTH = 176;
 const MINIMAP_HEIGHT = 88;
 /** Ghost planes are predicted forward from their last report for at most this long. */
 const GHOST_PREDICT_SECONDS = 0.4;
+/** Ease server corrections over a few frames instead of snapping the camera. */
+const RECONCILE_RATE = 12;
+const MAX_SNAPSHOT_PREDICT_SECONDS = 1;
 const TURN_KEYS_LEFT = new Set(["ArrowLeft", "a", "A"]);
 const TURN_KEYS_RIGHT = new Set(["ArrowRight", "d", "D"]);
 const BOOST_KEYS = new Set(["ArrowUp", "w", "W", "Shift", " "]);
@@ -56,6 +60,8 @@ export interface FlyoverFlightOptions {
   /** Shown on the clock before take-off. */
   readonly flightSeconds: number;
   readonly now: () => number;
+  /** A steady local clock for motion, independent of adjustments to the server clock. */
+  readonly animationNow?: () => number;
   readonly requestFrame: (callback: () => void) => number;
   readonly cancelFrame: (handle: number) => void;
   readonly signal: AbortSignal;
@@ -75,7 +81,8 @@ export interface FlyoverFlightOptions {
 export interface FlyoverFlight {
   readonly element: HTMLElement;
   readonly plane: () => PlaneState;
-  readonly setPlane: (plane: PlaneState) => void;
+  /** Reconcile a server snapshot without jumping the visible plane. Age is estimated transit time. */
+  readonly setPlane: (plane: PlaneState, ageMs?: number, input?: PlaneInput) => void;
   readonly target: () => FlyoverCountry | null;
   readonly isFlying: () => boolean;
   /** Start flying (or keep flying) until `endsAt` on the `now()` clock. */
@@ -172,10 +179,13 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 
 export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFlight {
   const { countries, now, requestFrame, cancelFrame, signal } = options;
+  const animationNow = options.animationNow ?? now;
   const paths = new Map<string, Path2D | null>(countries.map((country) => [country.code, buildPath(country)]));
 
   let flying = false;
   let plane: PlaneState = { x: MAP_VIEWBOX_WIDTH / 2, y: MAP_VIEWBOX_HEIGHT / 2, heading: 0 };
+  let predictedPlane = plane;
+  let correction = { x: 0, y: 0, heading: 0 };
   let target: FlyoverCountry | null = null;
   let targetSince = 0;
   let runEndsAt = 0;
@@ -465,6 +475,9 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
 
   // --- Flight ------------------------------------------------------------------------------
   function setTarget(next: FlyoverCountry | null, emptyText = "Every country visited!"): void {
+    // Polls and race syncs usually repeat the same target. Leave its flag, animation and hint
+    // clock alone until the country actually changes.
+    if (next ? next.code === target?.code : !target && targetName.textContent === emptyText) return;
     target = next;
     targetSince = now();
     if (!next) {
@@ -489,8 +502,9 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
 
   function updateClock(clockNow: number): void {
     const left = (runEndsAt - clockNow) / 1000;
-    clockValue.textContent = formatFlyoverClock(left);
-    clock.classList.toggle("is-low", left <= 10);
+    const text = formatFlyoverClock(left);
+    if (clockValue.textContent !== text) clockValue.textContent = text;
+    if (clock.classList.contains("is-low") !== (left <= 10)) clock.classList.toggle("is-low", left <= 10);
   }
 
   function currentInput() {
@@ -525,12 +539,31 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   function tick(): void {
     frameHandle = null;
     const clockNow = now();
-    const dt = Math.min(0.05, Math.max(0, (clockNow - lastFrameAt) / 1000));
-    lastFrameAt = clockNow;
+    const frameNow = animationNow();
+    const dt = Math.min(0.05, Math.max(0, (frameNow - lastFrameAt) / 1000));
+    lastFrameAt = frameNow;
     if (flying) {
       const input = currentInput();
       options.onInput?.(input);
-      plane = stepPlane(plane, input, dt);
+      if (options.authoritative) {
+        predictedPlane = stepPlane(predictedPlane, input, dt);
+        const remaining = Math.exp(-dt * RECONCILE_RATE);
+        // A delayed reply can be many frames behind. Limit positional correction so it cannot
+        // drag the camera backwards faster than the plane is flying forwards.
+        const distance = Math.hypot(correction.x, correction.y);
+        const positionEase = Math.min(1 - remaining, FLYOVER_SPEED * dt * 0.5 / Math.max(distance, 1e-9));
+        correction.x *= 1 - positionEase;
+        correction.y *= 1 - positionEase;
+        const headingEase = Math.min(1 - remaining, FLYOVER_TURN_RATE * dt * 0.5 / Math.max(Math.abs(correction.heading), 1e-9));
+        correction.heading *= 1 - headingEase;
+        plane = {
+          x: wrapX(predictedPlane.x + correction.x),
+          y: predictedPlane.y + correction.y,
+          heading: predictedPlane.heading + correction.heading,
+        };
+      } else {
+        plane = stepPlane(plane, input, dt);
+      }
       trail.push({ x: plane.x, y: plane.y });
       if (trail.length > TRAIL_LENGTH) trail = trail.slice(-TRAIL_LENGTH);
       moveGhosts(clockNow, dt);
@@ -569,7 +602,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     updateClock(clockNow);
     if (flying) return;
     flying = true;
-    lastFrameAt = clockNow;
+    lastFrameAt = animationNow();
     stage.classList.add("is-flying");
     scheduleFrame();
   }
@@ -591,6 +624,8 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   function reset(next: PlaneState, flightSeconds = options.flightSeconds): void {
     land();
     plane = next;
+    predictedPlane = next;
+    correction = { x: 0, y: 0, heading: 0 };
     target = null;
     over = null;
     trail = [];
@@ -605,6 +640,30 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     clock.classList.remove("is-low");
     renderMinimapBase();
     resize();
+  }
+
+  function setPlane(next: PlaneState, ageMs = 0, input: PlaneInput = currentInput()): void {
+    if (!options.authoritative || !flying) {
+      plane = next;
+      predictedPlane = next;
+      correction = { x: 0, y: 0, heading: 0 };
+      return;
+    }
+    // The server remains the source of truth. Predict only the snapshot's journey to us using
+    // the normal physics, then let the visible camera ease towards that corrected prediction.
+    let predicted = next;
+    let remaining = Math.min(MAX_SNAPSHOT_PREDICT_SECONDS, Math.max(0, ageMs / 1000));
+    while (remaining > 0) {
+      const dt = Math.min(1 / 60, remaining);
+      predicted = stepPlane(predicted, input, dt);
+      remaining -= dt;
+    }
+    predictedPlane = predicted;
+    correction = {
+      x: wrappedDeltaX(predicted.x, plane.x),
+      y: plane.y - predicted.y,
+      heading: angleDiff(predicted.heading, plane.heading),
+    };
   }
 
   function setGhosts(next: readonly FlyoverGhost[]): void {
@@ -700,7 +759,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   return {
     element: stage,
     plane: () => plane,
-    setPlane: (next) => { plane = next; },
+    setPlane,
     target: () => target,
     isFlying: () => flying,
     fly,
