@@ -1083,7 +1083,7 @@ export function createApp(options: AppOptions): App {
     if (navigateOptions?.replace) replaceRoute(route);
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {
-      mount(createLandingScreen({ shell, storage: options.storage }));
+      mount(createLandingScreen({ shell, storage: options.storage, countryIndex: options.countryIndex }));
       return;
     }
     if (route.type === "solo-game") {
