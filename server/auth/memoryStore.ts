@@ -42,6 +42,7 @@ const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, 
 
 export function createMemoryUserStore(): UserStore {
   const usersById = new Map<string, StoredUser>();
+  const adminIds = new Set<string>();
   const usersByEmail = new Map<string, StoredUser>();
   const usersByOAuth = new Map<string, StoredUser>();
   const sessions = new Map<string, Session>();
@@ -311,14 +312,22 @@ export function createMemoryUserStore(): UserStore {
           games: (stats.get(user.id) ?? EMPTY_STATS).totalGames,
           dailies: [...dailyResults.keys()].filter((key) => key.startsWith(`${user.id}:`)).length,
           lastActiveAt: lastActiveAt(user.id),
+          admin: adminIds.has(user.id) ? "granted" : null,
         })),
       };
+    },
+    isAdmin: (userId) => adminIds.has(userId),
+    setAdmin(userId, admin) {
+      if (!usersById.has(userId)) return;
+      if (admin) adminIds.add(userId);
+      else adminIds.delete(userId);
     },
     deleteUser(id: string): boolean {
       const user = usersById.get(id);
       if (!user) return false;
       usersById.delete(id);
       usersByEmail.delete(user.email);
+      adminIds.delete(id);
       for (const [key, value] of usersByOAuth) if (value.id === id) usersByOAuth.delete(key);
       for (const [key, session] of sessions) if (session.userId === id) sessions.delete(key);
       for (const [key, entry] of bestTimes) if (entry.userId === id) bestTimes.delete(key);

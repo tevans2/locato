@@ -12,6 +12,7 @@ import type {
   AdminSessionInfo,
   AdminTotals,
   AdminUserList,
+  AdminAccess,
   AuthUser,
   CategoryStats,
   DailyChallengeResult,
@@ -61,6 +62,8 @@ export interface AdminServiceOptions {
   readonly rooms?: AdminRoomsBridge;
   readonly presence?: AdminPresenceBridge;
   readonly clock?: () => number;
+  /** Accounts that are always admins (ADMIN_EMAILS): how the first admin gets in. */
+  readonly adminEmails?: readonly string[];
 }
 
 export interface AdminWindowStats {
@@ -100,7 +103,7 @@ export interface AdminAcademySummary {
 }
 
 export interface AdminUserDetail {
-  readonly user: AuthUser & { readonly hasPassword: boolean };
+  readonly user: AuthUser & { readonly hasPassword: boolean; readonly admin: AdminAccess };
   readonly online: boolean;
   readonly providers: readonly string[];
   readonly stats: UserStats;
@@ -175,12 +178,36 @@ function modeLabel(mode: string, playMode: string | null): string {
 }
 
 // Admin-only read and moderation layer over the user store plus live in-memory state.
-// Authentication happens in the route layer (ADMIN_TOKEN); nothing here re-checks it.
+// The route layer checks the caller is an admin (isAdmin) before anything here runs.
 export class AdminService {
   private readonly clock: () => number;
+  private readonly adminEmails: ReadonlySet<string>;
 
   constructor(private readonly store: UserStore, private readonly options: AdminServiceOptions = {}) {
     this.clock = options.clock ?? (() => Date.now());
+    this.adminEmails = new Set((options.adminEmails ?? []).map((email) => email.trim().toLowerCase()).filter(Boolean));
+  }
+
+  // --- Admin access ---
+
+  adminAccess(user: { readonly id: string; readonly email: string }): AdminAccess {
+    if (this.adminEmails.has(user.email.toLowerCase())) return "config";
+    return this.store.isAdmin(user.id) ? "granted" : null;
+  }
+
+  isAdmin(user: { readonly id: string; readonly email: string }): boolean {
+    return this.adminAccess(user) !== null;
+  }
+
+  /** Grant or revoke console access. ADMIN_EMAILS accounts and your own access can't be revoked here. */
+  setAdmin(actorId: string, targetId: string, admin: unknown): AdminResult<AdminAccess> {
+    if (typeof admin !== "boolean") return fail(400, "Send admin: true or false.");
+    const user = this.store.findUserById(targetId);
+    if (!user) return fail(404, "User not found.");
+    if (!admin && this.adminAccess(user) === "config") return fail(409, "This account is an admin through ADMIN_EMAILS. Remove it there instead.");
+    if (!admin && targetId === actorId) return fail(409, "You can't remove your own admin access. Ask another admin.");
+    this.store.setAdmin(targetId, admin);
+    return { ok: true, value: this.adminAccess(user) };
   }
 
   overview(): AdminOverview {
@@ -255,11 +282,12 @@ export class AdminService {
   // --- Users ---
 
   listUsers(query: { q?: unknown; limit?: unknown; offset?: unknown }): AdminUserList {
-    return this.store.listUsers({
+    const list = this.store.listUsers({
       query: nonEmpty(query.q),
       limit: clampInt(query.limit, DEFAULT_USER_PAGE, 1, MAX_USER_PAGE),
       offset: clampInt(query.offset, 0, 0, Number.MAX_SAFE_INTEGER),
     });
+    return { ...list, users: list.users.map((user) => (this.adminEmails.has(user.email.toLowerCase()) ? { ...user, admin: "config" } : user)) };
   }
 
   getUserDetail(id: string): AdminUserDetail | null {
@@ -271,7 +299,7 @@ export class AdminService {
     const requests = this.store.listFriendRequests(id);
     const online = new Set(this.options.presence?.onlineUserIds() ?? []);
     return {
-      user: { ...this.toAuthUser(user), hasPassword: user.passwordHash !== null },
+      user: { ...this.toAuthUser(user), hasPassword: user.passwordHash !== null, admin: this.adminAccess(user) },
       online: online.has(id),
       providers: this.store.listUserProviders(id),
       stats,

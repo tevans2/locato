@@ -244,6 +244,7 @@ function migrate(db: Database): void {
   // Additive migrations: columns added after initial schema deployment.
   const addIfMissing = (sql: string) => { try { db.exec(sql); } catch { /* already exists */ } };
   addIfMissing("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;");
+  addIfMissing("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN challenge_version INTEGER;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN rounds TEXT;");
   // Keep provenance without hiding historical results. New ranked writes are verified by
@@ -739,8 +740,8 @@ export class SqliteUserStore implements UserStore {
       .query<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${filter}`)
       .get(query.query ? { $like: like } : {})!.n;
     const rows = this.db
-      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; providers: string | null; createdAt: number; games: number; dailies: number; lastActiveAt: number | null }>(
-        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji,
+      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; providers: string | null; createdAt: number; games: number; dailies: number; lastActiveAt: number | null; isAdmin: number }>(
+        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji, u.is_admin AS isAdmin,
                 (u.password_hash IS NOT NULL) AS hasPassword, u.created_at AS createdAt,
                 COALESCE(s.total_games, 0) AS games,
                 (SELECT group_concat(provider) FROM oauth_accounts o WHERE o.user_id = u.id) AS providers,
@@ -756,7 +757,15 @@ export class SqliteUserStore implements UserStore {
          LIMIT $limit OFFSET $offset`,
       )
       .all(query.query ? { $like: like, $limit: query.limit, $offset: query.offset } : { $limit: query.limit, $offset: query.offset });
-    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, providers: row.providers ? row.providers.split(",").sort() : [], createdAt: row.createdAt, games: row.games, dailies: row.dailies, lastActiveAt: row.lastActiveAt })) };
+    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, providers: row.providers ? row.providers.split(",").sort() : [], createdAt: row.createdAt, games: row.games, dailies: row.dailies, lastActiveAt: row.lastActiveAt, admin: row.isAdmin === 1 ? "granted" : null })) };
+  }
+
+  isAdmin(userId: string): boolean {
+    return this.db.query<{ isAdmin: number }>("SELECT is_admin AS isAdmin FROM users WHERE id = ?").get(userId)?.isAdmin === 1;
+  }
+
+  setAdmin(userId: string, admin: boolean): void {
+    this.db.query("UPDATE users SET is_admin = ? WHERE id = ?").run(admin ? 1 : 0, userId);
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,

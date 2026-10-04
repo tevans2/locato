@@ -86,6 +86,6 @@ if (summary.tester) {
   console.log(`            ranks: ${t.ranks.map((r) => `${r.board} #${r.rank}/${r.of}`).join(", ")}`);
   console.log(`Every seed player (e.g. atlas_amy@${SEED_EMAIL_DOMAIN}) uses the same password.`);
   console.log(`\nLog in: npm run serve (or: DATABASE_PATH=${safety.path} bun server/index.ts), open http://localhost:${process.env.PORT ?? 3000}, Sign in with the email above.`);
-  console.log(process.env.ADMIN_TOKEN ? "Admin: open /admin and paste your ADMIN_TOKEN." : "Admin: start the server with ADMIN_TOKEN=<anything> to see the admin console at /admin.");
+  console.log(process.env.ADMIN_EMAILS ? `Admin: open /admin and sign in as one of ${process.env.ADMIN_EMAILS}.` : `Admin: start the server with ADMIN_EMAILS=<a seed player's email> to use the admin console at /admin.`);
   console.log(`\nAchievements live in localStorage. After signing in, paste this into the browser console:\n${summary.achievementsSnippet}`);
 }

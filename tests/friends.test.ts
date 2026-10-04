@@ -155,7 +155,7 @@ describe("friends routes", () => {
 
     const sent: { userId: string; message: SocialServerMessage }[] = [];
     const social: SocialBridge = { isOnline: () => true, notify: (userId, message) => sent.push({ userId, message }) };
-    const routeWith = (request: Request) => handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, null, social);
+    const routeWith = (request: Request) => handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, social);
 
     const ok = await routeWith(jsonRequest("/api/friends/invite", "POST", { userId: bob.user.id, roomCode: "ABCD" }, alice.session.id));
     expect(ok?.status).toBe(200);
@@ -176,7 +176,7 @@ describe("friends routes", () => {
     service.recordGame(bob.user.id, { mode: "solo", categoryIds: ["flags"], correctAnswers: 4, wrongAnswers: 1, score: 400, bestStreak: 3 });
 
     const social: SocialBridge = { isOnline: (userId) => userId === bob.user.id, notify: () => {} };
-    const routeWith = (request: Request) => handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, null, social);
+    const routeWith = (request: Request) => handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, social);
 
     const ok = await routeWith(jsonRequest(`/api/users/${bob.user.id}/profile`, "GET", undefined, alice.session.id));
     expect(ok?.status).toBe(200);

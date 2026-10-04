@@ -260,6 +260,7 @@ g.is-hovered .adm-hit { fill: var(--row-hover); }
 .adm-signin-card .adm-brand { padding: 0; }
 .adm-signin-card h1 { margin: 6px 0 0; font-family: var(--font-editorial); font-size: 26px; font-weight: 450; letter-spacing: -0.03em; }
 .adm-signin-card p { margin: -8px 0 0; font-size: 13px; }
+.adm-signin-card p a { color: var(--brand); font-weight: 600; }
 .adm-signin-error { margin: 0 !important; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--bad-soft); color: var(--bad); font-size: 13px; }
 
 /* ---------- Responsive (site breakpoints: 980px, 700px) ---------- */
