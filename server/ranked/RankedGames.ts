@@ -366,7 +366,7 @@ export class RankedGames {
           question = { ...common, kind: "puzzle", text: `Place ${country!.name}.`, paths: c.polygons.flatMap((p) => p.map((r) => r.map(([x, y]) => [x - c.centre[0], y - c.centre[1]] as const))) };
         } else {
           const prompt = getCategory(current.mode)!.prompt(country!);
-          question = prompt.kind === "text" ? { ...common, kind: "text", text: prompt.value } : { ...common, kind: current.mode === "flag-colors" ? "flag-colors" : "image", asset: `${asset}?v=${run.revision}` };
+          question = prompt.kind === "text" ? { ...common, kind: "text", text: prompt.value } : { ...common, kind: current.mode === "flag-colors" ? "flag-colors" : "image", asset: `${asset}?v=${run.revision}`, ...(prompt.presentation === "shape" ? { presentation: "shape" as const } : {}) };
         }
       }
       if (run.mode !== "daily" && question) {

@@ -12,6 +12,8 @@ export interface RankedQuestion {
   readonly kind: "text" | "image" | "flag-colors" | "name-all" | "click" | "spot" | "puzzle" | "pin" | "street" | "split" | "flight";
   readonly text: string;
   readonly asset?: string;
+  /** "shape": `asset` is a white country outline, drawn with the outline styling. */
+  readonly presentation?: "shape";
   readonly paths?: readonly (readonly ProjectedPoint[])[];
   readonly frames?: readonly { readonly asset: string }[];
   readonly mapTap?: MapTapRoundTarget;

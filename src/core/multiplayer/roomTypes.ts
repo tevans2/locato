@@ -42,6 +42,8 @@ export interface PublicPlayerState {
 export interface PublicPromptContent {
   readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe" | "geoguessr-streetview" | "flyover-flight";
   readonly value: string;
+  /** "shape": the image is a white country outline (see PromptContent). */
+  readonly presentation?: "shape" | "flag-colors";
 }
 
 export interface PublicRoundState {
