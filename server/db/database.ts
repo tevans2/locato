@@ -246,14 +246,48 @@ function migrate(db: Database): void {
   addIfMissing("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN challenge_version INTEGER;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN rounds TEXT;");
-  // Existing client-reported results cannot be retroactively verified. Preserve snapshots for
-  // review, and start competitive standings with server-verified results only.
+  // Keep provenance without hiding historical results. New ranked writes are verified by
+  // AuthService; existing results remain visible with their original verification flag.
   addIfMissing("ALTER TABLE mode_best_times ADD COLUMN verified INTEGER NOT NULL DEFAULT 0;");
   addIfMissing("ALTER TABLE mode_best_scores ADD COLUMN verified INTEGER NOT NULL DEFAULT 0;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN verified INTEGER NOT NULL DEFAULT 0;");
   db.exec(`CREATE TABLE IF NOT EXISTS legacy_mode_best_times AS SELECT * FROM mode_best_times WHERE verified = 0;
     CREATE TABLE IF NOT EXISTS legacy_mode_best_scores AS SELECT * FROM mode_best_scores WHERE verified = 0;
     CREATE TABLE IF NOT EXISTS legacy_daily_challenge_results AS SELECT * FROM daily_challenge_results WHERE verified = 0;`);
+  // The previous migration allowed weaker new results to replace historical bests. Recover
+  // those bests from its snapshots once, preserving better new results and original dates.
+  // A marker prevents future restarts from undoing deliberate administrator corrections.
+  db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);");
+  db.transaction(() => {
+    if (db.query("SELECT id FROM schema_migrations WHERE id = ?").get("restore_historical_results_v1")) return;
+    db.exec(`
+      INSERT INTO mode_best_times (user_id, game_mode, variant, best_time_ms, achieved_at, verified)
+      SELECT user_id, game_mode, variant, best_time_ms, achieved_at, verified
+      FROM legacy_mode_best_times WHERE EXISTS (SELECT 1 FROM users WHERE users.id = legacy_mode_best_times.user_id)
+      ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
+        best_time_ms = excluded.best_time_ms, achieved_at = excluded.achieved_at, verified = excluded.verified
+      WHERE excluded.best_time_ms < mode_best_times.best_time_ms
+        OR (excluded.best_time_ms = mode_best_times.best_time_ms AND excluded.achieved_at < mode_best_times.achieved_at);
+
+      INSERT INTO mode_best_scores (user_id, game_mode, variant, best_score, achieved_at, verified)
+      SELECT user_id, game_mode, variant, best_score, achieved_at, verified
+      FROM legacy_mode_best_scores WHERE EXISTS (SELECT 1 FROM users WHERE users.id = legacy_mode_best_scores.user_id)
+      ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
+        best_score = excluded.best_score, achieved_at = excluded.achieved_at, verified = excluded.verified
+      WHERE excluded.best_score > mode_best_scores.best_score
+        OR (excluded.best_score = mode_best_scores.best_score AND excluded.achieved_at < mode_best_scores.achieved_at);
+
+      INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at, challenge_version, rounds, verified)
+      SELECT user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at, challenge_version, rounds, verified
+      FROM legacy_daily_challenge_results WHERE EXISTS (SELECT 1 FROM users WHERE users.id = legacy_daily_challenge_results.user_id)
+      ON CONFLICT(user_id, date) DO UPDATE SET
+        seed = excluded.seed, score = excluded.score, time_ms = excluded.time_ms, hints_used = excluded.hints_used,
+        marks = excluded.marks, share_text = excluded.share_text, completed_at = excluded.completed_at,
+        challenge_version = excluded.challenge_version, rounds = excluded.rounds, verified = excluded.verified
+      WHERE excluded.completed_at < daily_challenge_results.completed_at;
+    `);
+    db.query("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("restore_historical_results_v1", Date.now());
+  })();
   // Expand user_stats from old 4-column schema to full split schema.
   for (const col of ["total_games", "total_correct", "total_wrong", "solo_games", "solo_correct", "solo_wrong", "solo_best_streak", "multiplayer_games", "multiplayer_wins", "multiplayer_correct", "multiplayer_wrong", "multiplayer_best_streak", "world_map_games", "world_map_completions", "world_best_time_ms", "world_best_countries"]) {
     addIfMissing(`ALTER TABLE user_stats ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0;`);
@@ -492,7 +526,7 @@ export class SqliteUserStore implements UserStore {
   getDailyResult(userId: string, date: string): DailyChallengeResult | null {
     const row = this.db
       .query<DailyResultRow>(
-        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE verified = 1 AND user_id = ? AND date = ?",
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE user_id = ? AND date = ?",
       )
       .get(userId, date);
     if (!row) return null;
@@ -502,7 +536,7 @@ export class SqliteUserStore implements UserStore {
   listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[] {
     const rows = this.db
       .query<DailyResultRow>(
-        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE verified = 1 AND user_id = ? ORDER BY date DESC LIMIT ?",
+        "SELECT date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds FROM daily_challenge_results WHERE user_id = ? ORDER BY date DESC LIMIT ?",
       )
       .all(userId, limit);
     return rows.map(dailyResultFromRow);
@@ -520,7 +554,7 @@ export class SqliteUserStore implements UserStore {
       .query<DailyResultRow & { userId: string }>(
         `SELECT user_id AS userId, date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds
          FROM daily_challenge_results
-         WHERE verified = 1 AND date = ?`,
+         WHERE date = ?`,
       )
       .all(date);
     return rows.map((row) => {
@@ -537,11 +571,7 @@ export class SqliteUserStore implements UserStore {
       .query(
         `INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at, challenge_version, rounds, verified)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-         ON CONFLICT(user_id, date) DO UPDATE SET seed = excluded.seed, score = excluded.score,
-           time_ms = excluded.time_ms, hints_used = excluded.hints_used, marks = excluded.marks,
-           share_text = excluded.share_text, completed_at = excluded.completed_at,
-           challenge_version = excluded.challenge_version, rounds = excluded.rounds, verified = 1
-         WHERE daily_challenge_results.verified = 0`,
+         ON CONFLICT(user_id, date) DO NOTHING`,
       )
       .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt, result.challengeVersion ?? null, result.rounds ? JSON.stringify(result.rounds) : null);
 
@@ -550,7 +580,7 @@ export class SqliteUserStore implements UserStore {
 
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
     const existing = this.db
-      .query<{ bestTimeMs: number }>("SELECT best_time_ms AS bestTimeMs FROM mode_best_times WHERE verified = 1 AND user_id = ? AND game_mode = ? AND variant = ?")
+      .query<{ bestTimeMs: number }>("SELECT best_time_ms AS bestTimeMs FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?")
       .get(userId, input.gameMode, input.variant);
 
     if (existing && input.timeMs >= existing.bestTimeMs) {
@@ -564,7 +594,7 @@ export class SqliteUserStore implements UserStore {
          ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
            best_time_ms = excluded.best_time_ms,
            achieved_at = excluded.achieved_at, verified = 1
-         WHERE mode_best_times.verified = 0 OR excluded.best_time_ms < mode_best_times.best_time_ms`,
+         WHERE excluded.best_time_ms < mode_best_times.best_time_ms`,
       )
       .run(userId, input.gameMode, input.variant, input.timeMs, input.achievedAt);
 
@@ -578,7 +608,7 @@ export class SqliteUserStore implements UserStore {
                 m.best_time_ms AS timeMs, m.achieved_at AS achievedAt
          FROM mode_best_times m
          JOIN users u ON u.id = m.user_id
-         WHERE m.verified = 1 AND m.game_mode = ? AND m.variant = ?
+         WHERE m.game_mode = ? AND m.variant = ?
          ORDER BY m.best_time_ms ASC, m.achieved_at ASC
          LIMIT ? OFFSET ?`,
       )
@@ -597,7 +627,7 @@ export class SqliteUserStore implements UserStore {
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null {
     const row = this.db
       .query<{ timeMs: number; achievedAt: number }>(
-        "SELECT best_time_ms AS timeMs, achieved_at AS achievedAt FROM mode_best_times WHERE verified = 1 AND user_id = ? AND game_mode = ? AND variant = ?",
+        "SELECT best_time_ms AS timeMs, achieved_at AS achievedAt FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?",
       )
       .get(userId, gameMode, variant);
     if (!row) return null;
@@ -606,7 +636,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ rank: number }>(
         `SELECT 1 + COUNT(*) AS rank
          FROM mode_best_times
-         WHERE verified = 1 AND game_mode = ? AND variant = ?
+         WHERE game_mode = ? AND variant = ?
            AND (best_time_ms < ? OR (best_time_ms = ? AND achieved_at < ?))`,
       )
       .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
@@ -619,7 +649,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ faster: number | null; total: number }>(
         `SELECT SUM(CASE WHEN best_time_ms < ? THEN 1 ELSE 0 END) AS faster, COUNT(*) AS total
          FROM mode_best_times
-         WHERE verified = 1 AND game_mode = ? AND variant = ?`,
+         WHERE game_mode = ? AND variant = ?`,
       )
       .get(timeMs, gameMode, variant);
     return { rank: (row?.faster ?? 0) + 1, total: row?.total ?? 0 };
@@ -627,7 +657,7 @@ export class SqliteUserStore implements UserStore {
 
   submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
     const existing = this.db
-      .query<{ bestScore: number }>("SELECT best_score AS bestScore FROM mode_best_scores WHERE verified = 1 AND user_id = ? AND game_mode = ? AND variant = ?")
+      .query<{ bestScore: number }>("SELECT best_score AS bestScore FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?")
       .get(userId, input.gameMode, input.variant);
 
     if (existing && input.score <= existing.bestScore) {
@@ -641,7 +671,7 @@ export class SqliteUserStore implements UserStore {
          ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
            best_score = excluded.best_score,
            achieved_at = excluded.achieved_at, verified = 1
-         WHERE mode_best_scores.verified = 0 OR excluded.best_score > mode_best_scores.best_score`,
+         WHERE excluded.best_score > mode_best_scores.best_score`,
       )
       .run(userId, input.gameMode, input.variant, input.score, input.achievedAt);
 
@@ -655,7 +685,7 @@ export class SqliteUserStore implements UserStore {
                 m.best_score AS score, m.achieved_at AS achievedAt
          FROM mode_best_scores m
          JOIN users u ON u.id = m.user_id
-         WHERE m.verified = 1 AND m.game_mode = ? AND m.variant = ?
+         WHERE m.game_mode = ? AND m.variant = ?
          ORDER BY m.best_score DESC, m.achieved_at ASC
          LIMIT ? OFFSET ?`,
       )
@@ -674,7 +704,7 @@ export class SqliteUserStore implements UserStore {
   getUserScoreRank(userId: string, gameMode: string, variant: string): UserLeaderboardScoreRank | null {
     const row = this.db
       .query<{ score: number; achievedAt: number }>(
-        "SELECT best_score AS score, achieved_at AS achievedAt FROM mode_best_scores WHERE verified = 1 AND user_id = ? AND game_mode = ? AND variant = ?",
+        "SELECT best_score AS score, achieved_at AS achievedAt FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?",
       )
       .get(userId, gameMode, variant);
     if (!row) return null;
@@ -683,7 +713,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ rank: number }>(
         `SELECT 1 + COUNT(*) AS rank
          FROM mode_best_scores
-         WHERE verified = 1 AND game_mode = ? AND variant = ?
+         WHERE game_mode = ? AND variant = ?
            AND (best_score > ? OR (best_score = ? AND achieved_at < ?))`,
       )
       .get(gameMode, variant, row.score, row.score, row.achievedAt);
@@ -696,7 +726,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ higher: number | null; total: number }>(
         `SELECT SUM(CASE WHEN best_score > ? THEN 1 ELSE 0 END) AS higher, COUNT(*) AS total
          FROM mode_best_scores
-         WHERE verified = 1 AND game_mode = ? AND variant = ?`,
+         WHERE game_mode = ? AND variant = ?`,
       )
       .get(score, gameMode, variant);
     return { rank: (row?.higher ?? 0) + 1, total: row?.total ?? 0 };
