@@ -3,7 +3,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexCountries, rawCountries, validateCountries } from "../src/core/countries";
 import { RoomManager, type MultiplayerConnection } from "./rooms/RoomManager";
-import { AuthService, bunPasswordHasher, handleAuthRequest, readSessionToken, type AuthUser } from "./auth";
+import { AuthService, bunPasswordHasher, handleAuthRequest, ipBanResponse, readSessionToken, type AuthUser } from "./auth";
 import { openDatabase, SqliteUserStore } from "./db/database";
 import { SocialHub, type SocialConnection } from "./social/SocialHub";
 import { StreetViewLocationPool } from "./streetview";
@@ -207,6 +207,9 @@ const server = Bun.serve<WebSocketData>({
     const { method } = request;
 
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    // Banned addresses: before the sockets and API routes below (handleAuthRequest checks again).
+    const ipBlocked = ipBanResponse(request, url, authService);
+    if (ipBlocked) return ipBlocked;
     if (/^\/api\/game-assets\/[a-f0-9]{48}$/.test(url.pathname) && method === "GET") {
       try { return await serveGameAsset(url); } catch { return json({ error: "Game artwork unavailable." }, 503); }
     }

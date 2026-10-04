@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eraser, LogOut, Pencil, RotateCcw, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import { Ban, Eraser, LogOut, Pencil, RotateCcw, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 import type { AdminAccess, AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../api";
 import { formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
@@ -20,6 +20,99 @@ function authLabel(user: { hasPassword: boolean; providers: readonly string[] })
 function AdminBadge({ access }: { access: AdminAccess }) {
   if (!access) return null;
   return <Badge tone="good" title={access === "config" ? "Admin through ADMIN_EMAILS" : "Admin access granted in the console"}>admin</Badge>;
+}
+
+// Ban and unban from anywhere in the console. Banning asks for an optional reason; unbanning is
+// one click, since nothing was deleted and it's just as easy to ban again.
+export function toggleBan(client: AdminClient, helpers: ActionHelpers, user: { id: string; displayName: string; banned: boolean }, onDone: () => void): void {
+  if (user.banned) {
+    void client.send("DELETE", `/users/${encodeURIComponent(user.id)}/ban`)
+      .then(() => { helpers.notify(`Unbanned ${user.displayName}.`); onDone(); })
+      .catch((err: unknown) => helpers.notify(err instanceof Error ? err.message : String(err), "bad"));
+    return;
+  }
+  let reason = "";
+  helpers.confirm({
+    title: `Ban ${user.displayName}?`,
+    body: (
+      <>
+        <p>Signs them out everywhere, stops them signing in or playing online, and hides them from every leaderboard. Nothing is deleted: unban to restore everything.</p>
+        <label className="adm-field">
+          <span>Reason (optional, only admins see it)</span>
+          <input onChange={(e) => { reason = e.target.value; }} maxLength={200} placeholder="e.g. Scripted leaderboard runs" />
+        </label>
+      </>
+    ),
+    confirmLabel: "Ban",
+    tone: "danger",
+    run: async () => {
+      await client.send("PUT", `/users/${encodeURIComponent(user.id)}/ban`, { reason });
+      helpers.notify(`Banned ${user.displayName}.`);
+      onDone();
+    },
+  });
+}
+
+export function BanSwitch({ banned, disabledReason, onToggle }: { banned: boolean; disabledReason: string | null; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={banned}
+      className={`adm-switch${banned ? " is-on" : ""}`}
+      disabled={disabledReason !== null}
+      title={disabledReason ?? (banned ? "Banned. Click to unban" : "Click to ban")}
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <span className="adm-switch-track" aria-hidden><span className="adm-switch-thumb" /></span>
+      <span>{banned ? "Banned" : "Active"}</span>
+    </button>
+  );
+}
+
+export const IP_BAN_LENGTHS: readonly { readonly value: string; readonly label: string }[] = [
+  { value: "1", label: "1 day" },
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "", label: "Until lifted" },
+];
+
+export function banIp(client: AdminClient, helpers: ActionHelpers, ip: string, onDone: () => void): void {
+  let days = "7";
+  let reason = "";
+  helpers.confirm({
+    title: `Ban ${ip}?`,
+    body: (
+      <>
+        <p>Blocks sign-in, sign-up, the game API and multiplayer from this address. It can hit other people on the same network (schools, offices, mobile data), and a VPN gets around it, so keep it short.</p>
+        <label className="adm-field">
+          <span>Length</span>
+          <select defaultValue={days} onChange={(e) => { days = e.target.value; }}>
+            {IP_BAN_LENGTHS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="adm-field">
+          <span>Reason (optional)</span>
+          <input onChange={(e) => { reason = e.target.value; }} maxLength={200} />
+        </label>
+      </>
+    ),
+    confirmLabel: "Ban IP",
+    tone: "danger",
+    run: async () => {
+      const length = days === "" ? null : Number(days);
+      await client.send("POST", "/bans/ips", { ip, reason, days: length });
+      helpers.notify(`Banned ${ip}${length ? ` for ${length} day${length === 1 ? "" : "s"}` : ""}.`);
+      onDone();
+    },
+  });
+}
+
+function banBlockedReason(user: { id: string; admin: AdminAccess }, currentAdminId: string): string | null {
+  if (user.id === currentAdminId) return "You can't ban yourself.";
+  return user.admin ? "Remove admin access before banning." : null;
 }
 
 // Heuristic only: helps spot automated / test signups at a glance.
@@ -60,7 +153,7 @@ export function UsersView({ client, currentAdminId, selectedId, onSelect, helper
           <div className="adm-table-wrap">
             <table className="adm-table is-clickable">
               <thead>
-                <tr><th>User</th><th>Email</th><th>Sign-in</th><th>Joined</th><th>Last active</th><th className="num">Games</th><th className="num">Dailies</th></tr>
+                <tr><th>User</th><th>Email</th><th>Sign-in</th><th>Joined</th><th>Last active</th><th className="num">Games</th><th className="num">Dailies</th><th>Status</th></tr>
               </thead>
               <tbody>
                 {list.data.users.map((user) => (
@@ -70,6 +163,7 @@ export function UsersView({ client, currentAdminId, selectedId, onSelect, helper
                         {user.avatarEmoji && <span aria-hidden>{user.avatarEmoji}</span>}
                         <strong>{user.displayName}</strong>
                         <AdminBadge access={user.admin} />
+                        {user.banned && <Badge tone="bad">banned</Badge>}
                         {looksLikeTestAccount(user.email, user.displayName) && <Badge tone="warn" title="Looks like an automated or test account">test?</Badge>}
                       </span>
                     </td>
@@ -79,6 +173,9 @@ export function UsersView({ client, currentAdminId, selectedId, onSelect, helper
                     <td>{formatRelative(user.lastActiveAt)}</td>
                     <td className="num">{user.games}</td>
                     <td className="num">{user.dailies}</td>
+                    <td>
+                      <BanSwitch banned={user.banned} disabledReason={banBlockedReason(user, currentAdminId)} onToggle={() => toggleBan(client, helpers, user, list.refresh)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -142,6 +239,7 @@ function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }:
             <div className="adm-chips">
               {d.online ? <Badge tone="good">Online</Badge> : <Badge>Offline</Badge>}
               <AdminBadge access={d.user.admin} />
+              {d.ban && <Badge tone="bad" {...(d.ban.reason ? { title: d.ban.reason } : {})}>Banned {formatDate(d.ban.bannedAt)}</Badge>}
               <Badge>{authLabel({ hasPassword: d.user.hasPassword, providers: d.providers })}</Badge>
               <Badge>Joined {formatDate(d.user.createdAt)}</Badge>
               <Badge>{d.sessions.length} active session{d.sessions.length === 1 ? "" : "s"}</Badge>
@@ -163,7 +261,8 @@ function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }:
                   try { await client.send("PATCH", path, { clearAvatar: true }); helpers.notify("Avatar cleared."); afterChange(); } catch (err) { helpers.notify(err instanceof Error ? err.message : String(err), "bad"); }
                 }}><Eraser size={14} aria-hidden /> Clear avatar</button>
               )}
-              {d.user.admin === null ? (
+              <BanSwitch banned={d.ban !== null} disabledReason={banBlockedReason({ id: d.user.id, admin: d.user.admin }, currentAdminId)} onToggle={() => toggleBan(client, helpers, { id: d.user.id, displayName: d.user.displayName, banned: d.ban !== null }, afterChange)} />
+              {d.user.admin === null && d.ban === null ? (
                 <button type="button" className="adm-btn is-small" onClick={() => helpers.confirm({
                   title: "Make this user an admin?",
                   body: <p><strong>{d.user.displayName}</strong> ({d.user.email}) will be able to sign in here and see every account, edit and delete users, and remove leaderboard entries.</p>,
@@ -201,6 +300,39 @@ function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }:
                 run: async () => { await client.send("DELETE", path); helpers.notify(`Deleted ${d.user.displayName}.`); onChanged(); onClose(); },
               })}><Trash2 size={14} aria-hidden /> Delete</button>
             </div>
+
+            {d.ban && (
+              <p className="adm-ban-note"><Ban size={14} aria-hidden /> Banned {formatDateTime(d.ban.bannedAt)}{d.ban.reason ? `: ${d.ban.reason}` : ""}</p>
+            )}
+
+            <section className="adm-section">
+              <h3>IP addresses</h3>
+              {d.ips.length === 0 ? <Empty>No addresses in the event log.</Empty> : (
+                <div className="adm-table-wrap">
+                  <table className="adm-table">
+                    <thead><tr><th>Address</th><th>Last seen</th><th className="num">Events</th><th /></tr></thead>
+                    <tbody>
+                      {d.ips.map((row) => (
+                        <tr key={row.ip}>
+                          <td><code>{row.ip}</code> {row.banned && <Badge tone="bad">banned</Badge>}</td>
+                          <td>{formatRelative(row.lastSeenAt)}</td>
+                          <td className="num">{row.events}</td>
+                          <td className="num">
+                            {row.banned ? (
+                              <button type="button" className="adm-btn is-small" onClick={async () => {
+                                try { await client.send("DELETE", `/bans/ips/${encodeURIComponent(row.ip)}`); helpers.notify(`Unbanned ${row.ip}.`); afterChange(); } catch (err) { helpers.notify(err instanceof Error ? err.message : String(err), "bad"); }
+                              }}>Unban IP</button>
+                            ) : (
+                              <button type="button" className="adm-btn is-small" onClick={() => banIp(client, helpers, row.ip, afterChange)}>Ban IP</button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
 
             <section className="adm-section">
               <h3>Stats</h3>

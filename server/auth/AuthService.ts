@@ -17,6 +17,7 @@ import type { AcademyProgress } from "../../src/core/academy/types";
 import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
 import type {
   AuthUser,
+  IpBan,
   DailyChallengeResult,
   DailyLeaderboardEntry,
   DailySummary,
@@ -89,6 +90,8 @@ const RUN_OUTCOMES: readonly RunOutcome[] = ["complete", "given-up", "abandoned"
 const NAME_ALL_COUNTRIES = indexCountries(rawCountries).countries;
 const NAME_ALL_CODES = NAME_ALL_COUNTRIES.map((country) => country.code);
 const NAME_ALL_NAMES = new Map(NAME_ALL_COUNTRIES.map((country) => [country.code, country.name]));
+
+export const BANNED_MESSAGE = "This account has been banned.";
 
 export type AuthOutcome =
   | { readonly ok: true; readonly user: AuthUser; readonly session: Session }
@@ -175,6 +178,8 @@ export class AuthService {
     if (!user) return invalid;
     if (user.passwordHash === null) return { ok: false, status: 401, error: "Sign in with your OAuth provider." };
     if (!(await this.hasher.verify(password, user.passwordHash))) return invalid;
+    // Only after the password checks out, so a ban doesn't reveal that an email has an account.
+    if (this.isBanned(user.id)) return { ok: false, status: 403, error: BANNED_MESSAGE };
 
     return { ok: true, user: this.toAuthUser(user), session: this.openSession(user.id, this.clock()) };
   }
@@ -192,7 +197,17 @@ export class AuthService {
       return null;
     }
     const user = this.store.findUserById(session.userId);
-    return user ? this.toAuthUser(user) : null;
+    // A banned account's leftover sessions count as signed out.
+    return user && !this.isBanned(user.id) ? this.toAuthUser(user) : null;
+  }
+
+  isBanned(userId: string): boolean {
+    return this.store.getUserBan(userId) !== null;
+  }
+
+  /** The ban covering this address right now, if any. */
+  ipBan(ip: string): IpBan | null {
+    return ip === "unknown" ? null : this.store.findIpBan(ip, this.clock());
   }
 
   upsertOAuthUser(

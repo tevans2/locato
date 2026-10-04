@@ -14,6 +14,9 @@ import type {
   AdminUserList,
   AdminAccess,
   AuthUser,
+  BannedUser,
+  IpBan,
+  UserBan,
   CategoryStats,
   DailyChallengeResult,
   GameRecord,
@@ -57,6 +60,23 @@ export interface AdminRoomsBridge {
 export interface AdminPresenceBridge {
   onlineUserIds(): readonly string[];
 }
+
+export interface AdminUserIp {
+  readonly ip: string;
+  readonly lastSeenAt: number;
+  readonly events: number;
+  readonly banned: boolean;
+}
+
+export interface AdminBans {
+  readonly users: readonly BannedUser[];
+  readonly ips: readonly IpBan[];
+}
+
+const MAX_BAN_REASON = 200;
+const MAX_IP_BAN_DAYS = 3650;
+// Loose on purpose (IPv4 or IPv6 text form); it only has to match what clientIp() reports.
+const IP_PATTERN = /^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]*:[0-9a-f:.]+)$/i;
 
 export interface AdminServiceOptions {
   readonly rooms?: AdminRoomsBridge;
@@ -104,6 +124,9 @@ export interface AdminAcademySummary {
 
 export interface AdminUserDetail {
   readonly user: AuthUser & { readonly hasPassword: boolean; readonly admin: AdminAccess };
+  readonly ban: UserBan | null;
+  /** Addresses this account has used, from the event log, most recent first. */
+  readonly ips: readonly AdminUserIp[];
   readonly online: boolean;
   readonly providers: readonly string[];
   readonly stats: UserStats;
@@ -171,6 +194,10 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
 
 function nonEmpty(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function banReason(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, MAX_BAN_REASON) : null;
 }
 
 function modeLabel(mode: string, playMode: string | null): string {
@@ -300,6 +327,8 @@ export class AdminService {
     const online = new Set(this.options.presence?.onlineUserIds() ?? []);
     return {
       user: { ...this.toAuthUser(user), hasPassword: user.passwordHash !== null, admin: this.adminAccess(user) },
+      ban: this.store.getUserBan(id),
+      ips: this.userIps(id, now),
       online: online.has(id),
       providers: this.store.listUserProviders(id),
       stats,
@@ -386,6 +415,64 @@ export class AdminService {
 
   deleteUser(id: string): boolean {
     return this.store.deleteUser(id);
+  }
+
+  // --- Bans ---
+
+  /** Bans an account: signs it out everywhere and hides its results. Admins must lose access first. */
+  banUser(actorId: string, targetId: string, reason: unknown): AdminResult<UserBan> {
+    const user = this.store.findUserById(targetId);
+    if (!user) return fail(404, "User not found.");
+    if (targetId === actorId) return fail(409, "You can't ban yourself.");
+    if (this.isAdmin(user)) return fail(409, "Remove their admin access before banning them.");
+    const ban: UserBan = { bannedAt: this.clock(), reason: banReason(reason), bannedBy: actorId };
+    this.store.setUserBan(targetId, ban);
+    this.store.deleteUserSessions(targetId);
+    return { ok: true, value: ban };
+  }
+
+  unbanUser(targetId: string): AdminResult<null> {
+    if (!this.store.findUserById(targetId)) return fail(404, "User not found.");
+    if (!this.store.getUserBan(targetId)) return fail(409, "This account isn't banned.");
+    this.store.setUserBan(targetId, null);
+    return { ok: true, value: null };
+  }
+
+  listBans(): AdminBans {
+    return { users: this.store.listBannedUsers(), ips: this.store.listIpBans(this.clock()) };
+  }
+
+  /** Bans an address, for `days` days or until lifted (days omitted). */
+  banIp(actorId: string, actorIp: string, input: { ip?: unknown; reason?: unknown; days?: unknown }): AdminResult<IpBan> {
+    const ip = typeof input.ip === "string" ? input.ip.trim() : "";
+    if (!IP_PATTERN.test(ip) || ip.length > 45) return fail(400, "That isn't an IP address.");
+    if (ip === actorIp) return fail(409, "That's the address you're using right now.");
+    const days = input.days === undefined || input.days === null ? null : input.days;
+    if (days !== null && (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > MAX_IP_BAN_DAYS)) {
+      return fail(400, `Ban length must be 1–${MAX_IP_BAN_DAYS} days, or left empty for no end date.`);
+    }
+    const now = this.clock();
+    const ban: IpBan = { ip, reason: banReason(input.reason), createdAt: now, expiresAt: days === null ? null : now + days * DAY_MS, createdBy: actorId };
+    this.store.saveIpBan(ban);
+    return { ok: true, value: ban };
+  }
+
+  unbanIp(ip: string): boolean {
+    return this.store.deleteIpBan(ip);
+  }
+
+  private userIps(userId: string, now: number): readonly AdminUserIp[] {
+    const seen = new Map<string, { lastSeenAt: number; events: number }>();
+    for (const event of this.store.listEvents({ level: null, action: null, ip: null, userId, before: null, limit: 500 })) {
+      if (!event.ip || event.ip === "unknown") continue;
+      const entry = seen.get(event.ip) ?? { lastSeenAt: 0, events: 0 };
+      entry.events += 1;
+      entry.lastSeenAt = Math.max(entry.lastSeenAt, event.time);
+      seen.set(event.ip, entry);
+    }
+    return [...seen.entries()]
+      .map(([ip, entry]) => ({ ip, ...entry, banned: this.store.findIpBan(ip, now) !== null }))
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
   revokeUserSessions(id: string): number {
