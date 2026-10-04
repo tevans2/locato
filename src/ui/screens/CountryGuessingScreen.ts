@@ -715,7 +715,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       ...(givenUp ? { missedTitle: `${missed.length} missed` } : {}),
       onPlayAgain: () => {
         hideResults();
-        resetGame(timed ? "New timed run. The clock starts on your first correct move." : playMode === "puzzle" ? `Fresh ${puzzleContinent} puzzle ready.` : "Fresh world map ready.", false);
+        resetGame(timed ? `New timed run. The clock starts on your first ${options.ranked ? "guess" : "correct move"}.` : playMode === "puzzle" ? `Fresh ${puzzleContinent} puzzle ready.` : "Fresh world map ready.", false);
       },
       extraActions: givenUp ? [{ label: "Review on the map", icon: "globe", onClick: () => hideResults() }] : [],
       shareText: givenUp
@@ -963,7 +963,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       dismissKeyboardIfTouchInput(input);
       resetGame(
         timed
-          ? "Timer reset. Start with your first correct move."
+          ? `Timer reset. Start with your first ${options.ranked ? "guess" : "correct move"}.`
           : playMode === "click-country"
             ? "Fresh click challenge ready."
             : playMode === "spot-country"
