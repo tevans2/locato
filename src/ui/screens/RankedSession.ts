@@ -8,18 +8,23 @@ export class RankedSession {
   private readonly controller = new AbortController();
   private snapshot: RankedState | null = null;
   private chain: Promise<unknown> = Promise.resolve();
-  private nextMoveAt = 0;
   private offset = 0;
+  private firstGuessAt: number | null = null;
   constructor(readonly mode: GameModeId, readonly variant = "") {}
   get state(): RankedState { if (!this.snapshot) throw new Error("The game has not started."); return this.snapshot; }
   get signal(): AbortSignal { return this.controller.signal; }
-  elapsedMs(): number { return this.state.timeMs ?? Math.max(0, performance.now() + this.offset - this.state.startedAt); }
+  elapsedMs(): number {
+    if (this.state.timeMs !== null) return this.state.timeMs;
+    if (this.firstGuessAt !== null) return Math.max(0, performance.now() - this.firstGuessAt);
+    return this.state.startedAt === null ? 0 : Math.max(0, this.now() - this.state.startedAt);
+  }
+  noteGuess(): void { this.firstGuessAt ??= performance.now(); }
   now(): number { return performance.now() + this.offset; }
   private accept(value: RankedState): RankedState { this.snapshot = value; this.offset = value.serverNow - performance.now(); return value; }
   async start(): Promise<RankedState> {
     await this.chain.catch(() => {});
     const value = this.accept(await rankedRequest<RankedState>("/api/ranked/start", { gameMode: this.mode, variant: this.variant }, this.signal));
-    this.nextMoveAt = Date.now() + 160;
+    this.firstGuessAt = null;
     return value;
   }
   move(action: Omit<RankedAction, "runId" | "questionId">): Promise<RankedState> {
@@ -27,16 +32,10 @@ export class RankedSession {
     const questionId = this.state.question?.id;
     const task = this.chain.catch(() => {}).then(async () => {
       if (this.signal.aborted) throw new Error("Game closed.");
-      if (this.state.runId !== runId || (action.auto && this.state.question?.id !== questionId)) return this.state;
-      if (this.mode !== "flyover" && this.state.question?.id !== questionId) throw new Error("That challenge is no longer active.");
-      // Preserve the server's per-question minimum without making fast Enter/clicks fail.
-      if (this.mode !== "flyover") {
-        const delay = Math.max(0, this.nextMoveAt - Date.now());
-        if (delay) await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        this.nextMoveAt = Date.now() + 160;
-      }
-      const value = this.accept(await rankedRequest<RankedState>("/api/ranked/action", { ...action, runId, questionId }, this.signal));
-      this.nextMoveAt = Date.now() + 160;
+      if (this.state.runId !== runId || (this.mode !== "name-all" && action.auto && this.state.question?.id !== questionId)) return this.state;
+      if (this.mode !== "flyover" && this.mode !== "name-all" && this.state.question?.id !== questionId) throw new Error("That challenge is no longer active.");
+      const activeQuestionId = this.mode === "name-all" ? this.state.question?.id : questionId;
+      const value = this.accept(await rankedRequest<RankedState>("/api/ranked/action", { ...action, runId, questionId: activeQuestionId }, this.signal));
       return value;
     });
     this.chain = task;

@@ -360,7 +360,7 @@ export class AuthService {
     const reservation = dailyTicket ? this.store.findRun(dailyTicket) : null;
     if (reservation && !this.ranked.hasDaily(userId, String(input.variant))) return { error: "Today's attempt has ended or expired. A new challenge is available tomorrow." };
     const result = await this.ranked.start(userId, input);
-    if (dailyTicket && !reservation && !("error" in result)) this.store.createRun({ id: dailyTicket, userId, gameMode: "daily", variant: result.variant, timed: true, startedAt: result.startedAt, ip: null, userAgent: null });
+    if (dailyTicket && !reservation && !("error" in result)) this.store.createRun({ id: dailyTicket, userId, gameMode: "daily", variant: result.variant, timed: true, startedAt: result.startedAt ?? this.clock(), ip: null, userAgent: null });
     return result;
   }
 

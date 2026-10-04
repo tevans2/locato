@@ -19,16 +19,19 @@ import * as mapTap from "../src/core/maptap";
 const screens: Screen[] = [];
 afterEach(() => { for (const s of screens.splice(0)) s.destroy(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); localStorage.clear(); });
 
-async function setup(mode: GameModeId, full = false) {
+async function setup(mode: GameModeId, full: boolean | readonly string[] = false) {
   let now = 100_000;
   vi.spyOn(performance, "now").mockImplementation(() => now);
-  const countries = indexCountries(rawCountries.filter((c) => full || ["FR", "BR"].includes(c.code)));
+  const countries = indexCountries(rawCountries.filter((c) => Array.isArray(full) ? full.includes(c.code) : full || ["FR", "BR"].includes(c.code)));
   const store = createMemoryUserStore();
   const service = new AuthService(store, { hash: async (p) => p, verify: async (p, h) => p === h }, { clock: () => now, sessionTtlMs: 3_600_000, ranked: { countries, resolvePanorama: async (p) => ({ ...p, panoId: "private-panorama" }) } });
   const registration = await service.register({ email: "ui@test.local", password: "long-password", displayName: "tester" });
   if (!registration.ok) throw new Error(registration.error);
   let latest: RankedState | null = null;
+  let gate: Promise<void> | null = null;
+  const holdMoves = () => { let release!: () => void; gate = new Promise<void>((resolve) => { release = resolve; }); return () => { release(); gate = null; }; };
   const fetcher = vi.fn(async (path: string, init: RequestInit) => {
+    if (path === "/api/ranked/action" && gate) await gate;
     const request = new Request(`http://localhost${path}`, init);
     const get = request.headers.get.bind(request.headers);
     vi.spyOn(request.headers, "get").mockImplementation((name) => name === "cookie" ? `${SESSION_COOKIE_NAME}=${registration.session.id}` : get(name));
@@ -44,7 +47,7 @@ async function setup(mode: GameModeId, full = false) {
   const button = (text: string) => [...screen.element.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim() === text)!;
   const advance = (ms = 5000) => { now += ms; };
   const posted = () => vi.waitFor(() => expect($(".shell-results-sub")?.textContent).toContain("Posted to the leaderboard"));
-  return { screen, $, button, fetcher, service, store, user: registration.user, countries, advance, state: () => latest!, answer: () => answerFor(service.ranked, latest!), posted };
+  return { screen, $, button, fetcher, holdMoves, service, store, user: registration.user, countries, advance, state: () => latest!, answer: () => answerFor(service.ranked, latest!), posted };
 }
 
 it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"] as const)("uses the original %s form and posts only its completed server receipt", async (mode) => {
@@ -60,8 +63,8 @@ it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"
   }
   await ui.posted();
   const body = JSON.parse(ui.fetcher.mock.calls.find(([path]) => path === "/api/leaderboard")![1].body as string);
-  expect(body).toEqual({ gameMode: mode, variant: "", timeMs: 10_000, runId: ui.state().runId });
-  expect(ui.service.getUserLeaderboardRank(ui.user.id, mode, "")).toEqual({ rank: 1, timeMs: 10_000 });
+  expect(body).toEqual({ gameMode: mode, variant: "", timeMs: 5_000, runId: ui.state().runId });
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, mode, "")).toEqual({ rank: 1, timeMs: 5_000 });
   expect(ui.store.getStats(ui.user.id).totalGames).toBe(1);
   ui.service.submitLeaderboardAttempt(ui.user.id, body);
   expect(ui.store.getStats(ui.user.id).totalGames).toBe(1);
@@ -85,6 +88,8 @@ it("keeps Hint and Pass working without exposing the upcoming answer", async () 
   ui.$<HTMLButtonElement>(".shell-results-primary").click();
   await vi.waitFor(() => expect(ui.state().runId).not.toBe(JSON.parse(ui.fetcher.mock.calls.find(([p]) => p === "/api/leaderboard")![1].body as string).runId));
   expect(ui.$<HTMLInputElement>("#guess-input").disabled).toBe(false);
+  expect(ui.state().startedAt).toBeNull();
+  expect(ui.$(".game-run-clock-value").textContent).toBe("0:00.0");
 });
 
 it.each(["name-all", "spot-country", "click-country"] as const)("keeps the original %s map and completes with server-accepted guesses", async (mode) => {
@@ -178,7 +183,7 @@ it("keeps Flyover's Take off screen and ends at the server deadline", async () =
   await vi.waitFor(() => expect(ui.state()?.mode).toBe("flyover"));
   ui.advance(90_000);
   await ui.posted();
-  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: 0 });
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: ui.state().score });
 });
 
 it("keeps the puzzle tray and accuracy check, and refuses to post misplaced pieces", async () => {
@@ -214,4 +219,100 @@ it("keeps the puzzle tray and accuracy check, and refuses to post misplaced piec
   ui.advance(); ui.button("Check accuracy").click();
   await ui.posted();
   expect(ui.state().status).toBe("complete");
+});
+
+it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall", "name-all", "click-country", "spot-country", "puzzle"] as const)("keeps the %s timer at zero while waiting for the first guess", async (mode) => {
+  const ui = await setup(mode);
+  expect(ui.state().startedAt).toBeNull();
+  ui.advance(60_000);
+  expect(ui.$(".game-run-clock-value").textContent).toBe("0:00.0");
+  expect(ui.state().startedAt).toBeNull();
+});
+
+it.each(["flags", "flag-colors", "shapes", "name-all", "spot-country"] as const)("accepts Enter with country-code shortcuts immediately in %s", async (mode) => {
+  const ui = await setup(mode, ["CA", "ZA"]);
+  for (let i = 0; i < 2; i++) {
+    const challenge = privateChallenge(ui.service.ranked, ui.state());
+    const code = mode === "name-all" ? ["CA", "ZA"][i]! : challenge.country!.code;
+    const release = ui.holdMoves();
+    const input = ui.$<HTMLInputElement>("#guess-input");
+    input.value = code.split("").join("-"); input.dispatchEvent(new Event("input"));
+    // Partial/code input must not start an automatic request that swallows Enter.
+    expect(ui.fetcher.mock.calls.filter(([p]) => p === "/api/ranked/action")).toHaveLength(i);
+    ui.$<HTMLFormElement>(".guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+    expect(input.value).toBe("");
+    expect(ui.$(".feedback").textContent).toContain(ui.countries.byCode.get(code)!.name);
+    expect(ui.state().index).toBe(i); // Server has not answered yet.
+    expect(ui.$(".shell-results")).toBeNull();
+    release(); await vi.waitFor(() => expect(ui.state().index).toBe(i + 1));
+    if (mode === "spot-country" && i === 0) await vi.waitFor(() => expect(ui.$(".anonymous-map-highlight")).not.toBeNull());
+    ui.advance();
+  }
+  await ui.posted();
+});
+
+it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall", "name-all", "spot-country"] as const)("gives immediate typed-answer feedback in %s before a slow server response", async (mode) => {
+  const ui = await setup(mode, ["CA", "ZA"]);
+  const release = ui.holdMoves();
+  ui.advance(60_000);
+  const answer = ui.answer().answer!;
+  const input = ui.$<HTMLInputElement>("#guess-input");
+  input.value = answer; input.dispatchEvent(new Event("input"));
+  expect(input.value).toBe("");
+  expect(ui.$(".feedback").textContent).toContain(mode === "capital-recall" ? answer : privateChallenge(ui.service.ranked, ui.state()).country!.name);
+  expect(ui.state().startedAt).toBeNull();
+  expect(ui.$(".shell-results")).toBeNull();
+  release(); await vi.waitFor(() => expect(ui.state().index).toBe(1));
+  expect(ui.state().startedAt).toBe(160_000);
+});
+
+it("does not lose rapid Name All answers while earlier moves await verification", async () => {
+  const ui = await setup("name-all", ["CA", "ZA"]);
+  const release = ui.holdMoves();
+  for (const name of ["Canada", "South Africa"]) {
+    const input = ui.$<HTMLInputElement>("#guess-input"); input.value = name; input.dispatchEvent(new Event("input"));
+    expect(input.value).toBe("");
+  }
+  expect(ui.$(".country-guess-score").textContent).toContain("2");
+  expect(ui.state().index).toBe(0);
+  expect(ui.$(".shell-results")).toBeNull();
+  ui.advance(10_000); release();
+  await vi.waitFor(() => expect(ui.state().status).toBe("complete"));
+  expect(ui.state().found).toEqual(expect.arrayContaining(["CA", "ZA"]));
+});
+
+it("accepts a Street View country-code shortcut and shows correct feedback before verification returns", async () => {
+  const ui = await setup("streetview-country", true);
+  await vi.waitFor(() => expect(ui.$<HTMLInputElement>("#streetview-guess-input").disabled).toBe(false));
+  const code = ui.answer().answer!;
+  const release = ui.holdMoves();
+  const input = ui.$<HTMLInputElement>("#streetview-guess-input");
+  input.value = code.split("").join("-");
+  ui.$<HTMLFormElement>(".streetview-guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+  expect(input.value).toBe("");
+  expect(ui.$(".feedback").textContent).toContain(`Correct — ${ui.countries.byCode.get(code)!.name}`);
+  expect(ui.$(".streetview-points").textContent).toBe("3");
+  expect(ui.state().index).toBe(0);
+  expect(ui.$(".shell-results")).toBeNull();
+  release(); await vi.waitFor(() => expect(ui.state().index).toBe(1));
+});
+
+it.each(["flags", "name-all", "spot-country", "streetview-country"] as const)("rolls back immediate %s feedback when verification fails, without posting", async (mode) => {
+  const ui = await setup(mode, mode === "streetview-country");
+  const input = ui.$<HTMLInputElement>(mode === "streetview-country" ? "#streetview-guess-input" : "#guess-input");
+  await vi.waitFor(() => expect(input.disabled).toBe(false));
+  const country = mode === "streetview-country" ? ui.countries.byCode.get(ui.answer().answer!)! : privateChallenge(ui.service.ranked, ui.state()).country!;
+  ui.fetcher.mockImplementationOnce(async () => new Response(JSON.stringify({ error: "Verification failed for testing" }), { status: 400 }));
+  input.value = country.name;
+  ui.$<HTMLFormElement>(mode === "streetview-country" ? ".streetview-guess-form" : ".guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+  expect(input.value).toBe("");
+  await vi.waitFor(() => expect(ui.$(".feedback").textContent).toContain("Verification failed for testing"));
+  expect(ui.state().index).toBe(0);
+  expect(ui.$(".shell-results")).toBeNull();
+  expect(ui.fetcher.mock.calls.some(([path]) => path === "/api/leaderboard")).toBe(false);
+  if (mode === "streetview-country") expect(ui.$(".streetview-points").textContent).toBe("0");
+  // The same answer must work after rollback, rather than being treated as already found.
+  input.value = country.name;
+  ui.$<HTMLFormElement>(mode === "streetview-country" ? ".streetview-guess-form" : ".guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+  await vi.waitFor(() => expect(ui.state().index).toBe(1));
 });
