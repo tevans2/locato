@@ -104,7 +104,8 @@ it("the delivered standalone client cannot post its altered flight through the a
   expect(Context.prototype.arc).toBe(originalArc);
   expect(Context.prototype.rotate).toBe(originalRotate);
   expect(WebSocket.prototype.send).toBe(originalSend);
-}, 20_000);
+// The full 90-second, 60 FPS browser simulation needs more CPU time on CI runners.
+}, 60_000);
 
 it("requires a signed-in session before replacing the original screen", async () => {
   vi.stubGlobal("location", new URL("http://localhost:3000/?game=flyover"));

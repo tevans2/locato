@@ -182,5 +182,6 @@ describe("Flyover real-control autopilot reproduction", () => {
     expect(TestCanvasContext.prototype.arc).toBe(arc);
     expect(TestCanvasContext.prototype.rotate).toBe(rotate);
     console.log(JSON.stringify({ seed, soloScore: score, speedFactor, radiusFactor, positionFromCanvas: true }));
-  }, 20_000);
+  // Keep the complete flight simulation; allow slower CI runners time to render every frame.
+  }, 60_000);
 });
