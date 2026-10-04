@@ -107,8 +107,12 @@ export function createMixedThemeDailyChallenge(index: CountryIndex, date: string
   return buildThemedDailyChallenge(index, date, false);
 }
 
-function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean): DailyChallenge {
-  const seed = `daily:${date}`;
+/** Server callers supply a private seed; the public date must not reveal the ranked queue. */
+export function createServerDailyChallenge(index: CountryIndex, date: string, seed: string): DailyChallenge {
+  return buildThemedDailyChallenge(index, date, true, seed);
+}
+
+function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`): DailyChallenge {
   const theme = dailyThemeForDate(date);
   const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"];
   const tiers: readonly FameTier[] = [1, 1, 2, 2, 1, 3, 2, 3];

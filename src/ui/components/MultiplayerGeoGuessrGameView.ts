@@ -7,6 +7,7 @@ import { createGeoGuessMap } from "./GeoGuessMap";
 const PLAYER_COLORS = ["#38bdf8", "#fb923c", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#60a5fa", "#f87171"];
 
 interface StreetViewPrompt {
+  readonly asset?: string;
   readonly lat: number;
   readonly lng: number;
   readonly heading: number;
@@ -51,6 +52,7 @@ function googleMapsEmbedApiKey(): string {
 function parsePrompt(value: string): StreetViewPrompt | null {
   try {
     const parsed = JSON.parse(value) as Partial<StreetViewPrompt>;
+    if (typeof parsed.asset === "string" && /^\/api\/game-assets\/[a-f0-9]{48}$/.test(parsed.asset)) return parsed as StreetViewPrompt;
     if (![parsed.lat, parsed.lng, parsed.heading, parsed.pitch, parsed.fov].every((item) => typeof item === "number" && Number.isFinite(item))) return null;
     return parsed as StreetViewPrompt;
   } catch {
@@ -92,6 +94,16 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
     className: "geoguessr-streetview-frame",
     attrs: { title: "Multiplayer mystery Street View", loading: "eager", referrerpolicy: "no-referrer-when-downgrade", allowfullscreen: "true" },
   });
+  const streetImage = el("img", { className: "geoguessr-streetview-frame", attrs: { alt: "Multiplayer mystery Street View" } }) as HTMLImageElement;
+  let asset = "";
+  let turn = 0;
+  const look = el("div", { className: "verified-frame-buttons", attrs: { style: "position:absolute;bottom:1rem;left:1rem;z-index:3" } });
+  for (const [text, delta] of [["Look left", 270], ["Look right", 90]] as const) {
+    const control = el("button", { className: "shell-btn shell-btn-quiet", text, attrs: { type: "button" } });
+    control.addEventListener("click", () => { turn = (turn + delta) % 360; streetImage.src = `${asset}?turn=${turn}`; }, { signal: options.signal });
+    look.append(control);
+  }
+  streetImage.hidden = true; look.hidden = true;
   const missingKey = el("div", { className: "streetview-missing-key geoguessr-missing-key", children: [el("strong", { text: "Google Maps Embed API key missing" }), el("p", { text: "Set VITE_GOOGLE_MAPS_EMBED_API_KEY to play this room." })] });
   const statusText = el("span", { className: "geoguessr-mp-status", text: "Waiting for the round..." });
   const pinStatus = el("span", { className: "geoguessr-pin-status", text: "Place a pin on the map" });
@@ -128,7 +140,7 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
   const element = el("div", {
     className: "multiplayer-geoguessr-layout",
     children: [
-      el("div", { className: "geoguessr-stage multiplayer-geoguessr-stage", children: [streetViewFrame, missingKey, timerBar, statusText, scoreboard, mapPanel] }),
+      el("div", { className: "geoguessr-stage multiplayer-geoguessr-stage", children: [streetViewFrame, streetImage, look, missingKey, timerBar, statusText, scoreboard, mapPanel] }),
     ],
   });
 
@@ -214,7 +226,12 @@ export function createMultiplayerGeoGuessrGameView(options: MultiplayerGeoGuessr
         mapPanel.classList.remove("is-result");
         map.reset();
         const prompt = visibleRound?.prompt.kind === "geoguessr-streetview" ? parsePrompt(visibleRound.prompt.value) : null;
-        if (apiKey && prompt) {
+        streetImage.hidden = true; look.hidden = true;
+        if (prompt?.asset) {
+          asset = prompt.asset; turn = 0;
+          streetViewFrame.hidden = true; missingKey.hidden = true;
+          streetImage.hidden = false; look.hidden = false; streetImage.src = asset;
+        } else if (apiKey && prompt) {
           streetViewFrame.hidden = false;
           missingKey.hidden = true;
           streetViewFrame.src = streetViewUrl(apiKey, prompt);

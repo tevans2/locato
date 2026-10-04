@@ -94,7 +94,7 @@ function intParam(url: URL, name: string): number | undefined {
 const log = logEvent;
 
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
+  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 }
 
 function redirect(location: string): Response {
@@ -210,6 +210,10 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
 export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, adminToken: string | null = null, social: SocialBridge = NOOP_SOCIAL, admin: AdminRouteContext | null = null): Promise<Response | null> {
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const origin = request.headers.get("origin");
+    if (request.headers.get("sec-fetch-site") === "cross-site" || (origin && ![url.origin, new URL(baseUrl).origin].includes(origin))) return json({ error: "Forbidden origin." }, 403);
+  }
   const { pathname } = url;
   const { method } = request;
 
@@ -268,6 +272,7 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!body) return json({ error: "Invalid request body." }, 400);
     const result = parseGameResult(body);
     if (!result) return json({ error: "Invalid game result." }, 400);
+    if (result.mode === "multiplayer") return json({ error: "Multiplayer results are recorded by the server." }, 400);
     log("info", "game.recorded", { ip: ip(request), userId: user.id, mode: result.mode, correct: result.correctAnswers });
     return json({ stats: service.recordGame(user.id, result) });
   }
@@ -299,9 +304,8 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const result = parseDailyResult(body);
-    if (!result) return json({ error: "Invalid daily challenge result." }, 400);
-    const saved = service.saveDailyResult(user.id, result);
+    const saved = service.submitVerifiedDaily(user.id, body.runId);
+    if ("error" in saved) return json({ error: saved.error }, 400);
     log("info", "daily.recorded", { ip: ip(request), userId: user.id, date: saved.date, score: saved.score });
     return json({ result: saved });
   }
@@ -339,6 +343,23 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const result = service.startRun(user.id, body, runMeta(request));
     if ("error" in result) return json({ error: result.error }, 400);
     return json(result);
+  }
+
+  if ((pathname === "/api/ranked/start" || pathname === "/api/ranked/action") && method === "POST") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    const body = await readLimitedJsonBody(request, 4096);
+    if (body === "too-large") return json({ error: "Move is too large." }, 413);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = pathname.endsWith("/start") ? await service.startRankedGame(user.id, body) : await service.ranked.action(user.id, body);
+    return json(result, "error" in result ? 400 : 200);
+  }
+  const rankedAsset = pathname.match(/^\/api\/ranked\/([a-f0-9]{48})\/asset\/([a-f0-9]{48})$/);
+  if (rankedAsset && method === "GET") {
+    const user = service.authenticate(readSessionToken(request));
+    if (!user) return json({ error: "Not authenticated." }, 401);
+    try { return await service.ranked.asset(user.id, rankedAsset[1]!, rankedAsset[2]!, url); }
+    catch { return json({ error: "Game artwork unavailable." }, 503); }
   }
 
   if (pathname === "/api/runs/finish" && method === "POST") {

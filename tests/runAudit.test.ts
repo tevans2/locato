@@ -170,7 +170,7 @@ async function setup(enforceRunAudit = false) {
 }
 
 describe("run audit on the server", () => {
-  it("times a run from its ticket and posts an honest one", async () => {
+  it("records legacy timelines but does not treat them as verified play", async () => {
     const { service, store, clock, userId } = await setup(true);
     const started = service.startRun(userId, { gameMode: "name-all", timed: true });
     if ("error" in started) throw new Error(started.error);
@@ -178,19 +178,19 @@ describe("run audit on the server", () => {
     const timeMs = timeline.entries.at(-1)![1];
     clock.value += timeMs + 300;
     const result = service.submitLeaderboardAttempt(userId, { gameMode: "name-all", variant: "", timeMs, runId: started.runId, timeline });
-    expect("error" in result).toBe(false);
-    expect(result.audit).toMatchObject({ verdict: "ok", refused: false });
+    expect("error" in result).toBe(true);
+    expect(result.audit).toMatchObject({ verdict: "ok", refused: true });
     expect(store.findRun(started.runId)).toMatchObject({ posted: true, verdict: "ok", claimedMs: timeMs, countries: 196 });
-    expect(service.getUserLeaderboardRank(userId, "name-all", "")).toMatchObject({ timeMs });
+    expect(service.getUserLeaderboardRank(userId, "name-all", "")).toBeNull();
   });
 
-  it("observing: a console post still lands, but is recorded and flagged", async () => {
+  it("a console post is refused even when optional telemetry enforcement is off", async () => {
     const { service, store, userId } = await setup(false);
     const result = service.submitLeaderboardAttempt(userId, { gameMode: "name-all", variant: "", timeMs: 61_234 });
-    expect("error" in result).toBe(false);
+    expect("error" in result).toBe(true);
     expect(result.audit?.verdict).toBe("reject");
     const [run] = store.listUserRuns(userId, 5);
-    expect(run).toMatchObject({ posted: true, refused: false, verdict: "reject" });
+    expect(run).toMatchObject({ posted: true, refused: true, verdict: "reject" });
   });
 
   it("enforcing: refuses it, keeps it in the trail, and leaves the board alone", async () => {
@@ -211,7 +211,7 @@ describe("run audit on the server", () => {
     const timeMs = timeline.entries.at(-1)![1];
     clock.value += timeMs;
     expect(service.submitLeaderboardAttempt(other.user.id, { gameMode: "name-all", variant: "", timeMs, runId: started.runId, timeline }).audit?.flags.map((f) => f.code)).toContain("no-ticket");
-    expect("error" in service.submitLeaderboardAttempt(userId, { gameMode: "name-all", variant: "", timeMs, runId: started.runId, timeline })).toBe(false);
+    expect("error" in service.submitLeaderboardAttempt(userId, { gameMode: "name-all", variant: "", timeMs, runId: started.runId, timeline })).toBe(true);
     expect(service.submitLeaderboardAttempt(userId, { gameMode: "name-all", variant: "", timeMs, runId: started.runId, timeline }).audit?.flags.map((f) => f.code)).toContain("no-ticket");
   });
 
@@ -229,10 +229,10 @@ describe("run audit on the server", () => {
     expect(service.finishRun(userId, { runId: first.runId, outcome: "complete", timeline: honestTimeline() })).toEqual({ error: "This run has already ended." });
   });
 
-  it("leaves other boards alone", async () => {
+  it("requires verified play for other boards too", async () => {
     const { service, store, userId } = await setup(true);
     const result = service.submitLeaderboardAttempt(userId, { gameMode: "flags", variant: "", timeMs: 61_234 });
-    expect("error" in result).toBe(false);
+    expect("error" in result).toBe(true);
     expect(store.listUserRuns(userId, 5)).toEqual([]);
     expect("error" in service.startRun(userId, { gameMode: "flags", timed: true })).toBe(true);
   });
@@ -250,7 +250,7 @@ describe("run audit on the server", () => {
     expect(await finished!.json()).toEqual({ ok: true });
     const posted = await call("/api/leaderboard", { gameMode: "name-all", variant: "", timeMs: 61_234 });
     const body = (await posted!.json()) as Record<string, unknown>;
-    expect(body.accepted).toBe(true);
+    expect(posted!.status).toBe(400);
     expect(body).not.toHaveProperty("audit");
     const tooBig = await call("/api/runs/finish", { runId: started.runId, timeline: { entries: "x".repeat(40_000) } });
     expect(tooBig!.status).toBe(413);

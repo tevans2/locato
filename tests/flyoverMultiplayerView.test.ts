@@ -25,6 +25,7 @@ const player = (id: string, name: string, extra: Partial<PublicPlayerState> = {}
 function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), player("rival", "Rival")]) {
   let time = 100_000;
   let frames: (() => void)[] = [];
+  const onInput = vi.fn();
   const onPosition = vi.fn();
   const onReach = vi.fn();
   const onSkip = vi.fn();
@@ -34,6 +35,7 @@ function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), play
     signal: controller.signal,
     worldCountryFeatures: features,
     onPosition,
+    onInput,
     onReach,
     onSkip,
     now: () => time,
@@ -70,7 +72,7 @@ function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), play
     for (const callback of run) callback();
   };
   const fly = (seconds: number) => { for (let t = 0; t < seconds * 1000; t += 50) frame(50); };
-  return { view, room, $, frame, fly, onPosition, onReach, onSkip };
+  return { view, room, $, frame, fly, onInput, onPosition, onReach, onSkip };
 }
 
 describe("Flyover race view", () => {
@@ -86,18 +88,15 @@ describe("Flyover race view", () => {
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
   });
 
-  it("claims a reach straight away and moves on, then rolls back if the server says no", () => {
+  it("waits for server touches before moving on or awarding score", () => {
     const ui = setup();
-    ui.fly(3.1);
-    ui.fly(2.5);
-    expect(ui.onReach).toHaveBeenCalledTimes(1);
-    expect(ui.onReach.mock.calls[0]![0]).toBe(0);
-    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
-    expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("1");
-
-    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 0, score: 0, event: "sync" });
+    ui.fly(5.6);
+    expect(ui.onReach).not.toHaveBeenCalled();
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
     expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("0");
+    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 1, event: "reached", target: "CC" });
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
+    expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("1");
   });
 
   it("updates rivals' scores live and ranks the standings", () => {
@@ -112,6 +111,8 @@ describe("Flyover race view", () => {
     ui.fly(3.1);
     ui.$<HTMLButtonElement>(".flyover-skip")!.click();
     expect(ui.onSkip).toHaveBeenCalledWith(0);
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
+    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 0, event: "skipped", target: "CC" });
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
     expect(ui.$(".flyover-skip")?.textContent).toContain("5s hold");
   });
@@ -119,15 +120,16 @@ describe("Flyover race view", () => {
   it("reports the plane about five times a second, and draws rivals without counting yourself", () => {
     const ui = setup();
     ui.fly(3.1);
-    ui.onPosition.mockClear();
+    ui.onInput.mockClear();
     ui.fly(1);
-    expect(ui.onPosition.mock.calls.length).toBeGreaterThanOrEqual(4);
-    expect(ui.onPosition.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(ui.onInput.mock.calls.length).toBeGreaterThanOrEqual(4);
+    expect(ui.onInput.mock.calls.length).toBeLessThanOrEqual(6);
     expect(() => ui.view.setPlanes([{ playerId: "rival", x: 400, y: 200, heading: 0 }, { playerId: "me", x: 1, y: 1, heading: 0 }])).not.toThrow();
   });
 
   it("rejoining mid-flight resumes from the server's place on the route", () => {
     const ui = setup([player("me", "Me", { score: 1, routeIndex: 1 }), player("rival", "Rival")]);
+    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 1, event: "sync", target: "CC" });
     ui.fly(3.1);
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
     expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("1");
@@ -153,7 +155,8 @@ describe("Flyover race view", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     flying.fly(2.5);
     window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
-    expect(flying.onReach).toHaveBeenCalledTimes(1);
+    expect(flying.onInput.mock.calls.some(([input]) => input.turn === 1)).toBe(false);
+    expect(ui.onInput.mock.calls.some(([input]) => input.turn === 1)).toBe(true);
   });
 
   it("lets go of the lobby's focused button at take-off, so Space boosts instead of pressing it", () => {

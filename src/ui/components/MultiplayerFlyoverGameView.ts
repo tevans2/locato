@@ -1,4 +1,4 @@
-import { FLYOVER_SKIP_HOLD_SECONDS, buildFlyoverCountries, type FlyoverCountry, type PlaneState } from "../../core/flyover";
+import { FLYOVER_SKIP_HOLD_SECONDS, buildFlyoverCountries, type FlyoverCountry, type PlaneState, type PlaneInput } from "../../core/flyover";
 import type { WorldCountryFeature } from "../../core/map";
 import type { FlyoverFlightPrompt, FlyoverPlanePosition, PlayerId, PublicRoomState, PublicRoundState, ServerMessage } from "../../core/multiplayer";
 import { el } from "../dom/createElement";
@@ -30,6 +30,7 @@ export interface MultiplayerFlyoverGameViewOptions {
   readonly onPosition: (plane: PlaneState) => void;
   readonly onReach: (index: number, plane: PlaneState) => void;
   readonly onSkip: (index: number) => void;
+  readonly onInput?: (input: PlaneInput) => void;
   /** Epoch milliseconds, the server's clock (defaults to Date.now). */
   readonly now?: () => number;
   readonly requestFrame?: (callback: () => void) => number;
@@ -47,6 +48,7 @@ export interface MultiplayerFlyoverGameView {
 interface ActiveFlight {
   readonly key: string;
   readonly route: readonly FlyoverCountry[];
+  targetCode: string | null;
   readonly start: PlaneState;
   readonly takeoffAt: number;
   readonly endsAt: number;
@@ -57,8 +59,9 @@ export function parseFlyoverPrompt(value: string): FlyoverFlightPrompt | null {
     const parsed = JSON.parse(value) as Partial<FlyoverFlightPrompt>;
     const start = parsed.start;
     if (!start || ![start.x, start.y, start.heading].every((item) => typeof item === "number" && Number.isFinite(item))) return null;
-    if (!Array.isArray(parsed.route) || !parsed.route.every((code) => typeof code === "string")) return null;
-    return { start, route: parsed.route };
+    if (parsed.target !== undefined && parsed.target !== null && typeof parsed.target !== "string") return null;
+    if (parsed.target === undefined && (!Array.isArray(parsed.route) || !parsed.route.every((code) => typeof code === "string"))) return null;
+    return { start, ...(parsed.target !== undefined ? { target: parsed.target } : {}), ...(parsed.route ? { route: parsed.route } : {}) };
   } catch {
     return null;
   }
@@ -130,17 +133,18 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
       requestFrame,
       cancelFrame,
       signal,
-      onReach: reach,
+      onReach: () => {},
+      authoritative: true,
       onSkip: skip,
       onTimeUp: () => {
         engine?.land();
         engine?.setTarget(null, "Landing…");
       },
-      onMove: (plane) => {
+      onInput: (input) => {
         const clockNow = now();
         if (clockNow - lastPositionAt < POSITION_INTERVAL_MS) return;
         lastPositionAt = clockNow;
-        options.onPosition(plane);
+        options.onInput?.(input);
       },
     });
     element.append(engine.element);
@@ -153,36 +157,22 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
   }
 
   function aimAtCurrent(): void {
-    engine?.setTarget(targetAt(routeIndex), "Route complete!");
-  }
-
-  function reach(country: FlyoverCountry): void {
-    if (!engine || !flight) return;
-    const index = routeIndex;
-    routeIndex += 1;
-    score += 1;
-    reachedPositions.add(index);
-    if (localPlayerId) scores.set(localPlayerId, score);
-    engine.markVisited(country.code);
-    engine.showToast(`+1 ${country.name}`);
-    options.onReach(index, engine.plane());
-    aimAtCurrent();
-    renderStandings();
+    engine?.setTarget(flight?.targetCode ? byCode.get(flight.targetCode) ?? null : null, "Route complete!");
   }
 
   function skip(): void {
     const target = engine?.target();
     if (!engine || !flight || !target) return;
     options.onSkip(routeIndex);
-    routeIndex += 1;
-    engine.holdUntil(now() + FLYOVER_SKIP_HOLD_SECONDS * 1000);
-    engine.showToast(`Skipped ${target.name} · holding ${FLYOVER_SKIP_HOLD_SECONDS}s`);
-    aimAtCurrent();
   }
 
   function applyProgress(message: FlyoverProgressMessage): void {
     scores.set(message.playerId, message.score);
-    if (message.playerId === localPlayerId && message.event === "sync" && flight && engine) {
+    if (message.playerId === localPlayerId && flight && engine) {
+      if (message.score > score && engine.target()) {
+        engine.markVisited(engine.target()!.code);
+        engine.showToast(`+1 ${engine.target()!.name}`);
+      }
       // The server turned a claim down: go back to where it says this plane is.
       for (const position of [...reachedPositions]) {
         if (position < message.index) continue;
@@ -193,9 +183,12 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
       const changed = routeIndex !== message.index;
       routeIndex = message.index;
       score = message.score;
+      if (message.target !== undefined) flight.targetCode = message.target;
+      else flight.targetCode = targetAt(routeIndex)?.code ?? null;
+      if (message.event === "skipped") engine.holdUntil(now() + FLYOVER_SKIP_HOLD_SECONDS * 1000);
+      aimAtCurrent();
       if (changed) {
-        engine.showToast("That one didn't count");
-        aimAtCurrent();
+        if (message.event === "sync") engine.showToast("Flight synced");
       }
     }
     renderStandings();
@@ -204,6 +197,8 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
   function setPlanes(planes: readonly FlyoverPlanePosition[]): void {
     if (!engine || !room) return;
     const order = room.players.map((player) => player.id);
+    const own = planes.find((plane) => plane.playerId === localPlayerId);
+    if (own) engine.setPlane(own);
     engine.setGhosts(planes
       .filter((plane) => plane.playerId !== localPlayerId)
       .map((plane) => ({
@@ -271,8 +266,8 @@ export function createMultiplayerFlyoverGameView(options: MultiplayerFlyoverGame
 
   function startFlight(round: PublicRoundState, prompt: FlyoverFlightPrompt, key: string): void {
     const view = ensureEngine();
-    const route = prompt.route.map((code) => byCode.get(code)).filter((country): country is FlyoverCountry => country !== undefined);
-    flight = { key, route, start: prompt.start, takeoffAt: round.startedAt, endsAt: round.endsAt ?? round.startedAt };
+    const route = (prompt.route ?? []).map((code) => byCode.get(code)).filter((country): country is FlyoverCountry => country !== undefined);
+    flight = { key, route, targetCode: prompt.target ?? route[0]?.code ?? null, start: prompt.start, takeoffAt: round.startedAt, endsAt: round.endsAt ?? round.startedAt };
     const own = room?.players.find((player) => player.id === localPlayerId);
     // Rejoining mid-flight picks up where the server has this plane on the route.
     routeIndex = own?.routeIndex ?? 0;

@@ -9,6 +9,7 @@ import {
   wrappedDeltaX,
   type FlyoverCountry,
   type PlaneState,
+  type PlaneInput,
 } from "../../core/flyover";
 import { MAP_VIEWBOX_HEIGHT, MAP_VIEWBOX_WIDTH } from "../../core/map";
 import { el } from "../dom/createElement";
@@ -66,11 +67,15 @@ export interface FlyoverFlightOptions {
   readonly onTimeUp: () => void;
   /** Every frame in flight, after the plane moves. */
   readonly onMove?: (plane: PlaneState) => void;
+  readonly onInput?: (input: PlaneInput) => void;
+  /** Ranked flights count touches on the server. Local motion is a visual prediction only. */
+  readonly authoritative?: boolean;
 }
 
 export interface FlyoverFlight {
   readonly element: HTMLElement;
   readonly plane: () => PlaneState;
+  readonly setPlane: (plane: PlaneState) => void;
   readonly target: () => FlyoverCountry | null;
   readonly isFlying: () => boolean;
   /** Start flying (or keep flying) until `endsAt` on the `now()` clock. */
@@ -523,13 +528,15 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     const dt = Math.min(0.05, Math.max(0, (clockNow - lastFrameAt) / 1000));
     lastFrameAt = clockNow;
     if (flying) {
-      plane = stepPlane(plane, currentInput(), dt);
+      const input = currentInput();
+      options.onInput?.(input);
+      plane = stepPlane(plane, input, dt);
       trail.push({ x: plane.x, y: plane.y });
       if (trail.length > TRAIL_LENGTH) trail = trail.slice(-TRAIL_LENGTH);
       moveGhosts(clockNow, dt);
       options.onMove?.(plane);
       const reached = target;
-      if (flying && reached && clockNow >= holdEndsAt && planeTouchesCountry(reached, plane.x, plane.y)) {
+      if (!options.authoritative && flying && reached && clockNow >= holdEndsAt && planeTouchesCountry(reached, plane.x, plane.y)) {
         target = null;
         flashUntil = clockNow + 600;
         options.onReach(reached, (clockNow - targetSince) / 1000);
@@ -693,6 +700,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   return {
     element: stage,
     plane: () => plane,
+    setPlane: (next) => { plane = next; },
     target: () => target,
     isFlying: () => flying,
     fly,

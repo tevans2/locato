@@ -11,7 +11,7 @@ import type { WorldCountryFeature } from "../../core/map";
 import type { Screen } from "../../app/router";
 import type { AuthControls } from "../components/AuthPanel";
 import { getPlayerEmoji } from "../../core/auth/avatars";
-import { fetchFriends, inviteFriendToGame, recordGame, type FriendInfo } from "../../core/auth";
+import { fetchFriends, inviteFriendToGame, fetchFullStats, type FriendInfo } from "../../core/auth";
 import { el } from "../dom/createElement";
 import { MULTIPLAYER_SESSION_KEY, readPlayerName, writePlayerName } from "../../core/multiplayer/localPlayer";
 import { confirmDialog } from "../shell/confirmDialog";
@@ -701,6 +701,7 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
     signal: controller.signal,
     worldCountryFeatures: options.worldCountryFeatures,
     onPosition: (plane) => transport?.send({ type: "FLYOVER_POSITION", x: plane.x, y: plane.y, heading: plane.heading }),
+    onInput: (input) => transport?.send({ type: "FLYOVER_INPUT", turn: input.turn, towards: input.towards ?? null, boost: input.boost === true }),
     onReach: (index, plane) => transport?.send({ type: "FLYOVER_REACHED", index, x: plane.x, y: plane.y, clientSentAt: Date.now() }),
     onSkip: (index) => transport?.send({ type: "FLYOVER_SKIP", index }),
   });
@@ -1014,23 +1015,8 @@ export function createMultiplayerLobbyScreen(options: MultiplayerLobbyScreenOpti
         finalResults = message.results;
         feedback = "Game complete.";
         playVictory();
-        // Record this player's stats to their account if they're signed in.
-        // The server has already validated the results; we just forward our own row.
-        const myResult = message.results.find((result) => result.playerId === localPlayerId);
-        if (myResult) {
-          void recordGame({
-            mode: "multiplayer",
-            categoryIds: room?.categoryIds ?? [],
-            correctAnswers: myResult.correctAnswers,
-            wrongAnswers: myResult.wrongAnswers,
-            score: myResult.score,
-            bestStreak: 0,
-            rank: myResult.rank,
-            totalPlayers: message.results.length,
-          }).then((stats) => {
-            if (stats) options.authControls?.refreshStats(stats);
-          });
-        }
+        // Account records are written from server standings, never uploaded from this page.
+        void fetchFullStats().then((stats) => { if (stats) options.authControls?.refreshStats(stats); });
         break;
       }
       case "PLAYER_JOINED":

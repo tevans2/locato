@@ -4,6 +4,9 @@ import { createSeededRandom, shuffle } from "../../src/core/game";
 import { buildPromptSlots, getCategory, resolveCategoryIds, type PromptSlot } from "../../src/core/categories";
 import { filterProfanity } from "../../src/core/multiplayer/profanity";
 import type { FinalResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomState, PublicRoundState, RoomCode, RoundResult, ServerMessage } from "../../src/core/multiplayer";
+import { issueGameAsset, revokeGameAsset } from "../ranked/GameAssets";
+import { FlagReveal, countryOutline } from "../ranked/assets";
+import { matchesCountryName } from "../../src/core/categories/matching";
 
 export const DEFAULT_MAX_PLAYERS_PER_ROOM = 8;
 export const DEFAULT_MULTIPLAYER_ROUND_LIMIT = 10;
@@ -54,12 +57,13 @@ function toPublicPlayer(player: PrivatePlayerState): PublicPlayerState {
   return { ...player };
 }
 
-function toPublicRound(round: PrivateRoundState | null, index: CountryIndex): PublicRoundState | null {
+function toPublicRound(round: PrivateRoundState | null, index: CountryIndex, artwork?: string | null): PublicRoundState | null {
   if (!round) return null;
   const country = index.byId[round.countryId];
   const category = getCategory(round.categoryId);
   if (!country || !category) return null;
-  return { roundNumber: round.roundNumber, prompt: category.prompt(country), startedAt: round.startedAt, endsAt: round.endsAt };
+  const prompt = category.prompt(country);
+  return { roundNumber: round.roundNumber, prompt: artwork ? { ...prompt, value: artwork } : prompt, startedAt: round.startedAt, endsAt: round.endsAt };
 }
 
 function createPlayer(id: PlayerId, name: string): PrivatePlayerState {
@@ -83,6 +87,8 @@ export class Room {
   private players = new Map<PlayerId, PrivatePlayerState>();
   private remainingSlots: PromptSlot[];
   private currentRound: PrivateRoundState | null = null;
+  private artwork: string | null = null;
+  private flagReveals = new Map<PlayerId, { reveal: FlagReveal; url: string; revision: number }>();
   private roundAnswers = new Map<PlayerId, RoundResult>();
   private skipVotes = new Set<PlayerId>();
   private completedRounds = 0;
@@ -119,7 +125,7 @@ export class Room {
   }
 
   get publicRound(): PublicRoundState | null {
-    return toPublicRound(this.currentRound, this.promptCountryIndex);
+    return toPublicRound(this.currentRound, this.promptCountryIndex, this.artwork);
   }
 
   get state(): RoomStatus {
@@ -278,6 +284,7 @@ export class Room {
   submitAnswer(playerId: PlayerId, answer: string, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round is accepting answers.");
+    if (now < this.currentRound.startedAt || (this.currentRound.endsAt !== null && now >= this.currentRound.endsAt)) return fail("round-not-open", "This round has ended.");
     const player = this.players.get(playerId);
     if (!player || !player.connected) return fail("not-in-room", "Player is not connected to this room.");
 
@@ -292,7 +299,22 @@ export class Room {
       // Rejection is private to the guesser: broadcasting it would flash "Not quite" on every
       // screen. No state other than this player's private streak/wrong tally changes, so there
       // is nothing to broadcast either.
-      return ok([], [{ type: "ANSWER_REJECTED", reason: "Not quite. Try again before the round ends." }]);
+      const reply: ServerMessage[] = [{ type: "ANSWER_REJECTED", reason: "Not quite. Try again before the round ends." }];
+      if (category.id === "flag-colors") {
+        const guess = this.promptCountryIndex.countries.find((c) => matchesCountryName(c, answer, false, true));
+        if (guess) {
+          let entry = this.flagReveals.get(playerId);
+          if (!entry) {
+            const reveal = new FlagReveal(country.flagSrc);
+            entry = { reveal, url: issueGameAsset({ reveal }), revision: 0 };
+            this.flagReveals.set(playerId, entry);
+          }
+          entry.reveal.guess(guess.flagSrc);
+          entry.revision += 1;
+          reply.push({ type: "ROUND_STARTED", round: { ...this.publicRound!, prompt: { kind: "flag-colors", value: `${entry.url}?v=${entry.revision}` } } });
+        }
+      }
+      return ok([], reply);
     }
 
     const points = this.calculatePoints(player, now);
@@ -389,6 +411,12 @@ export class Room {
       startedAt: now,
       endsAt: this.roundDurationMs > 0 ? now + this.roundDurationMs : null,
     };
+    this.clearArtwork();
+    const country = this.promptCountryIndex.byId[slot.countryId]!;
+    const prompt = getCategory(slot.categoryId)!.prompt(country);
+    if (prompt.kind === "map-highlight") this.artwork = JSON.stringify({ paths: countryOutline(country.code) });
+    else if (prompt.kind === "image") this.artwork = issueGameAsset({ path: prompt.value });
+    else if (prompt.kind === "flag-colors") this.artwork = issueGameAsset({ reveal: new FlagReveal(country.flagSrc) });
     return this.publicRound;
   }
 
@@ -420,6 +448,7 @@ export class Room {
   // round state is still intact, then arms the result-display deadline the RoomManager uses
   // to schedule the next round.
   private closeRound(now: number): readonly ServerMessage[] {
+    this.clearArtwork();
     const reveal = this.roundEndedMessage();
     this.status = "round-result";
     this.completedRounds += 1;
@@ -442,11 +471,19 @@ export class Room {
   }
 
   private completeGame(now: number): RoomResult {
+    this.clearArtwork();
     this.touch(now);
     this.status = "complete";
     this.currentRound = null;
     this.resultStartedAt = null;
     this.resultEndsAt = null;
     return ok([{ type: "GAME_COMPLETED", results: this.finalResults() }, this.snapshotMessage()]);
+  }
+
+  private clearArtwork(): void {
+    if (this.artwork) revokeGameAsset(this.artwork);
+    this.artwork = null;
+    for (const entry of this.flagReveals.values()) revokeGameAsset(entry.url);
+    this.flagReveals.clear();
   }
 }
