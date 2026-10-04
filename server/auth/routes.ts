@@ -10,6 +10,7 @@ import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 import { parseDailyRoundResults, scoreDailyRound } from "../../src/core/dailyChallenge";
 import { isAvatarEmoji } from "../../src/core/auth/avatars";
+import { clientIp } from "../clientIp";
 
 const MAX_STAT_VALUE = 1_000_000;
 const DAILY_COUNTRY_COUNT = 10;
@@ -20,7 +21,7 @@ function publicRef(user: AuthUser) {
 }
 
 function ip(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  return clientIp(request);
 }
 
 // A run's timeline is one short entry per country found: a few KB for Name all countries.
@@ -171,6 +172,23 @@ function parseDailyResult(body: Record<string, unknown>): DailyChallengeResult |
   };
 }
 
+export const IP_BANNED_MESSAGE = "Access from your network has been blocked.";
+
+/**
+ * A 403 for a banned address on the parts of the site that act for a player: sign-in, sign-up,
+ * the API and multiplayer sockets. Pages stay up, and /api/admin/* is left to the admin check.
+ */
+export function ipBanResponse(request: Request, url: URL, service: AuthService): Response | null {
+  const { pathname } = url;
+  const guarded = pathname.startsWith("/auth/") || (pathname.startsWith("/api/") && !pathname.startsWith("/api/admin/")) || pathname === "/ws" || pathname === "/social";
+  if (!guarded) return null;
+  const callerIp = ip(request);
+  const ban = service.ipBan(callerIp);
+  if (!ban) return null;
+  log("warn", "ip_ban.blocked", { ip: callerIp, path: pathname });
+  return pathname.startsWith("/auth/") && request.method === "GET" ? redirect("/?error=banned") : json({ error: IP_BANNED_MESSAGE }, 403);
+}
+
 // Returns a Response for any /auth/* or /api/* route it owns, or null so the caller falls
 // through to static file serving. Cookies are HttpOnly so the session token is never exposed to JS.
 export async function handleAuthRequest(request: Request, url: URL, service: AuthService, cookieOptions: CookieOptions, baseUrl: string, social: SocialBridge = NOOP_SOCIAL, admin: AdminRouteContext | null = null): Promise<Response | null> {
@@ -178,6 +196,8 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     const origin = request.headers.get("origin");
     if (request.headers.get("sec-fetch-site") === "cross-site" || (origin && ![url.origin, new URL(baseUrl).origin].includes(origin))) return json({ error: "Forbidden origin." }, 403);
   }
+  const blocked = ipBanResponse(request, url, service);
+  if (blocked) return blocked;
   const { pathname } = url;
   const { method } = request;
 
@@ -522,6 +542,10 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     try {
       const profile = await exchangeOAuthCode("github", code, baseUrl);
       const authUser = service.upsertOAuthUser("github", profile.id, profile);
+      if (service.isBanned(authUser.id)) {
+        log("warn", "oauth.banned", { ip: ip(request), provider: "github", userId: authUser.id });
+        return redirect("/?error=banned");
+      }
       const session = service.createSessionFor(authUser.id);
       log("info", "oauth.ok", { ip: ip(request), provider: "github", userId: authUser.id, email: authUser.email });
       return new Response(null, { status: 302, headers: { Location: "/", "set-cookie": serializeSessionCookie(session.id, service.sessionMaxAgeSeconds, cookieOptions) } });
@@ -549,6 +573,10 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     try {
       const profile = await exchangeOAuthCode("google", code, baseUrl);
       const authUser = service.upsertOAuthUser("google", profile.id, profile);
+      if (service.isBanned(authUser.id)) {
+        log("warn", "oauth.banned", { ip: ip(request), provider: "google", userId: authUser.id });
+        return redirect("/?error=banned");
+      }
       const session = service.createSessionFor(authUser.id);
       log("info", "oauth.ok", { ip: ip(request), provider: "google", userId: authUser.id, email: authUser.email });
       return new Response(null, { status: 302, headers: { Location: "/", "set-cookie": serializeSessionCookie(session.id, service.sessionMaxAgeSeconds, cookieOptions) } });
