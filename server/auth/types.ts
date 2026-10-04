@@ -217,7 +217,12 @@ export interface AdminUserSummary {
   readonly dailies: number;
   // Latest game, daily, or login; null when the account has never been used since signup.
   readonly lastActiveAt: number | null;
+  readonly admin: AdminAccess;
 }
+
+// Why an account can use the admin console: listed in ADMIN_EMAILS ("config", can't be revoked
+// from the console) or granted by another admin ("granted"). null = not an admin.
+export type AdminAccess = "config" | "granted" | null;
 
 // Session tokens are credentials, so admin views only ever see their timestamps.
 export interface AdminSessionInfo {
@@ -401,6 +406,9 @@ export interface UserStore {
   getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement;
   // Admin account controls.
   listUsers(query: AdminUserListQuery): AdminUserList;
+  /** The admin flag granted from the console (ADMIN_EMAILS is applied on top, in AdminService). */
+  isAdmin(userId: string): boolean;
+  setAdmin(userId: string, admin: boolean): void;
   deleteUser(id: string): boolean;
   deleteUserSessions(userId: string): number;
   updateDisplayName(userId: string, displayName: string): void;

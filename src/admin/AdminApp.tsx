@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Gauge, KeyRound, LayoutDashboard, ListTree, LogOut, Moon, Radio, ShieldCheck, Sun, Users } from "lucide-react";
-import { checkToken, createClient, loadToken, saveToken } from "./api";
+import { Activity, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, Users } from "lucide-react";
+import { checkSession, createClient, signIn, signOut as endSession, type AdminSessionState } from "./api";
 import { ConfirmDialog, Toasts, type ConfirmRequest, type Toast } from "./ui";
 import { OverviewView } from "./views/Overview";
 import { UsersView, type ActionHelpers } from "./views/Users";
@@ -46,18 +46,38 @@ function useRoute(): [Route, (view: ViewId, param?: string | null) => void] {
   return [route, navigate];
 }
 
-function SignIn({ onSignedIn, notice }: { onSignedIn: (token: string) => void; notice: string | null }) {
-  const [token, setToken] = useState("");
+function SignIn({ state, notice, onSignedIn, onSignOut }: { state: AdminSessionState | null; notice: string | null; onSignedIn: () => void; onSignOut: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(notice);
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    if (!token.trim()) return;
+    if (!email.trim() || !password) return;
     setBusy(true);
-    const result = await checkToken(token.trim());
+    setError(null);
+    const result = await signIn(email.trim(), password);
     setBusy(false);
-    if (result.ok) onSignedIn(token.trim());
+    if (result.ok) onSignedIn();
     else setError(result.error);
+  }
+
+  if (state === null) {
+    return <main className="adm-signin"><div className="adm-signin-card"><p className="adm-muted">Checking your session…</p></div></main>;
+  }
+
+  if (state.kind === "not-admin") {
+    return (
+      <main className="adm-signin">
+        <div className="adm-signin-card">
+          <div className="adm-brand"><span>locato</span><i>.</i> <em>admin</em></div>
+          <h1>No admin access</h1>
+          <p className="adm-muted">You're signed in, but this account isn't an admin. Ask an admin to grant access from Users, or sign in with another account.</p>
+          {error && <p className="adm-signin-error" role="alert">{error}</p>}
+          <button type="button" className="adm-btn is-primary is-block" onClick={onSignOut}>Sign out</button>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -65,23 +85,28 @@ function SignIn({ onSignedIn, notice }: { onSignedIn: (token: string) => void; n
       <form className="adm-signin-card" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <div className="adm-brand"><span>locato</span><i>.</i> <em>admin</em></div>
         <h1>Sign in to the console</h1>
-        <p className="adm-muted">Use the server's <code>ADMIN_TOKEN</code>. It's kept only for this browser tab.</p>
+        <p className="adm-muted">Use your Locato account. It needs admin access.</p>
         <label className="adm-field">
-          <span>Admin token</span>
+          <span>Email</span>
           <div className="adm-input-icon">
-            <KeyRound size={15} aria-hidden />
-            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoFocus autoComplete="current-password" spellCheck={false} />
+            <Mail size={15} aria-hidden />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete="username" spellCheck={false} />
           </div>
         </label>
-        {error && <p className="adm-signin-error" role="alert">{error}</p>}
-        <button type="submit" className="adm-btn is-primary is-block" disabled={busy || !token.trim()}>{busy ? "Checking…" : "Sign in"}</button>
+        <label className="adm-field">
+          <span>Password</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+        </label>
+        {(error ?? (state.kind === "error" ? state.error : null)) && <p className="adm-signin-error" role="alert">{error ?? (state.kind === "error" ? state.error : null)}</p>}
+        <button type="submit" className="adm-btn is-primary is-block" disabled={busy || !email.trim() || !password}>{busy ? "Signing in…" : "Sign in"}</button>
+        <p className="adm-muted">Use GitHub or Google? <a href="/">Sign in on Locato</a>, then come back to <code>/admin</code>.</p>
       </form>
     </main>
   );
 }
 
 export function AdminApp() {
-  const [token, setToken] = useState<string | null>(() => loadToken());
+  const [session, setSession] = useState<AdminSessionState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [route, navigate] = useRoute();
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
@@ -89,13 +114,22 @@ export function AdminApp() {
   const [theme, setThemeState] = useState(currentTheme());
   const toastId = useRef(0);
 
-  const signOut = useCallback((message: string | null = null) => {
-    saveToken(null);
-    setToken(null);
-    setNotice(message);
+  const refreshSession = useCallback(() => {
+    void checkSession().then(setSession);
+  }, []);
+  useEffect(refreshSession, [refreshSession]);
+
+  const signOut = useCallback(async () => {
+    await endSession();
+    setNotice(null);
+    setSession({ kind: "signed-out" });
   }, []);
 
-  const client = useMemo(() => (token ? createClient(token, () => signOut("Your admin token was rejected — it may have been rotated. Sign in again.")) : null), [token, signOut]);
+  const signedInAs = session?.kind === "admin" ? session.user : null;
+  const client = useMemo(() => (signedInAs ? createClient((status) => {
+    setNotice(status === 401 ? "Your session ended. Sign in again." : null);
+    setSession({ kind: status === 401 ? "signed-out" : "not-admin" });
+  }) : null), [signedInAs?.id]);
 
   const helpers: ActionHelpers = useMemo(() => ({
     confirm: setConfirmRequest,
@@ -108,8 +142,8 @@ export function AdminApp() {
 
   const openUser = useCallback((id: string) => navigate("users", id), [navigate]);
 
-  if (!client) {
-    return <SignIn notice={notice} onSignedIn={(next) => { saveToken(next); setNotice(null); setToken(next); }} />;
+  if (!client || !signedInAs) {
+    return <SignIn state={session} notice={notice} onSignedIn={() => { setNotice(null); refreshSession(); }} onSignOut={() => void signOut()} />;
   }
 
   const active = NAV.find((item) => item.id === route.view) ?? NAV[0]!;
@@ -133,7 +167,7 @@ export function AdminApp() {
             {theme === "dark" ? <Sun size={17} aria-hidden /> : <Moon size={17} aria-hidden />} <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
           </button>
           <a className="adm-nav-link" href="/" target="_blank" rel="noreferrer"><Activity size={17} aria-hidden /> <span>Open Locato</span></a>
-          <button type="button" className="adm-nav-link" onClick={() => signOut()}><LogOut size={17} aria-hidden /> <span>Sign out</span></button>
+          <button type="button" className="adm-nav-link" onClick={() => void signOut()} title={signedInAs.email}><LogOut size={17} aria-hidden /> <span>Sign out {signedInAs.displayName}</span></button>
         </div>
       </aside>
 
@@ -143,7 +177,7 @@ export function AdminApp() {
           <p>{active.description}</p>
         </header>
         {route.view === "overview" && <OverviewView client={client} onOpenUser={openUser} />}
-        {route.view === "users" && <UsersView client={client} selectedId={route.param} onSelect={(id) => navigate("users", id)} helpers={helpers} />}
+        {route.view === "users" && <UsersView client={client} currentAdminId={signedInAs.id} selectedId={route.param} onSelect={(id) => navigate("users", id)} helpers={helpers} />}
         {route.view === "moderation" && <ModerationView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "live" && <LiveView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "events" && <EventsView client={client} onOpenUser={openUser} />}

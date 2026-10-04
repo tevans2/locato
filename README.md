@@ -83,7 +83,7 @@ All configuration is via environment variables (none required for basic local pl
 | `NODE_ENV` | — | `production` marks session cookies `Secure`. |
 | `BASE_URL` | `http://localhost:$PORT` | Public origin; used to build OAuth callback URLs. |
 | `ALLOWED_ORIGINS` | _(same origin)_ | Comma-separated origin allowlist for the WebSocket upgrade. |
-| `ADMIN_TOKEN` | _(unset → admin API disabled)_ | Credential for `/api/admin/*` (`Authorization: Bearer` or `x-admin-token`). |
+| `ADMIN_EMAILS` | _(none)_ | Comma-separated emails of accounts that are always admins. Other admins are granted from the console. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | Enables GitHub OAuth. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Enables Google OAuth. |
 | `MAX_PLAYERS_PER_ROOM` | `8` | Multiplayer room cap. |
@@ -134,9 +134,9 @@ JSON over HTTP; session is an `HttpOnly` cookie set on register/login.
 
 ### Admin console
 
-Gated by `ADMIN_TOKEN` (`Authorization: Bearer <token>` or `x-admin-token: <token>`). While the variable is unset the entire surface is hidden: `/admin` and `/api/admin/*` fall through to `404`. With it set, missing/wrong credentials get `403`, and an IP that gets it wrong 10 times in 15 minutes is locked out with `429`. Password hashes and session tokens are never returned, and admin responses are `Cache-Control: no-store`.
+Admins sign in with their normal Locato account; the console uses the same session cookie as the game. `/api/admin/*` answers `401` without a session and `403` for an account without admin access (logged as `admin.unauthorized`). An account is an admin when its email is in `ADMIN_EMAILS` (how the first admin gets in; can't be revoked from the console) or when another admin granted it from **Users → a player → Make admin** (stored as `users.is_admin`). Admins can't remove their own access. Every admin action in the event log carries `adminId`/`adminName`. Password hashes and session tokens are never returned, and admin responses are `Cache-Control: no-store`.
 
-**Panel:** open `/admin` and sign in with the token (kept in `sessionStorage` for that tab only). Sections: Overview (30-day activity, deltas, top players, modes), Users (search, full dossier, rename, clear avatar, reset stats, sign out everywhere, delete), Leaderboards (daily results and best times with too-fast/backdated flags, remove entries), Live (open rooms, close a room, who's online), Event log, and System. In dev, run `npm run serve` with `ADMIN_TOKEN` set plus `npm run dev`, then open `/admin.html` on the Vite port.
+**Panel:** open `/admin` and sign in with your email and password. Accounts that use GitHub or Google sign in on Locato first, then open `/admin`. Sections: Overview (30-day activity, deltas, top players, modes), Users (search, full dossier, rename, clear avatar, reset stats, sign out everywhere, delete), Leaderboards (daily results and best times with too-fast/backdated flags, remove entries), Live (open rooms, close a room, who's online), Event log, and System. In dev, run `npm run serve` with `ADMIN_EMAILS=<your email>` plus `npm run dev`, then open `/admin.html` on the Vite port.
 
 **Event log:** every structured server log line (`logEvent` in `server/admin/events.ts`) is also written to the `admin_events` table and pruned after `ADMIN_EVENT_RETENTION_DAYS` (default 90), so history survives Fly's short stdout retention. It only records signed-in activity and server events; guest play isn't tracked.
 

@@ -116,8 +116,8 @@ const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs
 });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
-// Out-of-band admin credential. When unset, the /api/admin surface is disabled entirely.
-const adminToken = process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.length > 0 ? process.env.ADMIN_TOKEN : null;
+// Accounts that are always admins, comma-separated. Further admins are granted from the console.
+const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map((email) => email.trim()).filter(Boolean);
 // Presence + friend/invite push hub, backed by the persistent /social socket.
 const socialHub = new SocialHub((userId) => authService.friendIds(userId));
 const streetViewPool = new StreetViewLocationPool({
@@ -134,7 +134,7 @@ streetViewPool.warm();
 setEventSink((event) => userStore.recordEvent(event));
 const EVENT_RETENTION_DAYS = readIntegerEnv("ADMIN_EVENT_RETENTION_DAYS", 90);
 const serverStartedAt = Date.now();
-const adminService = new AdminService(userStore, { rooms: roomManager, presence: socialHub });
+const adminService = new AdminService(userStore, { rooms: roomManager, presence: socialHub, adminEmails });
 
 function fileSize(path: string): number {
   try {
@@ -177,11 +177,10 @@ setInterval(() => {
   userStore.pruneEvents(Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }, 60 * 60 * 1000).unref?.();
 
-// The admin console page. Like the API, it only exists when ADMIN_TOKEN is configured; the page
-// itself holds no data and signs in with the token against /api/admin/*.
+// The admin console page. It holds no data: /api/admin/* only answers an admin account's session.
 function serveAdminPage(): Response {
   const path = safeStaticPath("/admin.html");
-  if (!adminToken || !path) return new Response("Not found", { status: 404 });
+  if (!path) return new Response("Not found", { status: 404 });
   return new Response(Bun.file(path), {
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -265,7 +264,7 @@ const server = Bun.serve<WebSocketData>({
       return json(await streetViewPool.stats());
     }
 
-    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, adminToken, socialHub, { service: adminService, system: systemSnapshot });
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot });
     if (authResponse) return authResponse;
 
     return serveStatic(url.pathname);

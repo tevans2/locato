@@ -10,7 +10,8 @@ import { MAX_ACADEMY_CARDS, MAX_ACADEMY_PAYLOAD_BYTES, MAX_CLOCK_SKEW_MS, valida
 import type { PasswordHasher, UserStore } from "../server/auth/types";
 import type { AcademyProgress, CardProgress } from "../src/core/academy/types";
 
-const ADMIN = "secret-admin-token";
+// Session token of an ADMIN_EMAILS account, for the admin routes.
+const ADMIN = "admin-session-token";
 const NOW = Date.UTC(2026, 8, 25, 12, 0, 0);
 const DAY = 86_400_000;
 const COOKIE_OPTS = { secure: false };
@@ -25,10 +26,12 @@ function createHarness() {
   const clock = { value: NOW };
   const store: UserStore = createMemoryUserStore();
   const service = new AuthService(store, fakeHasher, { sessionTtlMs: 60 * 60 * 1000, clock: () => clock.value });
-  const admin = new AdminService(store, { clock: () => clock.value });
+  const admin = new AdminService(store, { clock: () => clock.value, adminEmails: ["root@locato.test"] });
+  store.createUser({ id: "admin-root", email: "root@locato.test", displayName: "root", passwordHash: null, avatarUrl: null, createdAt: NOW });
+  store.createSession({ id: ADMIN, userId: "admin-root", expiresAt: NOW + DAY, createdAt: NOW });
   setEventSink((event) => store.recordEvent(event));
   const route = (request: Request) =>
-    handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, ADMIN, undefined, { service: admin, system: () => ({ uptimeSeconds: 1 }) });
+    handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, undefined, { service: admin, system: () => ({ uptimeSeconds: 1 }) });
   return { clock, store, service, admin, route };
 }
 
@@ -141,7 +144,7 @@ describe("academy admin + deletion", () => {
     await put(h, { progress: progress({ cards: { "FR:flag": card({ box: 5 }), "DE:map": card({ box: 2 }), "JP:map": card({ box: 0, lastSeenAt: 0, dueAt: 0 }) } }) }, token);
     expect(h.admin.getUserDetail(id)!.academy).toEqual({ cardsSeen: 2, cardsMastered: 1, activeDays: 1, placementCompletedAt: null, updatedAt: NOW - DAY });
 
-    const reset = await h.route(new Request(`http://localhost/api/admin/users/${id}/stats`, { method: "DELETE", headers: { authorization: `Bearer ${ADMIN}` } }));
+    const reset = await h.route(new Request(`http://localhost/api/admin/users/${id}/stats`, { method: "DELETE", headers: { cookie: `${SESSION_COOKIE_NAME}=${ADMIN}` } }));
     expect(reset!.status).toBe(200);
     expect(h.store.getAcademyProgress(id)).not.toBeNull();
   });

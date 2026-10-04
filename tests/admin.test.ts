@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AuthService } from "../server/auth/AuthService";
 import { createMemoryUserStore } from "../server/auth/memoryStore";
-import { handleAuthRequest, resetAdminLockouts } from "../server/auth/routes";
+import { handleAuthRequest } from "../server/auth/routes";
 import { parseCookieHeader, SESSION_COOKIE_NAME } from "../server/auth/cookies";
 import { AdminService, type AdminRoomsBridge } from "../server/admin/AdminService";
 import { setEventSink } from "../server/admin/events";
@@ -10,7 +10,10 @@ import { indexCountries, type RawCountry } from "../src/core/countries";
 import type { DailyChallengeResult, PasswordHasher, UserStore } from "../server/auth/types";
 import type { ServerMessage } from "../src/core/multiplayer";
 
-const ADMIN = "secret-admin-token";
+// The console's own admin: an ADMIN_EMAILS account, signed in with this session token.
+const ADMIN = "admin-session-token";
+const ADMIN_EMAIL = "root@locato.test";
+const ADMIN_ID = "admin-root";
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 8, 25, 12, 0, 0);
 const COOKIE_OPTS = { secure: false };
@@ -26,7 +29,7 @@ interface Harness {
   readonly service: AuthService;
   readonly admin: AdminService;
   readonly clock: { value: number };
-  route(request: Request, adminToken?: string | null): Promise<Response | null>;
+  route(request: Request): Promise<Response | null>;
 }
 
 function createHarness(options: { rooms?: AdminRoomsBridge; online?: string[] } = {}): Harness {
@@ -37,15 +40,18 @@ function createHarness(options: { rooms?: AdminRoomsBridge; online?: string[] } 
     clock: () => clock.value,
     ...(options.rooms ? { rooms: options.rooms } : {}),
     presence: { onlineUserIds: () => options.online ?? [] },
+    adminEmails: [ADMIN_EMAIL],
   });
+  store.createUser({ id: ADMIN_ID, email: ADMIN_EMAIL, displayName: "root", passwordHash: null, avatarUrl: null, createdAt: NOW - 365 * DAY });
+  store.createSession({ id: ADMIN, userId: ADMIN_ID, expiresAt: NOW + 30 * DAY, createdAt: NOW - 365 * DAY }); // outside the activity windows
   setEventSink((event) => store.recordEvent(event));
   return {
     store,
     service,
     admin,
     clock,
-    route: (request, adminToken = ADMIN) =>
-      handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, adminToken, undefined, { service: admin, system: () => ({ uptimeSeconds: 42 }) }),
+    route: (request) =>
+      handleAuthRequest(request, new URL(request.url), service, COOKIE_OPTS, BASE_URL, undefined, { service: admin, system: () => ({ uptimeSeconds: 42 }) }),
   };
 }
 
@@ -57,7 +63,7 @@ function jsonRequest(path: string, method: string, body?: unknown, token?: strin
 }
 
 function adminRequest(path: string, method = "GET", body?: unknown, token = ADMIN, ip = "10.0.0.1"): Request {
-  const headers: Record<string, string> = { authorization: `Bearer ${token}`, "x-forwarded-for": ip };
+  const headers: Record<string, string> = { cookie: `${SESSION_COOKIE_NAME}=${token}`, "x-forwarded-for": ip };
   if (body !== undefined) headers["content-type"] = "application/json";
   return new Request(`http://localhost${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 }
@@ -88,34 +94,70 @@ async function body(response: Response | null): Promise<any> {
   return response!.json();
 }
 
-beforeEach(() => resetAdminLockouts());
 afterEach(() => setEventSink(null));
 
 describe("admin gate", () => {
-  it("is hidden when no admin token is configured", async () => {
+  it("asks for a sign-in when there's no session", async () => {
     const h = createHarness();
-    expect(await h.route(jsonRequest("/api/admin/users", "GET"), null)).toBeNull();
+    const response = await h.route(jsonRequest("/api/admin/users", "GET"));
+    expect(response?.status).toBe(401);
   });
 
-  it("rejects missing or wrong credentials and records the attempt", async () => {
+  it("turns away a signed-in player without admin access and records the attempt", async () => {
     const h = createHarness();
-    expect((await h.route(jsonRequest("/api/admin/users", "GET")))?.status).toBe(403);
-    expect((await h.route(adminRequest("/api/admin/users", "GET", undefined, "wrong")))?.status).toBe(403);
-    expect(h.store.listEvents({ level: "warn", action: "admin.unauthorized", ip: null, userId: null, before: null, limit: 10 })).toHaveLength(2);
+    const player = await seedUser(h, "player@b.com");
+    expect((await h.route(adminRequest("/api/admin/users", "GET", undefined, player.token)))?.status).toBe(403);
+    expect(h.store.listEvents({ level: "warn", action: "admin.unauthorized", ip: null, userId: player.id, before: null, limit: 10 })).toHaveLength(1);
   });
 
-  it("locks an IP out after repeated wrong tokens, even if it then guesses right", async () => {
+  it("lets an ADMIN_EMAILS account in and says who it is", async () => {
     const h = createHarness();
-    for (let i = 0; i < 10; i += 1) await h.route(adminRequest("/api/admin/session", "GET", undefined, "wrong", "6.6.6.6"));
-    expect((await h.route(adminRequest("/api/admin/session", "GET", undefined, ADMIN, "6.6.6.6")))?.status).toBe(429);
-    // Other callers are unaffected.
-    expect((await h.route(adminRequest("/api/admin/session", "GET", undefined, ADMIN, "7.7.7.7")))?.status).toBe(200);
+    const session = await body(await h.route(adminRequest("/api/admin/session")));
+    expect(session).toEqual({ user: { id: ADMIN_ID, email: ADMIN_EMAIL, displayName: "root", avatarEmoji: null }, access: "config" });
   });
 
   it("marks admin responses as uncacheable", async () => {
     const h = createHarness();
     const response = await h.route(adminRequest("/api/admin/session"));
     expect(response?.headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+describe("admin access", () => {
+  it("grants and revokes admin access, and records which admin did it", async () => {
+    const h = createHarness();
+    const mod = await seedUser(h, "mod@b.com");
+    expect((await h.route(adminRequest("/api/admin/session", "GET", undefined, mod.token)))?.status).toBe(403);
+
+    expect(await body(await h.route(adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: true })))).toEqual({ admin: "granted" });
+    expect((await body(await h.route(adminRequest("/api/admin/session", "GET", undefined, mod.token)))).access).toBe("granted");
+    const listed = await body(await h.route(adminRequest("/api/admin/users?q=mod")));
+    expect(listed.users[0].admin).toBe("granted");
+    expect((await body(await h.route(adminRequest(`/api/admin/users/${mod.id}`)))).user.admin).toBe("granted");
+    const [grant] = h.store.listEvents({ level: null, action: "admin.user.grant_admin", ip: null, userId: null, before: null, limit: 10 });
+    expect(grant?.details).toMatchObject({ adminId: ADMIN_ID, targetUserId: mod.id });
+
+    expect(await body(await h.route(adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: false })))).toEqual({ admin: null });
+    expect((await h.route(adminRequest("/api/admin/session", "GET", undefined, mod.token)))?.status).toBe(403);
+  });
+
+  it("won't let an admin remove their own access, or revoke an ADMIN_EMAILS account", async () => {
+    const h = createHarness();
+    const mod = await seedUser(h, "mod@b.com");
+    await h.route(adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: true }));
+    expect((await h.route(adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: false }, mod.token)))?.status).toBe(409);
+    expect((await h.route(adminRequest(`/api/admin/users/${ADMIN_ID}/admin`, "PUT", { admin: false }, mod.token)))?.status).toBe(409);
+    expect((await h.route(adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: "yes" })))?.status).toBe(400);
+    expect((await h.route(adminRequest("/api/admin/users/nobody/admin", "PUT", { admin: true })))?.status).toBe(404);
+  });
+
+  it("refuses a grant posted from another site", async () => {
+    const h = createHarness();
+    const mod = await seedUser(h, "mod@b.com");
+    const request = adminRequest(`/api/admin/users/${mod.id}/admin`, "PUT", { admin: true });
+    request.headers.set("origin", "https://evil.example");
+    expect((await h.route(request))?.status).toBe(403);
+    expect(h.store.isAdmin(mod.id)).toBe(false);
   });
 });
 
@@ -128,7 +170,7 @@ describe("admin users", () => {
     h.store.saveDailyResult(alice.id, daily("2026-09-25"));
 
     const all = await body(await h.route(adminRequest("/api/admin/users")));
-    expect(all.total).toBe(2);
+    expect(all.total).toBe(3); // the two players plus the harness's admin
     const row = all.users.find((u: { email: string }) => u.email === "alice@b.com");
     expect(row).not.toHaveProperty("passwordHash");
     expect(row).toMatchObject({ hasPassword: true, providers: [], games: 1, dailies: 1 });
@@ -304,7 +346,7 @@ describe("admin overview", () => {
     h.store.saveDailyResult(old.id, daily("2026-09-25", { completedAt: NOW - 1000 }));
 
     const overview = await body(await h.route(adminRequest("/api/admin/overview")));
-    expect(overview.totals).toMatchObject({ users: 2, games: 2, dailies: 1 });
+    expect(overview.totals).toMatchObject({ users: 3, games: 2, dailies: 1 }); // users includes the admin
     expect(overview.live.onlineUsers).toBe(1);
     expect(overview.windows.month).toMatchObject({ signups: 1, games: 2, dailies: 1, activeUsers: 2 });
     expect(overview.windows.previousMonth.signups).toBe(1);
