@@ -89,7 +89,7 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .atlas-reset { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--brand); cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
 .atlas-reset:hover:not(:disabled) { border-color: var(--brand); background: var(--accent-soft); }
 .atlas-reset:disabled { cursor: default; opacity: .45; }
-.atlas-globe-stage { position: relative; width: 100%; aspect-ratio: 1.08; margin-top: -10px; isolation: isolate; }
+.atlas-globe-stage { position: relative; width: min(100%, 430px); aspect-ratio: 1.08; margin: -10px auto 0; isolation: isolate; }
 .atlas-globe-host { position: absolute; inset: 0; }
 .atlas-globe-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; }
 .atlas-globe-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -6px; border-radius: 50%; }
