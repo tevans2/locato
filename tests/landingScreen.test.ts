@@ -72,15 +72,16 @@ describe("Landing globe and game launcher", () => {
     expect(globeMock.destroy).toHaveBeenCalledOnce();
   });
 
-  it("keeps the globe mounted when the selected game changes and launches the new mode", async () => {
+  it("opens games directly from the original tiles without adding a launch button", async () => {
     const { navigation } = await mount();
     await click('[data-testid="picker-mode-capitals"]');
-    expect(document.querySelector('[data-testid="button-play-selected"]')?.textContent).toContain("Play Capitals");
-    await click('[data-testid="button-play-selected"]');
+    expect(document.querySelector('[data-testid="button-play-selected"]')).toBeNull();
     expect(navigation.openGame).toHaveBeenCalledWith("capitals", "practice");
     expect(globeMock.create).toHaveBeenCalledOnce();
     await click('.mode-picker-tabs button:nth-child(2)');
-    expect(document.querySelector('[data-testid="button-play-selected"]')?.textContent).toContain("Play Name all countries");
+    expect(navigation.openGame).toHaveBeenCalledTimes(1);
+    await click('[data-testid="picker-mode-name-all"]');
+    expect(navigation.openGame).toHaveBeenLastCalledWith("name-all", "practice");
   });
 
   it("leaves games and country exploration usable when the globe fails, and permits retry", async () => {
@@ -90,7 +91,7 @@ describe("Landing globe and game launcher", () => {
     const picker = document.querySelector<HTMLSelectElement>('#atlas-country-picker')!;
     await act(async () => { picker.value = "JP"; picker.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(navigation.openCountry).toHaveBeenCalledWith("JP");
-    await click('[data-testid="button-play-selected"]');
+    await click('[data-testid="picker-mode-flags"]');
     expect(navigation.openGame).toHaveBeenCalledWith("flags", "practice");
     await click('.atlas-interaction-hint button');
     expect(globeMock.create).toHaveBeenCalledOnce();

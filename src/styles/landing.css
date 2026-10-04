@@ -41,9 +41,9 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .mode-picker-option[aria-pressed="true"] > svg { color: var(--brand); }
 .mode-picker-indicator { display: grid; flex: 0 0 17px; place-items: center; width: 17px; height: 17px; margin-left: auto; border: 1px solid var(--border-strong); border-radius: 50%; }
 [aria-pressed="true"] > .mode-picker-indicator { border-color: var(--brand); color: var(--on-brand); background: var(--brand); }
-.mode-picker-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--border); }
-.mode-picker-actions .mode-picker-resume { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .73rem; font-weight: 600; cursor: pointer; }
-.mode-picker-actions .mode-picker-resume:hover { color: var(--brand); }
+.mode-picker-shortcuts { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 18px; padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--border); }
+.mode-picker-shortcuts button { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .73rem; font-weight: 600; cursor: pointer; }
+.mode-picker-shortcuts button:hover { color: var(--brand); }
 @media(max-width: 1000px) {
   .landing-hero.game-picker { gap: 32px; }
   .mode-picker-heading { align-items: flex-start; }
@@ -59,9 +59,8 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
   .mode-picker-tabs button { min-height: 38px; padding-bottom: 10px; font-size: .75rem; }
   .mode-picker-options { grid-auto-rows: 48px; min-height: 160px; gap: 8px; }
   .mode-picker-option { font-size: .73rem; padding-inline: 12px; }
-  .mode-picker-actions { margin-top: 15px; padding-top: 12px; }
-  .mode-picker-actions .mode-picker-resume { font-size: .67rem; }
-  .mode-picker-play { min-height: 50px; padding: 12px 18px; font-size: .78rem; }
+  .mode-picker-shortcuts { margin-top: 15px; padding-top: 9px; }
+  .mode-picker-shortcuts button { font-size: .67rem; }
 }
 @media(max-width: 360px) {
   .landing-hero.game-picker { gap: 18px; padding-top: 22px; }
@@ -76,19 +75,12 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .mode-picker-sub { margin: 6px 0 0; color: var(--muted); font-size: .86rem; font-weight: 600; }
 .mode-picker-option-label { min-width: 0; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
 .mode-picker-saved { color: var(--brand); font-size: .64rem; font-weight: 750; font-variant-numeric: tabular-nums; }
-.mode-picker-resume > svg:first-child { color: var(--brand); }
-.mode-picker-play > span { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
-.mode-picker-play small { font-size: .74rem; font-weight: 650; opacity: .78; font-variant-numeric: tabular-nums; }
+.mode-picker-shortcuts button > svg:first-child { color: var(--brand); }
 
 /* The globe rests on the page itself, rather than inside a preview card. */
-.landing-hero.game-picker { gap: clamp(32px, 4.8vw, 72px); min-height: 0; padding-block: 30px 28px; }
-.game-picker .mode-picker-heading h1 { font-size: clamp(1.75rem, 3.3vw, 3rem); }
-.game-picker .mode-picker-sub { font-size: .96rem; line-height: 1.55; }
-.game-picker .mode-picker-option { font-size: .87rem; }
-.game-picker .mode-picker-tabs button { font-size: .87rem; }
-@media (min-width: 1001px) {
-  .game-picker .mode-picker-heading { margin-bottom: 36px; }
-  .game-picker .mode-picker-options { grid-auto-rows: 70px; min-height: 230px; }
+/* Keep the original menu's vertical centering within its 580px hero, independent of globe height. */
+@media (min-width: 761px) {
+  .mode-picker-menu { display: flex; flex-direction: column; justify-content: center; min-height: calc(580px - 46px - 52px); }
 }
 .mode-atlas-preview { min-width: 0; }
 .landing-atlas { position: relative; }
@@ -117,8 +109,6 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
 .atlas-interaction-hint > svg { flex: none; }
 .atlas-hover-hint::before { content: "·"; margin-inline: 8px; }
 .atlas-interaction-hint > button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; text-decoration: underline; cursor: pointer; }
-.mode-picker-actions .mode-picker-play { display: inline-flex; flex: 0 1 auto; align-items: center; justify-content: center; gap: 22px; min-width: 160px; min-height: 44px; margin-left: auto; padding: 10px 18px; border: 0; border-radius: 6px; background: var(--brand); color: var(--on-brand); font-size: .8rem; font-weight: 700; cursor: pointer; }
-.mode-picker-actions .mode-picker-play:hover { background: var(--brand-hover); }
 .atlas-keyboard-picker { position: absolute; z-index: 4; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .atlas-keyboard-picker:focus-within, .atlas-keyboard-picker.is-visible { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: auto; height: auto; margin: 0 0 14px; padding: 12px; overflow: visible; clip-path: none; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: .7rem; }
 .atlas-keyboard-picker select { min-width: 0; max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); font: inherit; }
@@ -128,16 +118,10 @@ body:has(.landing-screen-shell) .app-shell { width: 100%; padding: 0; display: f
   .atlas-country-card { gap: 8px; padding: 11px; }
 }
 @media (max-width: 760px) {
-  .landing-hero.game-picker { padding-block: 26px 28px; gap: 26px; }
-  .game-picker .mode-picker-heading h1 { font-size: 1.8rem; }
-  .game-picker .mode-picker-sub { font-size: .8rem; }
-  .game-picker .mode-picker-option { font-size: .73rem; }
-  .game-picker .mode-picker-tabs button { font-size: .75rem; }
   .mode-atlas-preview { width: min(100%, 520px); justify-self: center; }
   .landing-atlas-heading > span { font-size: .56rem; }
   .atlas-globe-stage { margin-top: -4px; }
   .atlas-interaction-hint { font-size: .65rem; margin-bottom: 12px; }
-  .mode-picker-actions .mode-picker-play { min-width: 135px; }
 }
 @media (pointer: coarse) {
   .atlas-hover-hint { font-size: 0; }

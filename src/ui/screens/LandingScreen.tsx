@@ -130,7 +130,6 @@ function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOption
   const [group, setGroup] = useState<GameModeGroup>(GAME_MODE_GROUPS[0]!);
   const [mode, setMode] = useState<GameModeCatalogueEntry>(GAME_MODE_GROUPS[0]!.modes[0]!);
   const allModes = GAME_MODE_GROUPS.flatMap((item) => item.modes);
-  const resume = modeResumeProgress(storage, mode.id);
   const latest = latestResume(storage);
   const play = (id: GameModeId) => shell.openGame(id, "practice");
 
@@ -149,16 +148,13 @@ function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOption
         </button>)}
       </div>
       <div className="mode-picker-options" role="group" aria-label={`${group.label} games`}>
-        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} aria-controls="selected-game-action" onClick={() => setMode(item)}>
+        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} onClick={() => { setMode(item); play(item.id); }}>
           <Icon size={19} strokeWidth={1.5} /><span className="mode-picker-option-label">{item.label}{saved ? <small className="mode-picker-saved" aria-label={`, saved run ${saved}`}>{saved}</small> : null}</span><span className="mode-picker-indicator" aria-hidden="true">{mode.id === item.id ? <Check size={12} /> : null}</span>
         </button>; })}
       </div>
-      <div className="mode-picker-actions">
-        {latest ? <button type="button" className="mode-picker-resume" data-testid="button-resume-latest" onClick={() => play(latest.mode)} aria-label={`Resume ${latest.label}`}><RotateCcw size={15} /> Resume {latest.label} <ArrowRight size={15} /></button> : null}
-        <button type="button" id="selected-game-action" className="mode-picker-play" data-testid="button-play-selected" aria-live="polite" onClick={() => play(mode.id)}>
-          <span>{resume ? `Resume ${mode.label}` : `Play ${mode.label}`}{resume ? <small>{resume}</small> : null}</span><ArrowRight size={18} />
-        </button>
-      </div>
+      {latest ? <div className="mode-picker-shortcuts">
+        <button type="button" data-testid="button-resume-latest" onClick={() => play(latest.mode)} aria-label={`Resume ${latest.label}`}><RotateCcw size={15} /> Resume {latest.label} <ArrowRight size={15} /></button>
+      </div> : null}
     </div>
     <section className="mode-atlas-preview" id="mode-preview" aria-label="Explore the world">
       <LandingGlobe countryIndex={countryIndex} onOpenCountry={shell.openCountry} />
