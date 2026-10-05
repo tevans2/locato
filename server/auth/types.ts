@@ -169,6 +169,8 @@ export interface SubmitBestScoreInput {
   readonly variant: string;
   readonly score: number;
   readonly achievedAt: number;
+  /** False for client-reported results, including the restored local Flyover mode. */
+  readonly verified?: boolean;
 }
 
 export interface LeaderboardScoreEntry {

@@ -320,7 +320,7 @@ export class AuthService {
    * Post one attempt to a board: `timeMs` for time boards, `score` for score boards (sending the
    * other one is rejected). Only a personal best replaces the stored entry.
    */
-  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): SubmitBestTimeResult | { error: string } {
+  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown; verified?: boolean }): SubmitBestTimeResult | { error: string } {
     if (!this.allowSubmit(userId)) return { error: "Too many submissions. Try again shortly." };
 
     const board = resolveBoard(input.gameMode, input.variant);
@@ -334,11 +334,11 @@ export class AuthService {
     }
     if (input.timeMs !== undefined) return { error: "This leaderboard ranks scores, not times." };
     if (!isValidLeaderboardScore(gameMode, input.score)) return { error: "Invalid score." };
-    return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock() });
+    return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock(), verified: input.verified !== false });
   }
 
   /**
-   * Only completed server-owned games authorize a ranked write. Browser timelines are
+   * Completed server-owned games authorize ranked writes, except client-reported Flyover. Browser timelines are
    * diagnostic evidence, never authority to post a result, regardless of audit settings.
    */
   submitLeaderboardAttempt(
@@ -350,6 +350,11 @@ export class AuthService {
     if ("error" in board) return board;
     const claimed = board.metric === "time" ? input.timeMs : input.score;
     if (board.metric === "time" ? !isValidLeaderboardTime(claimed) || input.score !== undefined : !isValidLeaderboardScore(board.gameMode, claimed) || input.timeMs !== undefined) return { error: "Invalid ranked result." };
+    // Flyover intentionally uses its original, instant local game again. Authentication,
+    // score bounds and personal-best rules still apply, but this is a client-reported result.
+    if (board.gameMode === "flyover" && input.runId === undefined) {
+      return this.submitBestTime(userId, { gameMode: "flyover", variant: board.variant, score: claimed, verified: false });
+    }
     const verified = this.ranked.consume(userId, input.runId, board.gameMode, board.variant, claimed);
     if (!verified) {
       const audit = isAuditedMode(board.gameMode) ? this.auditFinishedRun(userId, { gameMode: board.gameMode, variant: board.variant, timed: true, outcome: "complete", runId: input.runId, timeline: input.timeline, claimedMs: typeof claimed === "number" ? claimed : null, previousBestMs: null, posted: true }, meta, true) : undefined;

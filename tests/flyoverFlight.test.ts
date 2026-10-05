@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFlyoverFlight } from "../src/ui/components/FlyoverFlight";
-import { FLYOVER_SPEED, buildFlyoverCountries, wrappedDeltaX } from "../src/core/flyover";
+import { FLYOVER_SPEED, FLYOVER_BOOST, buildFlyoverCountries, wrappedDeltaX } from "../src/core/flyover";
 import type { PlaneState } from "../src/core/flyover";
 import type { WorldCountryFeature } from "../src/core/map";
 
@@ -19,7 +19,7 @@ function setup(start: PlaneState = { x: 500, y: 250, heading: 0 }) {
   const onReach = vi.fn();
   const flight = createFlyoverFlight({
     countries, hudRight: document.createElement("div"), overlay: document.createElement("div"),
-    skipLabel: "Skip", flightSeconds: 90, signal: controller.signal, authoritative: true,
+    skipLabel: "Skip", flightSeconds: 90, signal: controller.signal,
     now: () => time + clockOffset, animationNow: () => time,
     requestFrame: (callback) => { frames.push(callback); return frames.length; }, cancelFrame: () => { frames = []; },
     onReach, onSkip() {}, onTimeUp() {},
@@ -37,35 +37,37 @@ function setup(start: PlaneState = { x: 500, y: 250, heading: 0 }) {
   return { flight, frame, onReach, setClockOffset: (offset: number) => { clockOffset = offset; } };
 }
 
-describe("authoritative Flyover presentation", () => {
-  it("keeps moving between delayed snapshots without jumping backwards when they arrive", () => {
-    const ui = setup();
+describe("local Flyover movement", () => {
+  it("moves continuously at the original speed across the wrapping map", () => {
+    const ui = setup({ x: 998, y: 250, heading: 0 });
     let previous = ui.flight.plane();
-    for (let frame = 1; frame <= 120; frame++) {
+    for (let frame = 0; frame < 120; frame++) {
       const shown = ui.frame();
-      expect(wrappedDeltaX(previous.x, shown.x)).toBeGreaterThan(0);
-      expect(wrappedDeltaX(previous.x, shown.x)).toBeLessThan(1);
-      if (frame % 9 === 0) {
-        // A server position 100ms old, delivered every 150ms.
-        ui.flight.setPlane({ x: 500 + FLYOVER_SPEED * (frame / 60 - 0.1), y: 250, heading: 0 }, 100);
-        expect(ui.flight.plane()).toEqual(shown);
-      }
+      expect(wrappedDeltaX(previous.x, shown.x)).toBeCloseTo(FLYOVER_SPEED / 60);
       previous = shown;
     }
-    expect(ui.flight.plane().x).toBeCloseTo(584, 1);
+    expect(ui.flight.plane().x).toBeCloseTo(82);
   });
 
-  it("smoothly corrects a divergent prediction across the wrapping map", () => {
-    const ui = setup({ x: 998, y: 250, heading: Math.PI - 0.02 });
+  it("boosts immediately and returns to normal speed on release", () => {
+    const ui = setup();
     const before = ui.flight.plane();
-    ui.flight.setPlane({ x: 2, y: 250, heading: -Math.PI + 0.02 });
-    expect(ui.flight.plane()).toEqual(before);
-    const after = ui.frame();
-    expect(Math.abs(wrappedDeltaX(before.x, after.x))).toBeLessThan(2);
-    expect(Math.abs(Math.atan2(Math.sin(after.heading - before.heading), Math.cos(after.heading - before.heading)))).toBeLessThan(0.1);
-    for (let i = 0; i < 60; i++) ui.frame();
-    const expectedX = 2 + Math.cos(-Math.PI + 0.02) * FLYOVER_SPEED * (61 / 60);
-    expect(Math.abs(wrappedDeltaX(expectedX, ui.flight.plane().x))).toBeLessThan(0.1);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp" }));
+    const boosted = ui.frame();
+    expect(wrappedDeltaX(before.x, boosted.x)).toBeCloseTo(FLYOVER_SPEED * FLYOVER_BOOST / 60);
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowUp" }));
+    expect(wrappedDeltaX(boosted.x, ui.frame().x)).toBeCloseTo(FLYOVER_SPEED / 60);
+  });
+
+  it("steers towards a held map pointer immediately and stops turning on release", () => {
+    const ui = setup();
+    const canvas = ui.flight.element.querySelector("canvas")!;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 800, 500));
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, clientX: 400, clientY: 450 }));
+    expect(ui.frame().heading).toBeGreaterThan(0);
+    canvas.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
+    const heading = ui.flight.plane().heading;
+    expect(ui.frame().heading).toBeCloseTo(heading);
   });
 
   it("steers on the next animation frame even while waiting for the server", () => {
@@ -77,18 +79,7 @@ describe("authoritative Flyover presentation", () => {
     expect(ui.frame().heading).toBeCloseTo(heading);
   });
 
-  it("does not undo active steering when a reply still has the old heading", () => {
-    const ui = setup();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-    for (let i = 0; i < 12; i++) ui.frame();
-    const before = ui.flight.plane();
-    ui.flight.setPlane({ ...before, heading: 0 });
-    expect(ui.flight.plane()).toEqual(before);
-    expect(ui.frame().heading).toBeGreaterThan(before.heading);
-    window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
-  });
-
-  it("clears a pending correction when restarting the flight", () => {
+  it("resets the flight without retaining old movement", () => {
     const ui = setup();
     ui.flight.setPlane({ x: 700, y: 300, heading: 1 });
     const start = { x: 100, y: 250, heading: 0 };
@@ -115,7 +106,7 @@ describe("authoritative Flyover presentation", () => {
     expect(wrappedDeltaX(after.x, ui.frame().x)).toBeCloseTo(FLYOVER_SPEED / 60);
   });
 
-  it("keeps the current target stable on repeated server updates and animates a real change", () => {
+  it("keeps the current target stable on repeated updates and animates a real change", () => {
     const ui = setup();
     const country = countries[0]!;
     ui.flight.setTarget(country);
@@ -131,12 +122,12 @@ describe("authoritative Flyover presentation", () => {
     expect(card.textContent).toContain("Bravo");
   });
 
-  it("never awards local touches in an authoritative flight", () => {
+  it("awards a local touch on the same frame and clears its target", () => {
     const country = countries[0]!;
     const ui = setup({ x: country.centre[0], y: country.centre[1], heading: 0 });
     ui.flight.setTarget(country);
     ui.frame();
-    expect(ui.onReach).not.toHaveBeenCalled();
-    expect(ui.flight.target()).toBe(country);
+    expect(ui.onReach).toHaveBeenCalledOnce();
+    expect(ui.flight.target()).toBeNull();
   });
 });

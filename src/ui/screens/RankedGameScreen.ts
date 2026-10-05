@@ -41,7 +41,7 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
         getAuthUser: options.getAuthUser, onLeaderboard: () => shell.openLeaderboards(mode, variant) });
     } else if (mode === "flyover") {
       const { createFlyoverScreen } = await import("./FlyoverScreen");
-      screen = createFlyoverScreen({ shell, storage, worldCountryFeatures: world, onHome: shell.goHome, ranked: session });
+      screen = createFlyoverScreen({ shell, storage, worldCountryFeatures: world, onHome: shell.goHome });
     } else if (mode === "map-tap") {
       const { createMapTapScreen } = await import("./MapTapScreen");
       screen = createMapTapScreen({ ...common, run: "timed" }, {

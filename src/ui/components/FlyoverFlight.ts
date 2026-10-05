@@ -1,7 +1,6 @@
 import {
   FLYOVER_HINT_AFTER_SECONDS,
   FLYOVER_SPEED,
-  FLYOVER_TURN_RATE,
   countryUnderPoint,
   headingTowards,
   planeTouchesCountry,
@@ -33,9 +32,6 @@ const MINIMAP_WIDTH = 176;
 const MINIMAP_HEIGHT = 88;
 /** Ghost planes are predicted forward from their last report for at most this long. */
 const GHOST_PREDICT_SECONDS = 0.4;
-/** Ease server corrections over a few frames instead of snapping the camera. */
-const RECONCILE_RATE = 12;
-const MAX_SNAPSHOT_PREDICT_SECONDS = 1;
 const TURN_KEYS_LEFT = new Set(["ArrowLeft", "a", "A"]);
 const TURN_KEYS_RIGHT = new Set(["ArrowRight", "d", "D"]);
 const BOOST_KEYS = new Set(["ArrowUp", "w", "W", "Shift", " "]);
@@ -81,8 +77,7 @@ export interface FlyoverFlightOptions {
 export interface FlyoverFlight {
   readonly element: HTMLElement;
   readonly plane: () => PlaneState;
-  /** Reconcile a server snapshot without jumping the visible plane. Age is estimated transit time. */
-  readonly setPlane: (plane: PlaneState, ageMs?: number, input?: PlaneInput) => void;
+  readonly setPlane: (plane: PlaneState) => void;
   readonly target: () => FlyoverCountry | null;
   readonly isFlying: () => boolean;
   /** Start flying (or keep flying) until `endsAt` on the `now()` clock. */
@@ -184,8 +179,6 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
 
   let flying = false;
   let plane: PlaneState = { x: MAP_VIEWBOX_WIDTH / 2, y: MAP_VIEWBOX_HEIGHT / 2, heading: 0 };
-  let predictedPlane = plane;
-  let correction = { x: 0, y: 0, heading: 0 };
   let target: FlyoverCountry | null = null;
   let targetSince = 0;
   let runEndsAt = 0;
@@ -545,25 +538,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     if (flying) {
       const input = currentInput();
       options.onInput?.(input);
-      if (options.authoritative) {
-        predictedPlane = stepPlane(predictedPlane, input, dt);
-        const remaining = Math.exp(-dt * RECONCILE_RATE);
-        // A delayed reply can be many frames behind. Limit positional correction so it cannot
-        // drag the camera backwards faster than the plane is flying forwards.
-        const distance = Math.hypot(correction.x, correction.y);
-        const positionEase = Math.min(1 - remaining, FLYOVER_SPEED * dt * 0.5 / Math.max(distance, 1e-9));
-        correction.x *= 1 - positionEase;
-        correction.y *= 1 - positionEase;
-        const headingEase = Math.min(1 - remaining, FLYOVER_TURN_RATE * dt * 0.5 / Math.max(Math.abs(correction.heading), 1e-9));
-        correction.heading *= 1 - headingEase;
-        plane = {
-          x: wrapX(predictedPlane.x + correction.x),
-          y: predictedPlane.y + correction.y,
-          heading: predictedPlane.heading + correction.heading,
-        };
-      } else {
-        plane = stepPlane(plane, input, dt);
-      }
+      plane = stepPlane(plane, input, dt);
       trail.push({ x: plane.x, y: plane.y });
       if (trail.length > TRAIL_LENGTH) trail = trail.slice(-TRAIL_LENGTH);
       moveGhosts(clockNow, dt);
@@ -624,8 +599,6 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   function reset(next: PlaneState, flightSeconds = options.flightSeconds): void {
     land();
     plane = next;
-    predictedPlane = next;
-    correction = { x: 0, y: 0, heading: 0 };
     target = null;
     over = null;
     trail = [];
@@ -640,30 +613,6 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     clock.classList.remove("is-low");
     renderMinimapBase();
     resize();
-  }
-
-  function setPlane(next: PlaneState, ageMs = 0, input: PlaneInput = currentInput()): void {
-    if (!options.authoritative || !flying) {
-      plane = next;
-      predictedPlane = next;
-      correction = { x: 0, y: 0, heading: 0 };
-      return;
-    }
-    // The server remains the source of truth. Predict only the snapshot's journey to us using
-    // the normal physics, then let the visible camera ease towards that corrected prediction.
-    let predicted = next;
-    let remaining = Math.min(MAX_SNAPSHOT_PREDICT_SECONDS, Math.max(0, ageMs / 1000));
-    while (remaining > 0) {
-      const dt = Math.min(1 / 60, remaining);
-      predicted = stepPlane(predicted, input, dt);
-      remaining -= dt;
-    }
-    predictedPlane = predicted;
-    correction = {
-      x: wrappedDeltaX(predicted.x, plane.x),
-      y: plane.y - predicted.y,
-      heading: angleDiff(predicted.heading, plane.heading),
-    };
   }
 
   function setGhosts(next: readonly FlyoverGhost[]): void {
@@ -760,7 +709,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   return {
     element: stage,
     plane: () => plane,
-    setPlane,
+    setPlane: (next) => { plane = next; },
     target: () => target,
     isFlying: () => flying,
     fly,

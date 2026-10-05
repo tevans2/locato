@@ -14,7 +14,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-it("the delivered standalone client cannot post its altered flight through the authenticated player's real leaderboard handler and restores the original screen", async () => {
+it("the local Flyover rollback allows the isolated altered client to post its flight through the authenticated player's real leaderboard handler and restores the original screen", async () => {
   let time = 100_000;
   let frames: FrameRequestCallback[] = [];
   let timer: (() => void) | undefined;
@@ -88,7 +88,7 @@ it("the delivered standalone client cannot post its altered flight through the a
     for (const frame of run) frame(time);
     if (timer && time + 1e-6 >= nextTick) { nextTick += 50; timer(); }
   }
-  await vi.waitFor(() => expect(api.status().posting?.failed).toBe(true));
+  await vi.waitFor(() => expect(api.status().posting?.serverAccepted).toBe(true));
   expect(errors).not.toHaveBeenCalled();
   expect(api.status().lastScore).toBeGreaterThanOrEqual(150);
   expect(api.status().currentScore).toBe(api.status().lastScore);
@@ -96,9 +96,9 @@ it("the delivered standalone client cannot post its altered flight through the a
   expect(posts).toHaveLength(1);
   expect(posts[0]![1]?.method).toBe("POST");
   expect(JSON.parse(posts[0]![1]!.body as string)).toEqual({ gameMode: "flyover", variant: "", score: api.status().lastScore });
-  expect(service.getUserLeaderboardRank(user.id, "flyover", "")).toBeNull();
-  expect(document.querySelector(".shell-results-sub")?.textContent).toContain("Couldn't post");
-  console.log(JSON.stringify({ deliveredScriptScore: api.status().lastScore, clockSeconds: 90, leaderboardRequests: posts.length, serverAccepted: false }));
+  expect(service.getUserLeaderboardRank(user.id, "flyover", "")).toMatchObject({ score: api.status().lastScore });
+  expect(document.querySelector(".shell-results-sub")?.textContent).toContain("Posted to the leaderboard");
+  console.log(JSON.stringify({ deliveredScriptScore: api.status().lastScore, clockSeconds: 90, leaderboardRequests: posts.length, serverAccepted: true }));
   api.restore();
   expect(document.querySelector("#app > .flyover-screen")).toBe(original);
   expect(Context.prototype.arc).toBe(originalArc);
