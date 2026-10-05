@@ -420,7 +420,7 @@ export interface UserStore {
   listDailyResults(userId: string, limit: number): readonly DailyChallengeResult[];
   listDailyResultsForUsers(userIds: readonly string[], date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[];
   listDailyResultsForDate(date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[];
-  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult;
+  saveDailyResult(userId: string, result: DailyChallengeResult, verified?: boolean): DailyChallengeResult;
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult;
   getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[];
   getUserRank(userId: string, gameMode: string, variant: string): UserLeaderboardRank | null;

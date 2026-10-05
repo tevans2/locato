@@ -290,7 +290,11 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!user) return json({ error: "Not authenticated." }, 401);
     const body = await readJsonBody(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const saved = service.submitVerifiedDaily(user.id, body.runId);
+    // Daily uses its original local game again. Keep completed server receipts compatible
+    // with older clients, but never fall back to client totals for a supplied invalid receipt.
+    const result = body.runId === undefined ? parseDailyResult(body) : null;
+    if (body.runId === undefined && !result) return json({ error: "Invalid daily challenge result." }, 400);
+    const saved = result ? service.saveDailyResult(user.id, result) : service.submitVerifiedDaily(user.id, body.runId);
     if ("error" in saved) return json({ error: saved.error }, 400);
     log("info", "daily.recorded", { ip: ip(request), userId: user.id, date: saved.date, score: saved.score });
     return json({ result: saved });
