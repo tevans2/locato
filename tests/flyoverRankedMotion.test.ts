@@ -1,64 +1,65 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { createFlyoverScreen } from "../src/ui/screens/FlyoverScreen";
-import { RankedSession } from "../src/ui/screens/RankedSession";
+import { createRankedGameScreen } from "../src/ui/screens/RankedGameScreen";
 import * as flightComponent from "../src/ui/components/FlyoverFlight";
-import { FLYOVER_SPEED, wrappedDeltaX } from "../src/core/flyover";
 import type { WorldCountryFeature } from "../src/core/map";
-import type { RankedState } from "../src/core/ranked";
+import type { ShellContext } from "../src/ui/shell/types";
+import type { Screen } from "../src/app/router";
 
-const cleanups: (() => void)[] = [];
-afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); localStorage.clear(); });
+const screens: Screen[] = [];
+afterEach(() => { screens.splice(0).forEach((s) => s.destroy()); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); localStorage.clear(); });
+const square = (lng: number, lat: number) => ({ type: "Polygon" as const, coordinates: [[[lng, lat], [lng + 10, lat], [lng + 10, lat + 10], [lng, lat + 10], [lng, lat]]] });
+const features = [
+  { name: "Alpha", code: "AA", continent: "Europe", geometry: square(0, 0) },
+  { name: "Bravo", code: "BB", continent: "Africa", geometry: square(-30, 0) },
+  { name: "Charlie", code: "CC", continent: "Asia", geometry: square(100, 20) },
+] as unknown as WorldCountryFeature[];
 
-it("keeps the ranked flight smooth and its target stable while HTTP responses and clock estimates lag", async () => {
-  vi.useFakeTimers();
-  let localTime = 1000;
-  let frames: (() => void)[] = [];
-  vi.spyOn(performance, "now").mockImplementation(() => localTime);
-  const startState: RankedState = {
-    runId: "flight", mode: "flyover", variant: "", status: "playing", startedAt: 100_000,
-    serverNow: 100_000, endsAt: 190_000, index: 0, total: 1, score: 0, timeMs: null,
-    question: { id: "target", kind: "flight", text: "Alpha" }, plane: { x: 500, y: 250, heading: 0 }, reaches: [],
-  };
-  let release!: () => void;
-  const responseGate = new Promise<void>((resolve) => { release = resolve; });
-  const fetcher = vi.fn(async (path: string) => {
-    if (path.endsWith("start")) return Response.json(startState);
-    const elapsed = localTime - 1000;
-    const snapshot = { ...startState, serverNow: 100_000 + elapsed, plane: { x: 500 + FLYOVER_SPEED * elapsed / 1000, y: 250, heading: 0 } };
-    await responseGate;
-    return Response.json(snapshot);
-  });
+it("gives signed-in and guest flights identical controls, local touches, skips and results with HTTP stalled", async () => {
+  let time = 1000;
+  let frames: FrameRequestCallback[] = [];
+  vi.spyOn(performance, "now").mockImplementation(() => time);
+  vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
+  vi.stubGlobal("cancelAnimationFrame", () => {});
+  const fetcher = vi.fn((_path: string, _init?: RequestInit) => new Promise<Response>(() => {}));
   vi.stubGlobal("fetch", fetcher);
-  let flight!: flightComponent.FlyoverFlight;
+  const flights: flightComponent.FlyoverFlight[] = [];
   const createFlight = flightComponent.createFlyoverFlight;
-  vi.spyOn(flightComponent, "createFlyoverFlight").mockImplementation((options) => { flight = createFlight(options); return flight; });
-  const session = new RankedSession("flyover");
-  const screen = createFlyoverScreen({
-    storage: localStorage, onHome() {}, ranked: session,
-    worldCountryFeatures: [{ name: "Alpha", code: "AA", continent: "Europe", geometry: { type: "Polygon", coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] } }] as WorldCountryFeature[],
-  }, { requestFrame: (callback) => { frames.push(callback); return frames.length; }, cancelFrame: () => { frames = []; } });
-  document.body.append(screen.element);
-  cleanups.push(() => { session.destroy(); screen.destroy(); });
-  screen.element.querySelector<HTMLButtonElement>(".flyover-start")!.click();
-  await vi.waitFor(() => expect(flight.isFlying()).toBe(true));
-  const frame = () => { localTime += 1000 / 60; const pending = frames; frames = []; pending.forEach((callback) => callback()); };
-  for (let i = 0; i < 9; i++) frame();
-  await vi.advanceTimersByTimeAsync(150);
-  expect(fetcher).toHaveBeenCalledTimes(2);
-  const card = screen.element.querySelector<HTMLElement>(".flyover-target")!;
-  const restartAnimation = vi.spyOn(card.classList, "remove");
-  const reconcile = vi.spyOn(flight, "setPlane");
-  for (let i = 0; i < 12; i++) frame();
-  const beforeReply = flight.plane();
-  release();
-  await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce());
-  expect(reconcile.mock.calls[0]![1]).toBeCloseTo(100);
-  expect(flight.plane()).toEqual(beforeReply);
-  frame();
-  expect(wrappedDeltaX(beforeReply.x, flight.plane().x)).toBeGreaterThan(0);
-  expect(wrappedDeltaX(beforeReply.x, flight.plane().x)).toBeLessThan(1);
-  expect(restartAnimation).not.toHaveBeenCalled();
-  expect(screen.element.querySelector(".flyover-score-value")?.textContent).toBe("0");
-  expect(screen.element.querySelector(".flyover-target-name")?.textContent).toBe("Alpha");
+  vi.spyOn(flightComponent, "createFlyoverFlight").mockImplementation((options) => { const flight = createFlight(options); flights.push(flight); return flight; });
+  const shell = (signedIn: boolean): ShellContext => ({ signedIn: () => signedIn, storage: localStorage, controls: document.createElement("div"), openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, confirmLeave: async () => true });
+  const signedIn = await createRankedGameScreen({ mode: "flyover", shell: shell(true), world: features, storage: localStorage, getAuthUser: () => null });
+  const guest = createFlyoverScreen({ shell: shell(false), storage: localStorage, worldCountryFeatures: features, onHome() {} });
+  screens.push(signedIn, guest);
+  document.body.append(signedIn.element, guest.element);
+  const frame = (ms = 50) => { time += ms; const pending = frames; frames = []; pending.forEach((callback) => callback(time)); expect(flights[0]!.plane()).toEqual(flights[1]!.plane()); };
+  for (const screen of screens) screen.element.querySelector<HTMLButtonElement>(".flyover-start")!.click();
+  expect(flights.every((f) => f.isFlying())).toBe(true);
+  for (let i = 0; i < 50; i++) frame();
+  for (const screen of screens) {
+    expect(screen.element.querySelector(".flyover-score-value")?.textContent).toBe("1");
+    expect(screen.element.querySelector(".flyover-target-name")?.textContent).toBe("Alpha");
+  }
+  const updatePlane = flights.map((flight) => vi.spyOn(flight, "setPlane"));
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp" }));
+  const before = flights[0]!.plane();
+  for (let i = 0; i < 25; i++) frame();
+  expect(flights[0]!.plane().heading).not.toBe(before.heading);
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowUp" }));
+  for (let i = 0; i < 20; i++) frame();
+  expect(updatePlane.every((spy) => spy.mock.calls.length === 0)).toBe(true);
+  expect(fetcher.mock.calls.some(([path]) => String(path).startsWith("/api/ranked/"))).toBe(false);
+  for (const screen of screens) screen.element.querySelector<HTMLButtonElement>(".flyover-skip")!.click();
+  expect(flights[0]!.endsAt()).toBe(86000);
+  expect(flights[1]!.endsAt()).toBe(86000);
+  for (const screen of screens) {
+    expect(screen.element.querySelector(".flyover-target-name")?.textContent).toBe("Charlie");
+    screen.element.querySelector<HTMLButtonElement>(".flyover-skip")!.click();
+    expect(screen.element.querySelector(".shell-results")).not.toBeNull();
+  }
+  expect(flights.every((f) => !f.isFlying())).toBe(true);
+  expect(fetcher.mock.calls.filter(([path]) => path === "/api/leaderboard")).toHaveLength(1);
 });

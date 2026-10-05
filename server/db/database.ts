@@ -682,13 +682,13 @@ export class SqliteUserStore implements UserStore {
     this.db
       .query(
         `INSERT INTO mode_best_scores (user_id, game_mode, variant, best_score, achieved_at, verified)
-         VALUES (?, ?, ?, ?, ?, 1)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
            best_score = excluded.best_score,
-           achieved_at = excluded.achieved_at, verified = 1
+           achieved_at = excluded.achieved_at, verified = excluded.verified
          WHERE excluded.best_score > mode_best_scores.best_score`,
       )
-      .run(userId, input.gameMode, input.variant, input.score, input.achievedAt);
+      .run(userId, input.gameMode, input.variant, input.score, input.achievedAt, input.verified === false ? 0 : 1);
 
     return { accepted: true, isPersonalBest: true };
   }

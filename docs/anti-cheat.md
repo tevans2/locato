@@ -1,8 +1,12 @@
 # Ranked game authority
 
-All competitive results come from server-owned games. This closes raw final-score submission,
-client speed/radius changes, forged flight positions/reaches, predictable ranked queues, answer
-codes in clue URLs, exposed Street View origins, and full multiplayer route disclosure.
+Competitive results except Flyover come from server-owned games. This closes raw final-score
+submission in those modes, predictable ranked queues, answer codes in clue URLs and exposed
+Street View origins. Flyover deliberately uses its original local gameplay again: movement,
+touches, targets and skips do not wait for HTTP responses or reconcile to server positions.
+Its scores are client-reported and its multiplayer route is public. This restores the earlier
+Flyover cheating opportunities, including altered physics, autopilot and fabricated in-range
+solo totals. Flyover must not be described as cheat-proof or server-verified.
 It does **not** prove that a human supplied the accepted controls or answers.
 
 ## Coverage
@@ -14,11 +18,11 @@ It does **not** prove that a human supplied the accepted controls or answers.
 | Click Country, Spot Country, Puzzle (all continents) | Private current challenge; click containment / puzzle placement / typed name; full set; elapsed server time |
 | Map Tap, GeoGuessr | Fixed challenge count; valid pin; private scoring origin; recomputed distance/points |
 | WorldSplit | Fixed rounds; valid line; server population split and points |
-| Flyover | Fixed 90-second deadline; server simulation with stock speed, turn rate, boost and touch radius; server-detected touches |
+| Flyover | Local 90-second game; authenticated, bounded client score submissions; improvements only |
 | Daily | Private themed daily queue; server answers/pins; wrong-guess penalties; one reserved account attempt per date |
-| Multiplayer | Existing server answer/pin scoring plus strict deadlines; server-simulated Flyover; private next targets; server-written account results |
+| Multiplayer | Existing server answer/pin scoring plus strict deadlines; Flyover route order/location/coarse travel-time checks; server-written account results |
 
-Signed-in ranked play uses the original gameplay screens through `RankedGameScreen` and
+Signed-in ranked play outside Flyover uses the original gameplay screens through `RankedGameScreen` and
 `RankedSession`. Practice and timed games share their layouts, controls and results views;
 ranked actions and result posting remain server-owned. Daily uses `VerifiedGameScreen`.
 Timed completion games stay at zero until the first submitted guess (including a wrong
@@ -26,11 +30,13 @@ manual guess) or first map/puzzle placement. Partial automatic input, Hint and P
 start the clock. The backend uses its receipt time; browser timestamps never set the result.
 Score games retain their original start/deadline rules, including Flyover's Take off.
 
-Flyover predicts motion every animation frame on a steady local clock. Server snapshots
-correct that prediction with a short camera ease, rather than snapping back to an older
-position on each poll. Solo snapshots account for estimated return latency. Repeated
-targets leave the country card animation and hint clock alone. This applies to solo and
-multiplayer presentation; touches, targets, speed, radius and final scores remain server-owned.
+Flyover runs its original physics once per animation frame on a steady local clock. Keyboard,
+boost and held map-pointer steering work immediately. Local touches advance targets and scores
+on that frame, solo skips subtract five seconds, and multiplayer skips apply the original
+five-second holding pattern. Multiplayer position reports only draw other players; delayed
+echoes never overwrite your plane. Repeated targets leave the country card animation alone.
+The active Flyover screen never starts or polls a ranked server session. The older ranked
+Flyover endpoints remain available for compatibility with older clients.
 
 Correct answers and map finds update the screen synchronously using the original practice
 matchers. No typing debounce, transport spacing or minimum guess delay is added; requests
@@ -42,7 +48,7 @@ The backend independently rechecks every action; rejected predictions roll back 
 finish or post a run. The next private clue and completed result still require a server
 response. Keeping every current answer secret from JavaScript would require waiting for
 server validation before correct-answer feedback.
-Guest/practice play continues locally and cannot upload its final values to ranked boards. Educational country data, public practice assets, and
+Guest/practice play continues locally. Outside Flyover it cannot upload final values to ranked boards. Educational country data, public practice assets, and
 map geography remain public: a browser needs visible geography to render a playable game.
 
 ## API boundaries
@@ -53,8 +59,8 @@ map geography remain public: a browser needs visible geography to render a playa
   answer, pin, placement, split line or flight controls. Hint, Pass and Reveal are also
   server actions. Puzzle drops record each piece offset; Check accuracy only completes a
   timed game after every piece is within the permitted placement tolerance. Stale question IDs, invalid moves and
-  excessive requests fail. A flight never accepts client position, radius, speed or score.
-- `POST /api/leaderboard` requires a completed, unexpired, account-owned run and the exact
+  excessive requests fail. The legacy ranked flight API never accepts client position, radius, speed or score; the active Flyover screen does not use it.
+- `POST /api/leaderboard` outside Flyover requires a completed, unexpired, account-owned run and the exact
   server result for that mode/variant. Changing final numbers or using an old audit ticket
   does not work. Exact retries within five minutes keep the original best timestamp and do
   not record duplicate account games.
@@ -71,9 +77,12 @@ map geography remain public: a browser needs visible geography to render a playa
   Image requests are deduplicated, bounded and briefly cached in server memory; EXIF/IPTC
   location metadata is stripped. Public practice APIs no longer expose the generated ranked
   Street View pool.
-- Multiplayer `FLYOVER_INPUT` contains turn, desired heading and boost. Legacy
-  `FLYOVER_POSITION` / `FLYOVER_REACHED` messages cannot award points or teleport a server plane.
-  Controls expire after one second of silence; reconnecting cannot bank that gap as movement.
+- Flyover `POST /api/leaderboard` without a run ID accepts authenticated client totals within
+  the current mode's score bounds. SQLite marks these entries `verified = 0`. A supplied legacy
+  run ID still requires its completed server result. No other mode accepts raw final values.
+- Multiplayer Flyover sends `FLYOVER_POSITION`, `FLYOVER_REACHED` and `FLYOVER_SKIP`, as before
+  security changes. The server relays positions and checks route order, touch location, coarse
+  travel time, skip holds and deadlines. It does not simulate or correct the player's plane.
 - Authenticated writes reject cross-site origins. WebSocket upgrades default to same-origin;
   a configured `ALLOWED_ORIGINS` list can explicitly allow additional frontends.
 - Multiplayer account wins are written by the room server. `/api/games` rejects browser
@@ -110,7 +119,7 @@ Before deploying:
 
 Historical results remain visible on leaderboards, personal ranks, placement previews and daily
 history. The `verified` field preserves provenance: historical entries are not retroactively
-marked as server-verified. New submissions still require a completed server-owned game.
+marked as server-verified. New submissions outside Flyover still require a completed server-owned game.
 Only improvements replace existing best scores/times, and completed daily results stay immutable.
 
 The earlier quarantine migration hid all old results and allowed weaker verified results to
@@ -120,36 +129,32 @@ results from `legacy_mode_best_times`, `legacy_mode_best_scores`, and
 Its migration marker prevents later restarts from undoing administrator corrections; deleted
 accounts are excluded. Snapshot rows remain available for review and are removed on account
 deletion. Historical scores, including previously cheated scores, are restored as requested;
-server verification applies to new submissions, not retroactively to old records.
+server verification applies to new submissions outside Flyover, not retroactively to old records.
 
 ## Remaining automation
 
 A script can recognize a visible flag/outline, match anonymous geometry to a public atlas,
-identify a street image, type valid answers, or steer a plane with permitted controls. The
+identify a street image, type valid answers, or steer a plane with permitted controls. Outside Flyover the
 server can enforce rules and physics but cannot reliably distinguish those inputs from a
 skilled person. Private future questions remove advance knowledge; visible clues cannot be
 made secret from the person or software displaying them. Bot detection needs additional
 behavioral signals, review and moderation, with false positives considered. Obfuscation or
 "private" JavaScript variables are not an anti-cheat boundary.
 The immediate-feedback fingerprint also allows a script to identify the current answer
-without image recognition. Server authority prevents fabricated results and altered physics;
+without image recognition. Outside Flyover, server authority prevents fabricated results and altered physics;
 it does not prevent a bot from submitting valid answers quickly.
 
 ## Regression checks
 
-`rankedSecurity.test.ts` completes real server games across every ranked mode, rejects raw
-submissions, verifies ownership/expiry/variant/result matching and private clue payloads, and
-checks daily scoring/reservation. `rankedUI.test.ts` plays through the actual frontend and HTTP
-handler in every regular mode, including original controls, Hint/Pass, restarts and score
-posting, idle timers, country shortcuts, rapid answers, and immediate feedback while server
-responses are held back. `rankedMigration.test.ts` runs the production migration/queries against real SQLite.
-It also verifies historical restoration, original timestamps, preservation of better new
-results, pagination/variants, daily history, and one-time repair after restarts.
-Flight/room tests enforce stock movement, silence/deadlines and private targets. Earlier cheat
-scripts remain isolated reproduction fixtures; their browser-only score cannot post a ranked result.
+`rankedSecurity.test.ts` completes real server games across every ranked mode and rejects raw
+submissions outside the intentional Flyover exception. It verifies ownership, expiry, variant
+and result matching, private clue payloads and daily reservation. `rankedUI.test.ts` plays the
+actual frontend and HTTP handler, including original controls, country shortcuts, idle timers,
+Hint/Pass and immediate feedback while responses are held back. `rankedMigration.test.ts`
+checks historical restoration, timestamps, improvements, provenance and pagination in SQLite.
 
-Local validation, including the gameplay regression fixes, passed all 687 tests and the
-production build. A separate native Bun/SQLite
-HTTP run rejected forged Flyover scores of 93, 159 and 196, rendered a private PNG clue, and
-accepted/persisted a completed 196-answer Codes game using its server receipt. This also
-demonstrates the remaining boundary: software can still submit valid answers under the rules.
+Flyover tests compare signed-in and guest movement frame by frame while all HTTP responses
+are stalled, exercise local reaches/skips/results and ensure multiplayer echoes cannot move
+the local plane. Original Flyover room tests cover position relays, plausible reaches, skip
+holds and deadlines. The isolated score-forgery fixture explicitly documents that raw Flyover
+totals are accepted again; invalid values and unauthenticated submissions remain rejected.

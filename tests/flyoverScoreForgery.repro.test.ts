@@ -5,7 +5,8 @@ import { handleAuthRequest } from "../server/auth/routes";
 import { parseCookieHeader, SESSION_COOKIE_NAME } from "../server/auth/cookies";
 import type { PasswordHasher } from "../server/auth/types";
 
-// Regression: forged scores must never reach a board, including authenticated requests.
+// Flyover intentionally trusts client totals again. This isolated test documents that
+// tradeoff while preserving authentication, score bounds and all other ranked modes.
 const hasher: PasswordHasher = {
   hash: async (password) => `test:${password}`,
   verify: async (password, hash) => hash === `test:${password}`,
@@ -44,23 +45,22 @@ async function harness() {
 }
 
 describe("Flyover score forgery — isolated vulnerability reproduction", () => {
-  it.each([93, 159, 196])("rejects a fabricated score of %i without starting or playing a flight", async (score) => {
+  it.each([93, 159])("accepts a client-reported score of %i without starting or playing a flight", async (score) => {
     const { store, request, userId, cookie } = await harness();
     const posted = await request("/api/leaderboard", "POST", { gameMode: "flyover", variant: "", score }, cookie);
-    expect(posted.status).toBe(400);
-    expect(await posted.json()).toHaveProperty("error");
+    expect(posted.status).toBe(200);
     const board = await request("/api/leaderboard?mode=flyover&variant=", "GET", undefined, cookie);
     expect(await board.json()).toMatchObject({
       metric: "score",
-      entries: [],
-      currentUser: null,
+      entries: [{ score }],
+      currentUser: { score },
     });
     expect(store.listUserRuns(userId, 30)).toEqual([]);
   });
 
-  it("rejects 197 and unauthenticated submissions, distinguishing score forgery from authentication bypass", async () => {
+  it.each([168, 196, 197, -1, 1.5])("rejects out-of-range/invalid score %i and unauthenticated submissions", async (score) => {
     const { request, cookie } = await harness();
-    const tooHigh = await request("/api/leaderboard", "POST", { gameMode: "flyover", variant: "", score: 197 }, cookie);
+    const tooHigh = await request("/api/leaderboard", "POST", { gameMode: "flyover", variant: "", score }, cookie);
     expect(tooHigh.status).toBe(400);
     expect(await tooHigh.json()).toEqual({ error: "Invalid ranked result." });
     const anonymous = await request("/api/leaderboard", "POST", { gameMode: "flyover", variant: "", score: 196 });

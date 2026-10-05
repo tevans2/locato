@@ -175,15 +175,16 @@ it("uses Street View's original side panel and country guesses without location-
   expect(ui.service.getUserLeaderboardRank(ui.user.id, "streetview-country", "")).toMatchObject({ score: 15 });
 });
 
-it("keeps Flyover's Take off screen and ends at the server deadline", async () => {
+it("keeps Flyover local from Take off through results and posts its client score", async () => {
   const ui = await setup("flyover");
   expect(ui.fetcher.mock.calls.some(([path]) => path === "/api/ranked/start")).toBe(false);
   expect(ui.$(".flyover-ready")).not.toBeNull();
   ui.button("Take off").click();
-  await vi.waitFor(() => expect(ui.state()?.mode).toBe("flyover"));
+  expect(ui.$<HTMLElement>(".flyover-ready").hidden).toBe(true);
+  expect(ui.state()).toBeNull();
   ui.advance(90_000);
   await ui.posted();
-  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: ui.state().score });
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: 0 });
 });
 
 it("keeps the puzzle tray and accuracy check, and refuses to post misplaced pieces", async () => {

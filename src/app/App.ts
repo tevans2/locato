@@ -942,7 +942,6 @@ export function createApp(options: AppOptions): App {
   }
 
   async function startFlyover(): Promise<void> {
-    if (await startVerified("flyover")) return;
     const run = navigationRun;
     const loading = createLoadingScreen("Fuelling the plane...");
     mount(loading);

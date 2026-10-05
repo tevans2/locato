@@ -33,7 +33,7 @@ async function harness(full = false) {
 }
 
 describe("ranked authority", () => {
-  it.each(LEADERBOARD_MODES)("rejects invented final values for $mode", async (config) => {
+  it.each(LEADERBOARD_MODES.filter((config) => config.mode !== "flyover"))("rejects invented final values for $mode", async (config) => {
     const { request, service, user } = await harness();
     const response = await request("/api/leaderboard", { gameMode: config.mode, variant: config.variants[0], ...(config.metric === "time" ? { timeMs: 60_000 } : { score: config.maxScore }) });
     expect(response.status).toBe(400);

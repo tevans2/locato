@@ -129,3 +129,18 @@ it("ranks and paginates historical and verified entries together while keeping v
   expect(store.getLeaderboard({ gameMode: "flags", variant: "territories", limit: 10, offset: 0 })).toMatchObject([{ userId: "old", rank: 1, timeMs: 55000 }]);
   db.close();
 });
+
+it("stores local Flyover improvements as client-reported while preserving existing bests and other-mode provenance", () => {
+  const db = openDatabase(originalDatabase());
+  db.exec("INSERT INTO users (id,email,display_name,created_at) VALUES ('local','local@test.local','LocalPlayer',2);");
+  const store = new SqliteUserStore(db);
+  const service = new AuthService(store, { hash: async (p) => p, verify: async (p, h) => p === h }, { clock: () => 100000, sessionTtlMs: 3600000 });
+  expect(service.submitLeaderboardAttempt("local", { gameMode: "flyover", variant: "", score: 43 })).toMatchObject({ accepted: true });
+  expect(service.submitLeaderboardAttempt("local", { gameMode: "flyover", variant: "", score: 60 })).toMatchObject({ accepted: true });
+  expect(db.query("SELECT best_score, verified FROM mode_best_scores WHERE user_id = 'local'").get()).toEqual({ best_score: 60, verified: 0 });
+  expect(service.submitLeaderboardAttempt("old", { gameMode: "flyover", variant: "", score: 60 })).toMatchObject({ accepted: false });
+  expect(store.getUserScoreRank("old", "flyover", "")?.score).toBe(196);
+  store.submitBestScore("local", { gameMode: "worldsplit", variant: "", score: 100, achievedAt: 100001 });
+  expect(db.query("SELECT verified FROM mode_best_scores WHERE game_mode = 'worldsplit'").get()).toEqual({ verified: 1 });
+  db.close();
+});
