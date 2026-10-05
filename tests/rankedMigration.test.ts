@@ -144,3 +144,17 @@ it("stores local Flyover improvements as client-reported while preserving existi
   expect(db.query("SELECT verified FROM mode_best_scores WHERE game_mode = 'worldsplit'").get()).toEqual({ verified: 1 });
   db.close();
 });
+
+it("marks restored local Daily scores unverified without changing earlier results or server receipt provenance", () => {
+  const db = openDatabase(originalDatabase());
+  const store = new SqliteUserStore(db);
+  const service = new AuthService(store, { hash: async (p) => p, verify: async (p, h) => p === h }, { sessionTtlMs: 3600000 });
+  const local = { date: "2026-10-05", seed: "daily:2026-10-05", score: 80, timeMs: 120000, hintsUsed: 0, marks: [] as const, shareText: "local daily", completedAt: 10 };
+  expect(service.saveDailyResult("old", local)).toEqual(local);
+  expect(db.query("SELECT score, verified FROM daily_challenge_results WHERE date = '2026-10-05'").get()).toEqual({ score: 80, verified: 0 });
+  expect(service.saveDailyResult("old", { ...local, score: 100, completedAt: 20 })).toEqual(local);
+  expect(service.saveDailyResult("old", { ...local, date: "2026-10-04", seed: "daily:2026-10-04" })).toMatchObject({ score: 100, completedAt: 1 });
+  store.saveDailyResult("old", { ...local, date: "2026-10-06", seed: "verified-daily:2026-10-06" });
+  expect(db.query("SELECT verified FROM daily_challenge_results WHERE date = '2026-10-06'").get()).toEqual({ verified: 1 });
+  db.close();
+});
