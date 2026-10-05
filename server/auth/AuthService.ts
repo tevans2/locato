@@ -270,7 +270,7 @@ export class AuthService {
   }
 
   saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
-    return this.store.saveDailyResult(userId, result);
+    return this.store.saveDailyResult(userId, result, false);
   }
 
   getDailySummary(userId: string, date: string, limit = DEFAULT_DAILY_HISTORY_LIMIT): DailySummary {

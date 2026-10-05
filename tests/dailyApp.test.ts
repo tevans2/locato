@@ -9,13 +9,18 @@ import { createSoloSave } from "../src/storage/localSave";
 import type { SoloGameScreenOptions } from "../src/ui/screens/SoloGameScreen";
 import type { MapTapScreenOptions } from "../src/ui/screens/MapTapScreen";
 import type { StreetViewCountryScreenOptions } from "../src/ui/screens/StreetViewCountryScreen";
+import { AuthService } from "../server/auth/AuthService";
+import { createMemoryUserStore } from "../server/auth/memoryStore";
+import { handleAuthRequest } from "../server/auth/routes";
+import { SESSION_COOKIE_NAME } from "../server/auth/cookies";
+import type { AuthUser } from "../server/auth/types";
 
-const captured = vi.hoisted(() => ({ solo: [] as SoloGameScreenOptions[], map: [] as MapTapScreenOptions[], street: [] as StreetViewCountryScreenOptions[] }));
-vi.mock("../src/ui/components/AuthPanel", () => ({ createAuthControls: (options: { onAuthChange: (state: { user: null; stats: null }) => void }) => {
-  queueMicrotask(() => options.onAuthChange({ user: null, stats: null }));
-  return { trigger: document.createElement("button"), panel: document.createElement("div"), getUser: () => null, refreshStats: vi.fn(), openPanel: vi.fn() };
+const captured = vi.hoisted(() => ({ user: null as AuthUser | null, solo: [] as SoloGameScreenOptions[], map: [] as MapTapScreenOptions[], street: [] as StreetViewCountryScreenOptions[] }));
+vi.mock("../src/ui/components/AuthPanel", () => ({ createAuthControls: (options: { onAuthChange: (state: { user: AuthUser | null; stats: null }) => void }) => {
+  queueMicrotask(() => options.onAuthChange({ user: captured.user, stats: null }));
+  return { trigger: document.createElement("button"), panel: document.createElement("div"), getUser: () => captured.user, refreshStats: vi.fn(), openPanel: vi.fn() };
 } }));
-vi.mock("../src/core/map", () => ({ loadWorldCountryFeatures: async () => [] }));
+vi.mock("../src/core/map", async (importOriginal) => ({ ...await importOriginal<typeof import("../src/core/map")>(), loadWorldCountryFeatures: async () => [] }));
 vi.mock("../src/ui/screens/LandingScreen", () => ({ createLandingScreen: () => ({ element: document.createElement("section"), destroy: vi.fn() }) }));
 vi.mock("../src/ui/screens/SoloGameScreen", () => ({ createSoloGameScreen: (options: SoloGameScreenOptions) => { captured.solo.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
 vi.mock("../src/ui/screens/MapTapScreen", () => ({ createMapTapScreen: (options: MapTapScreenOptions) => { captured.map.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
@@ -24,19 +29,43 @@ vi.mock("../src/ui/screens/StreetViewCountryScreen", () => ({ createStreetViewCo
 const index = indexCountries(rawCountries);
 beforeEach(() => {
   captured.solo.length = captured.map.length = captured.street.length = 0;
+  captured.user = null;
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ entries: [], summary: null }), { status: 200 })));
 });
-afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function setup() {
   const root = document.createElement("div"); root.id = "app"; document.body.append(root);
   return { root, app: createApp({ root, countryIndex: index, storage: window.localStorage }) };
 }
 
+async function signIn() {
+  const service = new AuthService(createMemoryUserStore(), { hash: async (p) => p, verify: async (p, h) => p === h }, { sessionTtlMs: 3600000 });
+  const registration = await service.register({ email: "daily@locato.test", password: "daily-test-password", displayName: "DailyTest" });
+  if (!registration.ok) throw new Error(registration.error);
+  captured.user = registration.user;
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+    const url = new URL(input, window.location.href);
+    requests.push(url.pathname);
+    // The unrelated server imagery service is unavailable. Original Daily must still play.
+    if (url.pathname.startsWith("/api/ranked/")) return new Response(JSON.stringify({ error: "Street View is unavailable. Please try again later." }), { status: 503 });
+    const request = new Request(url, init);
+    // Happy DOM strips the forbidden Cookie header; emulate the browser's session transport.
+    const get = request.headers.get.bind(request.headers);
+    vi.spyOn(request.headers, "get").mockImplementation((name) => name === "cookie" ? `${SESSION_COOKIE_NAME}=${registration.session.id}` : get(name));
+    return await handleAuthRequest(request, url, service, { secure: false }, window.location.origin)
+      ?? new Response(JSON.stringify({ entries: [], summary: null }));
+  }));
+  return { service, userId: registration.user.id, requests };
+}
+
 describe("daily app orchestration", () => {
-  it("shows the intro, saves all ten review entries, and restores categories on resume", async () => {
+  it.each([false, true])("shows the original intro, resumes and saves ten rounds (signed in: %s)", async (signedIn) => {
+    const account = signedIn ? await signIn() : null;
+    const userId = account?.userId ?? null;
     const { root, app } = setup();
     const challenge = createDailyChallenge(index);
     app.navigate({ type: "daily-challenge" });
@@ -54,8 +83,8 @@ describe("daily app orchestration", () => {
       marks.push(i === 0 ? "hint" : "correct");
     });
     first.dailyChallenge!.onProgress!({ score: 17, hintsUsed: 1, marks, rounds, roundHintsUsed: 0, roundWrongGuesses: 0 });
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.rounds).toEqual(rounds);
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.themeScoped).toBe(true);
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)?.rounds).toEqual(rounds);
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)?.themeScoped).toBe(true);
     app.navigate({ type: "landing" });
     app.navigate({ type: "daily-challenge" });
     await vi.waitFor(() => expect(root.querySelector("#daily-intro")).not.toBeNull());
@@ -69,22 +98,48 @@ describe("daily app orchestration", () => {
     await vi.waitFor(() => expect(captured.map).toHaveLength(1));
     const pin = { target: (await import("../src/core/maptap/locations")).findMapTapLocation(challenge.mapTapTargetId)!, guess: { lat: 0, lng: 0 }, distanceKm: 1000, score: 2500, maxScore: 5000, decayKm: 1000, toleranceKm: 0 };
     captured.map[0]!.dailyChallenge!.onResult!(pin);
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)).toMatchObject({ stage: "street-view", roundIndex: 9, score: 82 });
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ stage: "street-view", roundIndex: 9, score: 82 });
     captured.map[0]!.dailyChallenge!.onComplete(pin);
     expect(captured.street).toHaveLength(1);
+    expect(captured.street[0]!.ranked).toBeUndefined();
+    expect(captured.street[0]!.dailyChallenge!.round.countryCode).toBe(challenge.streetViewCountryCode);
     captured.street[0]!.dailyChallenge!.onResult!({ missed: false, wrongGuesses: 1 });
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)).toMatchObject({ roundIndex: 10, score: 90 });
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ roundIndex: 10, score: 90 });
     // Refreshing after the answer was shown goes to results, without replaying the finale.
     app.navigate({ type: "landing" });
     app.navigate({ type: "daily-challenge" });
     await vi.waitFor(() => expect(root.querySelector("#daily-result")).not.toBeNull());
     expect(captured.street).toHaveLength(1);
-    const result = readDailyResult(window.localStorage, challenge.date)!;
+    const result = readDailyResult(window.localStorage, challenge.date, userId)!;
     expect(result.score).toBe(90);
     expect(result.rounds).toHaveLength(10);
     expect(result.rounds!.map((round) => round.points)).toEqual([7, 10, 10, 10, 10, 10, 10, 10, 5, 8]);
     expect(root.querySelectorAll(".daily-recap-row")).toHaveLength(10);
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)).toBeNull();
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toBeNull();
+    if (account) {
+      await vi.waitFor(() => expect(account.service.getDailyResult(userId!, challenge.date)).toMatchObject({ score: 90, challengeVersion: 2, rounds: result.rounds }));
+      expect(account.requests).toContain("/api/daily");
+      expect(account.requests.some((path) => path.startsWith("/api/ranked/"))).toBe(false);
+      app.navigate({ type: "landing" });
+      app.navigate({ type: "daily-challenge" });
+      await vi.waitFor(() => expect(root.querySelector("#daily-result")).not.toBeNull());
+      expect(captured.solo).toHaveLength(2);
+      expect(root.querySelectorAll(".daily-recap-row")).toHaveLength(10);
+    }
+  });
+
+  it("syncs an account's earlier locally completed daily without starting another game", async () => {
+    const account = await signIn();
+    const challenge = createDailyChallenge(index);
+    const result = createDailyResultSave({ date: challenge.date, seed: challenge.seed, score: 80, timeMs: 120_000, hintsUsed: 0, marks: [...Array(8).fill("correct"), "miss", "miss"] });
+    saveDailyResult(window.localStorage, result, account.userId);
+    window.history.replaceState(null, "", "/?view=daily-challenge");
+    const { root, app } = setup();
+    app.start();
+    await vi.waitFor(() => expect(account.service.getDailyResult(account.userId, challenge.date)?.score).toBe(80));
+    expect(root.querySelector("#daily-result")).not.toBeNull();
+    expect(captured.solo).toHaveLength(0);
+    expect(account.requests.some((path) => path.startsWith("/api/ranked/"))).toBe(false);
   });
 
   it("resumes an earlier mixed-theme attempt with its original assignments", async () => {

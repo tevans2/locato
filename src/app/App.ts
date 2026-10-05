@@ -404,8 +404,6 @@ export function createApp(options: AppOptions): App {
         return;
       }
 
-      if (await startVerified("daily", challenge.date)) return;
-
       if (localResult) {
         mountDailyResult(localResult);
         void saveDailyChallengeResult(dailyLocalResultToAccount(localResult)).then((synced) => {
@@ -801,7 +799,7 @@ export function createApp(options: AppOptions): App {
     void task.catch((error: unknown) => { if (run === navigationRun) showLoadError(error); });
   }
 
-  async function startVerified(mode: GameModeId | "daily", variant = ""): Promise<boolean> {
+  async function startVerified(mode: GameModeId, variant = ""): Promise<boolean> {
     const run = navigationRun;
     await authResolved;
     if (run !== navigationRun) return true;
@@ -809,9 +807,7 @@ export function createApp(options: AppOptions): App {
     mount(createLoadingScreen("Preparing your game…"));
     const world = await loadWorldCountryFeatures();
     if (run !== navigationRun) return true;
-    const screen = mode === "daily"
-      ? (await import("../ui/screens/VerifiedGameScreen")).createVerifiedGameScreen({ mode, variant, shell, world })
-      : await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser() });
+    const screen = await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser() });
     if (run === navigationRun) mount(screen);
     else screen.destroy();
     return true;

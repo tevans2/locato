@@ -578,17 +578,17 @@ export class SqliteUserStore implements UserStore {
     });
   }
 
-  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
+  saveDailyResult(userId: string, result: DailyChallengeResult, verified = true): DailyChallengeResult {
     const existing = this.getDailyResult(userId, result.date);
     if (existing) return existing;
 
     this.db
       .query(
         `INSERT INTO daily_challenge_results (user_id, date, seed, score, time_ms, hints_used, marks, share_text, completed_at, challenge_version, rounds, verified)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, date) DO NOTHING`,
       )
-      .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt, result.challengeVersion ?? null, result.rounds ? JSON.stringify(result.rounds) : null);
+      .run(userId, result.date, result.seed, result.score, result.timeMs, result.hintsUsed, JSON.stringify(result.marks), result.shareText, result.completedAt, result.challengeVersion ?? null, result.rounds ? JSON.stringify(result.rounds) : null, verified ? 1 : 0);
 
     return this.getDailyResult(userId, result.date)!;
   }
