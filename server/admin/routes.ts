@@ -1,6 +1,7 @@
 import { logEvent } from "./events";
 import type { AdminService } from "./AdminService";
 import type { AuthUser } from "../auth/types";
+import { clientIp } from "../clientIp";
 
 export interface AdminRouteContext {
   readonly service: AdminService;
@@ -14,7 +15,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 function ip(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  return clientIp(request);
 }
 
 function intParam(url: URL, name: string): number | undefined {
@@ -101,6 +102,43 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
     if (!result.ok) return json({ error: result.error }, result.status);
     audit(body.admin === true ? "admin.user.grant_admin" : "admin.user.revoke_admin", { targetUserId: id });
     return json({ admin: result.value });
+  }
+
+  const banMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/ban$/);
+  if (banMatch && (method === "PUT" || method === "DELETE")) {
+    const id = decodeURIComponent(banMatch[1]!);
+    if (method === "DELETE") {
+      const result = service.unbanUser(id);
+      if (!result.ok) return json({ error: result.error }, result.status);
+      audit("admin.user.unban", { targetUserId: id });
+      return json({ ban: null });
+    }
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.banUser(actor.id, id, body.reason);
+    if (!result.ok) return json({ error: result.error }, result.status);
+    audit("admin.user.ban", { targetUserId: id, reason: result.value.reason });
+    return json({ ban: result.value });
+  }
+
+  // --- Bans ---
+  if (pathname === "/api/admin/bans" && method === "GET") return json(service.listBans());
+
+  if (pathname === "/api/admin/bans/ips" && method === "POST") {
+    const body = await readJsonBody(request);
+    if (!body) return json({ error: "Invalid request body." }, 400);
+    const result = service.banIp(actor.id, ip(request), body);
+    if (!result.ok) return json({ error: result.error }, result.status);
+    audit("admin.ip.ban", { bannedIp: result.value.ip, reason: result.value.reason, expiresAt: result.value.expiresAt });
+    return json({ ban: result.value });
+  }
+
+  const ipBanMatch = pathname.match(/^\/api\/admin\/bans\/ips\/([^/]+)$/);
+  if (ipBanMatch && method === "DELETE") {
+    const bannedIp = decodeURIComponent(ipBanMatch[1]!);
+    const removed = service.unbanIp(bannedIp);
+    audit("admin.ip.unban", { bannedIp, removed });
+    return removed ? json({ ok: true }) : json({ error: "That address isn't banned." }, 404);
   }
 
   const sessionsMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/sessions$/);

@@ -36,6 +36,9 @@ import type {
   UserLeaderboardScoreRank,
   UserStats,
   UserStore,
+  BannedUser,
+  IpBan,
+  UserBan,
 } from "./types";
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
@@ -43,6 +46,8 @@ const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, 
 export function createMemoryUserStore(): UserStore {
   const usersById = new Map<string, StoredUser>();
   const adminIds = new Set<string>();
+  const userBans = new Map<string, UserBan>();
+  const ipBans = new Map<string, IpBan>();
   const usersByEmail = new Map<string, StoredUser>();
   const usersByOAuth = new Map<string, StoredUser>();
   const sessions = new Map<string, Session>();
@@ -59,6 +64,10 @@ export function createMemoryUserStore(): UserStore {
   let nextEventId = 1;
   const academyProgress = new Map<string, StoredAcademyProgress>();
   const runs = new Map<string, StoredRun>();
+
+  // Public boards leave banned accounts out.
+  const listedTimes = () => [...bestTimes.values()].filter((entry) => !userBans.has(entry.userId));
+  const listedScores = () => [...bestScores.values()].filter((entry) => !userBans.has(entry.userId));
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -203,7 +212,7 @@ export function createMemoryUserStore(): UserStore {
     },
     listDailyResultsForDate(date: string): readonly { readonly userId: string; readonly result: DailyChallengeResult }[] {
       return [...dailyResults.entries()]
-        .filter(([key]) => key.endsWith(`:${date}`))
+        .filter(([key]) => key.endsWith(`:${date}`) && !userBans.has(key.slice(0, -date.length - 1)))
         .map(([key, result]) => ({ userId: key.slice(0, -date.length - 1), result: { ...result, marks: [...result.marks] } }));
     },
     saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
@@ -223,7 +232,7 @@ export function createMemoryUserStore(): UserStore {
       return { accepted: true, isPersonalBest: true };
     },
     getLeaderboard(query: LeaderboardQuery): readonly LeaderboardEntry[] {
-      const rows = [...bestTimes.values()]
+      const rows = listedTimes()
         .filter((row) => row.gameMode === query.gameMode && row.variant === query.variant)
         .sort((a, b) => (a.timeMs !== b.timeMs ? a.timeMs - b.timeMs : a.achievedAt - b.achievedAt));
 
@@ -244,14 +253,14 @@ export function createMemoryUserStore(): UserStore {
       if (!row) return null;
 
       const rank =
-        [...bestTimes.values()]
+        listedTimes()
           .filter((entry) => entry.gameMode === gameMode && entry.variant === variant)
           .filter((entry) => entry.timeMs < row.timeMs || (entry.timeMs === row.timeMs && entry.achievedAt < row.achievedAt)).length + 1;
 
       return { rank, timeMs: row.timeMs };
     },
     getTimePlacement(gameMode: string, variant: string, timeMs: number): LeaderboardTimePlacement {
-      const board = [...bestTimes.values()].filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
+      const board = listedTimes().filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
       return { rank: board.filter((entry) => entry.timeMs < timeMs).length + 1, total: board.length };
     },
     submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
@@ -264,7 +273,7 @@ export function createMemoryUserStore(): UserStore {
       return { accepted: true, isPersonalBest: true };
     },
     getScoreLeaderboard(query: LeaderboardQuery): readonly LeaderboardScoreEntry[] {
-      const rows = [...bestScores.values()]
+      const rows = listedScores()
         .filter((row) => row.gameMode === query.gameMode && row.variant === query.variant)
         .sort((a, b) => (a.score !== b.score ? b.score - a.score : a.achievedAt - b.achievedAt));
 
@@ -284,13 +293,13 @@ export function createMemoryUserStore(): UserStore {
       const row = bestScores.get(bestTimeKey(userId, gameMode, variant));
       if (!row) return null;
       const rank =
-        [...bestScores.values()]
+        listedScores()
           .filter((entry) => entry.gameMode === gameMode && entry.variant === variant)
           .filter((entry) => entry.score > row.score || (entry.score === row.score && entry.achievedAt < row.achievedAt)).length + 1;
       return { rank, score: row.score };
     },
     getScorePlacement(gameMode: string, variant: string, score: number): LeaderboardTimePlacement {
-      const board = [...bestScores.values()].filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
+      const board = listedScores().filter((entry) => entry.gameMode === gameMode && entry.variant === variant);
       return { rank: board.filter((entry) => entry.score > score).length + 1, total: board.length };
     },
     listUsers(query: AdminUserListQuery): AdminUserList {
@@ -313,9 +322,26 @@ export function createMemoryUserStore(): UserStore {
           dailies: [...dailyResults.keys()].filter((key) => key.startsWith(`${user.id}:`)).length,
           lastActiveAt: lastActiveAt(user.id),
           admin: adminIds.has(user.id) ? "granted" : null,
+          banned: userBans.has(user.id),
         })),
       };
     },
+    getUserBan: (userId) => userBans.get(userId) ?? null,
+    setUserBan(userId, ban) {
+      if (!usersById.has(userId)) return;
+      if (ban) userBans.set(userId, ban);
+      else userBans.delete(userId);
+    },
+    listBannedUsers: () => [...userBans.entries()]
+      .flatMap(([id, ban]) => { const user = usersById.get(id); return user ? [{ id, email: user.email, displayName: user.displayName, ...ban }] : []; })
+      .sort((a, b) => b.bannedAt - a.bannedAt),
+    findIpBan(ip, now) {
+      const ban = ipBans.get(ip);
+      return ban && (ban.expiresAt === null || ban.expiresAt > now) ? ban : null;
+    },
+    listIpBans: (now) => [...ipBans.values()].filter((ban) => ban.expiresAt === null || ban.expiresAt > now).sort((a, b) => b.createdAt - a.createdAt),
+    saveIpBan(ban) { ipBans.set(ban.ip, ban); },
+    deleteIpBan: (ip) => ipBans.delete(ip),
     isAdmin: (userId) => adminIds.has(userId),
     setAdmin(userId, admin) {
       if (!usersById.has(userId)) return;
@@ -328,6 +354,7 @@ export function createMemoryUserStore(): UserStore {
       usersById.delete(id);
       usersByEmail.delete(user.email);
       adminIds.delete(id);
+      userBans.delete(id);
       for (const [key, value] of usersByOAuth) if (value.id === id) usersByOAuth.delete(key);
       for (const [key, session] of sessions) if (session.userId === id) sessions.delete(key);
       for (const [key, entry] of bestTimes) if (entry.userId === id) bestTimes.delete(key);

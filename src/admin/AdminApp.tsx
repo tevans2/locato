@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, Users } from "lucide-react";
+import { Activity, Ban, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, Users } from "lucide-react";
 import { checkSession, createClient, signIn, signOut as endSession, type AdminSessionState } from "./api";
 import { ConfirmDialog, Toasts, type ConfirmRequest, type Toast } from "./ui";
 import { OverviewView } from "./views/Overview";
 import { UsersView, type ActionHelpers } from "./views/Users";
 import { ModerationView } from "./views/Moderation";
+import { BansView } from "./views/Bans";
 import { LiveView } from "./views/Live";
 import { EventsView } from "./views/Events";
 import { SystemView } from "./views/System";
 import { currentTheme, toggleTheme } from "../ui/theme";
 
-type ViewId = "overview" | "users" | "moderation" | "live" | "events" | "system";
+type ViewId = "overview" | "users" | "moderation" | "bans" | "live" | "events" | "system";
 
 const NAV: readonly { id: ViewId; label: string; icon: typeof Users; description: string }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, description: "Activity and health at a glance" },
   { id: "users", label: "Users", icon: Users, description: "Accounts, stats and account actions" },
   { id: "moderation", label: "Leaderboards", icon: ShieldCheck, description: "Review and remove daily results and best times" },
+  { id: "bans", label: "Bans", icon: Ban, description: "Banned accounts and IP addresses" },
   { id: "live", label: "Live", icon: Radio, description: "Open multiplayer rooms and who's online" },
   { id: "events", label: "Event log", icon: ListTree, description: "Sign-ins, submissions, admin actions and warnings" },
   { id: "system", label: "System", icon: Gauge, description: "Server, database and configuration" },
@@ -179,6 +181,7 @@ export function AdminApp() {
         {route.view === "overview" && <OverviewView client={client} onOpenUser={openUser} />}
         {route.view === "users" && <UsersView client={client} currentAdminId={signedInAs.id} selectedId={route.param} onSelect={(id) => navigate("users", id)} helpers={helpers} />}
         {route.view === "moderation" && <ModerationView client={client} onOpenUser={openUser} helpers={helpers} />}
+        {route.view === "bans" && <BansView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "live" && <LiveView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "events" && <EventsView client={client} onOpenUser={openUser} />}
         {route.view === "system" && <SystemView client={client} />}

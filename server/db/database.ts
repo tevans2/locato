@@ -42,6 +42,9 @@ import type {
   UserLeaderboardScoreRank,
   UserStats,
   UserStore,
+  BannedUser,
+  IpBan,
+  UserBan,
 } from "../auth/types";
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
@@ -199,6 +202,14 @@ function migrate(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS friendships_user_high ON friendships(user_high);
 
+    CREATE TABLE IF NOT EXISTS ip_bans (
+      ip TEXT PRIMARY KEY,
+      reason TEXT,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      created_by TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS admin_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       time INTEGER NOT NULL,
@@ -245,6 +256,9 @@ function migrate(db: Database): void {
   const addIfMissing = (sql: string) => { try { db.exec(sql); } catch { /* already exists */ } };
   addIfMissing("ALTER TABLE users ADD COLUMN avatar_emoji TEXT DEFAULT NULL;");
   addIfMissing("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;");
+  addIfMissing("ALTER TABLE users ADD COLUMN banned_at INTEGER DEFAULT NULL;");
+  addIfMissing("ALTER TABLE users ADD COLUMN ban_reason TEXT DEFAULT NULL;");
+  addIfMissing("ALTER TABLE users ADD COLUMN banned_by TEXT DEFAULT NULL;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN challenge_version INTEGER;");
   addIfMissing("ALTER TABLE daily_challenge_results ADD COLUMN rounds TEXT;");
   // Keep provenance without hiding historical results. New ranked writes are verified by
@@ -555,7 +569,7 @@ export class SqliteUserStore implements UserStore {
       .query<DailyResultRow & { userId: string }>(
         `SELECT user_id AS userId, date, seed, score, time_ms AS timeMs, hints_used AS hintsUsed, marks, share_text AS shareText, completed_at AS completedAt, challenge_version AS challengeVersion, rounds
          FROM daily_challenge_results
-         WHERE date = ?`,
+         WHERE date = ? AND user_id NOT IN (SELECT id FROM users WHERE banned_at IS NOT NULL)`,
       )
       .all(date);
     return rows.map((row) => {
@@ -609,7 +623,7 @@ export class SqliteUserStore implements UserStore {
                 m.best_time_ms AS timeMs, m.achieved_at AS achievedAt
          FROM mode_best_times m
          JOIN users u ON u.id = m.user_id
-         WHERE m.game_mode = ? AND m.variant = ?
+         WHERE m.game_mode = ? AND m.variant = ? AND u.banned_at IS NULL
          ORDER BY m.best_time_ms ASC, m.achieved_at ASC
          LIMIT ? OFFSET ?`,
       )
@@ -637,7 +651,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ rank: number }>(
         `SELECT 1 + COUNT(*) AS rank
          FROM mode_best_times
-         WHERE game_mode = ? AND variant = ?
+         WHERE game_mode = ? AND variant = ? AND user_id NOT IN (SELECT id FROM users WHERE banned_at IS NOT NULL)
            AND (best_time_ms < ? OR (best_time_ms = ? AND achieved_at < ?))`,
       )
       .get(gameMode, variant, row.timeMs, row.timeMs, row.achievedAt);
@@ -650,7 +664,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ faster: number | null; total: number }>(
         `SELECT SUM(CASE WHEN best_time_ms < ? THEN 1 ELSE 0 END) AS faster, COUNT(*) AS total
          FROM mode_best_times
-         WHERE game_mode = ? AND variant = ?`,
+         WHERE game_mode = ? AND variant = ? AND user_id NOT IN (SELECT id FROM users WHERE banned_at IS NOT NULL)`,
       )
       .get(timeMs, gameMode, variant);
     return { rank: (row?.faster ?? 0) + 1, total: row?.total ?? 0 };
@@ -668,13 +682,13 @@ export class SqliteUserStore implements UserStore {
     this.db
       .query(
         `INSERT INTO mode_best_scores (user_id, game_mode, variant, best_score, achieved_at, verified)
-         VALUES (?, ?, ?, ?, ?, 1)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, game_mode, variant) DO UPDATE SET
            best_score = excluded.best_score,
-           achieved_at = excluded.achieved_at, verified = 1
+           achieved_at = excluded.achieved_at, verified = excluded.verified
          WHERE excluded.best_score > mode_best_scores.best_score`,
       )
-      .run(userId, input.gameMode, input.variant, input.score, input.achievedAt);
+      .run(userId, input.gameMode, input.variant, input.score, input.achievedAt, input.verified === false ? 0 : 1);
 
     return { accepted: true, isPersonalBest: true };
   }
@@ -686,7 +700,7 @@ export class SqliteUserStore implements UserStore {
                 m.best_score AS score, m.achieved_at AS achievedAt
          FROM mode_best_scores m
          JOIN users u ON u.id = m.user_id
-         WHERE m.game_mode = ? AND m.variant = ?
+         WHERE m.game_mode = ? AND m.variant = ? AND u.banned_at IS NULL
          ORDER BY m.best_score DESC, m.achieved_at ASC
          LIMIT ? OFFSET ?`,
       )
@@ -714,7 +728,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ rank: number }>(
         `SELECT 1 + COUNT(*) AS rank
          FROM mode_best_scores
-         WHERE game_mode = ? AND variant = ?
+         WHERE game_mode = ? AND variant = ? AND user_id NOT IN (SELECT id FROM users WHERE banned_at IS NOT NULL)
            AND (best_score > ? OR (best_score = ? AND achieved_at < ?))`,
       )
       .get(gameMode, variant, row.score, row.score, row.achievedAt);
@@ -727,7 +741,7 @@ export class SqliteUserStore implements UserStore {
       .query<{ higher: number | null; total: number }>(
         `SELECT SUM(CASE WHEN best_score > ? THEN 1 ELSE 0 END) AS higher, COUNT(*) AS total
          FROM mode_best_scores
-         WHERE game_mode = ? AND variant = ?`,
+         WHERE game_mode = ? AND variant = ? AND user_id NOT IN (SELECT id FROM users WHERE banned_at IS NOT NULL)`,
       )
       .get(score, gameMode, variant);
     return { rank: (row?.higher ?? 0) + 1, total: row?.total ?? 0 };
@@ -740,8 +754,8 @@ export class SqliteUserStore implements UserStore {
       .query<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${filter}`)
       .get(query.query ? { $like: like } : {})!.n;
     const rows = this.db
-      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; providers: string | null; createdAt: number; games: number; dailies: number; lastActiveAt: number | null; isAdmin: number }>(
-        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji, u.is_admin AS isAdmin,
+      .query<{ id: string; email: string; displayName: string; avatarEmoji: string | null; hasPassword: number; providers: string | null; createdAt: number; games: number; dailies: number; lastActiveAt: number | null; isAdmin: number; banned: number }>(
+        `SELECT u.id, u.email, u.display_name AS displayName, u.avatar_emoji AS avatarEmoji, u.is_admin AS isAdmin, (u.banned_at IS NOT NULL) AS banned,
                 (u.password_hash IS NOT NULL) AS hasPassword, u.created_at AS createdAt,
                 COALESCE(s.total_games, 0) AS games,
                 (SELECT group_concat(provider) FROM oauth_accounts o WHERE o.user_id = u.id) AS providers,
@@ -757,7 +771,7 @@ export class SqliteUserStore implements UserStore {
          LIMIT $limit OFFSET $offset`,
       )
       .all(query.query ? { $like: like, $limit: query.limit, $offset: query.offset } : { $limit: query.limit, $offset: query.offset });
-    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, providers: row.providers ? row.providers.split(",").sort() : [], createdAt: row.createdAt, games: row.games, dailies: row.dailies, lastActiveAt: row.lastActiveAt, admin: row.isAdmin === 1 ? "granted" : null })) };
+    return { total, users: rows.map((row) => ({ id: row.id, email: row.email, displayName: row.displayName, avatarEmoji: row.avatarEmoji, hasPassword: row.hasPassword === 1, providers: row.providers ? row.providers.split(",").sort() : [], createdAt: row.createdAt, games: row.games, dailies: row.dailies, lastActiveAt: row.lastActiveAt, admin: row.isAdmin === 1 ? "granted" : null, banned: row.banned === 1 })) };
   }
 
   isAdmin(userId: string): boolean {
@@ -766,6 +780,45 @@ export class SqliteUserStore implements UserStore {
 
   setAdmin(userId: string, admin: boolean): void {
     this.db.query("UPDATE users SET is_admin = ? WHERE id = ?").run(admin ? 1 : 0, userId);
+  }
+
+  getUserBan(userId: string): UserBan | null {
+    const row = this.db
+      .query<{ bannedAt: number | null; reason: string | null; bannedBy: string | null }>("SELECT banned_at AS bannedAt, ban_reason AS reason, banned_by AS bannedBy FROM users WHERE id = ?")
+      .get(userId);
+    return row && row.bannedAt !== null ? { bannedAt: row.bannedAt, reason: row.reason, bannedBy: row.bannedBy } : null;
+  }
+
+  setUserBan(userId: string, ban: UserBan | null): void {
+    this.db.query("UPDATE users SET banned_at = ?, ban_reason = ?, banned_by = ? WHERE id = ?").run(ban?.bannedAt ?? null, ban?.reason ?? null, ban?.bannedBy ?? null, userId);
+  }
+
+  listBannedUsers(): readonly BannedUser[] {
+    return this.db
+      .query<BannedUser>("SELECT id, email, display_name AS displayName, banned_at AS bannedAt, ban_reason AS reason, banned_by AS bannedBy FROM users WHERE banned_at IS NOT NULL ORDER BY banned_at DESC")
+      .all();
+  }
+
+  findIpBan(ip: string, now: number): IpBan | null {
+    return this.db
+      .query<IpBan>("SELECT ip, reason, created_at AS createdAt, expires_at AS expiresAt, created_by AS createdBy FROM ip_bans WHERE ip = ? AND (expires_at IS NULL OR expires_at > ?)")
+      .get(ip, now) ?? null;
+  }
+
+  listIpBans(now: number): readonly IpBan[] {
+    return this.db
+      .query<IpBan>("SELECT ip, reason, created_at AS createdAt, expires_at AS expiresAt, created_by AS createdBy FROM ip_bans WHERE expires_at IS NULL OR expires_at > ? ORDER BY created_at DESC")
+      .all(now);
+  }
+
+  saveIpBan(ban: IpBan): void {
+    this.db
+      .query("INSERT INTO ip_bans (ip, reason, created_at, expires_at, created_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT(ip) DO UPDATE SET reason = excluded.reason, created_at = excluded.created_at, expires_at = excluded.expires_at, created_by = excluded.created_by")
+      .run(ban.ip, ban.reason, ban.createdAt, ban.expiresAt, ban.createdBy);
+  }
+
+  deleteIpBan(ip: string): boolean {
+    return this.db.query("DELETE FROM ip_bans WHERE ip = ?").run(ip).changes > 0;
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,

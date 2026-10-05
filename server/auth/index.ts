@@ -1,5 +1,5 @@
 export { AuthService, type AuthOutcome, type AuthServiceOptions } from "./AuthService";
-export { handleAuthRequest } from "./routes";
+export { handleAuthRequest, ipBanResponse } from "./routes";
 export { bunPasswordHasher } from "./passwords";
 export { createMemoryUserStore } from "./memoryStore";
 export { parseCookieHeader, readSessionToken, serializeClearCookie, serializeSessionCookie, SESSION_COOKIE_NAME, type CookieOptions } from "./cookies";

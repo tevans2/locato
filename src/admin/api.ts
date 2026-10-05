@@ -1,8 +1,8 @@
-import type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail } from "../../server/admin/AdminService";
+import type { AdminBans, AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail } from "../../server/admin/AdminService";
 import type { AdminEvent, AdminUserList, AuthUser, LeaderboardEntry, PublicUser } from "../../server/auth/types";
 import type { AdminRoomSummary } from "../../server/rooms/RoomManager";
 
-export type { AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
+export type { AdminBans, AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
 
 export class AdminApiError extends Error {
   constructor(readonly status: number, message: string) {

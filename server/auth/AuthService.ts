@@ -17,6 +17,7 @@ import type { AcademyProgress } from "../../src/core/academy/types";
 import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
 import type {
   AuthUser,
+  IpBan,
   DailyChallengeResult,
   DailyLeaderboardEntry,
   DailySummary,
@@ -89,6 +90,8 @@ const RUN_OUTCOMES: readonly RunOutcome[] = ["complete", "given-up", "abandoned"
 const NAME_ALL_COUNTRIES = indexCountries(rawCountries).countries;
 const NAME_ALL_CODES = NAME_ALL_COUNTRIES.map((country) => country.code);
 const NAME_ALL_NAMES = new Map(NAME_ALL_COUNTRIES.map((country) => [country.code, country.name]));
+
+export const BANNED_MESSAGE = "This account has been banned.";
 
 export type AuthOutcome =
   | { readonly ok: true; readonly user: AuthUser; readonly session: Session }
@@ -175,6 +178,8 @@ export class AuthService {
     if (!user) return invalid;
     if (user.passwordHash === null) return { ok: false, status: 401, error: "Sign in with your OAuth provider." };
     if (!(await this.hasher.verify(password, user.passwordHash))) return invalid;
+    // Only after the password checks out, so a ban doesn't reveal that an email has an account.
+    if (this.isBanned(user.id)) return { ok: false, status: 403, error: BANNED_MESSAGE };
 
     return { ok: true, user: this.toAuthUser(user), session: this.openSession(user.id, this.clock()) };
   }
@@ -192,7 +197,17 @@ export class AuthService {
       return null;
     }
     const user = this.store.findUserById(session.userId);
-    return user ? this.toAuthUser(user) : null;
+    // A banned account's leftover sessions count as signed out.
+    return user && !this.isBanned(user.id) ? this.toAuthUser(user) : null;
+  }
+
+  isBanned(userId: string): boolean {
+    return this.store.getUserBan(userId) !== null;
+  }
+
+  /** The ban covering this address right now, if any. */
+  ipBan(ip: string): IpBan | null {
+    return ip === "unknown" ? null : this.store.findIpBan(ip, this.clock());
   }
 
   upsertOAuthUser(
@@ -305,7 +320,7 @@ export class AuthService {
    * Post one attempt to a board: `timeMs` for time boards, `score` for score boards (sending the
    * other one is rejected). Only a personal best replaces the stored entry.
    */
-  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown }): SubmitBestTimeResult | { error: string } {
+  submitBestTime(userId: string, input: { gameMode?: unknown; variant?: unknown; timeMs?: unknown; score?: unknown; verified?: boolean }): SubmitBestTimeResult | { error: string } {
     if (!this.allowSubmit(userId)) return { error: "Too many submissions. Try again shortly." };
 
     const board = resolveBoard(input.gameMode, input.variant);
@@ -319,11 +334,11 @@ export class AuthService {
     }
     if (input.timeMs !== undefined) return { error: "This leaderboard ranks scores, not times." };
     if (!isValidLeaderboardScore(gameMode, input.score)) return { error: "Invalid score." };
-    return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock() });
+    return this.store.submitBestScore(userId, { gameMode, variant, score: input.score, achievedAt: this.clock(), verified: input.verified !== false });
   }
 
   /**
-   * Only completed server-owned games authorize a ranked write. Browser timelines are
+   * Completed server-owned games authorize ranked writes, except client-reported Flyover. Browser timelines are
    * diagnostic evidence, never authority to post a result, regardless of audit settings.
    */
   submitLeaderboardAttempt(
@@ -335,6 +350,11 @@ export class AuthService {
     if ("error" in board) return board;
     const claimed = board.metric === "time" ? input.timeMs : input.score;
     if (board.metric === "time" ? !isValidLeaderboardTime(claimed) || input.score !== undefined : !isValidLeaderboardScore(board.gameMode, claimed) || input.timeMs !== undefined) return { error: "Invalid ranked result." };
+    // Flyover intentionally uses its original, instant local game again. Authentication,
+    // score bounds and personal-best rules still apply, but this is a client-reported result.
+    if (board.gameMode === "flyover" && input.runId === undefined) {
+      return this.submitBestTime(userId, { gameMode: "flyover", variant: board.variant, score: claimed, verified: false });
+    }
     const verified = this.ranked.consume(userId, input.runId, board.gameMode, board.variant, claimed);
     if (!verified) {
       const audit = isAuditedMode(board.gameMode) ? this.auditFinishedRun(userId, { gameMode: board.gameMode, variant: board.variant, timed: true, outcome: "complete", runId: input.runId, timeline: input.timeline, claimedMs: typeof claimed === "number" ? claimed : null, previousBestMs: null, posted: true }, meta, true) : undefined;

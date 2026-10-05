@@ -56,6 +56,8 @@ export interface FlyoverFlightOptions {
   /** Shown on the clock before take-off. */
   readonly flightSeconds: number;
   readonly now: () => number;
+  /** A steady local clock for motion, independent of adjustments to the server clock. */
+  readonly animationNow?: () => number;
   readonly requestFrame: (callback: () => void) => number;
   readonly cancelFrame: (handle: number) => void;
   readonly signal: AbortSignal;
@@ -172,6 +174,7 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 
 export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFlight {
   const { countries, now, requestFrame, cancelFrame, signal } = options;
+  const animationNow = options.animationNow ?? now;
   const paths = new Map<string, Path2D | null>(countries.map((country) => [country.code, buildPath(country)]));
 
   let flying = false;
@@ -465,6 +468,9 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
 
   // --- Flight ------------------------------------------------------------------------------
   function setTarget(next: FlyoverCountry | null, emptyText = "Every country visited!"): void {
+    // Polls and race syncs usually repeat the same target. Leave its flag, animation and hint
+    // clock alone until the country actually changes.
+    if (next ? next.code === target?.code : !target && targetName.textContent === emptyText) return;
     target = next;
     targetSince = now();
     if (!next) {
@@ -489,8 +495,9 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
 
   function updateClock(clockNow: number): void {
     const left = (runEndsAt - clockNow) / 1000;
-    clockValue.textContent = formatFlyoverClock(left);
-    clock.classList.toggle("is-low", left <= 10);
+    const text = formatFlyoverClock(left);
+    if (clockValue.textContent !== text) clockValue.textContent = text;
+    if (clock.classList.contains("is-low") !== (left <= 10)) clock.classList.toggle("is-low", left <= 10);
   }
 
   function currentInput() {
@@ -525,8 +532,9 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
   function tick(): void {
     frameHandle = null;
     const clockNow = now();
-    const dt = Math.min(0.05, Math.max(0, (clockNow - lastFrameAt) / 1000));
-    lastFrameAt = clockNow;
+    const frameNow = animationNow();
+    const dt = Math.min(0.05, Math.max(0, (frameNow - lastFrameAt) / 1000));
+    lastFrameAt = frameNow;
     if (flying) {
       const input = currentInput();
       options.onInput?.(input);
@@ -569,7 +577,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     updateClock(clockNow);
     if (flying) return;
     flying = true;
-    lastFrameAt = clockNow;
+    lastFrameAt = animationNow();
     stage.classList.add("is-flying");
     scheduleFrame();
   }
@@ -645,6 +653,7 @@ export function createFlyoverFlight(options: FlyoverFlightOptions): FlyoverFligh
     }
   }, { signal });
   window.addEventListener("keyup", (event) => {
+    if (typeof event.key !== "string") return;
     heldKeys.delete(event.key);
     // Shift changes the reported key of letters; clear the pair so nothing sticks.
     if (event.key.length === 1) {

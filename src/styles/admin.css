@@ -298,3 +298,18 @@ g.is-hovered .adm-hit { fill: var(--row-hover); }
 .adm-run-curve-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: .6; }
 .adm-runs .adm-run-checks { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 320px; }
 .adm-runs .adm-run-checks > div { flex-basis: 100%; }
+
+/* Ban toggle: a switch, so banning and unbanning is one control in the Users table and drawer. */
+.adm-switch { display: inline-flex; align-items: center; gap: 8px; padding: 2px 4px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.adm-switch:disabled { cursor: not-allowed; opacity: 0.45; }
+.adm-switch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.adm-switch-track { position: relative; width: 30px; height: 17px; border-radius: 999px; background: var(--border-strong); transition: background 0.15s; }
+.adm-switch-thumb { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.adm-switch.is-on { color: var(--bad); }
+.adm-switch.is-on .adm-switch-track { background: var(--bad); }
+.adm-switch.is-on .adm-switch-thumb { transform: translateX(13px); }
+.adm-ban-note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--bad-soft); color: var(--bad); font-size: 13px; font-weight: 600; }
+.adm-ban-form { flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.adm-ban-form input, .adm-ban-form select { flex: 1 1 140px; min-width: 0; }
+.adm-ban-form select { min-height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .adm-switch-track, .adm-switch-thumb { transition: none; } }

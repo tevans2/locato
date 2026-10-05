@@ -5,6 +5,8 @@
 .verified-content input, .verified-content select { padding: .7rem; border-radius: .5rem; border: 1px solid var(--border, #829080); background: var(--surface, #fffef8); color: inherit; }
 .verified-progress, .verified-feedback { text-align: center; min-height: 1.4rem; padding: .5rem; }
 .verified-prompt-image { width: min(500px, 90vw); height: 300px; object-fit: contain; }
+/* Outlines are white-filled: flip them on the pale light theme, like .country-shape-prompt. */
+:root:not([data-theme="dark"]) .verified-prompt-image.is-shape { filter: invert(1) hue-rotate(180deg); }
 .verified-street-image { width: min(800px, 100%); min-height: 300px; object-fit: contain; border-radius: .75rem; }
 .verified-map { width: 100%; min-height: 260px; background: #c9e0df; border-radius: 1rem; touch-action: none; }
 .verified-map path { fill: #f7f5eb; stroke: #829080; stroke-width: .4; }

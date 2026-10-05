@@ -42,6 +42,8 @@ export interface PublicPlayerState {
 export interface PublicPromptContent {
   readonly kind: "image" | "text" | "map-click" | "map-highlight" | "flag-colors" | "maptap-globe" | "geoguessr-streetview" | "flyover-flight";
   readonly value: string;
+  /** "shape": the image is a white country outline (see PromptContent). */
+  readonly presentation?: "shape" | "flag-colors";
 }
 
 export interface PublicRoundState {
@@ -130,9 +132,9 @@ export interface FinalResult {
 /** The `flyover-flight` prompt value (JSON): where every plane takes off and the shared route. */
 export interface FlyoverFlightPrompt {
   readonly start: { readonly x: number; readonly y: number; readonly heading: number };
-  /** Only the first target. Each racer's next target is sent privately after server verification. */
+  /** Current-target compatibility for older server-driven clients. */
   readonly target?: string | null;
-  /** Legacy fixtures only; servers never publish a full route. */
+  /** The shared route allows instant local touches and skips. */
   readonly route?: readonly string[];
 }
 

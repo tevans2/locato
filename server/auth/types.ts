@@ -169,6 +169,8 @@ export interface SubmitBestScoreInput {
   readonly variant: string;
   readonly score: number;
   readonly achievedAt: number;
+  /** False for client-reported results, including the restored local Flyover mode. */
+  readonly verified?: boolean;
 }
 
 export interface LeaderboardScoreEntry {
@@ -218,6 +220,31 @@ export interface AdminUserSummary {
   // Latest game, daily, or login; null when the account has never been used since signup.
   readonly lastActiveAt: number | null;
   readonly admin: AdminAccess;
+  readonly banned: boolean;
+}
+
+/** An account ban. Banned accounts can't sign in and drop off every leaderboard; nothing is deleted. */
+export interface UserBan {
+  readonly bannedAt: number;
+  readonly reason: string | null;
+  /** The admin who banned them. */
+  readonly bannedBy: string | null;
+}
+
+export interface BannedUser extends UserBan {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+}
+
+/** Requests from this address get a 403 on sign-in, sign-up, the API and multiplayer. */
+export interface IpBan {
+  readonly ip: string;
+  readonly reason: string | null;
+  readonly createdAt: number;
+  /** null = until lifted. */
+  readonly expiresAt: number | null;
+  readonly createdBy: string | null;
 }
 
 // Why an account can use the admin console: listed in ADMIN_EMAILS ("config", can't be revoked
@@ -409,6 +436,15 @@ export interface UserStore {
   /** The admin flag granted from the console (ADMIN_EMAILS is applied on top, in AdminService). */
   isAdmin(userId: string): boolean;
   setAdmin(userId: string, admin: boolean): void;
+  // Bans.
+  getUserBan(userId: string): UserBan | null;
+  setUserBan(userId: string, ban: UserBan | null): void;
+  listBannedUsers(): readonly BannedUser[];
+  /** The ban covering this address right now (expired bans don't count). */
+  findIpBan(ip: string, now: number): IpBan | null;
+  listIpBans(now: number): readonly IpBan[];
+  saveIpBan(ban: IpBan): void;
+  deleteIpBan(ip: string): boolean;
   deleteUser(id: string): boolean;
   deleteUserSessions(userId: string): number;
   updateDisplayName(userId: string, displayName: string): void;

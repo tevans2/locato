@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("Flyover real-control autopilot reproduction", () => {
-  it.each(["audit-one", "audit-two", "audit-three"])("the old script cannot obtain a full multiplayer route or claim points (%s)", async (seed) => {
+  it.each(["audit-one", "audit-two", "audit-three"])("the original local multiplayer supports the isolated autopilot again (%s)", async (seed) => {
     let time = 100_000;
     let frames: (() => void)[] = [];
     let tick: (() => void) | null = null;
@@ -99,16 +99,16 @@ describe("Flyover real-control autopilot reproduction", () => {
     }
     const score = room.snapshot().players[0]!.score;
     expect(errors).not.toHaveBeenCalled();
-    expect(pointerMoves).not.toHaveBeenCalled();
-    expect(score).toBe(0);
+    expect(pointerMoves).toHaveBeenCalled();
+    expect(score).toBeGreaterThan(60);
     expect(rejected).toBe(0);
     expect(score).toBe(clientArrivals);
-    expect(clientArrivals).toBe(0);
-    expect(JSON.parse(gameStarted.round.prompt.value)).not.toHaveProperty("route");
+    expect(JSON.parse(gameStarted.round.prompt.value).route.length).toBeGreaterThan(150);
     api.stop();
     expect(TestSocket.prototype.send).toBe(originalSend);
-    console.log(JSON.stringify({ seed, score, rejected, actualClientArrivals: clientArrivals, fullRouteVisible: false }));
-  });
+    console.log(JSON.stringify({ seed, score, rejected, actualClientArrivals: clientArrivals, fullRouteVisible: true }));
+  // This fixture renders a complete 93-second race, including the take-off countdown.
+  }, 60_000);
 
   it.each([
     { seed: "solo-one", speedFactor: 1, radiusFactor: 1, simulationFrameMs: frameMs },

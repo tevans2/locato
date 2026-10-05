@@ -187,7 +187,6 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     signal,
     worldCountryFeatures: options.worldCountryFeatures,
     onPosition: (plane) => session.send({ type: "FLYOVER_POSITION", x: plane.x, y: plane.y, heading: plane.heading }),
-    onInput: (input) => session.send({ type: "FLYOVER_INPUT", turn: input.turn, towards: input.towards ?? null, boost: input.boost === true }),
     onReach: (index, plane) => session.send({ type: "FLYOVER_REACHED", index, x: plane.x, y: plane.y, clientSentAt: Date.now() }),
     onSkip: (index) => session.send({ type: "FLYOVER_SKIP", index }),
   }));

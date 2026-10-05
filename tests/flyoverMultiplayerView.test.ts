@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMultiplayerFlyoverGameView } from "../src/ui/components/MultiplayerFlyoverGameView";
+import * as flightComponent from "../src/ui/components/FlyoverFlight";
 import { FLYOVER_TAKEOFF_COUNTDOWN_MS, buildFlyoverCountries } from "../src/core/flyover";
 import type { WorldCountryFeature } from "../src/core/map";
 import type { PublicPlayerState, PublicRoomState } from "../src/core/multiplayer";
@@ -18,6 +19,7 @@ const controllers: AbortController[] = [];
 afterEach(() => {
   for (const controller of controllers.splice(0)) controller.abort();
   document.body.replaceChildren();
+  vi.restoreAllMocks();
 });
 
 const player = (id: string, name: string, extra: Partial<PublicPlayerState> = {}): PublicPlayerState => ({ id, name, connected: true, score: 0, streak: 0, correctAnswers: 0, wrongAnswers: 0, ...extra });
@@ -25,7 +27,6 @@ const player = (id: string, name: string, extra: Partial<PublicPlayerState> = {}
 function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), player("rival", "Rival")]) {
   let time = 100_000;
   let frames: (() => void)[] = [];
-  const onInput = vi.fn();
   const onPosition = vi.fn();
   const onReach = vi.fn();
   const onSkip = vi.fn();
@@ -35,7 +36,6 @@ function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), play
     signal: controller.signal,
     worldCountryFeatures: features,
     onPosition,
-    onInput,
     onReach,
     onSkip,
     now: () => time,
@@ -73,7 +73,7 @@ function setup(players: readonly PublicPlayerState[] = [player("me", "Me"), play
     for (const callback of run) callback();
   };
   const fly = (seconds: number) => { for (let t = 0; t < seconds * 1000; t += 50) frame(50); };
-  return { view, room, $, frame, fly, onInput, onPosition, onReach, onSkip };
+  return { view, room, $, frame, fly, onPosition, onReach, onSkip };
 }
 
 describe("Flyover race view", () => {
@@ -89,12 +89,12 @@ describe("Flyover race view", () => {
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
   });
 
-  it("waits for server touches before moving on or awarding score", () => {
+  it("scores and names the next country immediately without a server response", () => {
     const ui = setup();
     ui.fly(5.6);
-    expect(ui.onReach).not.toHaveBeenCalled();
-    expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
-    expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("0");
+    expect(ui.onReach).toHaveBeenCalledOnce();
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
+    expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("1");
     ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 1, event: "reached", target: "CC" });
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
     expect(ui.$(".flyover-standing.is-local .flyover-standing-score")?.textContent).toBe("1");
@@ -107,13 +107,29 @@ describe("Flyover race view", () => {
     expect(rows).toEqual(["1Rival2", "2You0"]);
   });
 
+  it("leaves the target card alone on repeated race progress messages", () => {
+    const ui = setup();
+    ui.fly(3.1);
+    const card = ui.$(".flyover-target")!;
+    const restartAnimation = vi.spyOn(card.classList, "remove");
+    for (let i = 0; i < 10; i++) {
+      ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 0, score: 0, event: "sync", target: "BB" });
+      ui.frame();
+    }
+    expect(restartAnimation).not.toHaveBeenCalled();
+    ui.fly(2.5);
+    expect(restartAnimation).toHaveBeenCalledOnce();
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
+    restartAnimation.mockRestore();
+  });
+
   it("skips into a holding pattern and reports the skipped route position", () => {
     const ui = setup();
     ui.fly(3.1);
     ui.$<HTMLButtonElement>(".flyover-skip")!.click();
     expect(ui.onSkip).toHaveBeenCalledWith(0);
-    expect(ui.$(".flyover-target-name")?.textContent).toBe("Bravo");
-    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 0, event: "skipped", target: "CC" });
+    expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
+    ui.view.applyProgress({ type: "FLYOVER_PROGRESS", playerId: "me", index: 1, score: 0, event: "skipped" });
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Charlie");
     expect(ui.$(".flyover-skip")?.textContent).toContain("5s hold");
   });
@@ -121,10 +137,10 @@ describe("Flyover race view", () => {
   it("reports the plane about five times a second, and draws rivals without counting yourself", () => {
     const ui = setup();
     ui.fly(3.1);
-    ui.onInput.mockClear();
+    ui.onPosition.mockClear();
     ui.fly(1);
-    expect(ui.onInput.mock.calls.length).toBeGreaterThanOrEqual(4);
-    expect(ui.onInput.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(ui.onPosition.mock.calls.length).toBeGreaterThanOrEqual(4);
+    expect(ui.onPosition.mock.calls.length).toBeLessThanOrEqual(6);
     expect(() => ui.view.setPlanes([{ playerId: "rival", x: 400, y: 200, heading: 0 }, { playerId: "me", x: 1, y: 1, heading: 0 }])).not.toThrow();
   });
 
@@ -156,8 +172,8 @@ describe("Flyover race view", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     flying.fly(2.5);
     window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
-    expect(flying.onInput.mock.calls.some(([input]) => input.turn === 1)).toBe(false);
-    expect(ui.onInput.mock.calls.some(([input]) => input.turn === 1)).toBe(true);
+    expect(flying.onPosition.mock.calls.every(([plane]) => plane.heading === Math.PI)).toBe(true);
+    expect(ui.onPosition.mock.calls.some(([plane]) => plane.heading !== Math.PI)).toBe(true);
   });
 
   it("lets go of the lobby's focused button at take-off, so Space boosts instead of pressing it", () => {
@@ -177,4 +193,25 @@ describe("Flyover race view", () => {
     expect(ui.$(".flyover-target-name")?.textContent).toBe("Landing…");
     expect(ui.$(".flyover-stage")?.classList.contains("is-flying")).toBe(false);
   });
+});
+
+it("never reconciles the local plane to delayed multiplayer positions", () => {
+  let flight!: flightComponent.FlyoverFlight;
+  const create = flightComponent.createFlyoverFlight;
+  vi.spyOn(flightComponent, "createFlyoverFlight").mockImplementation((options) => { flight = create(options); return flight; });
+  const ui = setup();
+  ui.fly(3.1);
+  const setPlane = vi.spyOn(flight, "setPlane");
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp" }));
+  for (let i = 0; i < 60; i++) {
+    const before = flight.plane();
+    ui.view.setPlanes([{ playerId: "me", x: 1, y: 1, heading: 0 }, { playerId: "rival", x: 400, y: 200, heading: 0 }]);
+    expect(flight.plane()).toEqual(before);
+    ui.frame();
+    expect(flight.plane()).not.toEqual(before);
+  }
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowUp" }));
+  expect(setPlane).not.toHaveBeenCalled();
 });
