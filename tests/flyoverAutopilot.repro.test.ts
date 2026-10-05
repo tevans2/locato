@@ -107,7 +107,8 @@ describe("Flyover real-control autopilot reproduction", () => {
     api.stop();
     expect(TestSocket.prototype.send).toBe(originalSend);
     console.log(JSON.stringify({ seed, score, rejected, actualClientArrivals: clientArrivals, fullRouteVisible: true }));
-  });
+  // This fixture renders a complete 93-second race, including the take-off countdown.
+  }, 60_000);
 
   it.each([
     { seed: "solo-one", speedFactor: 1, radiusFactor: 1, simulationFrameMs: frameMs },
