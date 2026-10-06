@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
-import type { AdminClient, AdminDailyEntry, AdminLeaderboardEntry } from "../api";
-import { formatBoardValue, formatDateTime, formatDuration, modeName, todayUtc } from "../format";
+import type { AdminClient, AdminDailyEntry, AdminLeaderboardEntry, RemovedBoardEntry } from "../api";
+import { boardRemovalNotice, formatBoardValue, formatDateTime, formatDuration, modeName, todayUtc } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
 import type { ActionHelpers } from "./Users";
 import { FlaggedRuns } from "./Runs";
@@ -128,10 +128,10 @@ function BestTimes({ client, onOpenUser, helpers }: { client: AdminClient; onOpe
                   <td className="num">
                     <button type="button" className="adm-icon-btn" aria-label={`Remove ${entry.displayName}'s ${noun}`} onClick={() => helpers.confirm({
                       title: `Remove leaderboard ${noun}?`,
-                      body: <p>Removes <strong>{entry.displayName}</strong>'s {modeName(mode)}{variant ? ` (${variant})` : ""} {noun} of {formatBoardValue(entry)}.</p>,
+                      body: <p>Removes <strong>{entry.displayName}</strong>'s {modeName(mode)}{variant ? ` (${variant})` : ""} {noun} of {formatBoardValue(entry)}. Their best goes back to their previous {noun} on this board, if they have one.</p>,
                       confirmLabel: "Remove",
                       tone: "danger",
-                      run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(entry.userId)}?${new URLSearchParams({ mode, variant })}`); helpers.notify(`Leaderboard ${noun} removed.`); board.refresh(); },
+                      run: async () => { const result = await client.send<RemovedBoardEntry>("DELETE", `/leaderboards/${encodeURIComponent(entry.userId)}?${new URLSearchParams({ mode, variant })}`); helpers.notify(boardRemovalNotice(entry.displayName, noun, result)); board.refresh(); },
                     })}><Trash2 size={14} /></button>
                   </td>
                 </tr>

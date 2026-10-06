@@ -43,6 +43,7 @@ import type {
   UserStats,
   UserStore,
   BannedUser,
+  RemovedBest,
   IpBan,
   UserBan,
 } from "../auth/types";
@@ -173,6 +174,21 @@ function migrate(db: Database): void {
     CREATE INDEX IF NOT EXISTS mode_best_scores_rank
       ON mode_best_scores (game_mode, variant, best_score DESC, achieved_at ASC);
 
+    -- Every accepted leaderboard result, not just the best, so a removed fake best can fall back
+    -- to the player's previous one. removed_at marks results an admin struck off.
+    CREATE TABLE IF NOT EXISTS leaderboard_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_mode TEXT NOT NULL,
+      variant TEXT NOT NULL DEFAULT '',
+      metric TEXT NOT NULL,
+      value INTEGER NOT NULL,
+      achieved_at INTEGER NOT NULL,
+      verified INTEGER NOT NULL DEFAULT 1,
+      removed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS leaderboard_attempts_board ON leaderboard_attempts(user_id, game_mode, variant, metric);
+
     CREATE TABLE IF NOT EXISTS daily_challenge_results (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
@@ -302,6 +318,24 @@ function migrate(db: Database): void {
       WHERE excluded.completed_at < daily_challenge_results.completed_at;
     `);
     db.query("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("restore_historical_results_v1", Date.now());
+  })();
+  // Seed the attempt history once from everything already known: current bests, the pre-
+  // verification snapshots and verified ranked time runs. Older attempts were never kept, so a
+  // best with nothing earlier here still drops off the board when it's removed.
+  db.transaction(() => {
+    if (db.query("SELECT id FROM schema_migrations WHERE id = ?").get("leaderboard_attempts_v1")) return;
+    const seed = (metric: string, select: string) => db.exec(`
+      INSERT INTO leaderboard_attempts (user_id, game_mode, variant, metric, value, achieved_at, verified)
+      SELECT s.user_id, s.game_mode, s.variant, '${metric}', s.value, s.achieved_at, s.verified FROM (${select}) s
+      WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id)
+        AND NOT EXISTS (SELECT 1 FROM leaderboard_attempts a WHERE a.user_id = s.user_id AND a.game_mode = s.game_mode AND a.variant = s.variant
+          AND a.metric = '${metric}' AND a.value = s.value AND a.achieved_at = s.achieved_at);`);
+    seed("time", "SELECT user_id, game_mode, variant, best_time_ms AS value, achieved_at, verified FROM mode_best_times");
+    seed("time", "SELECT user_id, game_mode, variant, best_time_ms AS value, achieved_at, verified FROM legacy_mode_best_times");
+    seed("time", "SELECT user_id, game_mode, variant, claimed_ms AS value, finished_at AS achieved_at, 1 AS verified FROM runs WHERE id LIKE 'ranked:%' AND posted = 1 AND claimed_ms IS NOT NULL AND finished_at IS NOT NULL");
+    seed("score", "SELECT user_id, game_mode, variant, best_score AS value, achieved_at, verified FROM mode_best_scores");
+    seed("score", "SELECT user_id, game_mode, variant, best_score AS value, achieved_at, verified FROM legacy_mode_best_scores");
+    db.query("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("leaderboard_attempts_v1", Date.now());
   })();
   // Expand user_stats from old 4-column schema to full split schema.
   for (const col of ["total_games", "total_correct", "total_wrong", "solo_games", "solo_correct", "solo_wrong", "solo_best_streak", "multiplayer_games", "multiplayer_wins", "multiplayer_correct", "multiplayer_wrong", "multiplayer_best_streak", "world_map_games", "world_map_completions", "world_best_time_ms", "world_best_countries"]) {
@@ -593,7 +627,14 @@ export class SqliteUserStore implements UserStore {
     return this.getDailyResult(userId, result.date)!;
   }
 
+  private recordAttempt(userId: string, metric: "time" | "score", gameMode: string, variant: string, value: number, achievedAt: number, verified: boolean): void {
+    this.db
+      .query("INSERT INTO leaderboard_attempts (user_id, game_mode, variant, metric, value, achieved_at, verified) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(userId, gameMode, variant, metric, value, achievedAt, verified ? 1 : 0);
+  }
+
   submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
+    this.recordAttempt(userId, "time", input.gameMode, input.variant, input.timeMs, input.achievedAt, true);
     const existing = this.db
       .query<{ bestTimeMs: number }>("SELECT best_time_ms AS bestTimeMs FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?")
       .get(userId, input.gameMode, input.variant);
@@ -671,6 +712,7 @@ export class SqliteUserStore implements UserStore {
   }
 
   submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
+    this.recordAttempt(userId, "score", input.gameMode, input.variant, input.score, input.achievedAt, input.verified !== false);
     const existing = this.db
       .query<{ bestScore: number }>("SELECT best_score AS bestScore FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?")
       .get(userId, input.gameMode, input.variant);
@@ -857,7 +899,40 @@ export class SqliteUserStore implements UserStore {
   }
 
   deleteBestTime(userId: string, gameMode: string, variant: string): boolean {
+    this.db.query("DELETE FROM leaderboard_attempts WHERE user_id = ? AND game_mode = ? AND variant = ? AND metric = 'time'").run(userId, gameMode, variant);
     return this.db.query("DELETE FROM mode_best_times WHERE user_id = ? AND game_mode = ? AND variant = ?").run(userId, gameMode, variant).changes > 0;
+  }
+
+  removeBest(userId: string, metric: "time" | "score", gameMode: string, variant: string, now: number): RemovedBest | null {
+    const table = metric === "time" ? "mode_best_times" : "mode_best_scores";
+    const column = metric === "time" ? "best_time_ms" : "best_score";
+    let result: RemovedBest | null = null;
+    this.db.transaction(() => {
+      const current = this.db
+        .query<{ value: number }>(`SELECT ${column} AS value FROM ${table} WHERE user_id = ? AND game_mode = ? AND variant = ?`)
+        .get(userId, gameMode, variant);
+      if (!current) return;
+      // Every attempt at the removed value goes (the same fake posted twice is still the fake).
+      this.db
+        .query("UPDATE leaderboard_attempts SET removed_at = ? WHERE user_id = ? AND game_mode = ? AND variant = ? AND metric = ? AND value = ? AND removed_at IS NULL")
+        .run(now, userId, gameMode, variant, metric, current.value);
+      const next = this.db
+        .query<{ value: number; achievedAt: number; verified: number }>(
+          `SELECT value, achieved_at AS achievedAt, verified FROM leaderboard_attempts
+           WHERE user_id = ? AND game_mode = ? AND variant = ? AND metric = ? AND removed_at IS NULL
+           ORDER BY value ${metric === "time" ? "ASC" : "DESC"}, achieved_at ASC LIMIT 1`,
+        )
+        .get(userId, gameMode, variant, metric);
+      if (next) {
+        this.db
+          .query(`UPDATE ${table} SET ${column} = ?, achieved_at = ?, verified = ? WHERE user_id = ? AND game_mode = ? AND variant = ?`)
+          .run(next.value, next.achievedAt, next.verified, userId, gameMode, variant);
+      } else {
+        this.db.query(`DELETE FROM ${table} WHERE user_id = ? AND game_mode = ? AND variant = ?`).run(userId, gameMode, variant);
+      }
+      result = { removed: current.value, revertedTo: next ? { value: next.value, achievedAt: next.achievedAt } : null };
+    })();
+    return result;
   }
 
   listUserBestScores(userId: string): readonly AdminBestScore[] {
@@ -867,6 +942,7 @@ export class SqliteUserStore implements UserStore {
   }
 
   deleteBestScore(userId: string, gameMode: string, variant: string): boolean {
+    this.db.query("DELETE FROM leaderboard_attempts WHERE user_id = ? AND game_mode = ? AND variant = ? AND metric = 'score'").run(userId, gameMode, variant);
     return this.db.query("DELETE FROM mode_best_scores WHERE user_id = ? AND game_mode = ? AND variant = ?").run(userId, gameMode, variant).changes > 0;
   }
 

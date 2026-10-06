@@ -99,3 +99,10 @@ export function formatBoardValue(entry: { readonly timeMs?: number; readonly sco
   if (typeof entry.score === "number") return `${formatNumber(entry.score)} pts`;
   return typeof entry.timeMs === "number" ? formatDuration(entry.timeMs) : "—";
 }
+
+/** The toast after removing a board entry: where the player landed, if anywhere. */
+export function boardRemovalNotice(name: string, noun: "time" | "score", result: { readonly revertedTo: { readonly value: number } | null }): string {
+  if (!result.revertedTo) return `Removed. ${name} has no earlier ${noun}, so they're off this board.`;
+  const value = noun === "score" ? formatBoardValue({ score: result.revertedTo.value }) : formatBoardValue({ timeMs: result.revertedTo.value });
+  return `Removed. ${name}'s best is back to ${value}.`;
+}

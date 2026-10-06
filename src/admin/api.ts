@@ -87,6 +87,7 @@ export interface AdminSystem {
   readonly streetview: Record<string, unknown>;
 }
 
+export type RemovedBoardEntry = { readonly ok: true; readonly removed: number; readonly revertedTo: { readonly value: number; readonly achievedAt: number } | null };
 export type AdminUserUpdate = { displayName?: string; clearAvatar?: true };
 export type { AdminAccess } from "../../server/auth/types";
 export type { AuthUser };

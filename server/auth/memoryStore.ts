@@ -47,6 +47,7 @@ export function createMemoryUserStore(): UserStore {
   const usersById = new Map<string, StoredUser>();
   const adminIds = new Set<string>();
   const userBans = new Map<string, UserBan>();
+  const attempts: { userId: string; gameMode: string; variant: string; metric: "time" | "score"; value: number; achievedAt: number; removedAt: number | null }[] = [];
   const ipBans = new Map<string, IpBan>();
   const usersByEmail = new Map<string, StoredUser>();
   const usersByOAuth = new Map<string, StoredUser>();
@@ -68,6 +69,13 @@ export function createMemoryUserStore(): UserStore {
   // Public boards leave banned accounts out.
   const listedTimes = () => [...bestTimes.values()].filter((entry) => !userBans.has(entry.userId));
   const listedScores = () => [...bestScores.values()].filter((entry) => !userBans.has(entry.userId));
+
+  function dropAttempts(userId: string, gameMode: string, variant: string, metric: "time" | "score"): void {
+    for (let i = attempts.length - 1; i >= 0; i -= 1) {
+      const a = attempts[i]!;
+      if (a.userId === userId && a.gameMode === gameMode && a.variant === variant && a.metric === metric) attempts.splice(i, 1);
+    }
+  }
 
   function bestTimeKey(userId: string, gameMode: string, variant: string): string {
     return `${userId}:${gameMode}:${variant}`;
@@ -223,6 +231,7 @@ export function createMemoryUserStore(): UserStore {
       return dailyResults.get(key)!;
     },
     submitBestTime(userId: string, input: SubmitBestTimeInput): SubmitBestTimeResult {
+      attempts.push({ userId, gameMode: input.gameMode, variant: input.variant, metric: "time", value: input.timeMs, achievedAt: input.achievedAt, removedAt: null });
       const key = bestTimeKey(userId, input.gameMode, input.variant);
       const existing = bestTimes.get(key);
       if (existing && input.timeMs >= existing.timeMs) {
@@ -264,6 +273,7 @@ export function createMemoryUserStore(): UserStore {
       return { rank: board.filter((entry) => entry.timeMs < timeMs).length + 1, total: board.length };
     },
     submitBestScore(userId: string, input: SubmitBestScoreInput): SubmitBestTimeResult {
+      attempts.push({ userId, gameMode: input.gameMode, variant: input.variant, metric: "score", value: input.score, achievedAt: input.achievedAt, removedAt: null });
       const key = bestTimeKey(userId, input.gameMode, input.variant);
       const existing = bestScores.get(key);
       if (existing && input.score <= existing.score) {
@@ -352,6 +362,7 @@ export function createMemoryUserStore(): UserStore {
       const user = usersById.get(id);
       if (!user) return false;
       usersById.delete(id);
+      for (let i = attempts.length - 1; i >= 0; i -= 1) if (attempts[i]!.userId === id) attempts.splice(i, 1);
       usersByEmail.delete(user.email);
       adminIds.delete(id);
       userBans.delete(id);
@@ -398,14 +409,39 @@ export function createMemoryUserStore(): UserStore {
         .sort((a, b) => a.gameMode.localeCompare(b.gameMode) || a.variant.localeCompare(b.variant))
         .map((row) => ({ gameMode: row.gameMode, variant: row.variant, timeMs: row.timeMs, achievedAt: row.achievedAt }));
     },
-    deleteBestTime: (userId, gameMode, variant) => bestTimes.delete(bestTimeKey(userId, gameMode, variant)),
+    deleteBestTime(userId, gameMode, variant) {
+      dropAttempts(userId, gameMode, variant, "time");
+      return bestTimes.delete(bestTimeKey(userId, gameMode, variant));
+    },
+    removeBest(userId, metric, gameMode, variant, now) {
+      const key = bestTimeKey(userId, gameMode, variant);
+      const current = metric === "time" ? bestTimes.get(key)?.timeMs : bestScores.get(key)?.score;
+      if (current === undefined) return null;
+      const board = attempts.filter((a) => a.userId === userId && a.gameMode === gameMode && a.variant === variant && a.metric === metric && a.removedAt === null);
+      for (const attempt of board) if (attempt.value === current) attempt.removedAt = now;
+      const next = board
+        .filter((a) => a.removedAt === null)
+        .sort((a, b) => (metric === "time" ? a.value - b.value : b.value - a.value) || a.achievedAt - b.achievedAt)[0];
+      if (!next) {
+        if (metric === "time") bestTimes.delete(key);
+        else bestScores.delete(key);
+      } else if (metric === "time") {
+        bestTimes.set(key, { userId, gameMode, variant, timeMs: next.value, achievedAt: next.achievedAt });
+      } else {
+        bestScores.set(key, { userId, gameMode, variant, score: next.value, achievedAt: next.achievedAt });
+      }
+      return { removed: current, revertedTo: next ? { value: next.value, achievedAt: next.achievedAt } : null };
+    },
     listUserBestScores(userId: string): readonly AdminBestScore[] {
       return [...bestScores.values()]
         .filter((row) => row.userId === userId)
         .sort((a, b) => a.gameMode.localeCompare(b.gameMode) || a.variant.localeCompare(b.variant))
         .map((row) => ({ gameMode: row.gameMode, variant: row.variant, score: row.score, achievedAt: row.achievedAt }));
     },
-    deleteBestScore: (userId, gameMode, variant) => bestScores.delete(bestTimeKey(userId, gameMode, variant)),
+    deleteBestScore(userId, gameMode, variant) {
+      dropAttempts(userId, gameMode, variant, "score");
+      return bestScores.delete(bestTimeKey(userId, gameMode, variant));
+    },
     deleteDailyResult: (userId, date) => dailyResults.delete(dailyKey(userId, date)),
     resetUserStats(userId: string): void {
       stats.delete(userId);

@@ -149,6 +149,13 @@ export interface SubmitBestTimeInput {
   readonly achievedAt: number;
 }
 
+/** What removing a board entry left behind: the player's next-best result, or nothing. */
+export interface RemovedBest {
+  /** The value that was removed (ms on time boards, points on score boards). */
+  readonly removed: number;
+  readonly revertedTo: { readonly value: number; readonly achievedAt: number } | null;
+}
+
 export interface SubmitBestTimeResult {
   readonly accepted: boolean;
   readonly isPersonalBest: boolean;
@@ -451,7 +458,13 @@ export interface UserStore {
   listUserSessions(userId: string, now: number): readonly AdminSessionInfo[];
   listUserProviders(userId: string): readonly string[];
   listUserBestTimes(userId: string): readonly AdminBestTime[];
+  /** Hard delete of a board entry and its history (dev seeding). Moderation uses removeBest. */
   deleteBestTime(userId: string, gameMode: string, variant: string): boolean;
+  /**
+   * Strike a player's current best from the board and fall back to their next-best accepted
+   * result on it, or drop them from the board when there's none. null when there's no entry.
+   */
+  removeBest(userId: string, metric: "time" | "score", gameMode: string, variant: string, now: number): RemovedBest | null;
   listUserBestScores(userId: string): readonly AdminBestScore[];
   deleteBestScore(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;

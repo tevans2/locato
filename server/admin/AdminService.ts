@@ -16,6 +16,7 @@ import type {
   AuthUser,
   BannedUser,
   IpBan,
+  RemovedBest,
   UserBan,
   CategoryStats,
   DailyChallengeResult,
@@ -514,12 +515,13 @@ export class AdminService {
     return { ok: true, value: { metric: "time", entries: entries.map((entry) => ({ ...entry, suspicious: entry.timeMs < SUSPICIOUS_BEST_TIME_MS })) } };
   }
 
-  /** Remove one board entry (a best time or a best score, by the mode's metric). */
-  deleteBestTime(userId: string, mode: string, variant: string): boolean {
+  /**
+   * Remove a board entry (a best time or a best score, by the mode's metric). The player falls
+   * back to their next-best result on that board, and only leaves it when there's none.
+   */
+  removeBoardEntry(userId: string, mode: string, variant: string): RemovedBest | null {
     const metric = leaderboardMetric(mode);
-    if (metric === "score") return this.store.deleteBestScore(userId, mode, variant);
-    if (metric === "time") return this.store.deleteBestTime(userId, mode, variant);
-    return false;
+    return metric ? this.store.removeBest(userId, metric, mode, variant, this.clock()) : null;
   }
 
   daily(date: string): readonly AdminDailyEntry[] {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ban, Eraser, LogOut, Pencil, RotateCcw, Search, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
-import type { AdminAccess, AdminClient, AdminUserDetail, AdminUserList, AuthUser } from "../api";
-import { formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
+import type { AdminAccess, AdminClient, RemovedBoardEntry, AdminUserDetail, AdminUserList, AuthUser } from "../api";
+import { boardRemovalNotice, formatBoardValue, formatDate, formatDateTime, formatDuration, formatNumber, formatRelative, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
 import { EventRow } from "./Events";
 import { RunsTable } from "./Runs";
@@ -366,10 +366,10 @@ function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }:
                             <td className="num">
                               <button type="button" className="adm-icon-btn" aria-label={`Remove ${row.gameMode} ${noun}`} onClick={() => helpers.confirm({
                                 title: `Remove leaderboard ${noun}?`,
-                                body: <p>Removes {d.user.displayName}'s {modeName(row.gameMode)}{row.variant ? ` (${row.variant})` : ""} {noun} of {formatBoardValue(row)}.</p>,
+                                body: <p>Removes {d.user.displayName}'s {modeName(row.gameMode)}{row.variant ? ` (${row.variant})` : ""} {noun} of {formatBoardValue(row)}. Their best goes back to their previous {noun} on this board, if they have one.</p>,
                                 confirmLabel: "Remove",
                                 tone: "danger",
-                                run: async () => { await client.send("DELETE", `/leaderboards/${encodeURIComponent(id)}?${new URLSearchParams({ mode: row.gameMode, variant: row.variant })}`); helpers.notify(`Leaderboard ${noun} removed.`); afterChange(); },
+                                run: async () => { const result = await client.send<RemovedBoardEntry>("DELETE", `/leaderboards/${encodeURIComponent(id)}?${new URLSearchParams({ mode: row.gameMode, variant: row.variant })}`); helpers.notify(boardRemovalNotice(d.user.displayName, noun, result)); afterChange(); },
                               })}><Trash2 size={14} /></button>
                             </td>
                           </tr>
