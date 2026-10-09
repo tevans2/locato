@@ -30,10 +30,10 @@ function ensureContext(): AudioContext | null {
   const Ctor = window.AudioContext ?? legacyWindow.webkitAudioContext;
   if (!Ctor) return null;
   if (!context) {
-    context = new Ctor();
+    try { context = new Ctor(); } catch { return null; }
     master = context.createGain();
     // Keep everything gentle; these are cues, not music.
-    master.gain.value = 0.16;
+    master.gain.value = enabled ? 0.16 : 0;
     master.connect(context.destination);
   }
   // Autoplay policies start the context suspended. Browsers lift the gate on the next
@@ -42,7 +42,7 @@ function ensureContext(): AudioContext | null {
   if (context.state === "suspended" && !resumeBound) {
     resumeBound = true;
     const resume = (): void => {
-      void context?.resume();
+      void context?.resume().catch(() => {});
     };
     window.addEventListener("pointerdown", resume, { passive: true });
     window.addEventListener("keydown", resume, { passive: true });
@@ -53,23 +53,29 @@ function ensureContext(): AudioContext | null {
 interface ToneOptions {
   readonly type?: OscillatorType;
   readonly gain?: number;
+  readonly endFrequency?: number;
+  readonly attack?: number;
 }
 
-function tone(frequency: number, offsetSeconds: number, durationSeconds: number, options: ToneOptions = {}): void {
+function tone(frequency: number, offsetSeconds: number, durationSeconds: number, options: ToneOptions = {}): () => void {
   const audio = ensureContext();
-  if (!audio || !master || audio.state !== "running") return;
+  if (!audio || !master || audio.state !== "running") return () => {};
   const start = audio.currentTime + offsetSeconds;
   const oscillator = audio.createOscillator();
   const gain = audio.createGain();
   oscillator.type = options.type ?? "triangle";
   oscillator.frequency.setValueAtTime(frequency, start);
+  if (options.endFrequency) oscillator.frequency.exponentialRampToValueAtTime(options.endFrequency, start + durationSeconds);
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(options.gain ?? 1, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(options.gain ?? 1, start + (options.attack ?? 0.012));
   gain.gain.exponentialRampToValueAtTime(0.0001, start + durationSeconds);
   oscillator.connect(gain);
   gain.connect(master);
   oscillator.start(start);
   oscillator.stop(start + durationSeconds + 0.05);
+  const disconnect = () => { oscillator.disconnect(); gain.disconnect(); };
+  oscillator.onended = disconnect;
+  return () => { try { oscillator.stop(); } catch { /* Already stopped. */ } disconnect(); };
 }
 
 export function isSoundEnabled(): boolean {
@@ -78,6 +84,7 @@ export function isSoundEnabled(): boolean {
 
 export function setSoundEnabled(value: boolean): void {
   enabled = value;
+  if (master && context) master.gain.setValueAtTime(value ? 0.16 : 0, context.currentTime);
   try {
     saveSettings(window.localStorage, { ...readSettings(window.localStorage), soundEnabled: value });
   } catch {
@@ -150,4 +157,103 @@ export function flashScreen(tone: FlashTone): void {
   // Force a style flush so re-adding the class restarts the animation.
   void flashElement.offsetWidth;
   flashElement.classList.add(tone === "good" ? "is-good" : "is-bad");
+}
+
+/** Call directly from a gesture so the first map click can make a sound on Safari too. */
+export function unlockSound(): void {
+  if (!enabled) return;
+  const audio = ensureContext();
+  if (audio?.state === "suspended") void audio.resume().catch(() => {});
+}
+
+export type GeoSoundCue = "pin" | "submit" | "round" | "score" | "finish" | "countdown" | "go";
+
+let noiseBuffer: AudioBuffer | null = null;
+
+/** Filtered air/percussion gives UI actions a physical texture, without audio downloads. */
+function air(offset: number, duration: number, from: number, to: number, volume: number): () => void {
+  const audio = ensureContext();
+  if (!audio || !master || audio.state !== "running") return () => {};
+  if (!noiseBuffer) {
+    noiseBuffer = audio.createBuffer(1, Math.ceil(audio.sampleRate * 0.5), audio.sampleRate);
+    const samples = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+  }
+  const source = audio.createBufferSource();
+  const filter = audio.createBiquadFilter();
+  const envelope = audio.createGain();
+  const start = audio.currentTime + offset;
+  source.buffer = noiseBuffer;
+  filter.type = "bandpass";
+  filter.Q.value = 0.8;
+  filter.frequency.setValueAtTime(from, start);
+  filter.frequency.exponentialRampToValueAtTime(to, start + duration);
+  envelope.gain.setValueAtTime(0.0001, start);
+  envelope.gain.exponentialRampToValueAtTime(volume, start + Math.min(0.035, duration * 0.2));
+  envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter); filter.connect(envelope); envelope.connect(master);
+  const disconnect = () => { source.disconnect(); filter.disconnect(); envelope.disconnect(); };
+  source.onended = disconnect;
+  source.start(start); source.stop(start + duration + 0.02);
+  return () => { try { source.stop(); } catch { /* Already finished. */ } disconnect(); };
+}
+
+/** Original layered earcons. All voices share mute and are cancellable on navigation. */
+export function playGeoSound(cue: GeoSoundCue, score = 0): () => void {
+  if (!enabled) return () => {};
+  const stops: Array<() => void> = [];
+  const note = (frequency: number, offset: number, duration: number, options: ToneOptions = {}) => {
+    stops.push(tone(frequency, offset, duration, { gain: 0.55, attack: 0.004, ...options }));
+  };
+  const texture = (offset: number, duration: number, from: number, to: number, gain: number) => {
+    stops.push(air(offset, duration, from, to, gain));
+  };
+  const chime = (frequency: number, offset: number, duration: number, gain = 0.6) => {
+    note(frequency, offset, duration, { type: "sine", gain });
+    note(frequency * 2.76, offset, duration * 0.42, { type: "sine", gain: gain * 0.18 });
+    note(frequency * 4.2, offset, duration * 0.23, { type: "sine", gain: gain * 0.06 });
+  };
+  if (cue === "countdown") {
+    // A tight clock strike, with a higher final tick before the launch chord.
+    const frequency = score === 1 ? 880 : 659.25;
+    texture(0, 0.028, 4200, 1700, 0.35);
+    note(180, 0, 0.085, { type: "sine", endFrequency: 95, gain: 0.55 });
+    chime(frequency, 0, 0.2, 0.8);
+  } else if (cue === "go" || cue === "round") {
+    texture(0, 0.16, 800, 6000, 0.6);
+    note(164.81, 0.015, 0.24, { type: "sine", gain: 0.65 });
+    [659.25, 830.61, 987.77].forEach((f, i) => chime(f, 0.02 + i * 0.055, 0.32, 0.46));
+    chime(1318.51, 0.19, 0.38, 0.35);
+  } else if (cue === "pin") {
+    // A little tactile tap underneath a bright compass-like pluck.
+    texture(0, 0.045, 3300, 1100, 0.6);
+    note(240, 0, 0.12, { type: "sine", endFrequency: 90, gain: 0.9 });
+    chime(1108.73, 0.012, 0.23, 0.66);
+    chime(1661.22, 0.065, 0.17, 0.12);
+  } else if (cue === "submit") {
+    texture(0, 0.2, 450, 6200, 0.85);
+    note(90, 0.11, 0.2, { type: "sine", endFrequency: 55, gain: 0.95 });
+    note(330, 0.015, 0.13, { endFrequency: 660, gain: 0.25 });
+    chime(880, 0.14, 0.3, 0.65);
+    chime(1318.51, 0.21, 0.22, 0.2);
+  } else if (cue === "score") {
+    // Light ascending ticks follow the 850ms count-up, then resolve into a score chord.
+    [523.25, 587.33, 659.25, 783.99, 880, 987.77].forEach((f, i) => {
+      note(f, 0.18 + i * 0.09, 0.075, { gain: 0.25 });
+    });
+    texture(0.71, 0.12, 1700, 6500, 0.28);
+    note(score >= 4500 ? 130.81 : 196, 0.76, 0.35, { type: "sine", gain: 0.7 });
+    const chord = score >= 4500 ? [523.25, 659.25, 783.99, 1046.5] : [392, 523.25, 659.25];
+    chord.forEach((f, i) => chime(f, 0.76 + i * 0.025, 0.45, 0.38));
+    if (score >= 4500) chime(1567.98, 1.04, 0.26, 0.2);
+  } else {
+    // A compact victory hook with bass, a chord and a final sparkle.
+    texture(0, 0.2, 900, 7000, 0.55);
+    note(130.81, 0, 0.38, { type: "sine", gain: 0.7 });
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => chime(f, i * 0.105, 0.3, 0.62));
+    [523.25, 659.25, 783.99].forEach(f => chime(f, 0.62, 0.52, 0.3));
+    chime(1567.98, 0.8, 0.38, 0.23);
+    chime(2093, 0.93, 0.28, 0.12);
+  }
+  return () => stops.forEach(stop => stop());
 }

@@ -1,6 +1,6 @@
 import type { WorldCountryFeature } from "./types";
 
-const WORLD_MAP_ASSET_PATH = "assets/world-map.json";
+const WORLD_MAP_ASSET_PATH = "/assets/world-map.json";
 
 async function fetchFeatures(fetcher: typeof fetch): Promise<readonly WorldCountryFeature[]> {
   const response = await fetcher(WORLD_MAP_ASSET_PATH);

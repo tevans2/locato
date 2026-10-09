@@ -48,5 +48,5 @@ it("refuses answers and pins after deadlines even before the next room sweep", (
   expect(pin.submitGuess("host", 0, 0, 2000)).toMatchObject({ ok: false, code: "round-not-open" });
   const street = new GeoGuessrRoom({ code: "STRT1", hostPlayerId: "host", hostName: "Host", countryIndex: countries, seed: "fixture", now: 0, roundDurationMs: 1000 });
   street.startGame("host", 1000);
-  expect(street.submitGuess("host", 0, 0, 2000)).toMatchObject({ ok: false, code: "round-not-open" });
+  expect(street.submitGuess("host", 0, 0, 5000)).toMatchObject({ ok: false, code: "round-not-open" });
 });

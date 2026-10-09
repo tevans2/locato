@@ -26,7 +26,7 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
   const countryIndex = options.countryIndex ?? indexCountries(rawCountries);
   const common = { shell, storage, countryIndex, onHome: shell.goHome, onGameModeChange: (next: GameModeId) => shell.openGame(next), onDailyChallenge: () => shell.openSection("daily") };
   try {
-    if (mode !== "flyover") await session.start();
+    if (mode !== "flyover" && mode !== "geoguessr") await session.start();
     let screen: Screen;
     if (isPromptGameModeId(mode)) {
       const [{ createSoloGameScreen }, { createRankedSoloEngine }] = await Promise.all([import("./SoloGameScreen"), import("./rankedSoloEngine")]);
@@ -55,7 +55,7 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
       screen = createWorldSplitScreen({ ...common, worldCountryFeatures: world, ranked: session });
     } else if (mode === "geoguessr") {
       const { createGeoGuessrScreen } = await import("./GeoGuessrScreen");
-      screen = createGeoGuessrScreen({ ...common, ranked: session });
+      screen = createGeoGuessrScreen({ ...common, ranked: session, initialMap: variant });
     } else {
       const { createStreetViewCountryScreen } = await import("./StreetViewCountryScreen");
       screen = createStreetViewCountryScreen({ ...common, ranked: session });

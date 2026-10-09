@@ -46,11 +46,15 @@ describe("GeoGuessr multiplayer room", () => {
     expect(prompt.asset).toMatch(/^\/api\/game-assets\/[a-f0-9]{48}$/);
     const target = (room as unknown as { currentRound: { location: { lat: number; lng: number } } }).currentRound.location;
 
-    const firstGuess = room.submitGuess("host", target.lat, target.lng, 1040);
+    expect(round?.startedAt).toBe(4030);
+    expect(round?.endsAt).toBe(64030);
+    expect(room.submitGuess("host", target.lat, target.lng, 1040)).toMatchObject({ ok: false, code: "round-not-open" });
+    expect(room.voteSkip("host", 1040)).toMatchObject({ ok: false, code: "round-not-open" });
+    const firstGuess = room.submitGuess("host", target.lat, target.lng, 4040);
     expect(firstGuess.ok).toBe(true);
     expect(room.snapshot().status).toBe("playing");
 
-    const secondGuess = room.submitGuess("guest", target.lat + 5, target.lng + 5, 1050);
+    const secondGuess = room.submitGuess("guest", target.lat + 5, target.lng + 5, 4050);
     expect(secondGuess.ok).toBe(true);
     const reveal = secondGuess.ok ? secondGuess.messages.find((message) => message.type === "GEOGUESSR_ROUND_ENDED") : null;
     expect(reveal?.type).toBe("GEOGUESSR_ROUND_ENDED");

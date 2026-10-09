@@ -1,3 +1,4 @@
+import { GEO_GAME_MAPS } from "./geoguessr/maps";
 import type { GameModeId } from "./gameModes";
 
 /**
@@ -63,7 +64,7 @@ export const LEADERBOARD_MODES: readonly LeaderboardModeConfig[] = [
   time("puzzle", "Place every country of a continent as fast as you can.", PUZZLE_CONTINENT_VARIANTS),
   score("map-tap", `Pin ${MAP_TAP_ATTEMPT_TARGETS} places on the globe. Closer pins score more.`, MAP_TAP_ATTEMPT_TARGETS * 5000, "split"),
   score("worldsplit", `Split the population in ${WORLD_SPLIT_ATTEMPT_ROUNDS} rounds. Fairer lines score more.`, WORLD_SPLIT_ATTEMPT_ROUNDS * 100),
-  score("geoguessr", `Pin ${GEOGUESSR_ATTEMPT_ROUNDS} Street View locations. Closer pins score more.`, GEOGUESSR_ATTEMPT_ROUNDS * 5000),
+  { ...score("geoguessr", `Pin ${GEOGUESSR_ATTEMPT_ROUNDS} Street View locations. Closer pins score more.`, GEOGUESSR_ATTEMPT_ROUNDS * 5000), variants: GEO_GAME_MAPS.map(map => map.id) },
   score("flyover", `Fly over as many named countries as you can in ${FLYOVER_ATTEMPT_SECONDS} seconds.`, FLYOVER_MAX_SCORE),
   score("streetview-country", `Name ${STREET_VIEW_ATTEMPT_COUNTRIES} countries from Street View. Fewer guesses score more.`, STREET_VIEW_ATTEMPT_COUNTRIES * STREET_VIEW_POINTS_BY_GUESS[0]),
 ];

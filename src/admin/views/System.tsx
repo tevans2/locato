@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
   sessionTtlDays: "Session lifetime",
   eventRetentionDays: "Event log retention",
   generatedEntries: "Generated locations",
+  importedEntries: "Imported panoramas",
   fallbackEntries: "Fallback locations",
   maxEntries: "Pool cap",
   dailyGenerateCount: "Generated per day",

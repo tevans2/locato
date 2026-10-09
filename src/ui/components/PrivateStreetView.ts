@@ -1,3 +1,4 @@
+import { loadStreetImage } from "./loadStreetImage";
 import type { GeoStreetView } from "./GeoStreetView";
 import type { RankedSession } from "../screens/RankedSession";
 import { el } from "../dom/createElement";
@@ -8,6 +9,10 @@ export function createPrivateStreetView(session: RankedSession, signal: AbortSig
   const element = el("div", { className: "geo-panorama private-street-view", children: [image] });
   let turn = 0;
   let asset: string | null = null;
+  let pending: AbortController | null = null;
+  let destroyed = false;
+  const destroy = () => { destroyed = true; pending?.abort(); image.removeAttribute("src"); element.replaceChildren(); };
+  signal.addEventListener("abort", destroy, { once: true });
   const show = () => {
     if (asset) image.src = `${asset}&turn=${turn}`;
   };
@@ -20,8 +25,20 @@ export function createPrivateStreetView(session: RankedSession, signal: AbortSig
   element.append(controls);
   image.addEventListener("error", () => element.setAttribute("aria-label", "Street View could not load. Try loading the location again."), { signal });
   return { element, show: async () => {
+    if (destroyed || signal.aborted) throw new Error("Street View request cancelled.");
+    pending?.abort();
+    const request = new AbortController();
+    pending = request;
     const frame = session.state.question?.frames?.[frameIndex()];
     if (!frame) throw new Error("Street View unavailable.");
-    asset = frame.asset; turn = 0; show(); return { lat: 0, lng: 0 };
-  }, reset: () => { turn = 0; show(); }, destroy: () => element.replaceChildren() };
+    asset = frame.asset; turn = 0;
+    try {
+      await loadStreetImage(image, `${asset}&turn=0`, request.signal);
+      element.setAttribute("aria-label", "Explore the mystery Street View");
+      return { lat: 0, lng: 0 };
+    } catch (error) {
+      if (!request.signal.aborted) element.setAttribute("aria-label", "Street View could not load. Try loading the location again.");
+      throw error;
+    } finally { if (pending === request) pending = null; }
+  }, reset: () => { turn = 0; show(); }, destroy };
 }

@@ -10,6 +10,7 @@ export const DEFAULT_GEOGUESSR_ROUND_DURATION_MS = 60_000;
 export const DEFAULT_GEOGUESSR_RESULT_DISPLAY_MS = 8_000;
 export const DEFAULT_GEOGUESSR_ROUND_LIMIT = 5;
 export const DEFAULT_GEOGUESSR_MAX_PLAYERS = 8;
+export const GEOGUESSR_MULTIPLAYER_COUNTDOWN_MS = 3000;
 
 interface GeoGuessrPlayerState extends PublicPlayerState {
   readonly roundsGuessed: number;
@@ -146,6 +147,7 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
   voteSkip(playerId: PlayerId, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "playing" || !this.currentRound) return fail("round-not-open", "No active round can be skipped.");
+    if (now < this.currentRound.startedAt || (this.currentRound.endsAt !== null && now >= this.currentRound.endsAt)) return fail("round-not-open", "This round is not accepting votes.");
     const player = this.activePlayer(playerId);
     if ("ok" in player) return player;
     this.skipVotes.add(playerId);
@@ -182,7 +184,9 @@ export class GeoGuessrRoom extends RoomBase<GeoGuessrPlayerState> {
     this.resultStartedAt = null;
     this.resultEndsAt = null;
     this.status = "playing";
-    this.currentRound = { roundNumber: this.completedRounds + 1, location, startedAt: now, endsAt: this.roundDurationMs > 0 ? now + this.roundDurationMs : null };
+    // Everyone gets the same countdown before the full guessing timer begins.
+    const startedAt = now + GEOGUESSR_MULTIPLAYER_COUNTDOWN_MS;
+    this.currentRound = { roundNumber: this.completedRounds + 1, location, startedAt, endsAt: this.roundDurationMs > 0 ? startedAt + this.roundDurationMs : null };
     if (this.artwork) revokeGameAsset(this.artwork);
     this.artwork = issueGameAsset({ frame: location });
     return this.publicRound;

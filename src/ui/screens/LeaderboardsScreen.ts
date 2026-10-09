@@ -1,3 +1,4 @@
+import { GEO_GAME_MAPS } from "../../core/geoguessr/maps";
 import { fetchAuthState, fetchLeaderboard, type AuthUser } from "../../core/auth";
 import { GAME_MODE_GROUPS, isTimerGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
 import { leaderboardConfig, runLabels, type LeaderboardMetric, type LeaderboardModeConfig } from "../../core/leaderboards";
@@ -201,6 +202,13 @@ export function createLeaderboardsScreen(options: LeaderboardsScreenOptions): Sc
       return;
     }
     variantHost.hidden = false;
+    if (selected.id === "geoguessr") {
+      const select = el("select", { className: "lb-map-select", attrs: { "aria-label": "Map leaderboard" }, children: GEO_GAME_MAPS.map(map => el("option", { text: map.name, attrs: { value: map.id } })) });
+      select.value = variantFor(selected);
+      select.addEventListener("change", () => selectVariant(select.value), { signal });
+      variantHost.replaceChildren(el("label", { className: "lb-variants-label", text: "Map", children: [select] }));
+      return;
+    }
     const label = selected.id === "flags" ? "Flag set" : selected.id === "puzzle" ? "Continent" : "Board";
     const current = variantFor(selected);
     variantHost.replaceChildren(

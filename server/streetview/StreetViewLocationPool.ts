@@ -1,6 +1,14 @@
+import { importedGeoLocations } from "./GeoLocationCatalogue";
+import { GEO_LOCATION_CATALOGUE } from "../../src/core/geoguessr/catalogue";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
+
+import { GEO_WORLD_LOCATIONS } from "../../src/core/geoguessr/locations";
+import { geoGameMap, locationInGeoMap } from "../../src/core/geoguessr/maps";
+import type { GeoGuessrCandidate } from "../../src/core/geoguessr";
+import type { WorldCountryFeature } from "../../src/core/map";
+import { CountrySampler } from "./CountrySampler";
 
 interface StreetViewMetadataResponse {
   readonly status?: string;
@@ -32,6 +40,7 @@ interface StreetViewPoolFile {
 
 export interface StreetViewLocationPoolOptions {
   readonly storagePath: string;
+  readonly world?: readonly WorldCountryFeature[];
   readonly metadataApiKey?: string;
   readonly maxEntries?: number;
   readonly dailyGenerateCount?: number;
@@ -41,6 +50,7 @@ export interface StreetViewLocationPoolOptions {
 
 export interface StreetViewLocationPoolStats {
   readonly generatedEntries: number;
+  readonly importedEntries: number;
   readonly fallbackEntries: number;
   readonly maxEntries: number;
   readonly dailyGenerateCount: number;
@@ -49,10 +59,10 @@ export interface StreetViewLocationPoolStats {
   readonly refreshInProgress: boolean;
 }
 
-const DEFAULT_MAX_ENTRIES = 500;
-const DEFAULT_DAILY_GENERATE_COUNT = 50;
+const DEFAULT_MAX_ENTRIES = 20_000;
+const DEFAULT_DAILY_GENERATE_COUNT = 100;
 const DEFAULT_REFRESH_HOURS = 24;
-const DEFAULT_METADATA_RADIUS_METERS = 1000;
+const DEFAULT_METADATA_RADIUS_METERS = 10_000;
 const EARTH_KM_PER_LATITUDE_DEGREE = 111;
 const MAX_ROUNDS_PER_BATCH = 10;
 
@@ -79,7 +89,7 @@ function createEntryId(countryCode: string, lat: number, lng: number, panoId: st
 }
 
 function duplicateKey(countryCode: string, lat: number, lng: number): string {
-  return `${countryCode}:${lat.toFixed(2)}:${lng.toFixed(2)}`;
+  return `${countryCode}:${lat.toFixed(4)}:${lng.toFixed(4)}`;
 }
 
 function jitterAround(frame: StreetViewFrame): { readonly lat: number; readonly lng: number } {
@@ -100,6 +110,7 @@ function toFrame(entry: StreetViewPoolEntry): StreetViewFrame {
     pitch: entry.pitch,
     fov: entry.fov,
     label: "Generated frame",
+    ...(entry.panoId ? { panoId: entry.panoId } : {}),
   };
 }
 
@@ -128,9 +139,12 @@ export class StreetViewLocationPool {
   private readonly metadataRadiusMeters: number;
   private generationPromise: Promise<StreetViewPoolFile> | null = null;
   private lastCountryCode: string | null = null;
+  private metadataUnavailable = false;
+  private readonly sampler: CountrySampler | null;
 
   constructor(options: StreetViewLocationPoolOptions) {
     this.storagePath = options.storagePath;
+    this.sampler = options.world ? new CountrySampler(options.world) : null;
     this.metadataApiKey = options.metadataApiKey?.trim() ?? "";
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
     this.dailyGenerateCount = options.dailyGenerateCount ?? DEFAULT_DAILY_GENERATE_COUNT;
@@ -142,6 +156,7 @@ export class StreetViewLocationPool {
     const pool = await this.loadPool();
     return {
       generatedEntries: pool.entries.length,
+      importedEntries: GEO_LOCATION_CATALOGUE.total,
       fallbackEntries: fallbackFrames.length,
       maxEntries: this.maxEntries,
       dailyGenerateCount: this.dailyGenerateCount,
@@ -163,6 +178,16 @@ export class StreetViewLocationPool {
     const pool = await this.loadPool();
     this.refreshInBackgroundIfNeeded(pool);
     return Array.from({ length: safeCount }, () => this.createRoundFromPool(pool));
+  }
+
+  /** The same geographic filter is used for practice and server-scored games. */
+  async geoLocations(mapId = ""): Promise<GeoGuessrCandidate[]> {
+    const map = geoGameMap(mapId);
+    if (!map) throw new Error("Unknown GeoGuessr map.");
+    const pool = await this.loadPool();
+    this.refreshInBackgroundIfNeeded(pool);
+    return [...pool.entries.map(entry => ({ ...toFrame(entry), countryCode: entry.countryCode })), ...await importedGeoLocations(mapId), ...GEO_WORLD_LOCATIONS]
+      .filter(location => locationInGeoMap(location, map));
   }
 
   warm(): void {
@@ -200,7 +225,6 @@ export class StreetViewLocationPool {
   }
 
   private shouldRefresh(pool: StreetViewPoolFile): boolean {
-    if (pool.entries.length === 0) return true;
     if (!pool.lastGeneratedAt) return true;
     const last = Date.parse(pool.lastGeneratedAt);
     if (!Number.isFinite(last)) return true;
@@ -227,21 +251,33 @@ export class StreetViewLocationPool {
 
   private async generateBatch(existingEntries: readonly StreetViewPoolEntry[]): Promise<StreetViewPoolEntry[]> {
     const generated: StreetViewPoolEntry[] = [];
+    this.metadataUnavailable = false;
     const seen = new Set(existingEntries.map((entry) => duplicateKey(entry.countryCode, entry.lat, entry.lng)));
     const maxAttempts = Math.max(this.dailyGenerateCount * 8, 80);
 
-    for (let attempt = 0; attempt < maxAttempts && generated.length < this.dailyGenerateCount; attempt += 1) {
-      const seed = fallbackFrames[Math.floor(Math.random() * fallbackFrames.length)];
-      if (!seed) break;
-      const candidate = jitterAround(seed.frame);
-      const key = duplicateKey(seed.countryCode, candidate.lat, candidate.lng);
-      if (seen.has(key)) continue;
-      const entry = await this.validateCandidate(seed.countryCode, candidate.lat, candidate.lng);
-      if (!entry) continue;
-      const validatedKey = duplicateKey(entry.countryCode, entry.lat, entry.lng);
-      if (seen.has(validatedKey)) continue;
-      seen.add(validatedKey);
-      generated.push(entry);
+    const knownCodes = [...new Set(GEO_WORLD_LOCATIONS.map(location => location.countryCode))];
+    const allCodes = this.sampler?.codes().filter(code => code !== "AQ") ?? knownCodes;
+    // Most probes explore established coverage; some discover new countries too.
+    // Four bounded requests at a time keep refresh off the gameplay critical path.
+    for (let attempt = 0; attempt < maxAttempts && generated.length < this.dailyGenerateCount && !this.metadataUnavailable; attempt += 4) {
+      const entries = await Promise.all(Array.from({ length: Math.min(4, maxAttempts - attempt) }, async () => {
+        const codes = Math.random() < 0.8 ? knownCodes : allCodes;
+        const countryCode = codes[Math.floor(Math.random() * codes.length)]!;
+        const anchors = GEO_WORLD_LOCATIONS.filter(location => location.countryCode === countryCode);
+        const seed = anchors[Math.floor(Math.random() * anchors.length)];
+        const candidate = this.sampler && (Math.random() < 0.7 || !seed)
+          ? this.sampler.sample(countryCode)
+          : seed ? jitterAround(seed) : null;
+        if (!candidate || seen.has(duplicateKey(countryCode, candidate.lat, candidate.lng))) return null;
+        return this.validateCandidate(countryCode, candidate.lat, candidate.lng);
+      }));
+      for (const entry of entries) {
+        if (!entry) continue;
+        const key = duplicateKey(entry.countryCode, entry.lat, entry.lng);
+        if (seen.has(key)) continue;
+        seen.add(key); generated.push(entry);
+        if (generated.length >= this.dailyGenerateCount) break;
+      }
     }
 
     return generated;
@@ -256,12 +292,19 @@ export class StreetViewLocationPool {
     });
 
     try {
-      const response = await fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?${params.toString()}`);
+      const response = await fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
       if (!response.ok) return null;
       const data = (await response.json()) as StreetViewMetadataResponse;
+      if (data.status === "REQUEST_DENIED" || data.status === "OVER_QUERY_LIMIT" || data.status === "OVER_DAILY_LIMIT") {
+        this.metadataUnavailable = true;
+        return null;
+      }
       const resolvedLat = data.location?.lat;
       const resolvedLng = data.location?.lng;
-      if (data.status !== "OK" || typeof resolvedLat !== "number" || typeof resolvedLng !== "number") return null;
+      if (data.status !== "OK" || typeof resolvedLat !== "number" || typeof resolvedLng !== "number" ||
+        !Number.isFinite(resolvedLat) || !Number.isFinite(resolvedLng) || Math.abs(resolvedLat) > 90 || Math.abs(resolvedLng) > 180) return null;
+      // Snapping near a border must never turn a country map into its neighbour.
+      if (this.sampler && !this.sampler.contains(countryCode, resolvedLat, resolvedLng)) return null;
       const panoId = typeof data.pano_id === "string" && data.pano_id.length > 0 ? data.pano_id : null;
       return {
         id: createEntryId(countryCode, resolvedLat, resolvedLng, panoId),
@@ -311,8 +354,8 @@ function isPoolEntry(value: unknown): value is StreetViewPoolEntry {
   return (
     typeof entry.id === "string" &&
     typeof entry.countryCode === "string" &&
-    typeof entry.lat === "number" &&
-    typeof entry.lng === "number" &&
+    typeof entry.lat === "number" && Number.isFinite(entry.lat) && Math.abs(entry.lat) <= 90 &&
+    typeof entry.lng === "number" && Number.isFinite(entry.lng) && Math.abs(entry.lng) <= 180 &&
     typeof entry.heading === "number" &&
     typeof entry.pitch === "number" &&
     typeof entry.fov === "number" &&

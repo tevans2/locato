@@ -1,0 +1,60 @@
+/* Multiplayer uses the same immersive game surfaces and shared light/dark glass palette. */
+#multiplayer.mp-geo-immersive { padding: 0; overflow: hidden; }
+#multiplayer.mp-geo-immersive > .shell-site-header { display: none; }
+#multiplayer.mp-geo-immersive .shell-page-main { position: relative; width: 100%; max-width: none; height: 100dvh; margin: 0; padding: 0; }
+#multiplayer.mp-geo-immersive .mp-game { width: 100%; height: 100%; min-height: 0; gap: 0; }
+#multiplayer.mp-geo-immersive .mp-notice { position: absolute; z-index: 40; top: 108px; left: 18px; right: 18px; width: auto; }
+#multiplayer.mp-geo-immersive .multiplayer-chat-dock { bottom: 30px; right: auto; left: 82px; z-index: 25; }
+#multiplayer .geo-multiplayer-view { width: 100%; height: 100%; }
+#app .geo-multiplayer-view .geo-panorama.private-street-view { position: absolute; inset: 0; }
+.geo-multiplayer-view .private-street-image { width: 100%; height: 100%; object-fit: cover; }
+.geo-mp-embed { position: absolute; inset: -135px -330px; width: calc(100% + 660px); height: calc(100% + 270px); border: 0; }
+#app .geo-multiplayer-view .shell-run-pill { display: none; }
+.geo-mp-clock { display: grid; place-items: center; width: 128px; height: 40px; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.geo-mp-clock::after { display: none; }
+.geo-mp-status { position: absolute; z-index: 11; top: 76px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 40px); margin: 0; padding: 10px 16px; border: 1px solid var(--geo-glass-edge); border-radius: 30px; background: var(--geo-glass); color: var(--geo-ink); font-size: .75rem; text-align: center; backdrop-filter: var(--geo-glass-filter); -webkit-backdrop-filter: var(--geo-glass-filter); }
+.geo-mp-scoreboard { position: absolute; z-index: 11; top: 118px; right: 22px; width: 225px; max-height: 29dvh; padding: 12px; overflow: auto; border: 1px solid var(--geo-glass-edge); border-radius: 13px; background: var(--geo-glass); background-image: var(--geo-glass-shine); box-shadow: var(--geo-glass-shadow); backdrop-filter: var(--geo-glass-filter); -webkit-backdrop-filter: var(--geo-glass-filter); }
+.geo-mp-standings { display: grid; gap: 4px; list-style: none; margin: 8px 0 0; padding: 0; }
+.geo-mp-standings li { display: grid; grid-template-columns: 14px 22px minmax(0,1fr) auto; align-items: center; gap: 7px; padding: 6px; font-size: .7rem; border-radius: 6px; }
+.geo-mp-standings .is-local { background: color-mix(in srgb,var(--accent-soft) 75%,transparent); }
+.geo-mp-standings strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.geo-mp-rank { color: var(--geo-muted); font-variant-numeric: tabular-nums; }
+#app .geo-multiplayer-view .geo-round-steps { max-width: 35vw; overflow-x: auto; scrollbar-width: thin; }
+#app .geo-multiplayer-view .geo-round-steps li { flex-shrink: 0; }
+#app .geo-multiplayer-view .geo-map-panel { grid-template-rows: minmax(0,1fr) 44px; }
+#app .geo-multiplayer-view .geo-mp-skip { position: absolute; z-index: 11; left: 18px; bottom: 350px; min-height: 34px; border-radius: 30px; font-size: .7rem; background: var(--geo-glass); backdrop-filter: var(--geo-glass-filter); }
+#app .geo-multiplayer-view[data-phase="result"] .geo-mp-result { display: block; width: min(780px,calc(100% - 36px)); padding: 20px 24px; }
+.geo-mp-result-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.geo-mp-round-results { list-style: none; display: grid; gap: 3px; max-height: 160px; overflow: auto; margin: 0; padding: 0; }
+.geo-mp-round-results li { display: grid; grid-template-columns: 10px minmax(0,1fr) auto 65px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 7px; color: var(--geo-muted); font-size: .75rem; }
+.geo-mp-round-results li.is-local { background: var(--accent-soft); }
+.geo-mp-round-results strong { color: var(--geo-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-mp-round-results li > :last-child { text-align: right; color: var(--geo-accent); }
+.geo-mp-player-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--player-color); }
+#app .geo-multiplayer-view[data-phase="complete"] .geo-mp-final { top: 90px; bottom: auto; width: 390px; max-height: calc(100dvh - 114px); padding: 0; background: var(--surface); animation: none; }
+#multiplayer .geo-mp-final .mp-results { margin: 0; padding: 24px; border: 0; box-shadow: none; }
+#multiplayer .geo-mp-final .mp-results-title { font-family: var(--font-sans); font-size: 1.7rem; font-weight: 750; }
+#multiplayer .geo-mp-final .mp-standing { grid-template-columns: 24px 30px minmax(0,1fr) auto; padding: 9px 7px; gap: 7px; border-radius: 8px; animation: none; font-size: .75rem; }
+#multiplayer .geo-mp-final .mp-standing-score { font-size: 1rem; }
+#multiplayer .geo-mp-final .mp-standing-rank { width: 23px; height: 23px; font-size: .7rem; }
+#multiplayer .geo-mp-final .mp-avatar { width: 30px; height: 30px; font-size: 1.25rem; }
+#multiplayer .geo-mp-final .mp-standing-name .mp-muted { font-size: .65rem; }
+#multiplayer .geo-mp-final .mp-action-bar { flex-wrap: wrap; gap: 12px; }
+#multiplayer .geo-mp-final .mp-action-main { flex-wrap: wrap; width: 100%; }
+#multiplayer .geo-mp-final .mp-start-game { width: 100%; }
+#multiplayer .geo-mp-final .mp-muted { font-size: .75rem; }
+.geo-multiplayer-view .geo-map-legend { bottom: calc(var(--geo-result-height,225px) + 46px); }
+.geo-multiplayer-view[data-phase="complete"] .geo-map-legend { bottom: 28px; }
+@media (max-width:760px) {
+  .geo-mp-clock { top: 12px; left: 50%; width: 105px; transform: translateX(-50%); }
+  .geo-mp-scoreboard { top: 124px; right: 10px; width: 178px; max-height: 20dvh; padding: 9px; }
+  .geo-mp-standings li { font-size: .6rem; gap: 4px; padding: 4px; }
+  .geo-mp-status { top: 126px; left: 10px; max-width: calc(100% - 208px); transform: none; padding: 8px; border-radius: 10px; font-size: .65rem; }
+  #app .geo-multiplayer-view .geo-mp-skip { bottom: auto; top: 200px; left: 10px; }
+  #app .geo-multiplayer-view[data-phase="result"] .geo-mp-result { width: calc(100% - 20px); padding: 16px; }
+  .geo-mp-round-results li { gap: 7px; font-size: .65rem; grid-template-columns: 9px minmax(0,1fr) auto 50px; padding: 7px; }
+  .geo-mp-result-heading h2 { font-size: 1.2rem; }
+  #app .geo-multiplayer-view[data-phase="complete"] .geo-mp-final { top: 44%; left: 10px; width: calc(100% - 20px); bottom: 20px; }
+  #multiplayer .geo-mp-final .mp-results { padding: 20px; }
+  #multiplayer.mp-geo-immersive .multiplayer-chat-dock { left: 66px; bottom: 35px; }
+}

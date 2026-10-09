@@ -13,6 +13,7 @@ import type { RankedState } from "../src/core/ranked";
 import type { GameModeId } from "../src/core/gameModes";
 import type { ShellContext } from "../src/ui/shell/types";
 import * as globe from "../src/ui/components/MapTapGlobe";
+import * as countdown from "../src/ui/components/GeoCountdown";
 import * as geoMap from "../src/ui/components/GeoGuessMap";
 import * as mapTap from "../src/core/maptap";
 
@@ -24,7 +25,7 @@ async function setup(mode: GameModeId, full: boolean | readonly string[] = false
   vi.spyOn(performance, "now").mockImplementation(() => now);
   const countries = indexCountries(rawCountries.filter((c) => Array.isArray(full) ? full.includes(c.code) : full || ["FR", "BR"].includes(c.code)));
   const store = createMemoryUserStore();
-  const service = new AuthService(store, { hash: async (p) => p, verify: async (p, h) => p === h }, { clock: () => now, sessionTtlMs: 3_600_000, ranked: { countries, resolvePanorama: async (p) => ({ ...p, panoId: "private-panorama" }) } });
+  const service = new AuthService(store, { hash: async (p) => p, verify: async (p, h) => p === h }, { clock: () => now, sessionTtlMs: 3_600_000, ranked: { countries, resolvePanorama: async (p) => ({ ...p, panoId: `private-${p.lat}-${p.lng}` }) } });
   const registration = await service.register({ email: "ui@test.local", password: "long-password", displayName: "tester" });
   if (!registration.ok) throw new Error(registration.error);
   let latest: RankedState | null = null;
@@ -145,9 +146,13 @@ it("uses MapTap's globe, per-pin review and ten-target results, including a fres
 });
 
 it("uses GeoGuessr's original panorama, pin controls and five-round recap with private imagery", async () => {
+  vi.spyOn(countdown, "runGeoCountdown").mockResolvedValue();
+  vi.spyOn(HTMLImageElement.prototype, "decode").mockResolvedValue();
   let choose: (p: { lat: number; lng: number }) => void = () => {};
   vi.spyOn(geoMap, "createGeoGuessMap").mockImplementation((options) => { choose = options.onGuessChange; return { element: document.createElement("div"), reset() {}, reveal() {}, setAcceptingGuesses() {}, resize() {}, destroy() {} }; });
   const ui = await setup("geoguessr");
+  expect(ui.screen.element.dataset.phase).toBe("selecting");
+  ui.$<HTMLButtonElement>(".geo-start-map").click();
   for (let i = 0; i < 5; i++) {
     await vi.waitFor(() => expect(ui.screen.element.dataset.phase).toBe("playing"));
     expect(ui.$(".geo-panorama .private-street-image").getAttribute("src")).toMatch(/^\/api\/ranked\//);

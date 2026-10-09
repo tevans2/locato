@@ -1,4 +1,5 @@
 export interface StreetViewFrame {
+  readonly panoId?: string;
   readonly lat: number;
   readonly lng: number;
   readonly heading: number;

@@ -12,6 +12,7 @@ describe("shared world map data", () => {
     expect(first).toBe(second);
     expect(await loadWorldCountryFeatures()).toBe(first);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledWith("/assets/world-map.json");
   });
 
   it("retries after failure instead of caching a rejected request", async () => {

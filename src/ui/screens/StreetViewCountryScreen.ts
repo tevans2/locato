@@ -596,7 +596,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       const stage = initialStreetViewFrame.parentElement;
       if (stage && privateView.element.parentElement !== stage) stage.prepend(privateView.element);
       for (const button of privateView.element.querySelectorAll<HTMLButtonElement>("button")) button.disabled = status !== "playing";
-      if (status === "playing") void privateView.show({ lat: 0, lng: 0, heading: 0, label: "", countryCode: "" });
+      if (status === "playing") void privateView.show({ lat: 0, lng: 0, heading: 0, label: "", countryCode: "" }).catch(() => { /* The image surface displays the load failure. */ });
       return;
     }
     if (!apiKey) {

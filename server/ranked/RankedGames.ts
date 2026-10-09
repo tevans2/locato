@@ -1,3 +1,4 @@
+import { CountrySampler } from "../streetview/CountrySampler";
 import { randomBytes } from "node:crypto";
 import { indexCountries, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
 import { getCategory, matchesCountryName } from "../../src/core/categories";
@@ -11,7 +12,9 @@ import { buildFlyoverCountries, countryContainsPoint, type FlyoverCountry } from
 import { MAP_TAP_LOCATIONS } from "../../src/core/maptap/locations";
 import { isValidLatLng, scoreMapTapGuess } from "../../src/core/maptap/distance";
 import type { MapTapLocation } from "../../src/core/maptap/types";
-import { createGeoGuessrQueue, scoreGeoGuessrGuess, type GeoGuessrLocation } from "../../src/core/geoguessr";
+import { geoGameMap, locationInGeoMap } from "../../src/core/geoguessr/maps";
+import { GEO_WORLD_LOCATIONS } from "../../src/core/geoguessr/locations";
+import { sampleGeoLocations, geoGuessrLocations, scoreGeoGuessrGuess, type GeoGuessrLocation, type GeoGuessrCandidate, hasGeoCoordinates, geoLocationKey } from "../../src/core/geoguessr";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
 import { buildWorldSplitCountries, scoreWorldSplit, splitLineLength, WORLD_SPLIT_ROUNDS, type WorldSplitRound } from "../../src/core/worldsplit";
 import type { RankedAction, RankedQuestion, RankedState, RankedMoveResult } from "../../src/core/ranked";
@@ -34,7 +37,7 @@ interface Challenge {
   readonly country?: Country;
   readonly mapCountry?: FlyoverCountry;
   readonly location?: MapTapLocation;
-  readonly geo?: GeoGuessrLocation;
+  geo?: GeoGuessrCandidate;
   readonly street?: StreetViewCountryRound;
   readonly split?: WorldSplitRound;
 }
@@ -71,9 +74,11 @@ export interface RankedGamesOptions {
   readonly clock?: () => number;
   readonly countries?: CountryIndex;
   readonly world?: readonly WorldCountryFeature[];
+  readonly geoLocations?: (mapId: string) => Promise<readonly GeoGuessrCandidate[]>;
   readonly streetRounds?: () => Promise<readonly StreetViewCountryRound[]>;
   /** Resolve on the server so the client cannot replace the scoring origin with a snapped coordinate. */
   readonly resolvePanorama?: (frame: StreetViewFrame) => Promise<{ readonly panoId: string; readonly lat: number; readonly lng: number }>;
+  readonly resolveGeoPanorama?: (candidate: GeoGuessrCandidate) => Promise<{ readonly panoId: string; readonly lat: number; readonly lng: number }>;
   readonly challengeSecret?: string;
 }
 
@@ -85,6 +90,7 @@ export class RankedGames {
   private readonly countries: CountryIndex;
   private worldCache: readonly WorldCountryFeature[] | null = null;
   private mapCache: readonly FlyoverCountry[] | null = null;
+  private geoSampler: CountrySampler | null = null;
   private readonly dailySecret: string;
   constructor(private readonly options: RankedGamesOptions = {}) {
     this.clock = options.clock ?? Date.now;
@@ -137,9 +143,17 @@ export class RankedGames {
     } else if (mode === "worldsplit") {
       queue.push(...WORLD_SPLIT_ROUNDS.map((split) => ({ mode, split })));
     } else if (mode === "geoguessr" || mode === "streetview-country") {
-      const rounds = this.options.streetRounds ? await this.options.streetRounds() : streetViewCountryRounds;
-      if (mode === "geoguessr") queue.push(...createGeoGuessrQueue(seed, 5, rounds).map((geo) => ({ mode, geo })));
-      else queue.push(...shuffle(rounds, rng).slice(0, 5).map((street) => ({ mode, street })));
+      if (mode === "geoguessr") {
+        const map = geoGameMap(variant)!;
+        const pool = this.options.geoLocations ? await this.options.geoLocations(variant)
+          : this.options.streetRounds ? geoGuessrLocations(await this.options.streetRounds()) : GEO_WORLD_LOCATIONS;
+        const locations = sampleGeoLocations(seed, pool.filter(location => locationInGeoMap(location, map)), 5);
+        if (locations.length !== 5) return { error: "This map does not have enough locations yet." };
+        queue.push(...locations.map(geo => ({ mode, geo })));
+      } else {
+        const rounds = this.options.streetRounds ? await this.options.streetRounds() : streetViewCountryRounds;
+        queue.push(...shuffle(rounds, rng).slice(0, 5).map(street => ({ mode, street })));
+      }
     } else if (mode === "daily") {
       const daily = createServerDailyChallenge(this.countries, variant, seed);
       for (const slot of daily.promptSlots!) {
@@ -273,7 +287,8 @@ export class RankedGames {
       const guess = { lat: action.lat!, lng: action.lng! };
       if (action.type !== "pin" || !isValidLatLng(guess)) return no("Invalid map pin.");
       const mapTap = current.location ? { ...scoreMapTapGuess(guess, current.location), target: current.location, guess, maxScore: 5000 } : undefined;
-      const geo = current.geo ? scoreGeoGuessrGuess(guess, current.geo) : undefined;
+      if (current.geo && !hasGeoCoordinates(current.geo)) throw new Error("Panorama origin is not ready.");
+      const geo = current.geo && hasGeoCoordinates(current.geo) ? scoreGeoGuessrGuess(guess, current.geo) : undefined;
       const points = mapTap?.score ?? geo!.score;
       detail("pin", mapTap ? { mapTap } : { geo: geo! });
       run.feedback = `${points.toLocaleString()} / 5,000 points`;
@@ -336,12 +351,37 @@ export class RankedGames {
     const current = run.queue[run.index];
     if (!current) return;
     if (current.mode === "flag-colors") run.reveal = new FlagReveal(current.country!.flagSrc);
-    const frames = current.street?.frames ?? (current.geo ? [current.geo] : null);
-    if (frames) {
+    if (current.geo) {
+      const map = geoGameMap(run.variant)!;
+      const deadline = Date.now() + 15_000;
+      const resolve = async (candidate: GeoGuessrCandidate) => {
+        if (this.options.resolveGeoPanorama) return this.options.resolveGeoPanorama(candidate);
+        if (!hasGeoCoordinates(candidate) || !this.options.resolvePanorama) throw new Error("Server Street View metadata key required.");
+        return this.options.resolvePanorama(candidate);
+      };
+      const used = new Set(run.queue.filter(challenge => challenge !== current && challenge.geo).map(challenge => geoLocationKey(challenge.geo!)));
+      const prepare = async (candidate: GeoGuessrCandidate): Promise<GeoGuessrLocation | null> => {
+        try {
+          const origin = await resolve(candidate);
+          if (used.has(`pano:${origin.panoId}`)) return null;
+          if (this.options.geoLocations && !(this.geoSampler ??= new CountrySampler(this.world)).contains(candidate.countryCode, origin.lat, origin.lng)) return null;
+          return { ...candidate, ...origin };
+        } catch { return null; }
+      };
+      let location = await prepare(current.geo);
+      // Only fetch replacements when needed. Never mutate the shared catalogue.
+      if (!location && this.options.geoLocations) {
+        const available = (await this.options.geoLocations(run.variant)).filter(candidate => locationInGeoMap(candidate, map) && !used.has(geoLocationKey(candidate)) && geoLocationKey(candidate) !== geoLocationKey(current.geo!));
+        const sameCountry = available.filter(candidate => candidate.countryCode === current.geo!.countryCode);
+        const backups = [...sampleGeoLocations(id(), sameCountry, 8), ...sampleGeoLocations(id(), available.filter(candidate => candidate.countryCode !== current.geo!.countryCode), 8)];
+        for (const candidate of backups) { if (Date.now() >= deadline) break; location = await prepare(candidate); if (location) break; }
+      }
+      if (!location) throw new Error("No panorama available on this map.");
+      current.geo = location;
+      run.privateFrames = [location];
+    } else if (current.street) {
       if (!this.options.resolvePanorama) throw new Error("Server Street View metadata key required.");
-      const resolved = await Promise.all(frames.map(async (frame) => ({ ...frame, ...await this.options.resolvePanorama!(frame) })));
-      run.privateFrames = resolved;
-      if (current.geo) Object.assign(current.geo, { lat: resolved[0]!.lat, lng: resolved[0]!.lng });
+      run.privateFrames = await Promise.all(current.street.frames.map(async frame => ({ ...frame, ...await this.options.resolvePanorama!(frame) })));
     }
     run.questionAt = this.clock();
   }

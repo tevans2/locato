@@ -807,3 +807,4 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+.lb-map-select { display: inline-block; min-width: 210px; max-width: 100%; margin-left: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; letter-spacing: normal; text-transform: none; }

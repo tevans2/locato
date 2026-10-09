@@ -132,7 +132,7 @@ describe("Leaderboards screen", () => {
     mount({ shell: makeShell(), mode: "flags" });
     await flush();
     expect([...document.querySelectorAll<HTMLElement>(".lb-segment")].map((pill) => pill.textContent)).toEqual(["Countries", "Territories", "Both"]);
-    for (const mode of ["shapes", "map-tap", "geoguessr", "worldsplit"]) {
+    for (const mode of ["shapes", "map-tap", "worldsplit"]) {
       q<HTMLButtonElement>(`.lb-mode[data-mode='${mode}']`)!.click();
       expect(q<HTMLElement>(".lb-variants")!.hidden).toBe(true);
       expect(document.querySelectorAll(".lb-segment")).toHaveLength(0);
@@ -289,4 +289,19 @@ describe("leaderboard rank helpers", () => {
     mockFetch();
     expect(await submitBestTime({ gameMode: "flags", variant: "", timeMs: 61_000 })).toEqual({ accepted: true, isPersonalBest: true, rank: 3, bestTimeMs: 61_000 });
   });
+});
+
+
+it("lets players open a separate leaderboard for each GeoGuessr map", async () => {
+  const { requests } = mockFetch();
+  const shell = makeShell();
+  mount({ shell, mode: "geoguessr" });
+  const select = q<HTMLSelectElement>(".lb-map-select")!;
+  expect(select.options).toHaveLength(31);
+  expect(select.options[0]!.textContent).toBe("World");
+  select.value = "france";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  await vi.waitFor(() => expect(requests.some(url => url.pathname === "/api/leaderboard" && url.searchParams.get("variant") === "france")).toBe(true));
+  q<HTMLButtonElement>(".lb-play")!.click();
+  expect(shell.calls).toContain("game:geoguessr:timed:france");
 });

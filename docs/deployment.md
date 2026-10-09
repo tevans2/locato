@@ -70,7 +70,7 @@ OAuth callback URLs to register with each provider: `${BASE_URL}/auth/github/cal
 
 Native panoramas use Google's [Dynamic Street View billing SKU](https://developers.google.com/maps/billing-and-pricing/sku-details), so the new solo view has different usage costs from an Embed panorama. Review the project's quotas and budget before deploying. The Fly workflows already pass both browser keys as Docker build arguments; changing a runtime secret alone does not update an existing frontend bundle.
 
-Without a browser key, GeoGuessr displays a recoverable unavailable screen. For local layout checks without Google requests, `/tests/fixtures/geoguessr.html` mounts the real game UI with labeled sample surfaces; this fixture is excluded from the production build.
+Without a browser key, GeoGuessr displays a recoverable unavailable screen. `/tests/fixtures/geoguessr.html` mounts the real Google map and Street View implementations using the local browser key; this fixture is excluded from the production build. Multiplayer uses the same browser key for its guess map while its Street View images stay behind the server's private asset endpoint.
 
 ## Sizing & scaling
 

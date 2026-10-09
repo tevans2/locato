@@ -12,7 +12,14 @@ vi.mock("../src/ui/components/MultiplayerMapTapGameView", () => ({
   createMultiplayerMapTapGameView: () => ({ element: document.createElement("div"), update: () => undefined, destroy: () => undefined }),
 }));
 vi.mock("../src/ui/components/MultiplayerGeoGuessrGameView", () => ({
-  createMultiplayerGeoGuessrGameView: () => ({ element: document.createElement("div"), update: () => undefined, destroy: () => undefined }),
+  createMultiplayerGeoGuessrGameView: () => {
+    const element = document.createElement("div");
+    element.className = "geo-multiplayer-view";
+    const finalSlot = document.createElement("section");
+    finalSlot.className = "geo-mp-final";
+    element.append(finalSlot);
+    return { element, finalSlot, update: () => undefined, destroy: () => undefined };
+  },
 }));
 
 /** A transport the test drives: it records what the client sends and plays the server. */
@@ -299,5 +306,36 @@ describe("multiplayer screen", () => {
 
     screen.destroy();
     expect(server.sent.at(-1)).toEqual({ type: "LEAVE_ROOM" });
+  });
+
+  it("keeps GeoGuessr immersive through results and restores the lobby and other game results", async () => {
+    window.localStorage.setItem("locato.mp.name", "Ana");
+    const { server, screen } = mountScreen({ initialJoinCode: "K7QMR" });
+    await flush();
+    server.emit({ type: "SESSION_ASSIGNED", playerId: "p1", roomCode: "K7QMR", sessionToken: "t1" });
+    const geoRoom = room({ kind: "geoguessr", categoryIds: ["geoguessr"], status: "playing" });
+    server.emit({ type: "ROOM_SNAPSHOT", room: geoRoom });
+    const header = screen.element.querySelector<HTMLElement>(".shell-site-header")!;
+    const game = screen.element.querySelector<HTMLElement>(".mp-game")!;
+    expect(screen.element.classList.contains("mp-geo-immersive")).toBe(true);
+    expect(header.hidden).toBe(true);
+    expect(game.hidden).toBe(false);
+    server.emit({ type: "ROOM_SNAPSHOT", room: { ...geoRoom, status: "complete" } });
+    const results = [{ playerId: "p1", name: "Ana", rank: 1, score: 21000, correctAnswers: 5, wrongAnswers: 0 }];
+    server.emit({ type: "GAME_COMPLETED", results });
+    expect(screen.element.dataset.view).toBe("results");
+    expect(game.hidden).toBe(false);
+    expect(screen.element.querySelector(".geo-mp-final .mp-results-title")?.textContent).toBe("You won!");
+    screen.element.querySelector<HTMLButtonElement>(".geo-mp-final .mp-start-game")!.click();
+    expect(server.sent.at(-1)).toEqual({ type: "PLAY_AGAIN" });
+    server.emit({ type: "ROOM_SNAPSHOT", room: { ...geoRoom, status: "lobby" } });
+    expect(header.hidden).toBe(false);
+    expect(screen.element.classList.contains("mp-geo-immersive")).toBe(false);
+    expect(screen.element.querySelector(".geo-mp-final .mp-results")).toBeNull();
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ status: "complete" }) });
+    server.emit({ type: "GAME_COMPLETED", results });
+    expect(screen.element.querySelector(".shell-page-main > .mp-results .mp-results-title")?.textContent).toBe("You won!");
+    expect(game.hidden).toBe(true);
+    screen.destroy();
   });
 });

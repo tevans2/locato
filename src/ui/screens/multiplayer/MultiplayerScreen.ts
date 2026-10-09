@@ -180,6 +180,10 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
   }));
   const geoGuessrView = lazyView(() => createMultiplayerGeoGuessrGameView({
     signal,
+    shell: options.shell,
+    onLeave: () => session.leave(),
+    leaveGuard: leaveMessage,
+    ...(options.storage ? { storage: options.storage } : {}),
     onGuess: (lat, lng) => session.send({ type: "SUBMIT_GEOGUESSR_GUESS", lat, lng, clientSentAt: Date.now() }),
     onSkip: () => session.send({ type: "VOTE_SKIP" }),
   }));
@@ -267,6 +271,10 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     const view = !room ? "home" : room.status === "lobby" ? "lobby" : room.status === "complete" && state.finalResults ? "results" : "game";
     if (page.element.dataset.view !== view) page.element.scrollTop = 0;
     page.element.dataset.view = view;
+    const immersiveGeo = room?.kind === "geoguessr" && (view === "game" || view === "results");
+    page.element.classList.toggle("mp-geo-immersive", immersiveGeo);
+    page.header.element.hidden = immersiveGeo;
+    if (!immersiveGeo && results.element.closest(".geo-mp-final")) page.main.append(results.element);
     // App-level exits (another invite, the browser Back button) read this to ask first.
     const message = leaveMessage();
     if (message) page.element.dataset.leaveConfirm = message;
@@ -276,7 +284,7 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     roomHeading.hidden = view === "home";
     home.element.hidden = view !== "home";
     lobby.element.hidden = view !== "lobby";
-    gameArea.hidden = view !== "game";
+    gameArea.hidden = view !== "game" && !immersiveGeo;
     results.element.hidden = view !== "results";
     home.update({ pending: state.pending });
 
@@ -312,18 +320,23 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     const me = room.players.find((player) => player.id === localPlayerId);
     const spectating = Boolean(me?.spectator);
     const kind = room.kind;
-    spectatorBanner.hidden = view !== "game" || !spectating || kind === "flyover";
+    spectatorBanner.hidden = view !== "game" || !spectating || kind === "flyover" || kind === "geoguessr";
     for (const [viewKind, lazy] of [["quiz", quizView], ["map-tap", mapTapView], ["geoguessr", geoGuessrView], ["flyover", flyoverView]] as const) {
       const built = lazy.peek();
-      if (built) built.element.hidden = view !== "game" || kind !== viewKind;
+      if (built) built.element.hidden = (view !== "game" && !(immersiveGeo && viewKind === "geoguessr")) || kind !== viewKind;
     }
-    if (view !== "game") return;
+    if (view !== "game" && !immersiveGeo) return;
     const shown = playingRoom(room);
     const canSubmit = room.status === "playing" && state.status === "connected" && !spectating;
     const feedback = spectating && !state.feedback ? "Watching this game." : state.feedback;
     if (kind === "flyover") flyoverView.get().update({ room: shown, localPlayerId, round: state.round, canSubmit, spectating });
     else if (kind === "map-tap") mapTapView.get().update({ room: shown, localPlayerId, round: state.round, reveal: state.mapTapReveal, finalResults: null, feedback, canSubmit });
-    else if (kind === "geoguessr") geoGuessrView.get().update({ room: shown, localPlayerId, round: state.round, reveal: state.geoGuessrReveal, finalResults: null, feedback, canSubmit });
+    else if (kind === "geoguessr") {
+      const geo = geoGuessrView.get();
+      geo.element.hidden = false;
+      if (view === "results") geo.finalSlot.append(results.element);
+      geo.update({ room: shown, localPlayerId, round: state.round, reveal: state.geoGuessrReveal, finalResults: view === "results" ? state.finalResults : null, feedback, canSubmit });
+    }
     else quizView.get().update({ room: shown, localPlayerId, round: state.round, roundResult: state.quizReveal, finalResults: null, feedback, canSubmit });
   }
 
@@ -353,8 +366,10 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
         // A taken round already played its cue on ANSWER_ACCEPTED.
         if (!message.results.some((result) => result.correct)) playTimeUp();
         return;
-      case "MAPTAP_ROUND_ENDED":
-      case "GEOGUESSR_ROUND_ENDED": {
+      case "GEOGUESSR_ROUND_ENDED":
+        // The shared GeoGuessr view plays its richer score cue on reveal.
+        return;
+      case "MAPTAP_ROUND_ENDED": {
         const top = message.results[0];
         if (top?.guess && top.playerId === me) {
           playCorrect();

@@ -223,35 +223,22 @@ body:not(:has(.landing-screen-shell)) .geoguessr-map button:active:not(:disabled
 }
 
 .geoguessr-marker {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  border: 3px solid #f8f5ed;
-  border-radius: 50% 50% 50% 0;
-  background: var(--geoguessr-marker-color, var(--accent));
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.42);
-  transform: rotate(-45deg);
+  position: relative; width: 44px; height: 58px; padding: 0; border: 0;
+  background: transparent; transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 3px #19231f55);
 }
-
-.geoguessr-marker::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  background: rgba(8, 12, 8, 0.82);
+.geoguessr-marker > svg { display: block; width: 44px; height: 58px; overflow: visible; }
+.geoguessr-marker-label {
+  position: absolute; top: 8px; right: calc(100% + 7px); width: max-content; max-width: 130px;
+  padding: 6px 10px; border: 1px solid #fff; border-radius: 7px;
+  color: #fff; background: #245b4c; font-family: var(--font-sans); font-size: 11px; font-weight: 800;
+  line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 2px 7px #0003; pointer-events: none;
 }
-
-.geoguessr-marker-target {
-  --geoguessr-marker-color: #ef6a45;
-  width: 28px;
-  height: 28px;
-}
-
-.geoguessr-marker-guess {
-  --geoguessr-marker-color: #a4df59;
-}
+.geoguessr-marker-target .geoguessr-marker-label { right: auto; left: calc(100% + 7px); color: #352610; background: #fff1ce; }
 
 @media (max-width: 700px) {
+  .geoguessr-marker-label { max-width: 90px; padding: 5px 7px; font-size: 10px; }
 
   .geoguessr-stage {
     border-radius: 16px;

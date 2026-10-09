@@ -15,7 +15,7 @@ import { answerFor, privateChallenge, stateOf } from "./helpers/privateGame";
 
 const small = indexCountries(rawCountries.filter((c) => ["FR", "BR"].includes(c.code)));
 const clock = () => ({ value: Date.parse("2026-10-04T12:00:00Z") });
-const resolver = async (frame: { lat: number; lng: number }) => ({ ...frame, panoId: "private-panorama-id" });
+const resolver = async (frame: { lat: number; lng: number }) => ({ ...frame, panoId: `private-${frame.lat}-${frame.lng}` });
 const hasher = { hash: async (p: string) => p, verify: async (p: string, h: string) => p === h };
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
@@ -150,7 +150,7 @@ describe("ranked authority", () => {
     for (const mode of ["geoguessr", "streetview-country"]) {
       const state = stateOf(await service.startRankedGame(user.id, { gameMode: mode, variant: "" }));
       const json = JSON.stringify(state);
-      for (const forbidden of ["panoId", '"lat"', '"lng"', "countryCode", "private-panorama-id", "maps.googleapis.com"]) expect(json).not.toContain(forbidden);
+      for (const forbidden of ["panoId", '"lat"', '"lng"', "countryCode", "private-", "maps.googleapis.com"]) expect(json).not.toContain(forbidden);
       expect(state.question!.frames!.every((frame) => /^\/api\/ranked\/[a-f0-9]{48}\/asset\/[a-f0-9]{48}\?frame=\d+$/.test(frame.asset))).toBe(true);
     }
   });
@@ -209,10 +209,13 @@ it("proxies only four bounded Street View directions, deduplicates fetches, and 
   // JPEG header, EXIF with a location marker, then SOS + entropy + EOI.
   const raw = Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0, 6, 71, 80, 83, 33, 0xff, 0xda, 0, 2, 0xff, 0xd9]);
   const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(raw, { headers: { "content-type": "image/jpeg" } }));
-  const frame = { lat: 41.234567, lng: 11.987654, heading: 27, label: "private test view" };
+  const frame = { panoId: "selected-server-panorama", lat: 41.234567, lng: 11.987654, heading: 27, label: "private test view" };
   const url = new URL("http://localhost/api/game-assets/test?turn=90");
   const results = await Promise.all([streetImage(frame, url), streetImage(frame, url)]);
   expect(fetcher).toHaveBeenCalledTimes(1);
+  const upstream = new URL(String(fetcher.mock.calls[0]![0]));
+  expect(upstream.searchParams.get("pano")).toBe(frame.panoId);
+  expect(upstream.searchParams.has("location")).toBe(false);
   expect(await results[0]!.text()).not.toContain("GPS!");
   expect(results[0]!.headers.get("location")).toBeNull();
   expect(results[0]!.headers.get("cache-control")).toContain("no-store");

@@ -1,0 +1,400 @@
+{
+  "version": 1,
+  "total": 115271,
+  "withCoordinates": 35539,
+  "sources": {
+    "WanderBench": 29885,
+    "StreetView360AtoZ": 5654,
+    "G3": 79732
+  },
+  "countries": {
+    "AD": {
+      "count": 2,
+      "file": "ad-42073b337131.json"
+    },
+    "AE": {
+      "count": 2,
+      "file": "ae-80de6bbb8821.json"
+    },
+    "AL": {
+      "count": 429,
+      "file": "al-cb70c1de5210.json"
+    },
+    "AR": {
+      "count": 2032,
+      "file": "ar-1a120fc3d90e.json"
+    },
+    "AT": {
+      "count": 603,
+      "file": "at-e74911990c9f.json"
+    },
+    "AU": {
+      "count": 5850,
+      "file": "au-a9b3f181f00e.json"
+    },
+    "BA": {
+      "count": 1,
+      "file": "ba-b4001858866f.json"
+    },
+    "BD": {
+      "count": 445,
+      "file": "bd-07752ff2bcbb.json"
+    },
+    "BE": {
+      "count": 1939,
+      "file": "be-21d3cd429205.json"
+    },
+    "BG": {
+      "count": 742,
+      "file": "bg-616cf0f6e40f.json"
+    },
+    "BO": {
+      "count": 832,
+      "file": "bo-4cc66a0a74bc.json"
+    },
+    "BR": {
+      "count": 3422,
+      "file": "br-81c044bbd3df.json"
+    },
+    "BT": {
+      "count": 432,
+      "file": "bt-06ee6b5588b8.json"
+    },
+    "BW": {
+      "count": 111,
+      "file": "bw-64f5e49cc48c.json"
+    },
+    "BY": {
+      "count": 1,
+      "file": "by-c96a3af38e4b.json"
+    },
+    "CA": {
+      "count": 2909,
+      "file": "ca-8d0daca27b6c.json"
+    },
+    "CH": {
+      "count": 737,
+      "file": "ch-84451c80fb31.json"
+    },
+    "CL": {
+      "count": 1436,
+      "file": "cl-cd99c8fc965a.json"
+    },
+    "CO": {
+      "count": 1512,
+      "file": "co-2a1b5941bfaf.json"
+    },
+    "CR": {
+      "count": 45,
+      "file": "cr-e3f1eb6a7faa.json"
+    },
+    "CZ": {
+      "count": 768,
+      "file": "cz-6d697f9900c5.json"
+    },
+    "DE": {
+      "count": 1049,
+      "file": "de-ae552b916fa2.json"
+    },
+    "DK": {
+      "count": 639,
+      "file": "dk-4e234be6fbb4.json"
+    },
+    "DO": {
+      "count": 420,
+      "file": "do-6722ca5bffee.json"
+    },
+    "EC": {
+      "count": 784,
+      "file": "ec-78bda69d06af.json"
+    },
+    "EE": {
+      "count": 545,
+      "file": "ee-0df04663e0bc.json"
+    },
+    "ES": {
+      "count": 550,
+      "file": "es-ad1799ec9763.json"
+    },
+    "FI": {
+      "count": 753,
+      "file": "fi-ee4d5ca94322.json"
+    },
+    "FR": {
+      "count": 5527,
+      "file": "fr-9e8480f8fa8d.json"
+    },
+    "GB": {
+      "count": 3125,
+      "file": "gb-491ccca25eb6.json"
+    },
+    "GE": {
+      "count": 1,
+      "file": "ge-af3bdc6471d7.json"
+    },
+    "GH": {
+      "count": 891,
+      "file": "gh-3632323ad581.json"
+    },
+    "GR": {
+      "count": 601,
+      "file": "gr-71b17c36239a.json"
+    },
+    "GT": {
+      "count": 480,
+      "file": "gt-e22bb3bfea84.json"
+    },
+    "HR": {
+      "count": 533,
+      "file": "hr-fa5fa3acb089.json"
+    },
+    "HU": {
+      "count": 772,
+      "file": "hu-1c0ffabac782.json"
+    },
+    "ID": {
+      "count": 2421,
+      "file": "id-13f52155300e.json"
+    },
+    "IE": {
+      "count": 745,
+      "file": "ie-384ca09ef66d.json"
+    },
+    "IL": {
+      "count": 431,
+      "file": "il-06b2e4dcc7dd.json"
+    },
+    "IN": {
+      "count": 793,
+      "file": "in-0de3738f2bb4.json"
+    },
+    "IS": {
+      "count": 436,
+      "file": "is-e5b05c69ca41.json"
+    },
+    "IT": {
+      "count": 3819,
+      "file": "it-9a00c4b13d31.json"
+    },
+    "JO": {
+      "count": 426,
+      "file": "jo-43eb6349daff.json"
+    },
+    "JP": {
+      "count": 6905,
+      "file": "jp-0e8083c215bd.json"
+    },
+    "KE": {
+      "count": 1334,
+      "file": "ke-3c403dd7a771.json"
+    },
+    "KG": {
+      "count": 570,
+      "file": "kg-98f103a91ec1.json"
+    },
+    "KH": {
+      "count": 493,
+      "file": "kh-7c2f8b5a1310.json"
+    },
+    "KR": {
+      "count": 1564,
+      "file": "kr-97ff38331a1e.json"
+    },
+    "KZ": {
+      "count": 140,
+      "file": "kz-e7baf40f3257.json"
+    },
+    "LA": {
+      "count": 437,
+      "file": "la-0764703bb2dd.json"
+    },
+    "LK": {
+      "count": 508,
+      "file": "lk-0ffa191a10a3.json"
+    },
+    "LS": {
+      "count": 485,
+      "file": "ls-7ba5d467de2a.json"
+    },
+    "LT": {
+      "count": 567,
+      "file": "lt-dbb88ea02786.json"
+    },
+    "LU": {
+      "count": 443,
+      "file": "lu-401b8202bfc3.json"
+    },
+    "LV": {
+      "count": 493,
+      "file": "lv-689cff43b272.json"
+    },
+    "MA": {
+      "count": 1,
+      "file": "ma-fc9825c2a594.json"
+    },
+    "MC": {
+      "count": 2,
+      "file": "mc-fcace52dd52e.json"
+    },
+    "ME": {
+      "count": 429,
+      "file": "me-c19f84926c72.json"
+    },
+    "MK": {
+      "count": 423,
+      "file": "mk-2864db3a739d.json"
+    },
+    "MN": {
+      "count": 650,
+      "file": "mn-5189a5149f01.json"
+    },
+    "MT": {
+      "count": 437,
+      "file": "mt-928dc4c0fccf.json"
+    },
+    "MX": {
+      "count": 2183,
+      "file": "mx-645eb6a506c3.json"
+    },
+    "MY": {
+      "count": 599,
+      "file": "my-55b42bb64cf7.json"
+    },
+    "NA": {
+      "count": 257,
+      "file": "na-c45d99afa3d0.json"
+    },
+    "NG": {
+      "count": 556,
+      "file": "ng-9e32d406e256.json"
+    },
+    "NL": {
+      "count": 1449,
+      "file": "nl-f3bc783dec66.json"
+    },
+    "NO": {
+      "count": 680,
+      "file": "no-f7a23261f5ee.json"
+    },
+    "NP": {
+      "count": 19,
+      "file": "np-fd81bc691344.json"
+    },
+    "NZ": {
+      "count": 475,
+      "file": "nz-669e92557aa3.json"
+    },
+    "PA": {
+      "count": 4,
+      "file": "pa-b9cf196d7e26.json"
+    },
+    "PE": {
+      "count": 1245,
+      "file": "pe-d01ccce72acb.json"
+    },
+    "PH": {
+      "count": 890,
+      "file": "ph-3e7793ade2b4.json"
+    },
+    "PL": {
+      "count": 2161,
+      "file": "pl-378923974150.json"
+    },
+    "PS": {
+      "count": 431,
+      "file": "ps-a90f661f5887.json"
+    },
+    "PT": {
+      "count": 177,
+      "file": "pt-61679fc11c8d.json"
+    },
+    "QA": {
+      "count": 1,
+      "file": "qa-69f317e2aa19.json"
+    },
+    "RO": {
+      "count": 882,
+      "file": "ro-797035de2dc8.json"
+    },
+    "RS": {
+      "count": 467,
+      "file": "rs-74bee8642a70.json"
+    },
+    "RU": {
+      "count": 2532,
+      "file": "ru-9a6bc934e8c5.json"
+    },
+    "RW": {
+      "count": 251,
+      "file": "rw-35e6fe2ecd09.json"
+    },
+    "SE": {
+      "count": 1089,
+      "file": "se-f0e8f940b2e6.json"
+    },
+    "SG": {
+      "count": 499,
+      "file": "sg-8e2c9f185885.json"
+    },
+    "SI": {
+      "count": 643,
+      "file": "si-ed2ffb18ad54.json"
+    },
+    "SK": {
+      "count": 565,
+      "file": "sk-a11a977dd54a.json"
+    },
+    "SM": {
+      "count": 3,
+      "file": "sm-250aaab204df.json"
+    },
+    "SN": {
+      "count": 514,
+      "file": "sn-2a2936930bef.json"
+    },
+    "SZ": {
+      "count": 458,
+      "file": "sz-f22dba7aad19.json"
+    },
+    "TH": {
+      "count": 2576,
+      "file": "th-5154988c0663.json"
+    },
+    "TN": {
+      "count": 553,
+      "file": "tn-250cdee1f3fb.json"
+    },
+    "TR": {
+      "count": 960,
+      "file": "tr-4890759b6733.json"
+    },
+    "TW": {
+      "count": 1485,
+      "file": "tw-ebc2ef10a34c.json"
+    },
+    "UA": {
+      "count": 583,
+      "file": "ua-ac781777f106.json"
+    },
+    "UG": {
+      "count": 560,
+      "file": "ug-b7507a3bbda8.json"
+    },
+    "US": {
+      "count": 20341,
+      "file": "us-7a29a3159da0.json"
+    },
+    "UY": {
+      "count": 549,
+      "file": "uy-844e8c0cac30.json"
+    },
+    "VN": {
+      "count": 333,
+      "file": "vn-bbfeb0397235.json"
+    },
+    "ZA": {
+      "count": 2429,
+      "file": "za-690a00cecc51.json"
+    }
+  }
+}

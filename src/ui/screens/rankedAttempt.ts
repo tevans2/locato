@@ -47,8 +47,8 @@ export function createRankedBar(root: HTMLElement, shell: ShellContext, options:
   });
 }
 
-export function rankedBestKey(mode: GameModeId): string {
-  return `locato:ranked-best:${mode}:v1`;
+export function rankedBestKey(mode: GameModeId, variant = ""): string {
+  return `locato:ranked-best:${mode}${variant ? `:${variant}` : ""}:v1`;
 }
 
 /** Practice bests kept before these modes became single-run; they still count towards your best. */
@@ -59,12 +59,13 @@ const LEGACY_PRACTICE_BEST_KEYS: Partial<Record<GameModeId, string>> = {
 };
 
 /** A single-run mode's best score on this device (0 when there is none). */
-export function readSingleBest(storage: Storage | null | undefined, mode: GameModeId): number {
-  const legacy = LEGACY_PRACTICE_BEST_KEYS[mode];
-  return Math.max(readLocalBest(storage, rankedBestKey(mode)), legacy ? readLocalBest(storage, legacy) : 0);
+export function readSingleBest(storage: Storage | null | undefined, mode: GameModeId, variant = ""): number {
+  const legacy = variant ? undefined : LEGACY_PRACTICE_BEST_KEYS[mode];
+  return Math.max(readLocalBest(storage, rankedBestKey(mode, variant)), legacy ? readLocalBest(storage, legacy) : 0);
 }
 
 export interface BestBarOptions {
+  readonly variant?: () => string;
   readonly gameMode: GameModeId;
   readonly storage?: Storage | null;
   readonly extraMenuItems?: readonly GameBarMenuItem[];
@@ -79,7 +80,7 @@ export interface BestBarOptions {
 export function createBestBar(root: HTMLElement, shell: ShellContext, options: BestBarOptions): GameBarHandle & { readonly refreshBest: () => void } {
   markShellScreen(root, "game");
   const best = () => {
-    const value = readSingleBest(options.storage ?? shell.storage, options.gameMode);
+    const value = readSingleBest(options.storage ?? shell.storage, options.gameMode, options.variant?.() ?? "");
     return value > 0 ? formatNumber(value) : null;
   };
   const bar = createGameBar(shell, {
@@ -102,17 +103,18 @@ export async function submitRankedAttempt(input: {
   readonly shell: ShellContext;
   readonly mode: GameModeId;
   readonly total: number;
+  readonly variant?: string;
   readonly storage?: Storage | null;
   readonly post?: PostRankedAttempt;
 }): Promise<TimedPostOutcome> {
   const storage = input.storage ?? null;
   // A single-run mode's old practice best counts too, so "New personal best" means beating it.
-  const previousBest = isSingleRunMode(input.mode) ? readSingleBest(storage, input.mode) : readLocalBest(storage, rankedBestKey(input.mode));
-  const recorded = recordLocalBest(storage, rankedBestKey(input.mode), Math.max(previousBest, input.total));
+  const previousBest = isSingleRunMode(input.mode) ? readSingleBest(storage, input.mode, input.variant ?? "") : readLocalBest(storage, rankedBestKey(input.mode, input.variant ?? ""));
+  const recorded = recordLocalBest(storage, rankedBestKey(input.mode, input.variant ?? ""), Math.max(previousBest, input.total));
   const local = { previous: previousBest, isNew: input.total > previousBest, best: recorded.best };
   const post = input.post ?? postRankedAttempt;
   try {
-    const posting = await post({ gameMode: input.mode, variant: "", value: Math.round(input.total), isLoggedIn: input.shell.signedIn() });
+    const posting = await post({ gameMode: input.mode, variant: input.variant ?? "", value: Math.round(input.total), isLoggedIn: input.shell.signedIn() });
     return { isNewLocalBest: local.isNew && local.previous > 0, ...posting };
   } catch {
     return { isNewLocalBest: local.isNew && local.previous > 0, serverAccepted: input.shell.signedIn() ? false : null, rank: null, failed: true };
@@ -120,6 +122,8 @@ export async function submitRankedAttempt(input: {
 }
 
 export interface RankedResultsInput {
+  readonly tryAnother?: boolean;
+  readonly variant?: string;
   readonly mode: GameModeId;
   readonly title: string;
   /** Hero stat first ("Total score"). */
@@ -149,11 +153,12 @@ export function createRankedResults(shell: ShellContext, input: RankedResultsInp
     kicker: single ? label : `${label} · Ranked attempt`,
     title: input.title,
     subtitle: "Posting your score…",
+    ...(input.tryAnother !== undefined ? { tryAnother: input.tryAnother } : {}),
     stats: input.stats,
     ...(input.missed ? { missed: input.missed } : {}),
     ...(input.missedTitle ? { missedTitle: input.missedTitle } : {}),
     primary: { label: single ? "Play again" : "Try again", icon: "rotate-ccw", onClick: input.onTryAgain },
-    secondary: [{ label: "View leaderboard", icon: "trophy", onClick: () => shell.openLeaderboards(input.mode) }],
+    secondary: [{ label: "View leaderboard", icon: "trophy", onClick: () => input.variant ? shell.openLeaderboards(input.mode, input.variant) : shell.openLeaderboards(input.mode) }],
     share: {
       title: input.shareTitle,
       text: input.shareText,

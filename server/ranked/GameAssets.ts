@@ -57,6 +57,7 @@ export async function streetImage(frame: StreetViewFrame, url: URL, headers = { 
   if (!Number.isFinite(turnRaw) || turnRaw % 90 !== 0) return new Response("Invalid view", { status: 400 });
   const turn = ((turnRaw % 360) + 360) % 360;
   const params = new URLSearchParams({ key, size: "640x480", location: `${frame.lat},${frame.lng}`, heading: String(frame.heading + turn), pitch: String(frame.pitch ?? 0), fov: String(frame.fov ?? 90), source: "outdoor", return_error_code: "true" });
+  if (frame.panoId) { params.delete("location"); params.set("pano", frame.panoId); }
   const now = Date.now();
   const cacheKey = params.toString();
   for (const [token, image] of images) if (image.expiresAt < now) images.delete(token);

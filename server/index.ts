@@ -10,6 +10,9 @@ import { StreetViewLocationPool } from "./streetview";
 import { createMapTapRoundResponse, validateMapTapGuessResponse } from "./maptap";
 import { AdminService } from "./admin/AdminService";
 import { logEvent, setEventSink } from "./admin/events";
+import { rankedWorld } from "./ranked/assets";
+import { geoGameMap } from "../src/core/geoguessr/maps";
+import { sampleGeoLocations } from "../src/core/geoguessr";
 import { panoramaResolver } from "./ranked/panoramas";
 import { streetViewCountryRounds } from "../src/core/streetview";
 import { createSeededRandom, shuffle } from "../src/core/game";
@@ -83,7 +86,7 @@ function serveStatic(pathname: string): Response {
     return new Response(Bun.file(indexPath), { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   const ext = extname(filePath);
-  return new Response(Bun.file(filePath), { headers: { "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream" } });
+  return new Response(Bun.file(filePath), { headers: { "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream", ...(/^\/assets\/geoguessr\/locations\/[a-z]{2}-[0-9a-f]{12}\.json$/.test(pathname) ? { "cache-control": "public, max-age=31536000, immutable" } : {}) } });
 }
 
 const countryIndex = indexCountries(rawCountries);
@@ -107,11 +110,14 @@ const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/l
 const userStore = new SqliteUserStore(openDatabase(databasePath));
 // Ranked verification is mandatory. Optional legacy telemetry cannot authorize results.
 const enforceRunAudit = process.env.RUN_AUDIT_ENFORCE === "1";
+const serverPanoramaResolver = panoramaResolver(process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "");
 const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit,
   ranked: {
     ...(process.env.RANKED_CHALLENGE_SECRET ? { challengeSecret: process.env.RANKED_CHALLENGE_SECRET } : {}),
     streetRounds: () => streetViewPool.createRounds(5),
-    resolvePanorama: panoramaResolver(process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? ""),
+    geoLocations: mapId => streetViewPool.geoLocations(mapId),
+    resolvePanorama: serverPanoramaResolver,
+    resolveGeoPanorama: serverPanoramaResolver,
   },
 });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
@@ -121,12 +127,13 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map((email) => e
 // Presence + friend/invite push hub, backed by the persistent /social socket.
 const socialHub = new SocialHub((userId) => authService.friendIds(userId));
 const streetViewPool = new StreetViewLocationPool({
+  world: rankedWorld(),
   storagePath: process.env.STREETVIEW_POOL_PATH ?? resolve(PROJECT_ROOT, ".data/streetview-country-pool.json"),
   metadataApiKey: process.env.GOOGLE_MAPS_STREETVIEW_METADATA_API_KEY ?? process.env.GOOGLE_MAPS_STREETVIEW_STATIC_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? "",
-  maxEntries: readIntegerEnv("STREETVIEW_POOL_MAX_ENTRIES", 500),
-  dailyGenerateCount: readIntegerEnv("STREETVIEW_DAILY_GENERATE_COUNT", 50),
+  maxEntries: readIntegerEnv("STREETVIEW_POOL_MAX_ENTRIES", 20_000),
+  dailyGenerateCount: readIntegerEnv("STREETVIEW_DAILY_GENERATE_COUNT", 100),
   refreshHours: readIntegerEnv("STREETVIEW_REFRESH_HOURS", 24),
-  metadataRadiusMeters: readIntegerEnv("STREETVIEW_METADATA_RADIUS_METERS", 1000),
+  metadataRadiusMeters: readIntegerEnv("STREETVIEW_METADATA_RADIUS_METERS", 10_000),
 });
 streetViewPool.warm();
 
@@ -240,6 +247,17 @@ const server = Bun.serve<WebSocketData>({
 
     if (url.pathname === "/api/maptap/guess" && method === "POST") {
       return validateMapTapGuessResponse(request);
+    }
+
+    if (url.pathname === "/api/geoguessr/locations" && method === "GET") {
+      const mapId = url.searchParams.get("map") ?? "";
+      if (!geoGameMap(mapId)) return json({ error: "Unknown map." }, 400);
+      try {
+        return json(sampleGeoLocations(crypto.randomUUID(), await streetViewPool.geoLocations(mapId), 20));
+      } catch (error) {
+        logEvent("warn", "geoguessr.locations.failed", { error: error instanceof Error ? error.message : String(error) });
+        return json({ error: "Map locations unavailable." }, 503);
+      }
     }
 
     if (url.pathname === "/api/streetview-country/round" && method === "GET") {

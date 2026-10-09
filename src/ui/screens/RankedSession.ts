@@ -10,7 +10,8 @@ export class RankedSession {
   private chain: Promise<unknown> = Promise.resolve();
   private offset = 0;
   private firstGuessAt: number | null = null;
-  constructor(readonly mode: GameModeId, readonly variant = "") {}
+  constructor(readonly mode: GameModeId, private selectedVariant = "") {}
+  get variant(): string { return this.selectedVariant; }
   get state(): RankedState { if (!this.snapshot) throw new Error("The game has not started."); return this.snapshot; }
   get signal(): AbortSignal { return this.controller.signal; }
   elapsedMs(): number {
@@ -21,9 +22,10 @@ export class RankedSession {
   noteGuess(): void { this.firstGuessAt ??= performance.now(); }
   now(): number { return performance.now() + this.offset; }
   private accept(value: RankedState): RankedState { this.snapshot = value; this.offset = value.serverNow - performance.now(); return value; }
-  async start(): Promise<RankedState> {
+  async start(variant = this.variant): Promise<RankedState> {
     await this.chain.catch(() => {});
-    const value = this.accept(await rankedRequest<RankedState>("/api/ranked/start", { gameMode: this.mode, variant: this.variant }, this.signal));
+    const value = this.accept(await rankedRequest<RankedState>("/api/ranked/start", { gameMode: this.mode, variant }, this.signal));
+    this.selectedVariant = variant;
     this.firstGuessAt = null;
     return value;
   }
