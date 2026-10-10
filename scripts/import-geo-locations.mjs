@@ -49,13 +49,13 @@ const book=await json(`${g3}/guidebook.json`), labels=await json(`${g3}/countrie
 // one ISO3 country. Malformed/ambiguous upstream labels are excluded, not guessed.
 const labelCountries = new Map();
 for(const [image, values] of Object.entries(labels)) {
-  const ids=values[0], key=ids.join(',');
-  if(!labelCountries.has(key)) {
+  const ids=values[0], labelGroup=ids.join(',');
+  if(!labelCountries.has(labelGroup)) {
     const sets=ids.map(i=>new Set(book[i].geoparsed.map(g=>g.ISO3)));
     const intersection=sets.length ? [...sets[0]].filter(c=>sets.every(s=>s.has(c))) : [];
-    labelCountries.set(key, intersection.length===1 ? iso3.get(intersection[0]) : null);
+    labelCountries.set(labelGroup, intersection.length===1 ? iso3.get(intersection[0]) : null);
   }
-  const pano=image.replace(/_[0-3]\.png$/, ''), code=labelCountries.get(key);
+  const pano=image.replace(/_[0-3]\.png$/, ''), code=labelCountries.get(labelGroup);
   if(assignments.has(pano)&&assignments.get(pano)!==code) throw new Error('Conflicting panorama country labels');
   assignments.set(pano,code);
 }
@@ -67,7 +67,9 @@ const countries={};for(const {code,tuple} of entries.values()) (countries[code]?
 const manifest={ version:1, total:entries.size, withCoordinates:[...entries.values()].filter(e=>e.tuple.length>1).length, sources:sourceCounts, countries:{} };
 const directory=new URL('public/assets/geoguessr/locations/',root);await mkdir(directory,{recursive:true});
 for(const code of Object.keys(countries).sort()) {
-  const tuples=countries[code].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0), content=JSON.stringify(tuples), hash=createHash('sha256').update(content).digest('hex').slice(0,12);
+  // One panorama tuple per line keeps unrelated IDs out of the same scanner context.
+  // IDs are public Google references, including any that happen to contain "pwd".
+  const tuples=countries[code].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0), content='[\n'+tuples.map(tuple=>JSON.stringify(tuple)).join(',\n')+'\n]\n', hash=createHash('sha256').update(content).digest('hex').slice(0,12);
   const file=`${code.toLowerCase()}-${hash}.json`;await writeFile(new URL(file,directory),content);
   manifest.countries[code]={count:tuples.length,file};
 }

@@ -1,0 +1,3 @@
+# Historical country-label grouping expression; reviewed in docs/security-scanning.md.
+# The grouping variable is renamed in the current importer; do not ignore the file or commit.
+127e783bddce22d22654c2d420604927c53f9905:scripts/import-geo-locations.mjs:generic-api-key:56

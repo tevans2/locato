@@ -1,0 +1,21 @@
+title = "Locato secret scanning"
+[extend]
+useDefault = true
+
+# These are exact public identifiers, not credentials. Other rules, values and paths
+# remain scanned. See docs/security-scanning.md for the incident review.
+[[allowlists]]
+description = "Device-local achievement storage namespace"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)(?:src/storage/achievements\.ts|server/dev/seed\.ts)$''']
+regexTarget = "secret"
+regexes = ['''^locato\.achievements\.v1$''']
+
+[[allowlists]]
+description = "Public Cloudflare Web Analytics beacon identifier embedded in HTML"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)(?:index\.html|locato-mobile-fixes\.patch)$''']
+regexTarget = "secret"
+regexes = ['''^e3240616504f404b8ccb9066468abf30$''']

@@ -20,12 +20,14 @@ Prod stays always-on because multiplayer rooms are in-memory — stopping the ma
 
 ## CI/CD
 
-GitHub Actions deploy on push (both run `npm test` then `npm run build` before deploying):
+GitHub Actions deploy on push (both scan full Git history for secrets, then run `npm test` and `npm run build` before deploying):
 
 - `.github/workflows/fly-deploy.yml` — push to `main` → `flyctl deploy --config fly.toml --app locato`, using secret `FLY_API_TOKEN`.
 - `.github/workflows/fly-deploy-staging.yml` — push to `staging` → `flyctl deploy --config fly.staging.toml` (targets `locato-staging`), using secret `FLY_API_TOKEN_STAGING`.
 
 Manual deploy: `flyctl deploy --config fly.toml -a locato` (or `--config fly.staging.toml`).
+
+The shared `.github/actions/secret-scan` action installs checksum-pinned Gitleaks and blocks either deploy on unreviewed findings. `.github/workflows/secret-scan.yml` also scans pushes and pull requests outside the deployment branches. [Scanner configuration and the catalogue incident review](security-scanning.md) document the narrow public-identifier exceptions. Local environment files and outputs are excluded from Docker build uploads.
 
 ### Release gate: staging must deploy before main
 

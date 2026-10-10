@@ -24,6 +24,13 @@ describe('real panorama catalogue', () => {
       const bytes = await readFile(`public/assets/geoguessr/locations/${entry.file}`);
       expect(createHash('sha256').update(bytes).digest('hex').slice(0,12)).toBe(entry.file.split('-')[1]!.slice(0,12));
       expect(JSON.parse(bytes.toString())).toHaveLength(entry.count);
+      // Keep scanner context confined to one public panorama reference at a time.
+      // Random public IDs can contain password-like substrings; they are not credentials.
+      const lines = bytes.toString().trim().split('\n');
+      expect(lines).toHaveLength(entry.count + 2);
+      expect(lines[0]).toBe('[');
+      expect(lines.at(-1)).toBe(']');
+      expect(lines.slice(1, -1).every(line => Array.isArray(JSON.parse(line.replace(/,$/, ''))))).toBe(true);
     }
     expect(geoCatalogueCount()).toBe(all.length);
     for (const map of GEO_GAME_MAPS) {
