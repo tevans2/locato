@@ -1,3 +1,4 @@
+import type { QuickMatchGame } from "./quickMatch";
 import type { MapTapCategory } from "../maptap/types";
 import type { FlagPool } from "../flagPools";
 
@@ -35,6 +36,8 @@ export interface PublicPlayerState {
   readonly streak: number;
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
+  /** Quick matches: a signed-in player's rating for the room's game. */
+  readonly rating?: number;
   /** Flyover: how far along the shared route this racer is (reached + skipped). */
   readonly routeIndex?: number;
 }
@@ -88,6 +91,8 @@ export interface PublicRoomState {
   readonly phaseStartedAt: number | null;
   readonly phaseEndsAt: number | null;
   readonly chatMessages: readonly PublicChatMessage[];
+  /** Set on quick-match rooms: the game, and when it starts by itself (null while waiting for players). */
+  readonly quickMatch?: { readonly game: QuickMatchGame; readonly startsAt: number | null };
 }
 
 export interface RoundResult {

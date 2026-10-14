@@ -16,6 +16,22 @@ export interface PublicUser {
   readonly avatarEmoji: string | null;
 }
 
+/** A player's skill rating for one quick-match game (src/core/multiplayer/quickMatch.ts). */
+export interface PlayerRating {
+  readonly game: string;
+  readonly rating: number;
+  /** Rated games played. */
+  readonly games: number;
+  readonly updatedAt: number;
+}
+
+export interface RatingLeaderboardEntry {
+  readonly rank: number;
+  readonly user: PublicUser;
+  readonly rating: number;
+  readonly games: number;
+}
+
 export interface FriendRequestEntry {
   readonly user: PublicUser;
   readonly createdAt: number;
@@ -482,6 +498,12 @@ export interface UserStore {
   listFlaggedRuns(limit: number): readonly StoredRun[];
   /** Did another of the user's runs start before `startedAt` and finish after it? */
   hasOverlappingRun(userId: string, runId: string, startedAt: number): boolean;
+  // Quick-match ratings, one per user per game; deleted with the user.
+  getRating(userId: string, game: string): PlayerRating | null;
+  saveRating(userId: string, rating: PlayerRating): void;
+  listUserRatings(userId: string): readonly PlayerRating[];
+  /** Highest ratings first (ties: more games first). */
+  listTopRatings(game: string, limit: number): readonly RatingLeaderboardEntry[];
   // Academy (training) progress, one JSON blob per user; deleted with the user.
   getAcademyProgress(userId: string): StoredAcademyProgress | null;
   saveAcademyProgress(userId: string, progress: string, updatedAt: number): void;

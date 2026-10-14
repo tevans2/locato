@@ -16,3 +16,14 @@ export type { MessageParseResult } from "./messageValidation";
 export type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
 export type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomSettings, PublicRoomState, PublicRoundState, RoomCode, RoomKind, RoundResult } from "./roomTypes";
 export { ROOM_KINDS, isRoomKind, roomKindForCategories } from "./roomTypes";
+export {
+  QUICK_MATCH_COUNTDOWN_MS,
+  QUICK_MATCH_FULL_COUNTDOWN_MS,
+  QUICK_MATCH_GAMES,
+  QUICK_MATCH_MIN_PLAYERS,
+  RATING_START,
+  isQuickMatchGame,
+  quickMatchGameInfo,
+  ratingChanges,
+} from "./quickMatch";
+export type { QuickMatchGame, QuickMatchGameInfo, RatedStanding } from "./quickMatch";

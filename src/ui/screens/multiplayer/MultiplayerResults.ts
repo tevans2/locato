@@ -4,7 +4,8 @@
  * host is choosing, and can leave.
  */
 
-import type { ClientMessage, FinalResult, PublicRoomState } from "../../../core/multiplayer";
+import type { ClientMessage, FinalResult, PublicRoomState, QuickMatchGame } from "../../../core/multiplayer";
+import type { RatingUpdate } from "./roomSession";
 import { getPlayerEmoji } from "../../../core/auth/avatars";
 import { el } from "../../dom/createElement";
 import { shellIcon } from "../../shell";
@@ -14,12 +15,16 @@ export interface MultiplayerResultsOptions {
   readonly signal: AbortSignal;
   readonly send: (message: ClientMessage) => void;
   readonly onLeave: () => void;
+  /** Quick matches: queue for the next one. */
+  readonly onFindMatch?: (game: QuickMatchGame) => void;
 }
 
 export interface MultiplayerResultsState {
   readonly room: PublicRoomState;
   readonly localPlayerId: string | null;
   readonly results: readonly FinalResult[];
+  /** Quick matches: the rated players' new ratings, once the server sends them. */
+  readonly ratingUpdate?: RatingUpdate | null;
 }
 
 export interface MultiplayerResults {
@@ -48,6 +53,9 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
   const changeSettings = el("button", { className: "shell-btn shell-btn-quiet", text: "Change game", attrs: { type: "button" } });
   const waiting = el("p", { className: "mp-waiting", children: [el("span", { className: "mp-live-dot", attrs: { "aria-hidden": "true" } }), el("span")] });
   const leave = el("button", { className: "shell-btn shell-btn-quiet mp-leave", text: "Leave room", attrs: { type: "button" } });
+  const findMatch = el("button", { className: "shell-btn mp-start-game mp-find-match", attrs: { type: "button", hidden: "" }, children: [shellIcon("users", 18, 2.2), el("span", { text: "Find another match" })] });
+  let quickGame: QuickMatchGame | null = null;
+  findMatch.addEventListener("click", () => { if (quickGame) options.onFindMatch?.(quickGame); }, { signal });
   playAgain.addEventListener("click", () => options.send({ type: "PLAY_AGAIN" }), { signal });
   changeSettings.addEventListener("click", () => options.send({ type: "RETURN_TO_LOBBY" }), { signal });
   leave.addEventListener("click", () => options.onLeave(), { signal });
@@ -58,7 +66,7 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
     children: [
       el("header", { className: "mp-results-head", children: [kicker, headline, subline] }),
       standings,
-      el("div", { className: "mp-action-bar", children: [el("div", { className: "mp-action-main", children: [playAgain, changeSettings, waiting] }), leave] }),
+      el("div", { className: "mp-action-bar", children: [el("div", { className: "mp-action-main", children: [playAgain, changeSettings, findMatch, waiting] }), leave] }),
     ],
   });
   headline.id = "mp-results-title";
@@ -67,7 +75,7 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
 
   return {
     element,
-    update: ({ room, localPlayerId, results }) => {
+    update: ({ room, localPlayerId, results, ratingUpdate }) => {
       const isHost = localPlayerId === room.hostPlayerId;
       const winner = results[0];
       const mine = results.find((result) => result.playerId === localPlayerId);
@@ -83,8 +91,9 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
         ...results.map((result) => {
           const player = room.players.find((candidate) => candidate.id === result.playerId);
           const isYou = result.playerId === localPlayerId;
+          const change = ratingUpdate?.changes.find((item) => item.playerId === result.playerId);
           return el("li", {
-            className: `mp-standing rank-${Math.min(result.rank, 4)}${isYou ? " is-you" : ""}`,
+            className: `mp-standing rank-${Math.min(result.rank, 4)}${isYou ? " is-you" : ""}${change ? " has-rating" : ""}`,
             children: [
               el("span", { className: "mp-standing-rank", text: String(result.rank) }),
               el("span", { className: "mp-avatar is-emoji", text: getPlayerEmoji(player ?? { id: result.playerId }, isYou), attrs: { "aria-hidden": "true" } }),
@@ -96,14 +105,22 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
                 ],
               }),
               el("span", { className: "mp-standing-score", text: numberFormat.format(result.score) }),
+              ...(change ? [el("span", {
+                className: `mp-standing-rating ${change.delta > 0 ? "is-up" : change.delta < 0 ? "is-down" : ""}`.trim(),
+                text: `${numberFormat.format(change.rating)} (${change.delta > 0 ? "+" : change.delta < 0 ? "−" : "±"}${Math.abs(change.delta)})`,
+                attrs: { title: "Rating after this game" },
+              })] : []),
             ],
           });
         }),
       );
 
-      playAgain.hidden = !isHost;
-      changeSettings.hidden = !isHost;
-      waiting.hidden = isHost;
+      // Quick matches don't rematch: everyone queues for the next one.
+      quickGame = room.quickMatch?.game ?? null;
+      findMatch.hidden = quickGame === null || !options.onFindMatch;
+      playAgain.hidden = !isHost || quickGame !== null;
+      changeSettings.hidden = !isHost || quickGame !== null;
+      waiting.hidden = isHost || quickGame !== null;
       const host = room.players.find((player) => player.id === room.hostPlayerId);
       waiting.lastElementChild!.textContent = `${host?.name ?? "The host"} is choosing what's next…`;
 

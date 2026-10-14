@@ -162,9 +162,10 @@ describe("multiplayer home", () => {
     const controller = new AbortController();
     const onCreate = vi.fn();
     const onJoin = vi.fn();
-    const home = createMultiplayerHome({ shell: makeShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate, onJoin, ...overrides });
+    const onQuickMatch = vi.fn();
+    const home = createMultiplayerHome({ shell: makeShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate, onJoin, onQuickMatch, ...overrides });
     document.body.append(home.element);
-    return { home, onCreate, onJoin };
+    return { home, onCreate, onJoin, onQuickMatch };
   }
 
   it("opens a room straight from a game tile, once a guest has a name", () => {
@@ -299,5 +300,66 @@ describe("multiplayer screen", () => {
 
     screen.destroy();
     expect(server.sent.at(-1)).toEqual({ type: "LEAVE_ROOM" });
+  });
+});
+
+describe("quick match", () => {
+  function makeQuickShell(): ShellContext {
+    return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false };
+  }
+
+  it("finds a match for the chosen game from the home card, once a guest has a name", () => {
+    const controller = new AbortController();
+    const onQuickMatch = vi.fn();
+    const home = createMultiplayerHome({ shell: makeQuickShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate: vi.fn(), onJoin: vi.fn(), onQuickMatch });
+    document.body.append(home.element);
+    const mapTap = document.querySelector<HTMLButtonElement>(".mp-quick-game[data-game='map-tap']")!;
+    mapTap.click();
+    expect(mapTap.getAttribute("aria-checked")).toBe("true");
+    expect(document.querySelector(".mp-quick-note")?.textContent).toBe("Playing as a guest: sign in to earn a rating.");
+    document.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
+    expect(onQuickMatch).not.toHaveBeenCalled();
+    const name = document.querySelector<HTMLInputElement>("#mp-name")!;
+    name.value = "Sam";
+    document.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
+    expect(onQuickMatch).toHaveBeenCalledWith("map-tap", "Sam");
+    home.update({ pending: "match" });
+    expect(document.querySelector(".mp-quick-go")?.textContent).toBe("Finding a match…");
+    controller.abort();
+  });
+
+  it("counts down in the lobby, shows ratings, and queues again after the game", async () => {
+    window.localStorage.setItem("locato.mp.name", "Ana");
+    const server = fakeTransport();
+    const screen = createMultiplayerScreen({ shell: makeQuickShell(), countryIndex: indexCountries(rawCountries), worldCountryFeatures: [], createOnlineTransport: () => server.transport, storage: window.localStorage, sessionStorage: window.sessionStorage });
+    document.body.append(screen.element);
+    screen.element.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
+    await flush();
+    expect(server.sent[0]).toEqual({ type: "QUICK_MATCH", game: "flags", playerName: "Ana", avatarEmoji: expect.any(String) });
+
+    const quick = { quickMatch: { game: "flags" as const, startsAt: Date.now() + 12_000 }, players: [player("p1", "Ana", { rating: 1000 }), player("p2", "Ben", { rating: 1040 })] };
+    server.emit({ type: "SESSION_ASSIGNED", playerId: "p1", roomCode: "K7QMR", sessionToken: "t1" });
+    server.emit({ type: "ROOM_SNAPSHOT", room: room(quick) });
+    expect(screen.element.dataset.view).toBe("lobby");
+    expect([...screen.element.querySelectorAll(".mp-tag.is-rating")].map((tag) => tag.textContent)).toEqual(["1000", "1040"]);
+    expect(screen.element.querySelector(".mp-waiting")?.textContent).toBe("Starting in 12s. More players can still join.");
+    expect(screen.element.querySelector<HTMLElement>(".mp-settings-editor")!.hidden).toBe(true);
+    expect(screen.element.querySelector(".mp-summary-label")?.textContent).toBe("Flags race");
+    const start = screen.element.querySelector<HTMLButtonElement>(".mp-lobby .mp-start-game")!;
+    expect(start.hidden).toBe(false);
+    expect(start.textContent).toBe("Start now");
+
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ ...quick, status: "complete" }) });
+    server.emit({ type: "GAME_COMPLETED", results: [{ playerId: "p1", name: "Ana", rank: 1, score: 900, correctAnswers: 6, wrongAnswers: 1 }, { playerId: "p2", name: "Ben", rank: 2, score: 400, correctAnswers: 3, wrongAnswers: 2 }] });
+    server.emit({ type: "RATING_UPDATED", game: "flags", changes: [{ playerId: "p1", rating: 1016, delta: 16 }, { playerId: "p2", rating: 1024, delta: -16 }] });
+    expect(screen.element.dataset.view).toBe("results");
+    expect([...screen.element.querySelectorAll(".mp-standing-rating")].map((item) => item.textContent)).toEqual(["1,016 (+16)", "1,024 (−16)"]);
+    const results = screen.element.querySelector(".mp-results")!;
+    expect(results.querySelector<HTMLElement>(".mp-results .mp-start-game:not(.mp-find-match)")!.hidden).toBe(true);
+    const again = results.querySelector<HTMLButtonElement>(".mp-find-match")!;
+    expect(again.hidden).toBe(false);
+    again.click();
+    expect(server.sent.at(-1)).toEqual({ type: "QUICK_MATCH", game: "flags", playerName: "Ana", avatarEmoji: expect.any(String) });
+    screen.destroy();
   });
 });
