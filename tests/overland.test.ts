@@ -291,3 +291,20 @@ describe("Overland today's route streaks", () => {
     expect(readOverlandDay(storage, "2026-10-08", createDailyOverlandRoute("2026-10-09"))).toBeNull();
   });
 });
+
+describe("Overland today's route share text", () => {
+  it("numbers the day and says how it went, Travle-style", async () => {
+    const { overlandDailyNumber, overlandDailyShareText } = await import("../src/core/overland");
+    expect(overlandDailyNumber("2026-10-14")).toBe(1);
+    expect(overlandDailyNumber("2027-10-14")).toBe(366);
+    const route = { start: "PT", end: "PL", minimum: 3, guessesAllowed: 7 };
+    const details = { number: 12, startName: "Portugal", endName: "Poland", url: "https://locato.quest/?game=overland&daily=1", away: 2 };
+    const perfect = play(createOverlandRound(route), "ES", "FR", "DE");
+    expect(overlandDailyShareText(perfect, details)).toBe("#locato Overland #12 (perfect)\nPortugal → Poland\n🟩🟩🟩\nhttps://locato.quest/?game=overland&daily=1");
+    const hinted = (hintOverland(graph, play(createOverlandRound(route), "IT")) as { round: OverlandRound }).round;
+    expect(overlandDailyShareText(play(hinted, "ES", "FR", "DE"), details).split("\n").slice(0, 3)).toEqual(["#locato Overland #12 (+1)", "Portugal → Poland", "🟧🟩🟩🟩 💡"]);
+    const failed = play(createOverlandRound(route), "JP", "AU", "NZ", "IS", "MG", "LK", "ES");
+    expect(overlandDailyShareText(failed, details).split("\n")[0]).toBe("#locato Overland #12 (2 away)");
+    expect(overlandDailyShareText(revealOverland(createOverlandRound(route)), details).split("\n").slice(0, 3)).toEqual(["#locato Overland #12 (gave up)", "Portugal → Poland", "·"]);
+  });
+});

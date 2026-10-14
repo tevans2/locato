@@ -354,20 +354,22 @@ describe("Overland: today's route", () => {
     expect(done.$(".overland-outcome-title")?.textContent).toBe("Perfect route!");
   });
 
-  it("shares a spoiler-free grid and links to the five-route run", async () => {
+  it("copies the whole result to the clipboard, not just a link, and links to the five-route run", async () => {
     const writeText = vi.fn(async () => undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const share = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText }, share });
     const onPlayRun = vi.fn();
     const ui = mountToday(onPlayRun);
+    const path = graph.shortestRoute(todays.start, todays.end)!.slice(1, -1);
     ui.guess("JP");
-    for (const code of graph.shortestRoute(todays.start, todays.end)!.slice(1, -1)) ui.guess(code);
+    for (const code of path) ui.guess(code);
+    const expected = `#locato Overland #1 (+1)\n${nameOf(todays.start)} → ${nameOf(todays.end)}\n🟥${"🟩".repeat(todays.minimum)}\n${window.location.origin}/?game=overland&daily=1`;
+    expect(ui.$(".overland-share-preview")?.textContent).toBe(expected);
     ui.$<HTMLButtonElement>(".overland-share")!.click();
-    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
-    const text = (writeText.mock.calls[0] as unknown as [string])[0];
-    expect(text).toContain(`Locato Overland · ${DATE}`);
-    expect(text).toContain(`${nameOf(todays.start)} → ${nameOf(todays.end)}`);
-    expect(text).toContain(`🟥${"🟩".repeat(todays.minimum)} (+1)`);
-    for (const code of graph.shortestRoute(todays.start, todays.end)!.slice(1, -1)) expect(text).not.toContain(nameOf(code));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(expected));
+    expect(share).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(ui.$(".overland-share-status")?.textContent).toBe("Copied — paste it anywhere."));
+    for (const code of path) expect(expected).not.toContain(nameOf(code));
     ui.$<HTMLButtonElement>(".overland-play-run")!.click();
     expect(onPlayRun).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();

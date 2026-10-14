@@ -187,3 +187,12 @@ export function createThemedOverlandRoute(themeCountryCodes: readonly string[], 
     ?? pickRoute(steps, `${seed}:overland`, (candidate) => theme.has(candidate.a) || theme.has(candidate.b))
     ?? pickRoute(steps, `${seed}:overland`)!;
 }
+
+/** Today's route #1 was played on this date; each day after is the next number. */
+export const OVERLAND_DAILY_FIRST_DATE = "2026-10-14";
+
+/** Today's route's number for a date (YYYY-MM-DD), counting from 1. */
+export function overlandDailyNumber(date: string): number {
+  const days = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${OVERLAND_DAILY_FIRST_DATE}T12:00:00Z`)) / 86_400_000);
+  return Number.isFinite(days) ? Math.max(1, days + 1) : 1;
+}

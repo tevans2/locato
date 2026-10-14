@@ -132,3 +132,20 @@ export function overlandShareLine(round: OverlandRound): string {
   const points = overlandRoundPoints(round);
   return `${squares}${hints} ${points > 0 ? `+${points}` : "—"}`;
 }
+
+/**
+ * Today's route as share text: the day's number with how it went, the two ends, a square per
+ * guess (and a bulb per hint), then the link. It shows how you did, never which countries.
+ *
+ *   #locato Overland #12 (+1)
+ *   Greece → Sudan
+ *   🟥🟩🟩🟩🟩
+ *   https://locato.quest/?game=overland&daily=1
+ */
+export function overlandDailyShareText(round: OverlandRound, details: { readonly number: number; readonly startName: string; readonly endName: string; readonly url: string; readonly away: number }): string {
+  const extra = Math.max(0, round.guesses.length - round.route.minimum);
+  const tally = round.status === "solved" ? (extra === 0 ? "(perfect)" : `(+${extra})`) : round.status === "failed" ? `(${details.away} away)` : "(gave up)";
+  const squares = round.guesses.map((guess) => OVERLAND_VERDICTS[guess.verdict].emoji).join("") || "·";
+  const hints = round.hintsUsed > 0 ? ` ${"💡".repeat(round.hintsUsed)}` : "";
+  return `#locato Overland #${details.number} ${tally}\n${details.startName} → ${details.endName}\n${squares}${hints}\n${details.url}`;
+}

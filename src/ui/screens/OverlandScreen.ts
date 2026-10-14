@@ -20,7 +20,10 @@ import {
   hintOverland,
   isPerfectOverlandRound,
   overlandBestRoute,
+  overlandDailyNumber,
+  overlandDailyShareText,
   overlandGraph,
+  overlandMissingCountries,
   overlandPlayerRoute,
   overlandRoundPoints,
   overlandShareLine,
@@ -93,6 +96,22 @@ function guessErrorText(error: OverlandGuessError, name: string): string {
   if (error === "repeat") return `You've already named ${name}.`;
   if (error === "unknown") return `${name} isn't on the border map.`;
   return "This route is finished.";
+}
+
+/**
+ * Share copies the whole result (grid, route and link) straight to the clipboard, Travle-style.
+ * The system share sheet is only a fallback: its "Copy" often keeps just the link.
+ */
+async function copyShareText(text: string): Promise<"copied" | "shared" | "failed"> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return "copied";
+    }
+  } catch {
+    // Fall back to the share sheet below.
+  }
+  return shareResult({ title: "Locato Overland", text });
 }
 
 /** The rules, the colours and the scoring, as a dialog opened from the menu or the panel. */
@@ -453,15 +472,18 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   /** Today's route, once it's over: the streak, a share grid, and when the next route comes. */
   function todaySummary(current: OverlandRound): HTMLElement {
     const stats = readOverlandDailyStats(options.storage, today!.date);
-    const extra = Math.max(0, current.guesses.length - current.route.minimum);
-    const tally = current.status === "solved" ? `(+${extra})` : current.status === "failed" ? "✗" : "gave up";
-    const squares = current.guesses.map((guess) => OVERLAND_VERDICTS[guess.verdict].emoji).join("");
-    const shareText = `Locato Overland · ${today!.date}\n${nameOf(current.route.start)} → ${nameOf(current.route.end)}\n${squares} ${"💡".repeat(current.hintsUsed)}${current.hintsUsed ? " " : ""}${tally}`;
+    const shareText = overlandDailyShareText(current, {
+      number: overlandDailyNumber(today!.date),
+      startName: nameOf(current.route.start),
+      endName: nameOf(current.route.end),
+      url: `${typeof window === "undefined" ? "https://locato.quest" : window.location.origin}/?game=overland&daily=1`,
+      away: overlandMissingCountries(graph, current).length,
+    });
     const status = el("p", { className: "overland-share-status", attrs: { role: "status" } });
-    const shareButton = el("button", { className: "primary-action overland-share", attrs: { type: "button" }, children: [shellIcon("share-2", 17, 2), el("span", { text: "Share" })] });
+    const shareButton = el("button", { className: "primary-action overland-share", attrs: { type: "button" }, children: [shellIcon("copy", 17, 2), el("span", { text: "Share" })] });
     shareButton.addEventListener("click", () => {
-      void shareResult({ title: "Locato Overland", text: shareText, url: "https://locato.quest/?game=overland&daily=1" }).then((outcome) => {
-        status.textContent = outcome === "copied" ? "Copied to your clipboard." : outcome === "shared" ? "Thanks for sharing!" : "";
+      void copyShareText(shareText).then((outcome) => {
+        status.textContent = outcome === "copied" ? "Copied — paste it anywhere." : outcome === "shared" ? "Thanks for sharing!" : "Couldn't copy. Select the text above instead.";
       });
     }, { signal });
     const nextDay = new Date(`${today!.date}T00:00:00`);
@@ -478,6 +500,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
             ["Played", String(stats.played)],
           ].map(([label, value]) => el("div", { children: [el("dt", { text: label! }), el("dd", { text: value! })] })),
         }),
+        el("pre", { className: "overland-share-preview", text: shareText, attrs: { "aria-label": "Your result to share" } }),
         el("p", { className: "overland-today-next", text: `A new route in ${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m.` }),
         shareButton,
         ...(options.onPlayRun ? [el("button", { className: "overland-link overland-play-run", text: "Play a five-route run", attrs: { type: "button" }, on: { click: () => options.onPlayRun?.() } })] : []),

@@ -2,6 +2,7 @@ export { createBorderGraph, overlandGraph } from "./graph";
 export type { BorderGraph } from "./graph";
 export {
   EXCLAVE_BORDERS,
+  OVERLAND_DAILY_FIRST_DATE,
   OVERLAND_ROUTE_PLAN,
   OVERLAND_SPARE_GUESSES,
   createDailyOverlandRoute,
@@ -9,6 +10,7 @@ export {
   createThemedOverlandRoute,
   exclaveBorderNote,
   exclaveNotesFor,
+  overlandDailyNumber,
   overlandGuessAllowance,
   overlandRouteBetween,
   overlandRouteCandidates,
@@ -27,6 +29,7 @@ export {
   hintOverland,
   isPerfectOverlandRound,
   overlandBestRoute,
+  overlandDailyShareText,
   overlandMissingCountries,
   overlandPlayerRoute,
   overlandRoundPoints,
