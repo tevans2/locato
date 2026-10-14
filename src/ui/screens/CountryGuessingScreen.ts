@@ -526,7 +526,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         if (complete() && state.status === "complete" && lastResults === null) finishWorldRun();
       } else if (prediction) {
         guessedCountryIds.delete(prediction.id); render(); showFeedback(feedback, "Could not verify that country. Please enter it again.", "bad");
-      } else if (!action.auto) { runWrongGuesses++; showFeedback(feedback, state.feedback ?? "Try again.", "bad"); }
+      } else if (!action.auto) { runWrongGuesses++; showFeedback(feedback, state.feedback ?? "Try again.", "bad"); if (shouldAutoFocusTextInput()) input.select(); }
     } catch (error) { if (!controller.signal.aborted) { if (prediction) guessedCountryIds.delete(prediction.id); render(); showFeedback(feedback, (error as Error).message, "bad"); } }
     finally { rankedRequests--; rankedRequesting = rankedRequests > 0; }
   }

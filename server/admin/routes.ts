@@ -173,9 +173,9 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
     const userId = decodeURIComponent(bestTimeMatch[1]!);
     const mode = url.searchParams.get("mode") ?? "";
     const variant = url.searchParams.get("variant") ?? "";
-    const deleted = service.deleteBestTime(userId, mode, variant);
-    audit("admin.leaderboard.delete", { targetUserId: userId, mode, variant, deleted });
-    return deleted ? json({ ok: true }) : json({ error: "Leaderboard entry not found." }, 404);
+    const removed = service.removeBoardEntry(userId, mode, variant);
+    audit("admin.leaderboard.delete", { targetUserId: userId, mode, variant, deleted: removed !== null, removed: removed?.removed ?? null, revertedTo: removed?.revertedTo?.value ?? null });
+    return removed ? json({ ok: true, removed: removed.removed, revertedTo: removed.revertedTo }) : json({ error: "Leaderboard entry not found." }, 404);
   }
 
   if (pathname === "/api/admin/daily" && method === "GET") {
