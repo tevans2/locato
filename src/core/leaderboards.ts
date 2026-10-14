@@ -40,6 +40,8 @@ export const MAP_TAP_ATTEMPT_TARGETS = 10;
 export const WORLD_SPLIT_ATTEMPT_ROUNDS = 5;
 export const GEOGUESSR_ATTEMPT_ROUNDS = 5;
 export const STREET_VIEW_ATTEMPT_COUNTRIES = 5;
+/** Overland: one attempt is this many routes, each worth up to 100 points (src/core/overland). */
+export const OVERLAND_ATTEMPT_ROUTES = 5;
 /** Flyover: one attempt is a run against this clock; the score is how many countries you reach. */
 export const FLYOVER_ATTEMPT_SECONDS = 90;
 /** Flyover excludes the 29 countries below its minimum target area in the shipped map. */
@@ -65,6 +67,7 @@ export const LEADERBOARD_MODES: readonly LeaderboardModeConfig[] = [
   score("worldsplit", `Split the population in ${WORLD_SPLIT_ATTEMPT_ROUNDS} rounds. Fairer lines score more.`, WORLD_SPLIT_ATTEMPT_ROUNDS * 100),
   score("geoguessr", `Pin ${GEOGUESSR_ATTEMPT_ROUNDS} Street View locations. Closer pins score more.`, GEOGUESSR_ATTEMPT_ROUNDS * 5000),
   score("flyover", `Fly over as many named countries as you can in ${FLYOVER_ATTEMPT_SECONDS} seconds.`, FLYOVER_MAX_SCORE),
+  score("overland", `Link ${OVERLAND_ATTEMPT_ROUTES} pairs of countries by land. Fewer guesses score more.`, OVERLAND_ATTEMPT_ROUTES * 100),
   score("streetview-country", `Name ${STREET_VIEW_ATTEMPT_COUNTRIES} countries from Street View. Fewer guesses score more.`, STREET_VIEW_ATTEMPT_COUNTRIES * STREET_VIEW_POINTS_BY_GUESS[0]),
 ];
 

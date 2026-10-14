@@ -17,6 +17,7 @@ export type AppRoute =
   | { readonly type: "geoguessr" }
   | { readonly type: "worldsplit" }
   | { readonly type: "flyover" }
+  | { readonly type: "overland" }
   /**
    * Multiplayer (`?view=multiplayer`). `joinCode` joins that room (`?room=`, the invite link);
    * `create` opens straight into a new room (`&create=1`), optionally inviting one friend by user
@@ -72,7 +73,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
   }
   if (game === "map-tap") return { type: game, ...timed };
-  if (game === "worldsplit" || game === "flyover" || game === "geoguessr" || game === "streetview-country") return { type: game };
+  if (game === "worldsplit" || game === "flyover" || game === "overland" || game === "geoguessr" || game === "streetview-country") return { type: game };
   const view = params.get("view");
   if (view === "daily-practice" && /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "")) return { type: "daily-practice", date: params.get("date")! };
   if (view === "academy") {
@@ -91,7 +92,7 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
   if (view === "daily-challenge" || view === "stats" || view === "friends") return { type: view };
   if (view === "leaderboards" || view === "leaderboard" || view === "compete") {
     const mode = params.get("mode");
-    const validMode = mode && (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || ["worldsplit", "flyover", "map-tap", "geoguessr", "streetview-country"].includes(mode));
+    const validMode = mode && (isPromptGameModeId(mode) || isWorldMapGameModeId(mode) || ["worldsplit", "flyover", "overland", "map-tap", "geoguessr", "streetview-country"].includes(mode));
     // Compete (retired) opened on its Multiplayer tab unless it named a board.
     if (view === "compete" && params.get("tab") !== "leaderboards" && !mode) return { type: "multiplayer" };
     const variant = params.get("variant");
@@ -121,7 +122,7 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
     params.set("game", route.type);
     if (route.run === "timed") params.set("run", "timed");
   }
-  else if (route.type === "worldsplit" || route.type === "flyover" || route.type === "geoguessr" || route.type === "streetview-country") params.set("game", route.type);
+  else if (route.type === "worldsplit" || route.type === "flyover" || route.type === "overland" || route.type === "geoguessr" || route.type === "streetview-country") params.set("game", route.type);
   else if (route.type === "multiplayer" && route.joinCode) params.set("room", route.joinCode);
   else if (route.type === "multiplayer" && route.create) {
     params.set("view", "multiplayer");

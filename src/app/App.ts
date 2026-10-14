@@ -3,7 +3,7 @@ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } f
 import { createDailyChallenge, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
-import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isFlyoverGameModeId, isMapTapGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -148,7 +148,7 @@ export function createApp(options: AppOptions): App {
       } else if (mode === "map-tap") {
         navigate({ type: mode, run: "timed" });
       } else {
-        // Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one way to play.
+        // Single-run modes (Worldsplit, Flyover, Overland, GeoGuessr, Street View country) have one way to play.
         handleGameModeChange(mode);
       }
       return;
@@ -764,6 +764,11 @@ export function createApp(options: AppOptions): App {
 
     if (isFlyoverGameModeId(gameMode)) {
       navigate({ type: "flyover" });
+      return;
+    }
+
+    if (isOverlandGameModeId(gameMode)) {
+      navigate({ type: "overland" });
     }
   }
 
@@ -962,6 +967,34 @@ export function createApp(options: AppOptions): App {
     }
   }
 
+  async function startOverland(): Promise<void> {
+    if (await startVerified("overland")) return;
+    const run = navigationRun;
+    mount(createLoadingScreen("Unfolding the map..."));
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/OverlandScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createOverlandScreen({ shell,
+          worldCountryFeatures,
+          countryIndex: options.countryIndex,
+          storage: options.storage,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
   async function startMultiplayer(joinCode?: string, quickCreate?: { readonly inviteUserId?: string }): Promise<void> {
     const run = navigationRun;
     mount(createLoadingScreen("Loading multiplayer..."));
@@ -1146,6 +1179,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "flyover") {
       runNavigation(startFlyover());
+      return;
+    }
+    if (route.type === "overland") {
+      runNavigation(startOverland());
       return;
     }
     if (route.type === "multiplayer") {

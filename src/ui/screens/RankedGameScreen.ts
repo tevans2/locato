@@ -53,6 +53,9 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
     } else if (mode === "worldsplit") {
       const { createWorldSplitScreen } = await import("./WorldSplitScreen");
       screen = createWorldSplitScreen({ ...common, worldCountryFeatures: world, ranked: session });
+    } else if (mode === "overland") {
+      const { createOverlandScreen } = await import("./OverlandScreen");
+      screen = createOverlandScreen({ ...common, worldCountryFeatures: world, ranked: session });
     } else if (mode === "geoguessr") {
       const { createGeoGuessrScreen } = await import("./GeoGuessrScreen");
       screen = createGeoGuessrScreen({ ...common, ranked: session });

@@ -124,6 +124,28 @@ it("uses the original Worldsplit controls, round review and recap", async () => 
   expect(ui.screen.element.querySelectorAll(".gb-run-row")).toHaveLength(5);
 });
 
+it("plays Overland through the server: typed guesses, server verdicts and a posted total", async () => {
+  const ui = await setup("overland", true);
+  for (let position = 0; position < 5; position++) {
+    const route = ui.state().question!.route!;
+    expect(ui.$(".overland-end-name").textContent).toBe(ui.countries.byCode.get(route.start)!.name);
+    let made = 0;
+    while (ui.state().index === position) {
+      ui.advance();
+      ui.$<HTMLInputElement>("#overland-guess-input").value = ui.countries.byCode.get(ui.answer().countryCode!)!.name;
+      ui.$<HTMLFormElement>(".overland-guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+      made += 1;
+      await vi.waitFor(() => expect(ui.screen.element.querySelectorAll(".overland-guess.is-route")).toHaveLength(made));
+    }
+    await vi.waitFor(() => expect(ui.$<HTMLElement>(".overland-outcome").hidden).toBe(false));
+    expect(ui.$(".overland-outcome-points").textContent).toBe("+100 points");
+    ui.$<HTMLButtonElement>(".overland-next").click();
+  }
+  await ui.posted();
+  expect(JSON.parse(ui.fetcher.mock.calls.find(([path]) => path === "/api/leaderboard")![1].body as string)).toEqual({ gameMode: "overland", variant: "", score: 500, runId: ui.state().runId });
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, "overland", "")).toMatchObject({ rank: 1, score: 500 });
+});
+
 it("uses MapTap's globe, per-pin review and ten-target results, including a fresh restart", async () => {
   let choose: (p: { lat: number; lng: number }) => void = () => {};
   vi.spyOn(globe, "createMapTapGlobe").mockImplementation((options) => { choose = options.onGuess; return { element: document.createElement("div"), reset() {}, reveal() {}, revealMultiplayer() {}, setAcceptingGuesses() {}, destroy() {} }; });

@@ -1,0 +1,242 @@
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createOverlandScreen } from "../src/ui/screens/OverlandScreen";
+import { createOverlandRoutes, overlandGraph } from "../src/core/overland";
+import { indexCountries, rawCountries } from "../src/core/countries";
+import { OVERLAND_ATTEMPT_ROUTES } from "../src/core/leaderboards";
+import { rankedWorld } from "../server/ranked/assets";
+import type { ShellContext } from "../src/ui/shell/types";
+import type { PostRankedAttempt } from "../src/ui/screens/rankedAttempt";
+
+const SEED = "overland-ui";
+const routes = createOverlandRoutes(SEED);
+const graph = overlandGraph();
+const index = indexCountries(rawCountries);
+const world = rankedWorld();
+const nameOf = (code: string) => index.byCode.get(code)!.name;
+const ISLANDS = ["JP", "AU", "NZ", "IS", "MG", "LK", "CU", "PH", "FJ", "TW", "SG", "JM"];
+
+const screens: ReturnType<typeof createOverlandScreen>[] = [];
+afterEach(() => { for (const screen of screens.splice(0)) screen.destroy(); document.body.replaceChildren(); localStorage.clear(); });
+
+function stubShell(overrides: Partial<ShellContext> = {}): ShellContext {
+  return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false, storage: localStorage, ...overrides };
+}
+
+function setup(options: { shell?: Partial<ShellContext>; postAttempt?: PostRankedAttempt } = {}) {
+  const screen = createOverlandScreen({
+    shell: stubShell(options.shell),
+    worldCountryFeatures: world,
+    countryIndex: index,
+    storage: localStorage,
+    onGameModeChange() {},
+    onHome() {},
+  }, { seed: SEED, postAttempt: options.postAttempt ?? (async () => ({ serverAccepted: null, rank: null })) });
+  screens.push(screen);
+  document.body.append(screen.element);
+  const $ = <T extends Element = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector);
+  const all = (selector: string) => [...screen.element.querySelectorAll<HTMLElement>(selector)];
+  const input = $<HTMLInputElement>("#overland-guess-input")!;
+  const guess = (text: string) => {
+    input.value = text;
+    $<HTMLFormElement>(".overland-guess-form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+  };
+  const feedback = () => $(".overland-feedback")?.textContent ?? "";
+  /** Name the countries of a shortest route, then move on. */
+  const playRoute = (position: number) => {
+    const route = routes[position]!;
+    for (const code of graph.shortestRoute(route.start, route.end)!.slice(1, -1)) guess(nameOf(code));
+    expect($<HTMLElement>(".overland-outcome")!.hidden).toBe(false);
+    $<HTMLButtonElement>(".overland-next")!.click();
+  };
+  return { screen, $, all, input, guess, feedback, playRoute };
+}
+
+describe("Overland (single-run: every run counts)", () => {
+  it("deals five routes with a Best badge instead of a Practice / Ranked choice", () => {
+    expect(routes).toHaveLength(OVERLAND_ATTEMPT_ROUTES);
+    localStorage.setItem("locato:ranked-best:overland:v1", "312");
+    const ui = setup();
+    const [first] = routes;
+    expect(ui.$(".shell-run-pill")?.dataset.run).toBe("single");
+    expect(ui.$(".shell-run-option")).toBeNull();
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("312");
+    expect(ui.$(".overland-progress-label")?.textContent).toBe(`Route 1 of ${OVERLAND_ATTEMPT_ROUTES}`);
+    expect(ui.all(".overland-end-name").map((item) => item.textContent)).toEqual([nameOf(first!.start), nameOf(first!.end)]);
+    expect(ui.$(".overland-route-detail")?.textContent).toBe(`Name the countries in between. The shortest route crosses ${first!.minimum} countries.`);
+    expect(ui.$(".overland-meter-label")?.textContent).toBe(`0 of ${first!.guessesAllowed}`);
+    expect(ui.all(".world-map-country.is-ov-start, .world-map-country.is-ov-end")).toHaveLength(2);
+    ui.$<HTMLButtonElement>(".shell-gamebar-more")!.click();
+    expect(ui.$(".shell-menu")?.textContent).toContain("How to play");
+    expect(ui.$(".shell-menu")?.textContent).toContain("Restart run");
+  });
+
+  it("colours each guess on the map and in the list, and refuses the ends, repeats and unknown names", () => {
+    const ui = setup();
+    const [first] = routes;
+    const onRoute = graph.shortestRoute(first!.start, first!.end)![1]!;
+    ui.guess(nameOf(first!.start));
+    expect(ui.feedback()).toBe(`${nameOf(first!.start)} is one end of the route. Name the countries in between.`);
+    ui.guess("Atlantis");
+    expect(ui.feedback()).toBe("No country called “Atlantis”. Check the spelling.");
+    expect(ui.all(".overland-guess")).toHaveLength(0);
+
+    ui.guess(nameOf(onRoute).toLowerCase());
+    expect(ui.all(".overland-guess.is-route").map((row) => row.textContent)).toEqual([`1${nameOf(onRoute)}On route`]);
+    expect(ui.feedback()).toBe(`${nameOf(onRoute)}: On route.`);
+    expect(ui.all(".world-map-country.is-ov-route")).toHaveLength(1);
+    ui.guess(nameOf(onRoute));
+    expect(ui.feedback()).toBe(`You've already named ${nameOf(onRoute)}.`);
+
+    ui.guess("Japan");
+    expect(ui.all(".overland-guess")[1]?.classList.contains("is-off")).toBe(true);
+    expect(ui.all(".world-map-country.is-ov-off")).toHaveLength(1);
+    expect(ui.$(".overland-meter-label")?.textContent).toBe(`2 of ${first!.guessesAllowed}`);
+    expect(ui.all(".overland-pip.is-route, .overland-pip.is-off")).toHaveLength(2);
+  });
+
+  it("offers matching countries while typing and adds one from the keyboard", () => {
+    const ui = setup();
+    const ends = new Set([routes[0]!.start, routes[0]!.end]);
+    const pick = ["MN", "CL", "BO"].find((code) => !ends.has(code))!;
+    ui.input.value = nameOf(pick).slice(0, 4);
+    ui.input.dispatchEvent(new Event("input"));
+    expect(ui.all(".overland-suggestion").map((item) => item.textContent)).toContain(nameOf(pick));
+    expect(ui.input.getAttribute("aria-expanded")).toBe("true");
+    const position = ui.all(".overland-suggestion").findIndex((item) => item.textContent === nameOf(pick));
+    for (let step = 0; step <= position; step++) ui.input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+    expect(ui.input.getAttribute("aria-activedescendant")).toBe(`overland-suggestions-${position}`);
+    ui.$<HTMLFormElement>(".overland-guess-form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    expect(ui.all(".overland-guess-name").map((item) => item.textContent)).toEqual([nameOf(pick)]);
+    expect(ui.$<HTMLElement>(".overland-suggestions")!.hidden).toBe(true);
+    // Ends of the route are never offered.
+    ui.input.value = nameOf(routes[0]!.start);
+    ui.input.dispatchEvent(new Event("input"));
+    expect(ui.all(".overland-suggestion").map((item) => item.textContent)).not.toContain(nameOf(routes[0]!.start));
+    ui.input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(ui.$<HTMLElement>(".overland-suggestions")!.hidden).toBe(true);
+  });
+
+  it("gives three hints in order — an outline, every missing outline, then initials — at a cost", () => {
+    const ui = setup();
+    const route = routes[0]!;
+    const hint = ui.$<HTMLButtonElement>(".overland-hint")!;
+    expect(hint.textContent).toBe("Hint 1 of 3: outline the next country−15");
+    hint.click();
+    expect(ui.all(".world-map-country.is-ov-hinted")).toHaveLength(1);
+    expect(ui.$(".overland-hint-note")?.textContent).toBe("Dashed outline on the map: a country you still need.");
+    hint.click();
+    expect(ui.all(".world-map-country.is-ov-hinted")).toHaveLength(route.minimum);
+    hint.click();
+    expect(ui.all(".overland-initial")).toHaveLength(route.minimum);
+    expect(hint.disabled).toBe(true);
+    expect(hint.textContent).toBe("No hints left");
+    for (const code of graph.shortestRoute(route.start, route.end)!.slice(1, -1)) ui.guess(nameOf(code));
+    expect(ui.$(".overland-outcome-points")?.textContent).toBe("+55 points");
+    expect(ui.all(".world-map-country.is-ov-hinted")).toHaveLength(0);
+  });
+
+  it("accepts a longer route and shows it beside the shortest one", () => {
+    const ui = setup();
+    const route = routes[0]!;
+    const crossings = graph.distance(route.start, route.end)!;
+    const detour = graph.neighbours(route.start).find((code) => code !== route.end && graph.distance(code, route.end) === crossings)!;
+    expect(detour).toBeDefined();
+    for (const code of [detour, ...graph.shortestRoute(detour, route.end)!.slice(1, -1)]) ui.guess(nameOf(code));
+    expect(ui.$(".overland-outcome-title")?.textContent).toBe("Route found");
+    expect(ui.$(".overland-outcome-points")?.textContent).toBe("+90 points");
+    expect(ui.all(".overland-chain-label").map((label) => label.textContent)).toEqual(["Your route", "Shortest route"]);
+  });
+
+  it("gives up a route after asking, scores nothing and reveals a shortest route", async () => {
+    const confirmLeave = vi.fn(async () => true);
+    const ui = setup({ shell: { confirmLeave } });
+    const route = routes[0]!;
+    ui.$<HTMLButtonElement>(".overland-give-up")!.click();
+    await vi.waitFor(() => expect(ui.$<HTMLElement>(".overland-outcome")!.hidden).toBe(false));
+    expect(confirmLeave).toHaveBeenCalledWith("This route won't score, and a shortest route will be shown.", expect.objectContaining({ title: "Give up on this route?", confirmLabel: "Give up" }));
+    expect(ui.$(".overland-outcome-title")?.textContent).toBe("Route revealed");
+    expect(ui.$(".overland-outcome-points")?.textContent).toBe("No points");
+    expect(ui.all(".overland-chain-stop")).toHaveLength(route.minimum + 2);
+    expect(ui.all(".overland-chain-stop.is-missed")).toHaveLength(route.minimum);
+    expect(ui.all(".world-map-country.is-ov-missed")).toHaveLength(route.minimum);
+    expect(ui.$(".overland-map")?.classList.contains("has-borders")).toBe(true);
+    expect(ui.$(".overland-next")?.textContent).toBe("Next route");
+    ui.$<HTMLButtonElement>(".overland-next")!.click();
+    expect(ui.$(".overland-progress-label")?.textContent).toBe(`Route 2 of ${OVERLAND_ATTEMPT_ROUTES}`);
+    expect(ui.$(".overland-running-score")?.textContent).toBe("0 pts");
+    expect(ui.$(".overland-map")?.classList.contains("has-borders")).toBe(false);
+  });
+
+  it("keeps the route when giving up is cancelled", async () => {
+    const confirmLeave = vi.fn(async () => false);
+    const ui = setup({ shell: { confirmLeave } });
+    ui.$<HTMLButtonElement>(".overland-give-up")!.click();
+    await vi.waitFor(() => expect(confirmLeave).toHaveBeenCalled());
+    expect(ui.$<HTMLElement>(".overland-outcome")!.hidden).toBe(true);
+    expect(ui.input.disabled).toBe(false);
+  });
+
+  it("ends a route when the last guess runs out", () => {
+    const ui = setup();
+    const route = routes[0]!;
+    for (const code of ISLANDS.slice(0, route.guessesAllowed)) ui.guess(nameOf(code));
+    expect(ui.$(".overland-outcome-title")?.textContent).toBe("Out of guesses");
+    expect(ui.input.disabled).toBe(true);
+  });
+
+  it("never asks before leaving: an unfinished run just isn't counted", async () => {
+    const confirmLeave = vi.fn(async () => false);
+    const goBack = vi.fn();
+    const ui = setup({ shell: { confirmLeave, goBack } });
+    ui.playRoute(0);
+    ui.$<HTMLButtonElement>(".shell-gamebar-back")!.click();
+    await vi.waitFor(() => expect(goBack).toHaveBeenCalled());
+    expect(confirmLeave).not.toHaveBeenCalled();
+  });
+
+  it("posts every finished run and ends on the results card", async () => {
+    const postAttempt = vi.fn<PostRankedAttempt>(async () => ({ serverAccepted: null, rank: 4 }));
+    const openLeaderboards = vi.fn();
+    const ui = setup({ postAttempt, shell: { openLeaderboards } });
+    for (let position = 0; position < OVERLAND_ATTEMPT_ROUTES; position++) {
+      if (position === OVERLAND_ATTEMPT_ROUTES - 1) {
+        const route = routes[position]!;
+        for (const code of graph.shortestRoute(route.start, route.end)!.slice(1, -1)) ui.guess(nameOf(code));
+        expect(ui.$(".overland-next")?.textContent).toBe("See final score");
+        ui.$<HTMLButtonElement>(".overland-next")!.click();
+      } else ui.playRoute(position);
+    }
+    const stage = ui.$(".gb-results-stage")!;
+    expect(stage.hidden).toBe(false);
+    expect(stage.querySelector(".shell-results-kicker")?.textContent).toBe("Overland");
+    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("500");
+    expect(postAttempt).toHaveBeenCalledWith({ gameMode: "overland", variant: "", value: 500, isLoggedIn: false });
+    await vi.waitFor(() => expect(stage.querySelector(".shell-results-sub")?.textContent).toBe("That would place #4 on the board. Sign in to post your score to the leaderboard."));
+    expect(stage.querySelectorAll(".gb-run-row")).toHaveLength(OVERLAND_ATTEMPT_ROUTES);
+    expect(stage.querySelector(".gb-run-row")?.textContent).toContain(`${nameOf(routes[0]!.start)} → ${nameOf(routes[0]!.end)}`);
+    expect(ui.$(".shell-run-best-value")?.textContent).toBe("500");
+    [...stage.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("View leaderboard"))!.click();
+    expect(openLeaderboards).toHaveBeenCalledWith("overland");
+
+    const again = stage.querySelector<HTMLButtonElement>(".shell-results-primary")!;
+    expect(again.textContent).toBe("Play again");
+    again.click();
+    await vi.waitFor(() => expect(stage.hidden).toBe(true));
+    expect(ui.$(".overland-progress-label")?.textContent).toBe(`Route 1 of ${OVERLAND_ATTEMPT_ROUTES}`);
+    expect(ui.$(".overland-running-score")?.textContent).toBe("0 pts");
+    expect(ui.all(".overland-guess")).toHaveLength(0);
+  });
+
+  it("lists the countries missed on routes that weren't found", async () => {
+    const ui = setup();
+    for (let position = 0; position < OVERLAND_ATTEMPT_ROUTES; position++) {
+      for (const code of ISLANDS.slice(0, routes[position]!.guessesAllowed)) ui.guess(nameOf(code));
+      ui.$<HTMLButtonElement>(".overland-next")!.click();
+    }
+    const stage = ui.$(".gb-results-stage")!;
+    expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("0");
+    expect(stage.textContent).toContain("Countries you missed");
+    expect(stage.textContent).toContain(nameOf(graph.shortestRoute(routes[0]!.start, routes[0]!.end)![1]!));
+  });
+});

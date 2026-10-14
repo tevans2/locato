@@ -18,6 +18,7 @@ import {
   Plane,
   Puzzle,
   RotateCcw,
+  Route,
   Shapes,
   Split,
   Users,
@@ -68,6 +69,7 @@ const MODE_ICONS: Readonly<Record<GameModeId, LucideIcon>> = {
   "map-tap": Orbit,
   worldsplit: Split,
   flyover: Plane,
+  overland: Route,
   geoguessr: MapPin,
   "streetview-country": Binoculars,
 };
