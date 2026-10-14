@@ -1,15 +1,12 @@
 import type { FlagPool } from "../flagPools";
 import type { MapTapCategory } from "../maptap/types";
-import type { QuickMatchGame } from "./quickMatch";
-import type { FinalResult, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, FlyoverPlanePosition, RoomKind, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
   | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly avatarEmoji?: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
 
   | { readonly type: "JOIN_ROOM"; readonly roomCode: string; readonly playerName: string; readonly avatarEmoji?: string }
   | { readonly type: "REJOIN_ROOM"; readonly roomCode: string; readonly playerId: string; readonly sessionToken: string }
-  /** Find a public room for this game (or open one), leaving any room you're in. */
-  | { readonly type: "QUICK_MATCH"; readonly playerName: string; readonly avatarEmoji?: string; readonly game: QuickMatchGame }
   | { readonly type: "LEAVE_ROOM" }
   | { readonly type: "SET_ROOM_OPTIONS"; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
 
@@ -48,8 +45,8 @@ export type ServerMessage =
    */
   | { readonly type: "FLYOVER_PROGRESS"; readonly playerId: string; readonly index: number; readonly score: number; readonly event: FlyoverProgressEvent; readonly target?: string | null }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
-  /** After a quick match: the signed-in players' new ratings for the game. */
-  | { readonly type: "RATING_UPDATED"; readonly game: QuickMatchGame; readonly changes: readonly RatingChange[] }
+  /** After a game with two or more signed-in players: their new ratings for the room's game type. */
+  | { readonly type: "RATING_UPDATED"; readonly game: RoomKind; readonly changes: readonly RatingChange[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
 
 export interface RatingChange {

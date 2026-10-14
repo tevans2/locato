@@ -1,5 +1,5 @@
 import { rawCountries, indexCountries, type CountryIndex } from "../../src/core/countries";
-import { MAX_ANSWER_LENGTH, parseClientMessage, quickMatchGameInfo, roomKindForCategories, type QuickMatchGame, type ClientMessage, type MessageParseResult, type PublicPlayerState, type RoomCode, type RoomKind, type ServerMessage } from "../../src/core/multiplayer";
+import { MAX_ANSWER_LENGTH, parseClientMessage, roomKindForCategories, type ClientMessage, type MessageParseResult, type PublicPlayerState, type RoomCode, type RoomKind, type ServerMessage } from "../../src/core/multiplayer";
 import { parseRawClientMessage } from "../protocol/parseMessage";
 import { DEFAULT_MAX_PLAYERS_PER_ROOM, DEFAULT_RESULT_DISPLAY_MS, Room, type RoomResult } from "./Room";
 import type { RoomBase } from "./RoomBase";
@@ -49,13 +49,13 @@ export interface RoomManagerOptions {
   readonly flyoverCountries?: () => readonly FlyoverCountry[];
   readonly positionRateLimitPerSecond?: number;
   readonly onGameComplete?: (userId: string, result: GameResult) => void;
-  /** A signed-in player's rating for a quick-match game (shown beside their name). */
-  readonly getRating?: (userId: string, game: QuickMatchGame) => number;
+  /** A signed-in player's rating for a game type (shown beside their name in the room). */
+  readonly getRating?: (userId: string, game: RoomKind) => number;
   /**
-   * Rate a finished quick match: every signed-in entrant with their finishing position (anyone who
-   * left mid-game is ranked last). Returns their new ratings.
+   * Rate a finished game: every signed-in entrant with their finishing position (anyone who left
+   * mid-game is ranked last). Returns their new ratings; nothing when fewer than two are signed in.
    */
-  readonly rateGame?: (game: QuickMatchGame, standings: readonly { readonly userId: string; readonly rank: number }[]) => readonly { readonly userId: string; readonly rating: number; readonly delta: number }[];
+  readonly rateGame?: (game: RoomKind, standings: readonly { readonly userId: string; readonly rank: number }[]) => readonly { readonly userId: string; readonly rating: number; readonly delta: number }[];
 }
 
 export interface RoomManagerStats {
@@ -162,7 +162,7 @@ export class RoomManager {
   private readonly onGameComplete: RoomManagerOptions["onGameComplete"];
   private readonly getRating: RoomManagerOptions["getRating"];
   private readonly rateGame: RoomManagerOptions["rateGame"];
-  /** Quick matches in play: who started each game (player id → account), so leavers still count. */
+  /** Games in play: who started each one (player id → account), so leavers are still rated. */
   private readonly entrants = new Map<RoomCode, Map<string, string>>();
   private readonly rooms = new Map<RoomCode, AnyRoom>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
@@ -257,9 +257,6 @@ export class RoomManager {
   sweep(now = Date.now()): void {
     for (const room of this.rooms.values()) {
       if (isFlyoverRoom(room)) this.broadcastMessages(room, room.tick(now));
-      // A quick match starts by itself once its countdown runs out.
-      const startsAt = room.quickMatchStartsAt;
-      if (room.state === "lobby" && startsAt !== null && startsAt <= now) this.broadcastResult(room, room.startGame(room.host, now));
       // A single deadline drives both the round timeout and the result-display gap, so a fast
       // tick lands transitions within the tick interval instead of the old multi-second jitter.
       const dueAt = room.pendingTransitionAt;
@@ -290,9 +287,6 @@ export class RoomManager {
       case "JOIN_ROOM":
         this.joinRoom(connection, message.roomCode, message.playerName, message.avatarEmoji, now);
         return;
-      case "QUICK_MATCH":
-        this.quickMatch(connection, message.playerName, message.avatarEmoji, message.game, now);
-        return;
       case "REJOIN_ROOM":
         this.rejoinRoom(connection, message.roomCode, message.playerId, message.sessionToken, now);
         return;
@@ -305,10 +299,6 @@ export class RoomManager {
           return;
         }
         this.withSessionRoom(connection, (room, session) => {
-          if (room.quickMatch) {
-            sendError(connection, "quick-match", "Quick matches use standard settings.");
-            return;
-          }
           if (roomKindForCategories(message.categoryIds) !== room.kind) {
             this.switchRoomKind(connection, room, session.playerId, message, now);
           } else if (isMapTapRoom(room)) {
@@ -444,6 +434,8 @@ export class RoomManager {
       return;
     }
     this.detach(connection, now);
+    const hostRating = this.ratingFor(connection.authenticatedUserId, room.kind);
+    if (hostRating !== undefined) room.setRating(playerId, hostRating);
     this.rooms.set(roomCode, room);
     const sessionToken = this.issueToken(playerId, roomCode, connection.authenticatedUserId ?? null);
     this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
@@ -451,59 +443,17 @@ export class RoomManager {
     send(connection, { type: "ROOM_SNAPSHOT", room: room.snapshot() });
   }
 
-  /**
-   * Seat the player in a public room waiting for this game (the fullest one), or open a new one.
-   * Any room they were in is left for good first.
-   */
-  private quickMatch(connection: MultiplayerConnection, playerName: string, requestedAvatar: string | undefined, game: QuickMatchGame, now: number): void {
-    this.leaveRoom(connection, now);
-    const name = connection.authenticatedName ?? playerName;
-    const avatar = playerAvatar(connection, requestedAvatar);
-    const userId = connection.authenticatedUserId ?? null;
-    const rating = userId && this.getRating ? this.getRating(userId, game) : undefined;
-    const playerId = createId("player");
-    const open = [...this.rooms.values()]
-      .filter((room) => room.quickMatch === game && room.state === "lobby" && !room.isEmpty && room.snapshot().players.length < room.maxPlayers)
-      .sort((a, b) => b.snapshot().players.length - a.snapshot().players.length);
-    let room = open[0];
-    let messages: readonly ServerMessage[];
-    if (room) {
-      const result = room.addPlayer(playerId, name, now, avatar, rating);
-      if (!result.ok) {
-        sendError(connection, result.code, result.message);
-        return;
-      }
-      messages = result.messages;
-    } else {
-      if (this.rooms.size >= this.maxRooms) {
-        sendError(connection, "too-many-rooms", "The server is at room capacity.");
-        return;
-      }
-      const info = quickMatchGameInfo(game);
-      const code = createRoomCode(new Set(this.rooms.keys()));
-      const created = this.buildRoom(roomKindForCategories(info.categoryIds), code, { hostPlayerId: playerId, hostName: name, ...(avatar ? { hostAvatarEmoji: avatar } : {}) }, { categoryIds: info.categoryIds }, now);
-      if (!created) {
-        sendError(connection, "mode-unavailable", "That game isn't available right now.");
-        return;
-      }
-      if (rating !== undefined) created.setRating(playerId, rating);
-      created.markQuickMatch(game, now);
-      this.rooms.set(code, created);
-      room = created;
-      messages = [{ type: "ROOM_SNAPSHOT", room: created.snapshot() }];
-    }
-    const sessionToken = this.issueToken(playerId, room.code, userId);
-    this.assignSession(connection, { playerId, roomCode: room.code, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
-    send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode: room.code, sessionToken });
-    this.broadcastMessages(room, messages);
+  /** The rating to show for a signed-in player in a room of this kind. */
+  private ratingFor(userId: string | null | undefined, kind: RoomKind): number | undefined {
+    return userId && this.getRating ? this.getRating(userId, kind) : undefined;
   }
 
-  /** A finished quick match: rate its signed-in entrants and tell the room their new ratings. */
-  private rateQuickMatch(room: AnyRoom, results: readonly { readonly playerId: string; readonly rank: number }[]): ServerMessage | null {
-    const game = room.quickMatch;
+  /** A finished game: rate its signed-in entrants and tell the room their new ratings. */
+  private rateFinishedGame(room: AnyRoom, results: readonly { readonly playerId: string; readonly rank: number }[]): ServerMessage | null {
+    const game = room.kind;
     const entrants = this.entrants.get(room.code);
     this.entrants.delete(room.code);
-    if (!game || !entrants || !this.rateGame) return null;
+    if (!entrants || !this.rateGame) return null;
     const last = results.length + 1;
     const standings = [...entrants].map(([playerId, userId]) => ({ playerId, userId, rank: results.find((result) => result.playerId === playerId)?.rank ?? last }));
     if (standings.length < 2) return null;
@@ -578,6 +528,12 @@ export class RoomManager {
       return;
     }
     next.adoptRoster(room as RoomBase<PublicPlayerState>);
+    // Ratings are per game type: show everyone's rating for the new one.
+    for (const claim of this.sessionsByToken.values()) {
+      if (claim.roomCode !== room.code) continue;
+      const rating = this.ratingFor(claim.userId, next.kind);
+      if (rating !== undefined) next.setRating(claim.playerId, rating);
+    }
     this.rooms.set(room.code, next);
     this.broadcastMessages(next, [{ type: "ROOM_SNAPSHOT", room: next.snapshot() }]);
   }
@@ -591,7 +547,7 @@ export class RoomManager {
 
     this.detach(connection, now);
     const playerId = createId("player");
-    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now, playerAvatar(connection, requestedAvatar));
+    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now, playerAvatar(connection, requestedAvatar), this.ratingFor(connection.authenticatedUserId, room.kind));
     if (!result.ok) {
       sendError(connection, result.code, result.message);
       return;
@@ -707,7 +663,7 @@ export class RoomManager {
   private broadcastMessages(room: AnyRoom, messages: readonly ServerMessage[]): void {
     const followUps: ServerMessage[] = [];
     for (const message of messages) {
-      if (message.type === "GAME_STARTED" && room.quickMatch) {
+      if (message.type === "GAME_STARTED" && this.rateGame) {
         // Who started this game, by account: they're rated even if they leave before the end.
         const snapshot = room.snapshot();
         const seated = snapshot.players.filter((player) => player.connected && !player.spectator).map((player) => player.id);
@@ -716,8 +672,8 @@ export class RoomManager {
           return seat?.userId ? [[playerId, seat.userId] as const] : [];
         })));
       }
-      if (message.type === "GAME_COMPLETED" && room.quickMatch) {
-        const rating = this.rateQuickMatch(room, message.results);
+      if (message.type === "GAME_COMPLETED") {
+        const rating = this.rateFinishedGame(room, message.results);
         if (rating) followUps.push(rating);
       }
       if (message.type === "GAME_COMPLETED" && this.onGameComplete) {

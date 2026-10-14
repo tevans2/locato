@@ -128,7 +128,6 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
       session.create({ playerName, avatarEmoji: getLocalAvatar(), categoryIds: roomKindInfo(kind).categoryIds });
     },
     onJoin: (roomCode, playerName) => session.join(roomCode, playerName, getLocalAvatar()),
-    onQuickMatch: (game, playerName) => session.quickMatch(game, playerName, getLocalAvatar()),
     ...(options.onFriends ? { onFriends: options.onFriends } : {}),
     ...(options.subscribeFriends ? { subscribeFriends: options.subscribeFriends } : {}),
   });
@@ -145,11 +144,6 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     signal,
     send: (message) => session.send(message),
     onLeave: () => session.leave(),
-    onFindMatch: (game) => {
-      const { room, localPlayerId } = session.state();
-      const name = getUser()?.displayName ?? readPlayerName(options.storage) ?? room?.players.find((player) => player.id === localPlayerId)?.name ?? "Player";
-      session.quickMatch(game, name, getLocalAvatar());
-    },
   });
 
   // Round views are built the first time a room plays that game: MapTap needs WebGL and
@@ -234,8 +228,8 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
   const homeHeading = el("div", {
     className: "mp-heading",
     children: [
-      el("h1", { className: "mp-title", text: "Play live" }),
-      el("p", { className: "mp-lede", text: "Real-time games for 2 to 8 players. Find a match with anyone, or open a room and share the link with friends." }),
+      el("h1", { className: "mp-title", text: "Play with friends" }),
+      el("p", { className: "mp-lede", text: "Real-time games for 2 to 8 players. Open a room, share the link, and race." }),
     ],
   });
   const roomHeading = el("h1", { className: "mp-sr", text: "Multiplayer room" });

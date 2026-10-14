@@ -1,6 +1,5 @@
 import { filterProfanity } from "../../src/core/multiplayer/profanity";
 import type { ServerMessage } from "../../src/core/multiplayer/protocol";
-import { QUICK_MATCH_COUNTDOWN_MS, QUICK_MATCH_FULL_COUNTDOWN_MS, QUICK_MATCH_MIN_PLAYERS, type QuickMatchGame } from "../../src/core/multiplayer/quickMatch";
 import type { PlayerId, PublicChatMessage, PublicPlayerState, PublicRoomSettings, PublicRoomState, PublicRoundState, RoomCode, RoomKind } from "../../src/core/multiplayer/roomTypes";
 
 export type RoomStatus = PublicRoomState["status"];
@@ -55,9 +54,7 @@ export abstract class RoomBase<P extends PublicPlayerState> {
   private chatMessages: readonly PublicChatMessage[] = [];
   private chatSequence = 0;
   private touchedAt: number;
-  /** Quick matches: the game, when the room starts by itself, and the signed-in players' ratings. */
-  private quickMatchGame: QuickMatchGame | null = null;
-  private quickMatchAt: number | null = null;
+  /** Signed-in players' ratings for this room's game type, shown beside their names. */
   private readonly ratings = new Map<PlayerId, number>();
 
   constructor(options: RoomBaseOptions) {
@@ -146,44 +143,13 @@ export abstract class RoomBase<P extends PublicPlayerState> {
       phaseStartedAt: this.phaseStartedAt,
       phaseEndsAt: this.pendingTransitionAt,
       chatMessages: this.chatMessages,
-      ...(this.quickMatchGame ? { quickMatch: { game: this.quickMatchGame, startsAt: this.quickMatchAt } } : {}),
     };
   }
 
-  // ---------- quick matches ----------
-
-  /** Make this a public quick-match room for `game`: standard settings, starting by itself. */
-  markQuickMatch(game: QuickMatchGame, now: number): void {
-    this.quickMatchGame = game;
-    this.refreshQuickMatch(now);
-  }
-
-  get quickMatch(): QuickMatchGame | null {
-    return this.quickMatchGame;
-  }
-
-  /** When a quick match in the lobby starts by itself (null while it waits for players). */
-  get quickMatchStartsAt(): number | null {
-    return this.quickMatchAt;
-  }
+  // ---------- ratings ----------
 
   setRating(playerId: PlayerId, rating: number): void {
     this.ratings.set(playerId, rating);
-  }
-
-  /**
-   * The countdown follows who's in: it starts once two players are, shortens when the room fills,
-   * and stops if it drops below two again.
-   */
-  private refreshQuickMatch(now: number): void {
-    if (!this.quickMatchGame || this.status !== "lobby") {
-      this.quickMatchAt = null;
-      return;
-    }
-    const active = this.activePlayerIds().length;
-    if (active < QUICK_MATCH_MIN_PLAYERS) this.quickMatchAt = null;
-    else if (this.players.size >= this.maxPlayers) this.quickMatchAt = Math.min(this.quickMatchAt ?? Infinity, now + QUICK_MATCH_FULL_COUNTDOWN_MS);
-    else this.quickMatchAt ??= now + QUICK_MATCH_COUNTDOWN_MS;
   }
 
   /** Joins as a player in the lobby, or as a spectator while a game is running. */
@@ -195,7 +161,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     const player: P = this.status === "lobby" ? fresh : { ...fresh, spectator: true };
     this.players.set(playerId, player);
     if (rating !== undefined) this.ratings.set(playerId, rating);
-    this.refreshQuickMatch(now);
     return ok([{ type: "PLAYER_JOINED", player: this.publicPlayer(player) }, this.snapshotMessage()]);
   }
 
@@ -206,7 +171,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     this.players.delete(playerId);
     this.onPlayerGone(playerId);
     this.transferHostIfNeeded();
-    this.refreshQuickMatch(now);
     const closed = this.afterDeparture(playerId, now);
     return ok([{ type: "PLAYER_LEFT", playerId, name: player.name }, ...(closed ?? [this.snapshotMessage()])]);
   }
@@ -218,7 +182,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     this.players.set(playerId, { ...player, connected: true });
     // Someone reclaiming a seat in an empty room takes the host role back.
     this.transferHostIfNeeded();
-    this.refreshQuickMatch(now);
     return ok([this.snapshotMessage()]);
   }
 
@@ -229,7 +192,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     this.players.set(playerId, { ...player, connected: false, streak: 0 });
     this.onPlayerGone(playerId);
     this.transferHostIfNeeded();
-    this.refreshQuickMatch(now);
     return ok(this.afterDeparture(playerId, now) ?? [this.snapshotMessage()]);
   }
 
@@ -237,8 +199,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     this.touch(now);
     if (this.status !== "lobby") return fail("game-started", "The game has already started.");
     if (playerId !== this.hostPlayerId) return fail("not-host", "Only the host can start the game.");
-    if (this.quickMatchGame && this.activePlayerIds().length < QUICK_MATCH_MIN_PLAYERS) return fail("not-enough-players", "A quick match needs at least two players.");
-    this.quickMatchAt = null;
     return this.beginGame(now);
   }
 
@@ -246,7 +206,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
   playAgain(playerId: PlayerId, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "complete") return fail("game-not-complete", "A rematch can only start after the game ends.");
-    if (this.quickMatchGame) return fail("quick-match", "Quick matches don't rematch. Find another match instead.");
     if (playerId !== this.hostPlayerId) return fail("not-host", "Only the host can start the next game.");
     this.resetToLobby(now);
     return this.beginGame(now);
@@ -256,7 +215,6 @@ export abstract class RoomBase<P extends PublicPlayerState> {
   returnToLobby(playerId: PlayerId, now: number): RoomResult {
     this.touch(now);
     if (this.status !== "complete") return fail("game-not-complete", "The game hasn't finished yet.");
-    if (this.quickMatchGame) return fail("quick-match", "Quick matches use standard settings. Find another match instead.");
     if (playerId !== this.hostPlayerId) return fail("not-host", "Only the host can change the settings.");
     this.resetToLobby(now);
     return ok([this.snapshotMessage()]);

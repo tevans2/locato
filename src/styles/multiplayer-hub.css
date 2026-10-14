@@ -828,63 +828,40 @@
   #multiplayer[data-view="lobby"] .multiplayer-chat-dock { bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 156px); }
 }
 
-/* ---------- Quick match ---------- */
+/* ---------- Ratings ---------- */
 
-#multiplayer .mp-quick {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  gap: 16px;
-  padding: clamp(20px, 3vw, 32px);
-  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
-  background:
-    radial-gradient(110% 80% at 0 0, color-mix(in srgb, var(--accent-soft) 90%, transparent), transparent 60%),
-    var(--surface);
-  box-shadow: var(--shadow-panel);
-}
+#multiplayer .mp-ratings { display: grid; gap: 12px; }
+#multiplayer .mp-rating-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-soft); }
 
-#multiplayer .mp-quick-games {
+#multiplayer .mp-rating-kind {
+  min-height: 40px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
-  background: var(--surface-soft);
-}
-
-#multiplayer .mp-quick-game {
-  min-height: 52px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 7px;
-  padding: 6px 10px;
+  gap: 7px;
+  padding: 0 10px;
   border-radius: 11px;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-weight: 750;
   text-align: left;
   transition: background 150ms ease, color 150ms ease;
 }
 
-#multiplayer .mp-quick-game .shell-icon { grid-row: span 2; }
-#multiplayer .mp-quick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#multiplayer .mp-quick-rating { color: var(--subtle); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
-#multiplayer .mp-quick-rating:empty { display: none; }
-#multiplayer .mp-quick-game:hover { color: var(--text); }
-#multiplayer .mp-quick-game.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 14%, transparent); }
-#multiplayer .mp-quick-game.is-active .shell-icon { color: var(--brand); }
-#multiplayer .mp-quick-pitch { margin: -4px 0 0; }
-#multiplayer .mp-quick-go { justify-self: start; min-width: 220px; }
-#multiplayer .mp-quick-note { margin: -8px 0 0; }
-#multiplayer .mp-quick-board .mp-subtitle { margin-top: 4px; }
-#multiplayer .mp-quick-top { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-#multiplayer .mp-quick-top-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 0.86rem; }
-#multiplayer .mp-quick-top-row .mp-avatar { width: 28px; height: 28px; font-size: 0.95rem; }
-#multiplayer .mp-quick-top-rank { color: var(--muted); font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
-#multiplayer .mp-quick-top-name { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-#multiplayer .mp-quick-top-rating { font-variant-numeric: tabular-nums; }
+#multiplayer .mp-rating-kind:hover { color: var(--text); }
+#multiplayer .mp-rating-kind.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 14%, transparent); }
+#multiplayer .mp-rating-kind.is-active .shell-icon { color: var(--brand); }
+#multiplayer .mp-rating-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#multiplayer .mp-rating-value { color: var(--text); font-variant-numeric: tabular-nums; }
+#multiplayer .mp-rating-value:empty { display: none; }
+#multiplayer .mp-ratings-body .mp-subtitle { margin-top: 2px; }
+#multiplayer .mp-rating-top { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+#multiplayer .mp-rating-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 0.86rem; }
+#multiplayer .mp-rating-row .mp-avatar { width: 28px; height: 28px; font-size: 0.95rem; }
+#multiplayer .mp-rating-rank { color: var(--muted); font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+#multiplayer .mp-rating-name { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+#multiplayer .mp-rating-score { font-variant-numeric: tabular-nums; }
+#multiplayer .mp-ratings .mp-signin { justify-self: start; margin-top: 4px; }
 
 #multiplayer .mp-tag.is-rating { background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--text); font-variant-numeric: tabular-nums; }
 
@@ -894,8 +871,6 @@
 #multiplayer .mp-standing-rating.is-down { color: var(--bad); }
 
 @media (max-width: 700px) {
-  #multiplayer .mp-quick-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #multiplayer .mp-quick-go { justify-self: stretch; min-width: 0; }
   #multiplayer .mp-standing.has-rating { grid-template-columns: 30px 34px minmax(0, 1fr) auto; }
   #multiplayer .mp-standing.has-rating .mp-standing-rating { grid-column: 3 / -1; }
 }

@@ -4,12 +4,12 @@
  * lives in the lobby once the room exists.
  */
 
-import { QUICK_MATCH_GAMES, RATING_START, type QuickMatchGame, type RoomKind } from "../../../core/multiplayer";
+import { RATING_START, type RoomKind } from "../../../core/multiplayer";
 import { cleanJoinCode, MAX_PLAYER_NAME_LENGTH, readPlayerName, writePlayerName } from "../../../core/multiplayer/localPlayer";
 import { fetchFriends, fetchMyRatings, fetchTopRatings, type FriendInfo, type PlayerRatingInfo, type RatingBoardEntry } from "../../../core/auth";
 import { getLocalAvatar } from "../../../core/auth/avatars";
 import { el } from "../../dom/createElement";
-import { shellIcon, type ShellContext, type ShellIconName } from "../../shell";
+import { shellIcon, type ShellContext } from "../../shell";
 import { ROOM_KIND_INFO } from "./roomModes";
 
 export interface HomeUser {
@@ -25,15 +25,13 @@ export interface MultiplayerHomeOptions {
   /** Open a room of this kind (optionally inviting a friend once it exists). The name is saved. */
   readonly onCreate: (kind: RoomKind, playerName: string, inviteUserId?: string) => void;
   readonly onJoin: (roomCode: string, playerName: string) => void;
-  /** Find a public game to join (the name is saved). */
-  readonly onQuickMatch: (game: QuickMatchGame, playerName: string) => void;
   readonly onFriends?: () => void;
   /** Live presence changes; the listener refetches friends. Returns an unsubscribe. */
   readonly subscribeFriends?: (listener: () => void) => () => void;
 }
 
 export interface MultiplayerHomeState {
-  readonly pending: "create" | "join" | "rejoin" | "match" | null;
+  readonly pending: "create" | "join" | "rejoin" | null;
 }
 
 export interface MultiplayerHome {
@@ -140,115 +138,14 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
         children: [
           el("p", { className: "mp-kicker", children: [el("span", { className: "mp-live-dot", attrs: { "aria-hidden": "true" } }), el("span", { text: "Live · 2 to 8 players" })] }),
           el("h2", { className: "mp-start-title", text: "Start a game", attrs: { id: "mp-start-title" } }),
-          el("p", { className: "mp-muted", text: "Play with friends: pick a game and your room opens straight away. Share the link, and change anything once you're in." }),
+          el("p", { className: "mp-muted", text: "Pick a game and your room opens straight away. Share the link, and change anything once you're in." }),
         ],
       }),
+      nameField,
+      playingAs,
       el("div", { className: "mp-kinds", attrs: { role: "group", "aria-label": "Games" }, children: kindButtons.map((entry) => entry.button) }),
     ],
   });
-
-  // ---------- Quick match: find a public game ----------
-
-  const QUICK_ICONS: Readonly<Record<QuickMatchGame, ShellIconName>> = { flags: "flag", capitals: "crown", "map-tap": "map-pin", flyover: "plane" };
-  let quickGame: QuickMatchGame = "flags";
-  let myRatings: readonly PlayerRatingInfo[] | null = null;
-  const topCache = new Map<QuickMatchGame, readonly RatingBoardEntry[] | null>();
-  const quickButtons = QUICK_MATCH_GAMES.map((info) => {
-    const rating = el("span", { className: "mp-quick-rating" });
-    const button = el("button", {
-      className: "mp-quick-game",
-      attrs: { type: "button", role: "radio", "aria-checked": "false", "data-game": info.id },
-      children: [shellIcon(QUICK_ICONS[info.id], 18, 2), el("span", { className: "mp-quick-label", text: info.label }), rating],
-      on: { click: () => { quickGame = info.id; renderQuick(); void loadTop(); } },
-    });
-    return { info, button, rating };
-  });
-  const quickPitch = el("p", { className: "mp-muted mp-quick-pitch" });
-  const quickGo = el("button", { className: "shell-btn shell-btn-primary mp-quick-go", attrs: { type: "button" }, children: [shellIcon("users", 18, 2), el("span", { text: "Find a match" })] });
-  const quickNote = el("p", { className: "mp-muted mp-small mp-quick-note" });
-  const topTitle = el("h3", { className: "mp-subtitle" });
-  const topList = el("ol", { className: "mp-quick-top" });
-  quickGo.addEventListener("click", () => {
-    if (pending) return;
-    const name = claimName();
-    if (!name) return;
-    options.onQuickMatch(quickGame, name);
-  }, { signal });
-
-  const quickCard = el("section", {
-    className: "mp-card mp-quick",
-    attrs: { "aria-labelledby": "mp-quick-title" },
-    children: [
-      el("header", {
-        className: "mp-start-head",
-        children: [
-          el("p", { className: "mp-kicker", children: [el("span", { className: "mp-live-dot", attrs: { "aria-hidden": "true" } }), el("span", { text: "Quick match · play anyone" })] }),
-          el("h2", { className: "mp-start-title", text: "Find a match", attrs: { id: "mp-quick-title" } }),
-          el("p", { className: "mp-muted", text: "Get matched with other players. The game starts by itself once there are two of you, and signed-in players earn a rating for each game." }),
-        ],
-      }),
-      // Who you are: the first card asks once, for quick matches and new rooms alike.
-      nameField,
-      playingAs,
-      el("div", { className: "mp-quick-games", attrs: { role: "radiogroup", "aria-label": "Game to find a match for" }, children: quickButtons.map((entry) => entry.button) }),
-      quickPitch,
-      quickGo,
-      quickNote,
-      el("div", { className: "mp-quick-board", children: [topTitle, topList] }),
-    ],
-  });
-
-  function ratingFor(game: QuickMatchGame): PlayerRatingInfo | undefined {
-    return myRatings?.find((rating) => rating.game === game);
-  }
-
-  function renderQuick(): void {
-    const user = options.getUser();
-    for (const entry of quickButtons) {
-      const active = entry.info.id === quickGame;
-      entry.button.classList.toggle("is-active", active);
-      entry.button.setAttribute("aria-checked", String(active));
-      const mine = ratingFor(entry.info.id);
-      entry.rating.textContent = user ? String(mine?.rating ?? RATING_START) : "";
-      entry.rating.title = user ? (mine ? `Your rating · ${mine.games} rated game${mine.games === 1 ? "" : "s"}` : "Your starting rating") : "";
-    }
-    const info = QUICK_MATCH_GAMES.find((game) => game.id === quickGame)!;
-    quickPitch.textContent = info.pitch;
-    quickNote.textContent = user ? "Quick matches use standard settings, so ratings stay fair." : "Playing as a guest: sign in to earn a rating.";
-    topTitle.textContent = `Top rated · ${info.label}`;
-    const top = topCache.get(quickGame);
-    topList.replaceChildren(
-      ...(top === undefined
-        ? [el("li", { className: "mp-muted", text: "Loading…" })]
-        : top === null
-          ? [el("li", { className: "mp-muted", text: "Couldn't load the ratings." })]
-          : top.length === 0
-            ? [el("li", { className: "mp-muted", text: "No ratings yet. Win a quick match to be first." })]
-            : top.map((entry) => el("li", {
-                className: "mp-quick-top-row",
-                children: [
-                  el("span", { className: "mp-quick-top-rank", text: String(entry.rank) }),
-                  el("span", { className: `mp-avatar${entry.user.avatarEmoji ? " is-emoji" : ""}`, text: entry.user.avatarEmoji ?? entry.user.username.charAt(0).toUpperCase(), attrs: { "aria-hidden": "true" } }),
-                  el("span", { className: "mp-quick-top-name", text: entry.user.username }),
-                  el("strong", { className: "mp-quick-top-rating", text: String(entry.rating) }),
-                ],
-              }))),
-    );
-  }
-
-  async function loadTop(): Promise<void> {
-    const game = quickGame;
-    if (topCache.has(game)) return;
-    const entries = await fetchTopRatings(game);
-    if (signal.aborted) return;
-    topCache.set(game, entries);
-    if (game === quickGame) renderQuick();
-  }
-
-  async function loadMyRatings(): Promise<void> {
-    myRatings = options.getUser() ? await fetchMyRatings() : null;
-    if (!signal.aborted) renderQuick();
-  }
 
   // ---------- Join with a code ----------
 
@@ -383,6 +280,82 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     renderFriends();
   }
 
+  // ---------- Ratings ----------
+
+  let ratingKind: RoomKind = "quiz";
+  let myRatings: readonly PlayerRatingInfo[] | null = null;
+  const topCache = new Map<RoomKind, readonly RatingBoardEntry[] | null>();
+  const ratingButtons = ROOM_KIND_INFO.map((info) => {
+    const value = el("span", { className: "mp-rating-value" });
+    const button = el("button", {
+      className: "mp-rating-kind",
+      attrs: { type: "button", role: "radio", "aria-checked": "false", "data-kind": info.kind },
+      children: [shellIcon(info.icon, 16, 2), el("span", { className: "mp-rating-label", text: info.label }), value],
+      on: { click: () => { ratingKind = info.kind; renderRatings(); void loadTop(); } },
+    });
+    return { info, button, value };
+  });
+  const ratingsBody = el("div", { className: "mp-ratings-body", attrs: { "aria-live": "polite" } });
+  const ratingsCard = el("section", {
+    className: "mp-card mp-ratings",
+    attrs: { "aria-labelledby": "mp-ratings-title" },
+    children: [
+      el("header", { className: "mp-card-head", children: [el("h2", { className: "mp-card-title", text: "Ratings", attrs: { id: "mp-ratings-title" } })] }),
+      el("p", { className: "mp-muted mp-small", text: "Every game with two or more signed-in players is rated, separately for each game. Leaving mid-game counts as finishing last." }),
+      el("div", { className: "mp-rating-kinds", attrs: { role: "radiogroup", "aria-label": "Game" }, children: ratingButtons.map((entry) => entry.button) }),
+      ratingsBody,
+    ],
+  });
+
+  function renderRatings(): void {
+    const user = options.getUser();
+    for (const entry of ratingButtons) {
+      const active = entry.info.kind === ratingKind;
+      entry.button.classList.toggle("is-active", active);
+      entry.button.setAttribute("aria-checked", String(active));
+      const mine = myRatings?.find((rating) => rating.game === entry.info.kind);
+      entry.value.textContent = user ? String(mine?.rating ?? RATING_START) : "";
+      entry.value.title = user ? (mine ? `Your rating · ${mine.games} rated game${mine.games === 1 ? "" : "s"}` : "Your starting rating") : "";
+    }
+    const top = topCache.get(ratingKind);
+    ratingsBody.replaceChildren(
+      el("h3", { className: "mp-subtitle", text: `Top rated · ${ROOM_KIND_INFO.find((info) => info.kind === ratingKind)!.label}` }),
+      el("ol", {
+        className: "mp-rating-top",
+        children: top === undefined
+          ? [el("li", { className: "mp-muted", text: "Loading…" })]
+          : top === null
+            ? [el("li", { className: "mp-muted", text: "Couldn't load the ratings." })]
+            : top.length === 0
+              ? [el("li", { className: "mp-muted", text: "No ratings yet. Play a game with signed-in friends to be first." })]
+              : top.map((entry) => el("li", {
+                  className: "mp-rating-row",
+                  children: [
+                    el("span", { className: "mp-rating-rank", text: String(entry.rank) }),
+                    el("span", { className: `mp-avatar${entry.user.avatarEmoji ? " is-emoji" : ""}`, text: entry.user.avatarEmoji ?? entry.user.username.charAt(0).toUpperCase(), attrs: { "aria-hidden": "true" } }),
+                    el("span", { className: "mp-rating-name", text: entry.user.username }),
+                    el("strong", { className: "mp-rating-score", text: String(entry.rating) }),
+                  ],
+                })),
+      }),
+      ...(user ? [] : [el("button", { className: "shell-btn shell-btn-quiet mp-signin", text: "Sign in to get rated", attrs: { type: "button" }, on: { click: () => options.shell.openAccount() } })]),
+    );
+  }
+
+  async function loadTop(): Promise<void> {
+    const kind = ratingKind;
+    if (topCache.has(kind)) return;
+    const entries = await fetchTopRatings(kind);
+    if (signal.aborted) return;
+    topCache.set(kind, entries);
+    if (kind === ratingKind) renderRatings();
+  }
+
+  async function loadMyRatings(): Promise<void> {
+    myRatings = options.getUser() ? await fetchMyRatings() : null;
+    if (!signal.aborted) renderRatings();
+  }
+
   const steps = el("section", {
     className: "mp-card mp-steps",
     attrs: { "aria-labelledby": "mp-steps-title" },
@@ -401,12 +374,12 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     ],
   });
 
-  const homeMain = el("div", { className: "mp-home-main", children: [quickCard, startCard, joinForm] });
+  const homeMain = el("div", { className: "mp-home-main", children: [startCard, joinForm] });
   const element = el("div", {
     className: "mp-home",
     children: [
       homeMain,
-      el("div", { className: "mp-home-side", children: [onlineCard, steps] }),
+      el("div", { className: "mp-home-side", children: [onlineCard, ratingsCard, steps] }),
     ],
   });
 
@@ -421,15 +394,12 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
       entry.status.textContent = busy ? "Opening room…" : "";
     }
     joinButton.disabled = pending !== null;
-    quickGo.disabled = pending !== null;
-    quickGo.setAttribute("aria-busy", String(pending === "match"));
-    quickGo.lastElementChild!.textContent = pending === "match" ? "Finding a match…" : "Find a match";
     joinButton.firstElementChild!.textContent = pending === "join" ? "Joining…" : joinForm.classList.contains("is-invite") ? "Join room" : "Join";
   }
 
   renderUser();
   renderFriends();
-  renderQuick();
+  renderRatings();
   void loadFriends();
   void loadTop();
   void loadMyRatings();
@@ -457,6 +427,9 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     refreshUser: () => {
       renderUser();
       void loadFriends();
+      // Fresh standings too: a rated game may just have moved them.
+      topCache.clear();
+      void loadTop();
       void loadMyRatings();
     },
     destroy: () => unsubscribeFriends?.(),

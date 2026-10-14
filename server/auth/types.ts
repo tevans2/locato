@@ -16,7 +16,7 @@ export interface PublicUser {
   readonly avatarEmoji: string | null;
 }
 
-/** A player's skill rating for one quick-match game (src/core/multiplayer/quickMatch.ts). */
+/** A player's skill rating for one multiplayer game type (src/core/multiplayer/ratings.ts). */
 export interface PlayerRating {
   readonly game: string;
   readonly rating: number;
@@ -498,7 +498,7 @@ export interface UserStore {
   listFlaggedRuns(limit: number): readonly StoredRun[];
   /** Did another of the user's runs start before `startedAt` and finish after it? */
   hasOverlappingRun(userId: string, runId: string, startedAt: number): boolean;
-  // Quick-match ratings, one per user per game; deleted with the user.
+  // Multiplayer ratings, one per user per game type; deleted with the user.
   getRating(userId: string, game: string): PlayerRating | null;
   saveRating(userId: string, rating: PlayerRating): void;
   listUserRatings(userId: string): readonly PlayerRating[];

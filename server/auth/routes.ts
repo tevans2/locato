@@ -9,7 +9,7 @@ import { MAX_ACADEMY_PAYLOAD_BYTES } from "../academy/validation";
 import { leaderboardMetric } from "../leaderboard/validation";
 import type { AuthUser, DailyChallengeResult, DailyRoundMark, GameResult } from "./types";
 import { parseDailyRoundResults, scoreDailyRound } from "../../src/core/dailyChallenge";
-import { isQuickMatchGame } from "../../src/core/multiplayer/quickMatch";
+import { isRoomKind } from "../../src/core/multiplayer/roomTypes";
 import { isAvatarEmoji } from "../../src/core/auth/avatars";
 import { clientIp } from "../clientIp";
 
@@ -404,7 +404,7 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     return json(placement);
   }
 
-  // Quick-match ratings: yours, and the top players for one game.
+  // Multiplayer ratings: yours, and the top players for one game type.
   if (pathname === "/api/ratings/me" && method === "GET") {
     const user = service.authenticate(readSessionToken(request));
     if (!user) return json({ error: "Not authenticated." }, 401);
@@ -413,7 +413,7 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
 
   if (pathname === "/api/ratings" && method === "GET") {
     const game = url.searchParams.get("game") ?? "";
-    if (!isQuickMatchGame(game)) return json({ error: "Unknown quick-match game." }, 400);
+    if (!isRoomKind(game)) return json({ error: "Unknown game type." }, 400);
     const limit = Math.min(50, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10));
     return json({ game, entries: service.listTopRatings(game, limit) });
   }

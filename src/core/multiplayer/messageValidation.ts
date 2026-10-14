@@ -5,7 +5,6 @@ import { isMapTapCategory } from "../maptap/locations";
 import type { MapTapCategory } from "../maptap/types";
 import { isAvatarEmoji } from "../auth/avatars";
 import { isRoomKind } from "./roomTypes";
-import { isQuickMatchGame } from "./quickMatch";
 
 
 export const MAX_CLIENT_MESSAGE_BYTES = 2048;
@@ -154,12 +153,6 @@ export function parseClientMessage(value: unknown): MessageParseResult<ClientMes
       if (!isNonEmptyString(value.sessionToken, 128)) return reject("invalid-session", "Session token is required.");
       return { ok: true, message: { type: "REJOIN_ROOM", roomCode: normalizeRoomCode(value.roomCode), playerId: value.playerId, sessionToken: value.sessionToken } };
     }
-    case "QUICK_MATCH": {
-      if (!isNonEmptyString(value.playerName, MAX_PLAYER_NAME_LENGTH)) return reject("invalid-player-name", "Player name is required.");
-      if (value.avatarEmoji !== undefined && !isAvatarEmoji(value.avatarEmoji)) return reject("invalid-avatar", "Avatar is invalid.");
-      if (!isQuickMatchGame(value.game)) return reject("invalid-game", "Pick a game to find a match for.");
-      return { ok: true, message: { type: "QUICK_MATCH", playerName: normalizePlayerName(value.playerName), game: value.game, ...(isAvatarEmoji(value.avatarEmoji) ? { avatarEmoji: value.avatarEmoji } : {}) } };
-    }
     case "LEAVE_ROOM":
       return { ok: true, message: { type: "LEAVE_ROOM" } };
     case "SET_ROOM_OPTIONS": {
@@ -291,8 +284,7 @@ function isRoom(value: unknown): value is PublicRoomState {
     (value.phaseStartedAt === null || isFiniteNumber(value.phaseStartedAt)) &&
     (value.phaseEndsAt === null || isFiniteNumber(value.phaseEndsAt)) &&
     Array.isArray(value.chatMessages) &&
-    value.chatMessages.every(isChatMessage) &&
-    (value.quickMatch === undefined || (isRecord(value.quickMatch) && isQuickMatchGame(value.quickMatch.game) && (value.quickMatch.startsAt === null || isFiniteNumber(value.quickMatch.startsAt))))
+    value.chatMessages.every(isChatMessage)
   );
 }
 
@@ -389,7 +381,7 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");
       return { ok: true, message: { type: "GAME_COMPLETED", results: value.results } };
     case "RATING_UPDATED":
-      if (!isQuickMatchGame(value.game) || !Array.isArray(value.changes) || !value.changes.every((change) => isRecord(change) && typeof change.playerId === "string" && isFiniteNumber(change.rating) && isFiniteNumber(change.delta))) {
+      if (!isRoomKind(value.game) || !Array.isArray(value.changes) || !value.changes.every((change) => isRecord(change) && typeof change.playerId === "string" && isFiniteNumber(change.rating) && isFiniteNumber(change.delta))) {
         return reject("invalid-rating", "Rating update is invalid.");
       }
       return { ok: true, message: { type: "RATING_UPDATED", game: value.game, changes: value.changes as { playerId: string; rating: number; delta: number }[] } };

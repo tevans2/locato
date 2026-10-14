@@ -162,10 +162,9 @@ describe("multiplayer home", () => {
     const controller = new AbortController();
     const onCreate = vi.fn();
     const onJoin = vi.fn();
-    const onQuickMatch = vi.fn();
-    const home = createMultiplayerHome({ shell: makeShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate, onJoin, onQuickMatch, ...overrides });
+    const home = createMultiplayerHome({ shell: makeShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate, onJoin, ...overrides });
     document.body.append(home.element);
-    return { home, onCreate, onJoin, onQuickMatch };
+    return { home, onCreate, onJoin };
   }
 
   it("opens a room straight from a game tile, once a guest has a name", () => {
@@ -303,63 +302,52 @@ describe("multiplayer screen", () => {
   });
 });
 
-describe("quick match", () => {
-  function makeQuickShell(): ShellContext {
-    return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => false };
+describe("ratings", () => {
+  function makeRatingShell(): ShellContext {
+    return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => true };
   }
 
-  it("finds a match for the chosen game from the home card, once a guest has a name", () => {
+  it("shows your rating for each game and the top players for the chosen one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      if (input === "/api/ratings/me") return new Response(JSON.stringify({ ratings: [{ game: "map-tap", rating: 1084, games: 12 }] }));
+      if (input.startsWith("/api/ratings?game=map-tap")) return new Response(JSON.stringify({ entries: [{ rank: 1, user: { id: "u1", username: "atlas_amy", avatarEmoji: null }, rating: 1210, games: 40 }] }));
+      if (input.startsWith("/api/ratings?game=")) return new Response(JSON.stringify({ entries: [] }));
+      return new Response("{}", { status: 404 });
+    }));
     const controller = new AbortController();
-    const onQuickMatch = vi.fn();
-    const home = createMultiplayerHome({ shell: makeQuickShell(), storage: window.localStorage, signal: controller.signal, getUser: () => null, onCreate: vi.fn(), onJoin: vi.fn(), onQuickMatch });
+    const home = createMultiplayerHome({ shell: makeRatingShell(), storage: window.localStorage, signal: controller.signal, getUser: () => ({ displayName: "Ana", avatarEmoji: null }), onCreate: vi.fn(), onJoin: vi.fn() });
     document.body.append(home.element);
-    const mapTap = document.querySelector<HTMLButtonElement>(".mp-quick-game[data-game='map-tap']")!;
-    mapTap.click();
-    expect(mapTap.getAttribute("aria-checked")).toBe("true");
-    expect(document.querySelector(".mp-quick-note")?.textContent).toBe("Playing as a guest: sign in to earn a rating.");
-    document.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
-    expect(onQuickMatch).not.toHaveBeenCalled();
-    const name = document.querySelector<HTMLInputElement>("#mp-name")!;
-    name.value = "Sam";
-    document.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
-    expect(onQuickMatch).toHaveBeenCalledWith("map-tap", "Sam");
-    home.update({ pending: "match" });
-    expect(document.querySelector(".mp-quick-go")?.textContent).toBe("Finding a match…");
+    await flush();
+    const value = (kind: string) => document.querySelector(`.mp-rating-kind[data-kind='${kind}'] .mp-rating-value`)?.textContent;
+    expect(value("map-tap")).toBe("1084");
+    expect(value("quiz")).toBe("1000");
+    expect(document.querySelector(".mp-rating-top")?.textContent).toContain("No ratings yet");
+    document.querySelector<HTMLButtonElement>(".mp-rating-kind[data-kind='map-tap']")!.click();
+    await flush();
+    expect([...document.querySelectorAll(".mp-rating-row")].map((row) => row.textContent)).toEqual(["1Aatlas_amy1210"]);
+    expect(document.querySelector(".mp-quick")).toBeNull();
     controller.abort();
   });
 
-  it("counts down in the lobby, shows ratings, and queues again after the game", async () => {
+  it("shows ratings beside names in the lobby and their change on the results", async () => {
     window.localStorage.setItem("locato.mp.name", "Ana");
     const server = fakeTransport();
-    const screen = createMultiplayerScreen({ shell: makeQuickShell(), countryIndex: indexCountries(rawCountries), worldCountryFeatures: [], createOnlineTransport: () => server.transport, storage: window.localStorage, sessionStorage: window.sessionStorage });
+    const screen = createMultiplayerScreen({ shell: makeRatingShell(), countryIndex: indexCountries(rawCountries), worldCountryFeatures: [], createOnlineTransport: () => server.transport, storage: window.localStorage, sessionStorage: window.sessionStorage, initialJoinCode: "K7QMR" });
     document.body.append(screen.element);
-    screen.element.querySelector<HTMLButtonElement>(".mp-quick-go")!.click();
     await flush();
-    expect(server.sent[0]).toEqual({ type: "QUICK_MATCH", game: "flags", playerName: "Ana", avatarEmoji: expect.any(String) });
-
-    const quick = { quickMatch: { game: "flags" as const, startsAt: Date.now() + 12_000 }, players: [player("p1", "Ana", { rating: 1000 }), player("p2", "Ben", { rating: 1040 })] };
+    const players = [player("p1", "Ana", { rating: 1000 }), player("p2", "Ben", { rating: 1040 })];
     server.emit({ type: "SESSION_ASSIGNED", playerId: "p1", roomCode: "K7QMR", sessionToken: "t1" });
-    server.emit({ type: "ROOM_SNAPSHOT", room: room(quick) });
-    expect(screen.element.dataset.view).toBe("lobby");
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ players }) });
     expect([...screen.element.querySelectorAll(".mp-tag.is-rating")].map((tag) => tag.textContent)).toEqual(["1000", "1040"]);
-    expect(screen.element.querySelector(".mp-waiting")?.textContent).toBe("Starting in 12s. More players can still join.");
-    expect(screen.element.querySelector<HTMLElement>(".mp-settings-editor")!.hidden).toBe(true);
-    expect(screen.element.querySelector(".mp-summary-label")?.textContent).toBe("Flags race");
-    const start = screen.element.querySelector<HTMLButtonElement>(".mp-lobby .mp-start-game")!;
-    expect(start.hidden).toBe(false);
-    expect(start.textContent).toBe("Start now");
+    expect(screen.element.querySelector<HTMLElement>(".mp-settings-editor")!.hidden).toBe(false);
 
-    server.emit({ type: "ROOM_SNAPSHOT", room: room({ ...quick, status: "complete" }) });
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ players, status: "complete" }) });
     server.emit({ type: "GAME_COMPLETED", results: [{ playerId: "p1", name: "Ana", rank: 1, score: 900, correctAnswers: 6, wrongAnswers: 1 }, { playerId: "p2", name: "Ben", rank: 2, score: 400, correctAnswers: 3, wrongAnswers: 2 }] });
-    server.emit({ type: "RATING_UPDATED", game: "flags", changes: [{ playerId: "p1", rating: 1016, delta: 16 }, { playerId: "p2", rating: 1024, delta: -16 }] });
-    expect(screen.element.dataset.view).toBe("results");
+    server.emit({ type: "RATING_UPDATED", game: "quiz", changes: [{ playerId: "p1", rating: 1016, delta: 16 }, { playerId: "p2", rating: 1024, delta: -16 }] });
     expect([...screen.element.querySelectorAll(".mp-standing-rating")].map((item) => item.textContent)).toEqual(["1,016 (+16)", "1,024 (−16)"]);
-    const results = screen.element.querySelector(".mp-results")!;
-    expect(results.querySelector<HTMLElement>(".mp-results .mp-start-game:not(.mp-find-match)")!.hidden).toBe(true);
-    const again = results.querySelector<HTMLButtonElement>(".mp-find-match")!;
-    expect(again.hidden).toBe(false);
-    again.click();
-    expect(server.sent.at(-1)).toEqual({ type: "QUICK_MATCH", game: "flags", playerName: "Ana", avatarEmoji: expect.any(String) });
+    // The host still gets the usual Play again.
+    screen.element.querySelector<HTMLButtonElement>(".mp-results .mp-start-game")!.click();
+    expect(server.sent.at(-1)).toEqual({ type: "PLAY_AGAIN" });
     screen.destroy();
   });
 });

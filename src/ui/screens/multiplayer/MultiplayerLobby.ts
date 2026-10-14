@@ -5,7 +5,7 @@
  */
 
 import { MAP_TAP_CATEGORIES } from "../../../core/maptap";
-import { QUICK_MATCH_MIN_PLAYERS, quickMatchGameInfo, type ClientMessage, type PublicRoomState, type RoomKind } from "../../../core/multiplayer";
+import type { ClientMessage, PublicRoomState, RoomKind } from "../../../core/multiplayer";
 import { fetchFriends, inviteFriendToGame, type FriendInfo } from "../../../core/auth";
 import { getPlayerEmoji } from "../../../core/auth/avatars";
 import { el } from "../../dom/createElement";
@@ -127,8 +127,8 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
       ...room.players.map((player) => {
         const isYou = player.id === localPlayerId;
         const tags = [
-          ...(player.rating !== undefined ? [el("span", { className: "mp-tag is-rating", text: String(player.rating), attrs: { title: "Rating for this game" } })] : []),
-          ...(player.id === room!.hostPlayerId && !room!.quickMatch ? [el("span", { className: "mp-tag is-host", text: "Host" })] : []),
+          ...(player.rating !== undefined ? [el("span", { className: "mp-tag is-rating", text: String(player.rating), attrs: { title: `${roomKindInfo(room!.kind).label} rating` } })] : []),
+          ...(player.id === room!.hostPlayerId ? [el("span", { className: "mp-tag is-host", text: "Host" })] : []),
           ...(player.spectator ? [el("span", { className: "mp-tag", text: "Watching" })] : []),
           ...(!player.connected ? [el("span", { className: "mp-tag is-offline", text: "Offline" })] : []),
         ];
@@ -239,10 +239,9 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
   const summaryIcon = el("span", { className: "mp-kind-icon" });
   const summaryLabel = el("strong", { className: "mp-summary-label" });
   const summaryFacts = el("ul", { className: "mp-facts" });
-  const summaryNote = el("p", { className: "mp-muted mp-small", text: "The host picks the game." });
   const summary = el("div", {
     className: "mp-settings-summary",
-    children: [el("div", { className: "mp-summary-head", children: [summaryIcon, summaryLabel] }), summaryFacts, summaryNote],
+    children: [el("div", { className: "mp-summary-head", children: [summaryIcon, summaryLabel] }), summaryFacts, el("p", { className: "mp-muted mp-small", text: "The host picks the game." })],
   });
   const settingsCard = el("section", {
     className: "mp-card mp-settings-card",
@@ -253,16 +252,13 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
   function renderSettings(isHost: boolean): void {
     if (!room) return;
     const { kind, settings } = room;
-    // Quick matches always use the standard settings: everyone just reads them.
-    const editable = isHost && !room.quickMatch;
-    editor.hidden = !editable;
-    summary.hidden = editable;
+    editor.hidden = !isHost;
+    summary.hidden = isHost;
     const info = roomKindInfo(kind);
     summaryIcon.replaceChildren(shellIcon(info.icon, 20, 1.9));
-    summaryLabel.textContent = room.quickMatch ? quickMatchGameInfo(room.quickMatch.game).label : info.label;
+    summaryLabel.textContent = info.label;
     summaryFacts.replaceChildren(...describeRoom(room).map((fact) => el("li", { text: fact })));
-    summaryNote.textContent = room.quickMatch ? "Quick matches use the standard settings, so ratings stay fair." : "The host picks the game.";
-    if (!editable) return;
+    if (!isHost) return;
 
     for (const entry of kindButtons) {
       const active = entry.info.kind === kind;
@@ -300,20 +296,6 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
   function renderActions(isHost: boolean): void {
     if (!room) return;
     const others = room.players.filter((player) => player.id !== localPlayerId && player.connected).length;
-    if (room.quickMatch) {
-      const ready = room.players.filter((player) => player.connected && !player.spectator).length >= QUICK_MATCH_MIN_PLAYERS;
-      const startsAt = room.quickMatch.startsAt;
-      const seconds = startsAt === null ? null : Math.max(0, Math.ceil((startsAt - Date.now()) / 1000));
-      startButton.hidden = !isHost || !ready;
-      startButton.lastElementChild!.textContent = "Start now";
-      startNote.hidden = true;
-      waiting.hidden = false;
-      waiting.lastElementChild!.textContent = !ready
-        ? "Looking for another player… Share the link to bring a friend."
-        : seconds !== null ? `Starting in ${seconds}s. More players can still join.` : "Starting soon…";
-      return;
-    }
-    startButton.lastElementChild!.textContent = "Start game";
     startButton.hidden = !isHost;
     startNote.hidden = !isHost;
     waiting.hidden = isHost;
@@ -326,12 +308,6 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
     className: "mp-lobby",
     children: [header, el("div", { className: "mp-lobby-grid", children: [playersCard, settingsCard] }), actionBar],
   });
-
-  // A quick match counts down to its start: refresh the line every second while it does.
-  const ticker = setInterval(() => {
-    if (room?.quickMatch?.startsAt && room.status === "lobby" && !element.closest("[hidden]")) renderActions(localPlayerId === room.hostPlayerId);
-  }, 1000);
-  signal.addEventListener("abort", () => clearInterval(ticker));
 
   return {
     element,

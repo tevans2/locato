@@ -3,7 +3,7 @@
  * server has told us. No DOM: the multiplayer screen renders `state` and plays the sounds.
  */
 
-import type { ClientMessage, FinalResult, MultiplayerTransport, QuickMatchGame, PublicRoomState, PublicRoundState, RoundResult, ServerMessage, TransportStatus } from "../../../core/multiplayer";
+import type { ClientMessage, FinalResult, MultiplayerTransport, RoomKind, PublicRoomState, PublicRoundState, RoundResult, ServerMessage, TransportStatus } from "../../../core/multiplayer";
 import type { MapTapMultiplayerReveal } from "../../components/MultiplayerMapTapGameView";
 import type { GeoGuessrMultiplayerReveal } from "../../components/MultiplayerGeoGuessrGameView";
 import { MULTIPLAYER_SESSION_KEY } from "../../../core/multiplayer/localPlayer";
@@ -24,9 +24,9 @@ export interface RoomNotice {
   readonly text: string;
 }
 
-/** After a quick match: each rated player's new rating and its change. */
+/** After a rated game: each signed-in player's new rating for the game type, and its change. */
 export interface RatingUpdate {
-  readonly game: QuickMatchGame;
+  readonly game: RoomKind;
   readonly changes: readonly { readonly playerId: string; readonly rating: number; readonly delta: number }[];
 }
 
@@ -44,8 +44,8 @@ export interface RoomSessionState {
   readonly feedback: string;
   /** Something to tell the player outside the game: a failed join, a lost connection, a new host. */
   readonly notice: RoomNotice | null;
-  /** A create / join / rejoin / quick match on its way to the server. */
-  readonly pending: "create" | "join" | "rejoin" | "match" | null;
+  /** A create / join / rejoin on its way to the server. */
+  readonly pending: "create" | "join" | "rejoin" | null;
 }
 
 export interface CreateRoomRequest {
@@ -69,8 +69,6 @@ export interface RoomSession {
   readonly state: () => RoomSessionState;
   readonly create: (request: CreateRoomRequest) => void;
   readonly join: (roomCode: string, playerName: string, avatarEmoji: string) => void;
-  /** Find a public room for this game (leaving the current one). */
-  readonly quickMatch: (game: QuickMatchGame, playerName: string, avatarEmoji: string) => void;
   /** Reclaim a seat after a reload (or a lost connection) with stored credentials. */
   readonly resume: (session: StoredSession) => void;
   /** Leave for good: tells the server, forgets the seat. */
@@ -171,7 +169,7 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
     const offStatus = next.onStatusChange((status) => {
       // A reconnect lands here with credentials in hand: reclaim the seat automatically. The first
       // connect of a create/join has none yet, so it is left to `afterConnect`.
-      if (status === "connected" && seat && state.pending !== "create" && state.pending !== "join" && state.pending !== "match") {
+      if (status === "connected" && seat && state.pending !== "create" && state.pending !== "join") {
         next.send({ type: "REJOIN_ROOM", roomCode: seat.roomCode, playerId: seat.playerId, sessionToken: seat.sessionToken });
       }
       if (status === "error" && !state.room) {
@@ -287,8 +285,7 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
         return;
       case "ERROR":
         // A failed (re)join, or the room going away, drops us back to the start.
-        // A failed quick match has already left the old room on the server.
-        if (message.code === "session-expired" || message.code === "room-not-found" || (!before.room && before.pending) || before.pending === "match") {
+        if (message.code === "session-expired" || message.code === "room-not-found" || (!before.room && before.pending)) {
           reset({ tone: "error", text: message.message });
           return;
         }
@@ -308,17 +305,6 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
     join: (roomCode, name, avatarEmoji) => {
       writeSeat(null);
       connect("join", () => transport?.send({ type: "JOIN_ROOM", roomCode, playerName: name, avatarEmoji }));
-    },
-    quickMatch: (game, name, avatarEmoji) => {
-      // Already connected (another match after this one): the server moves us across in one step.
-      if (transport && state.status === "connected") {
-        writeSeat(null);
-        set({ pending: "match", notice: null });
-        transport.send({ type: "QUICK_MATCH", game, playerName: name, avatarEmoji });
-        return;
-      }
-      writeSeat(null);
-      connect("match", () => transport?.send({ type: "QUICK_MATCH", game, playerName: name, avatarEmoji }));
     },
     resume: (stored) => {
       seat = stored;

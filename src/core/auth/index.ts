@@ -480,7 +480,7 @@ export function saveAvatarToServer(emoji: string): void {
 
 export { AVATAR_OPTIONS, clearStoredAvatar, getLocalAvatar, getPlayerEmoji, getStoredAvatar, isAvatarEmoji, storeAvatar } from "./avatars";
 
-// ---- Quick-match ratings ----------------------------------------------------------------------
+// ---- Multiplayer ratings ------------------------------------------------------------------------
 
 export interface PlayerRatingInfo {
   readonly game: string;
@@ -495,7 +495,7 @@ export interface RatingBoardEntry {
   readonly games: number;
 }
 
-/** The signed-in player's quick-match ratings (empty when they have none, null when signed out or offline). */
+/** The signed-in player's multiplayer ratings (empty when they have none, null when signed out or offline). */
 export async function fetchMyRatings(): Promise<readonly PlayerRatingInfo[] | null> {
   try {
     const response = await fetch("/api/ratings/me");
@@ -506,7 +506,7 @@ export async function fetchMyRatings(): Promise<readonly PlayerRatingInfo[] | nu
   }
 }
 
-/** The top-rated players for one quick-match game, or null when it can't be loaded. */
+/** The top-rated players for one multiplayer game type, or null when it can't be loaded. */
 export async function fetchTopRatings(game: string, limit = 5): Promise<readonly RatingBoardEntry[] | null> {
   try {
     const response = await fetch(`/api/ratings?game=${encodeURIComponent(game)}&limit=${limit}`);

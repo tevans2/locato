@@ -94,7 +94,7 @@ const roomManager = new RoomManager({
   countryIndex,
   onGameComplete: (userId, result) => { authService.recordGame(userId, result); },
   getRating: (userId, game) => authService.getRating(userId, game),
-  rateGame: (game, standings) => authService.rateQuickMatch(game, standings),
+  rateGame: (game, standings) => authService.rateGame(game, standings),
   maxPlayersPerRoom: readIntegerEnv("MAX_PLAYERS_PER_ROOM", 8),
   maxRooms: readIntegerEnv("MAX_ROOMS", 500),
   roomTtlMs: readIntegerEnv("ROOM_TTL_SECONDS", 7200) * 1000,

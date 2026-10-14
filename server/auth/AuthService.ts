@@ -15,7 +15,7 @@ import { auditRun, isAuditedMode, parseRunTimeline, runVerdict, type RunFlag, ty
 import { indexCountries, rawCountries } from "../../src/core/countries";
 import type { AcademyProgress } from "../../src/core/academy/types";
 import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
-import { RATING_START, ratingChanges } from "../../src/core/multiplayer/quickMatch";
+import { RATING_START, ratingChanges } from "../../src/core/multiplayer/ratings";
 import type {
   AuthUser,
   IpBan,
@@ -268,16 +268,16 @@ export class AuthService {
     return this.store.recordGame(userId, result, this.clock());
   }
 
-  /** A player's rating for a quick-match game (the starting rating before their first game). */
+  /** A player's rating for a multiplayer game type (the starting rating before their first game). */
   getRating(userId: string, game: string): number {
     return this.store.getRating(userId, game)?.rating ?? RATING_START;
   }
 
   /**
-   * Rate a finished quick match from its signed-in entrants' finishing positions (one entry per
+   * Rate a finished multiplayer game from its signed-in entrants' finishing positions (one entry per
    * account, at its best position) and save the new ratings. Fewer than two accounts: unrated.
    */
-  rateQuickMatch(game: string, standings: readonly { readonly userId: string; readonly rank: number }[]): readonly { readonly userId: string; readonly rating: number; readonly delta: number }[] {
+  rateGame(game: string, standings: readonly { readonly userId: string; readonly rank: number }[]): readonly { readonly userId: string; readonly rating: number; readonly delta: number }[] {
     const best = new Map<string, number>();
     for (const { userId, rank } of standings) if (this.store.findUserById(userId)) best.set(userId, Math.min(rank, best.get(userId) ?? Infinity));
     if (best.size < 2) return [];
