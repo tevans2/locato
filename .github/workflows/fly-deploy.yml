@@ -21,6 +21,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets before deployment
+        uses: ./.github/actions/secret-scan
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
