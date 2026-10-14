@@ -358,7 +358,13 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
           flagSlot.replaceChildren(mapHighlightPrompt);
         } else if (visibleRound.prompt.kind === "flag-colors") {
           setWorldMapTargetCountry(mapView, null);
-          if (visibleRound.prompt.value.startsWith("/api/game-assets/")) {
+          if (intermission && !visibleRound.prompt.value.startsWith("/api/game-assets/")) {
+            // The round is over and the server has dropped its masked art, leaving the real flag path:
+            // show the whole flag rather than an unrevealed local canvas.
+            activeFlagColorRoundKey = null;
+            activeFlagColorPromptSrc = null;
+            flagSlot.replaceChildren(el("img", { className: "flag-image", attrs: { src: visibleRound.prompt.value, alt: "The target flag" } }));
+          } else if (visibleRound.prompt.value.startsWith("/api/game-assets/")) {
             flagSlot.replaceChildren(el("img", { className: "flag-image", attrs: { src: visibleRound.prompt.value, alt: "Revealed part of the hidden flag" } }));
           } else {
             if (activeFlagColorRoundKey !== roundKey || activeFlagColorPromptSrc !== visibleRound.prompt.value) {
