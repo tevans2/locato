@@ -213,6 +213,7 @@ export const SEED_SCORE_BOARDS: readonly ScoreBoardSpec[] = [
   { gameMode: "worldsplit", variant: "", bestShare: 0.96, worstShare: 0.5, popularity: 0.45 },
   { gameMode: "flyover", variant: "", bestShare: 0.16, worstShare: 0.03, popularity: 0.5 },
   { gameMode: "overland", variant: "", bestShare: 0.94, worstShare: 0.35, popularity: 0.4 },
+  { gameMode: "mystery", variant: "", bestShare: 0.9, worstShare: 0.3, popularity: 0.45 },
   { gameMode: "geoguessr", variant: "", bestShare: 0.9, worstShare: 0.25, popularity: 0.65 },
   { gameMode: "streetview-country", variant: "", bestShare: 1, worstShare: 0.3, popularity: 0.55 },
 ];

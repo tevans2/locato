@@ -146,6 +146,25 @@ it("plays Overland through the server: typed guesses, server verdicts and a post
   expect(ui.service.getUserLeaderboardRank(ui.user.id, "overland", "")).toMatchObject({ rank: 1, score: 500 });
 });
 
+it("plays Mystery country through the server: clues from the server, the answer only at the end", async () => {
+  const ui = await setup("mystery", true);
+  for (let position = 0; position < 5; position++) {
+    const target = privateChallenge(ui.service.ranked, ui.state()).mystery!;
+    const decoy = ["NZ", "AU", "IS"].find((code) => code !== target)!;
+    for (const [made, code] of [decoy, target].entries()) {
+      ui.advance();
+      ui.$<HTMLInputElement>("#mystery-guess-input").value = ui.countries.byCode.get(code)!.name;
+      ui.$<HTMLFormElement>(".mystery-guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+      await vi.waitFor(() => expect(ui.screen.element.querySelectorAll(".mystery-guess")).toHaveLength(made + 1));
+    }
+    await vi.waitFor(() => expect(ui.$(".mystery-answer-name")?.textContent).toBe(ui.countries.byCode.get(target)!.name));
+    expect(ui.$(".mystery-outcome-points").textContent).toBe("+88 points");
+    ui.$<HTMLButtonElement>(".mystery-next").click();
+  }
+  await ui.posted();
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, "mystery", "")).toMatchObject({ rank: 1, score: 440 });
+});
+
 it("uses MapTap's globe, per-pin review and ten-target results, including a fresh restart", async () => {
   let choose: (p: { lat: number; lng: number }) => void = () => {};
   vi.spyOn(globe, "createMapTapGlobe").mockImplementation((options) => { choose = options.onGuess; return { element: document.createElement("div"), reset() {}, reveal() {}, revealMultiplayer() {}, setAcceptingGuesses() {}, destroy() {} }; });

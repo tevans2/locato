@@ -8,7 +8,7 @@ import type { StreetViewCountryRound } from "../../src/core/streetview";
 import { overlandGraph, type OverlandRound, type OverlandRoute } from "../../src/core/overland";
 
 // Test-only introspection: expected answers come from the server fixture, never a public response.
-export interface PrivateChallenge { mode: string; country?: Country; mapCountry?: FlyoverCountry; location?: MapTapLocation; geo?: GeoGuessrLocation; street?: StreetViewCountryRound; route?: OverlandRoute; }
+export interface PrivateChallenge { mode: string; country?: Country; mapCountry?: FlyoverCountry; location?: MapTapLocation; geo?: GeoGuessrLocation; street?: StreetViewCountryRound; route?: OverlandRoute; mystery?: string; }
 export function privateChallenge(games: RankedGames, state: RankedState): PrivateChallenge {
   const runs = (games as unknown as { runs: Map<string, { queue: PrivateChallenge[]; index: number }> }).runs;
   const run = runs.get(state.runId)!;
@@ -18,6 +18,7 @@ export function answerFor(games: RankedGames, state: RankedState): Omit<RankedAc
   const c = privateChallenge(games, state);
   if (c.location || c.geo) { const p = c.location ?? c.geo!; return { type: "pin", lat: p.lat, lng: p.lng }; }
   if (c.mode === "worldsplit") return { type: "line", line: [[500, 0], [500, 500]] };
+  if (c.mystery) return { type: "answer", countryCode: c.mystery };
   if (c.route) {
     // A perfect route: the next country along the shortest route already started.
     const run = (games as unknown as { runs: Map<string, { overland?: OverlandRound }> }).runs.get(state.runId)!;

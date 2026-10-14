@@ -184,6 +184,35 @@ describe("ranked authority", () => {
     expect(service.ranked.completedRecord(user.id, state.runId)).toMatchObject({ categoryIds: ["overland"], score: 285, correctAnswers: 3, wrongAnswers: allowed });
   });
 
+  it("keeps the Mystery country hidden on the server until its round is over, and scores it there", async () => {
+    const { time, service, user } = await harness();
+    let state = stateOf(await service.startRankedGame(user.id, { gameMode: "mystery", variant: "" }));
+    const act = async (action: Record<string, unknown>) => {
+      time.value += 1000;
+      return service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, ...action });
+    };
+    const target = privateChallenge(service.ranked, state).mystery!;
+    expect(state.question).toEqual({ id: state.question!.id, kind: "mystery", text: "Find the mystery country.", mystery: { guessesAllowed: 8 } });
+    const wrong = ["FR", "BR", "JP"].find((code) => code !== target)!;
+    for (const action of [{ type: "answer", countryCode: "XX" }, { type: "answer", answer: target }, { type: "line", line: [[0, 0], [1, 1]] }]) expect(await act(action)).toHaveProperty("error");
+    state = stateOf(await act({ type: "answer", countryCode: wrong, correct: true, points: 100 }));
+    expect(state.result?.mystery).toMatchObject({ guess: { code: wrong, clues: { correct: false } }, status: "playing", points: 0 });
+    expect(JSON.stringify(state)).not.toContain(`"${target}"`);
+    expect(await act({ type: "answer", countryCode: wrong })).toHaveProperty("error");
+    state = stateOf(await act({ type: "hint" }));
+    expect(state.result?.mystery?.hint?.level).toBe(1);
+    state = stateOf(await act({ type: "answer", countryCode: target }));
+    expect(state.result?.mystery).toMatchObject({ status: "solved", points: 100 - 12 - 15, target });
+    expect(state.index).toBe(1);
+
+    state = stateOf(await act({ type: "reveal" }));
+    expect(state.result?.mystery).toMatchObject({ status: "revealed", points: 0 });
+    expect(state.result?.mystery?.target).toMatch(/^[A-Z]{2}$/);
+    while (state.status === "playing") state = stateOf(await act(answerFor(service.ranked, state)));
+    expect(state.score).toBe(73 + 0 + 300);
+    expect(service.ranked.completedRecord(user.id, state.runId)).toMatchObject({ categoryIds: ["mystery"], correctAnswers: 4, wrongAnswers: 1 });
+  });
+
   it("does not leak future locations or pano identifiers in Street View JSON", async () => {
     const { service, user } = await harness();
     for (const mode of ["geoguessr", "streetview-country"]) {

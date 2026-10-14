@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Binoculars,
   CalendarDays,
+  Compass,
   Check,
   Crown,
   Eye,
@@ -70,6 +71,7 @@ const MODE_ICONS: Readonly<Record<GameModeId, LucideIcon>> = {
   worldsplit: Split,
   flyover: Plane,
   overland: Route,
+  mystery: Compass,
   geoguessr: MapPin,
   "streetview-country": Binoculars,
 };

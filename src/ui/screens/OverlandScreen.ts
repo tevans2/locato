@@ -27,9 +27,7 @@ import {
   overlandPlayerRoute,
   overlandRoundPoints,
   overlandShareLine,
-  resolveCountryName,
   revealOverland,
-  suggestCountryNames,
   type OverlandGuessError,
   type OverlandRound,
   type OverlandRoute,
@@ -39,6 +37,7 @@ import { fameTier } from "../../core/countries/fame";
 import { shareResult, type ResultsMissedCountry } from "../shell/ResultsCard";
 import { readOverlandDailyStats, readOverlandDay, saveOverlandDay } from "../../storage/overlandDaily";
 import { createOverlandMap } from "../components/OverlandMap";
+import { createCountryGuessInput } from "../components/countryGuessInput";
 import { el } from "../dom/createElement";
 import { shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { shellIcon } from "../shell/icons";
@@ -172,8 +171,6 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   let round: OverlandRound | null = null;
   const finished: { readonly round: OverlandRound; readonly points: number }[] = [];
   let busy = false;
-  let suggestions: readonly Country[] = [];
-  let activeSuggestion = -1;
 
   // ---- Map ---------------------------------------------------------------------------------
   const map = createOverlandMap(options.worldCountryFeatures, countryIndex);
@@ -214,28 +211,22 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   const progressDots = Array.from({ length: OVERLAND_ATTEMPT_ROUTES }, () => el("span", { className: "overland-progress-dot" }));
   const todayLabel = today ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${today.date}T12:00:00Z`)) : "";
 
-  const inputId = "overland-guess-input";
-  const listId = "overland-suggestions";
-  const input = el("input", {
-    className: "overland-input",
-    attrs: {
-      id: inputId, type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", enterkeyhint: "done", maxlength: "60",
-      placeholder: "Type a country…", role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": listId,
+  const guessInput = createCountryGuessInput({
+    prefix: "overland",
+    countryIndex,
+    label: "Add a country to your route",
+    signal,
+    exclude: () => {
+      const exclude = guessedCodes();
+      if (round) for (const code of [round.route.start, round.route.end]) exclude.add(code);
+      return exclude;
     },
+    onPick: (picked) => void submitCountry(picked.code),
+    onEmpty: () => setFeedback("Type a country to add it to your route.", "warn"),
+    onUnknown: (text, ambiguous) => setFeedback(ambiguous ? "Which one? Pick a country from the list." : `No country called “${text}”. Check the spelling.`, "warn"),
+    onType: () => { if (feedback.dataset.tone === "warn") setFeedback(""); },
   });
-  const addButton = el("button", { className: "primary-action overland-add", text: "Add", attrs: { type: "submit" } });
-  const suggestionList = el("ul", { className: "overland-suggestions", attrs: { id: listId, role: "listbox", "aria-label": "Matching countries" } });
-  suggestionList.hidden = true;
-  const feedback = el("p", { className: "overland-feedback", attrs: { role: "status", "aria-live": "polite" } });
-  const form = el("form", {
-    className: "overland-guess-form",
-    attrs: { novalidate: "" },
-    children: [
-      el("label", { className: "overland-input-label", text: "Add a country to your route", attrs: { for: inputId } }),
-      el("div", { className: "overland-input-row", children: [input, addButton, suggestionList] }),
-      feedback,
-    ],
-  });
+  const { form, input, feedback } = guessInput;
 
   const meterLabel = el("span", { className: "overland-meter-label" });
   const meterPips = el("div", { className: "overland-meter-pips", attrs: { "aria-hidden": "true" } });
@@ -334,10 +325,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   function setBusy(value: boolean): void {
     busy = value;
     const playing = round?.status === "playing";
-    // Read-only rather than disabled while a guess is checked, so the phone keyboard stays up.
-    input.disabled = !playing;
-    input.readOnly = value;
-    addButton.disabled = value || !playing;
+    guessInput.setState({ disabled: !playing, busy: value });
     giveUpButton.disabled = value || !playing;
     renderHints();
   }
@@ -379,8 +367,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     outcome.hidden = true;
     outcome.replaceChildren();
     playControls.hidden = false;
-    input.value = "";
-    hideSuggestions();
+    guessInput.clear();
     setFeedback("");
     map.showRoute(route.start, route.end);
     renderGuesses();
@@ -646,8 +633,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     round = next;
     if (round.status === "playing") saveToday();
     const guess = next.guesses[next.guesses.length - 1]!;
-    input.value = "";
-    hideSuggestions();
+    guessInput.clear();
     map.mark(guess.code, guess.verdict);
     map.frame({ animate: true });
     renderGuesses();
@@ -658,25 +644,6 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     }
     setBusy(false);
     input.focus({ preventScroll: true });
-  }
-
-  function submitTyped(): void {
-    const text = input.value.trim();
-    if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
-      void submitCountry(suggestions[activeSuggestion]!.code);
-      return;
-    }
-    if (!text) {
-      setFeedback("Type a country to add it to your route.", "warn");
-      return;
-    }
-    const match = resolveCountryName(countryIndex, text);
-    if (match) {
-      void submitCountry(match.code);
-      return;
-    }
-    updateSuggestions();
-    setFeedback(suggestions.length > 1 ? "Which one? Pick a country from the list." : `No country called “${text}”. Check the spelling.`, "warn");
   }
 
   async function useHint(): Promise<void> {
@@ -728,77 +695,6 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     endRoute(0);
   }
 
-  // ---- Suggestions -------------------------------------------------------------------------
-  function hideSuggestions(): void {
-    suggestions = [];
-    activeSuggestion = -1;
-    suggestionList.hidden = true;
-    suggestionList.replaceChildren();
-    input.setAttribute("aria-expanded", "false");
-    input.removeAttribute("aria-activedescendant");
-  }
-
-  function renderSuggestions(): void {
-    if (suggestions.length === 0) {
-      hideSuggestions();
-      return;
-    }
-    suggestionList.replaceChildren(...suggestions.map((item, index) => {
-      const option = el("li", {
-        className: `overland-suggestion${index === activeSuggestion ? " is-active" : ""}`,
-        attrs: { id: `${listId}-${index}`, role: "option", "aria-selected": String(index === activeSuggestion) },
-        children: [
-          el("img", { attrs: { src: item.flagSrc, alt: "", width: "22", height: "15", loading: "lazy", decoding: "async" } }),
-          el("span", { text: item.name }),
-        ],
-      });
-      // Pointer down, not click: the input keeps focus, so the keyboard stays open on phones.
-      option.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        void submitCountry(item.code);
-      });
-      option.addEventListener("mousedown", (event) => event.preventDefault());
-      return option;
-    }));
-    suggestionList.hidden = false;
-    input.setAttribute("aria-expanded", "true");
-    if (activeSuggestion >= 0) input.setAttribute("aria-activedescendant", `${listId}-${activeSuggestion}`);
-    else input.removeAttribute("aria-activedescendant");
-  }
-
-  function updateSuggestions(): void {
-    if (!round) return;
-    const exclude = guessedCodes();
-    exclude.add(round.route.start);
-    exclude.add(round.route.end);
-    suggestions = suggestCountryNames(countryIndex, input.value, exclude);
-    activeSuggestion = -1;
-    renderSuggestions();
-  }
-
-  input.addEventListener("input", () => {
-    updateSuggestions();
-    if (feedback.dataset.tone === "warn") setFeedback("");
-  }, { signal });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      if (suggestions.length === 0) return;
-      event.preventDefault();
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      activeSuggestion = (activeSuggestion + step + suggestions.length + 1) % (suggestions.length + 1);
-      if (activeSuggestion === suggestions.length) activeSuggestion = -1;
-      renderSuggestions();
-    } else if (event.key === "Escape" && !suggestionList.hidden) {
-      event.preventDefault();
-      event.stopPropagation();
-      hideSuggestions();
-    }
-  }, { signal });
-  input.addEventListener("blur", () => hideSuggestions(), { signal });
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submitTyped();
-  }, { signal });
   hintButton.addEventListener("click", () => void useHint(), { signal });
   giveUpButton.addEventListener("click", () => void giveUp(), { signal });
   nextButton.addEventListener("click", nextRoute, { signal });

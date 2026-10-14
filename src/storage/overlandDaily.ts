@@ -1,3 +1,4 @@
+import { dailyPuzzleStats, type DailyPuzzleStats } from "./dailyStreak";
 import { OVERLAND_MAX_HINTS, createOverlandRound, guessOverland, overlandGraph, revealOverland, type OverlandRound, type OverlandRoute } from "../core/overland";
 
 /**
@@ -8,7 +9,6 @@ import { OVERLAND_MAX_HINTS, createOverlandRound, guessOverland, overlandGraph, 
 export const OVERLAND_DAILY_KEY = "locato:overland-daily:v1";
 /** Days kept; older ones only ever mattered to the streak, which this comfortably covers. */
 const KEPT_DAYS = 400;
-const DAY_MS = 86_400_000;
 
 interface SavedDay {
   readonly start: string;
@@ -76,32 +76,9 @@ export function readOverlandDay(storage: Storage, date: string, route: OverlandR
   return saved.revealed ? revealOverland(round) : round;
 }
 
-export interface OverlandDailyStats {
-  /** Consecutive days solved, up to today (or yesterday, while today is unsolved). */
-  readonly streak: number;
-  readonly bestStreak: number;
-  readonly played: number;
-  readonly solved: number;
-}
-
-function dayNumber(date: string): number | null {
-  const time = Date.parse(`${date}T00:00:00Z`);
-  return Number.isFinite(time) ? Math.round(time / DAY_MS) : null;
-}
+export type OverlandDailyStats = DailyPuzzleStats;
 
 export function readOverlandDailyStats(storage: Storage, today: string): OverlandDailyStats {
-  const days = readDays(storage);
-  const finished = Object.entries(days).filter(([, day]) => day.status !== "playing");
-  const solvedDays = new Set(finished.filter(([, day]) => day.status === "solved").map(([date]) => dayNumber(date)).filter((day): day is number => day !== null));
-  const todayNumber = dayNumber(today);
-  let streak = 0;
-  if (todayNumber !== null) for (let day = solvedDays.has(todayNumber) ? todayNumber : todayNumber - 1; solvedDays.has(day); day -= 1) streak += 1;
-  let bestStreak = 0;
-  for (const day of solvedDays) {
-    if (solvedDays.has(day - 1)) continue;
-    let length = 0;
-    while (solvedDays.has(day + length)) length += 1;
-    bestStreak = Math.max(bestStreak, length);
-  }
-  return { streak, bestStreak, played: finished.length, solved: solvedDays.size };
+  const finished = Object.entries(readDays(storage)).filter(([, day]) => day.status !== "playing");
+  return dailyPuzzleStats(new Map(finished.map(([date, day]) => [date, day.status === "solved"])), today);
 }

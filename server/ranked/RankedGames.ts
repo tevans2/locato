@@ -14,6 +14,7 @@ import type { MapTapLocation } from "../../src/core/maptap/types";
 import { createGeoGuessrQueue, scoreGeoGuessrGuess, type GeoGuessrLocation } from "../../src/core/geoguessr";
 import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
 import { buildWorldSplitCountries, scoreWorldSplit, splitLineLength, WORLD_SPLIT_ROUNDS, type WorldSplitRound } from "../../src/core/worldsplit";
+import { MYSTERY_MAX_GUESSES, createMysteryRound, createMysteryTargets, guessMystery, hintMystery, mysteryRoundPoints, revealMystery, type MysteryGuess, type MysteryGuessError, type MysteryRound } from "../../src/core/mystery";
 import { OVERLAND_HINT_LABELS, OVERLAND_VERDICTS, createOverlandRound, createOverlandRoutes, guessOverland, hintOverland, overlandGraph, overlandRoundPoints, revealOverland, type OverlandGuess, type OverlandGuessError, type OverlandRound, type OverlandRoute } from "../../src/core/overland";
 import type { RankedAction, RankedQuestion, RankedState, RankedMoveResult } from "../../src/core/ranked";
 import type { GameModeId } from "../../src/core/gameModes";
@@ -29,6 +30,11 @@ const LIFETIME_MS = 2 * 60 * 60 * 1000;
 const RECEIPT_LIFETIME_MS = 5 * 60 * 1000;
 const MAX_RUNS = 2000;
 const INDEX = indexCountries(rawCountries);
+const MYSTERY_GUESS_ERRORS: Readonly<Record<MysteryGuessError, string>> = {
+  finished: "This country is already found.",
+  unknown: "That isn't a country in the game.",
+  repeat: "You've already guessed that country.",
+};
 const OVERLAND_GUESS_ERRORS: Readonly<Record<OverlandGuessError, string>> = {
   finished: "This route is already finished.",
   unknown: "That country isn't on the border map.",
@@ -45,6 +51,8 @@ interface Challenge {
   readonly street?: StreetViewCountryRound;
   readonly split?: WorldSplitRound;
   readonly route?: OverlandRoute;
+  /** Mystery country: the hidden country's code. Never in a view until its round is over. */
+  readonly mystery?: string;
 }
 interface Run {
   readonly id: string;
@@ -75,6 +83,8 @@ interface Run {
   readonly placements: Map<string, { dx: number; dy: number }>;
   /** Overland: the current route's guesses and hints. */
   overland?: OverlandRound;
+  /** Mystery country: the current country's guesses and hints. */
+  mystery?: MysteryRound;
 }
 export interface VerifiedResult { readonly mode: string; readonly variant: string; readonly value: number; }
 export interface RankedGamesOptions {
@@ -146,6 +156,8 @@ export class RankedGames {
       queue.push(...shuffle(MAP_TAP_LOCATIONS, rng).slice(0, 10).map((location) => ({ mode, location })));
     } else if (mode === "worldsplit") {
       queue.push(...WORLD_SPLIT_ROUNDS.map((split) => ({ mode, split })));
+    } else if (mode === "mystery") {
+      queue.push(...createMysteryTargets(seed).map((mystery) => ({ mode, mystery })));
     } else if (mode === "overland") {
       queue.push(...createOverlandRoutes(seed).map((route) => ({ mode, route })));
     } else if (mode === "geoguessr" || mode === "streetview-country") {
@@ -268,6 +280,34 @@ export class RankedGames {
         return { advance: true, points: 0 };
       }
     }
+    if (current.mystery) {
+      const round = run.mystery!;
+      if (action.type === "hint") {
+        const hinted = hintMystery(round);
+        if ("error" in hinted) return no(hinted.error === "no-hints" ? "No hints left for this country." : MYSTERY_GUESS_ERRORS.finished);
+        run.mystery = hinted.round;
+        run.hints = hinted.round.hintsUsed;
+        detail("hint", { mystery: { hint: hinted.hint, status: "playing", points: 0 } });
+        run.feedback = hinted.hint.text;
+        return { advance: false, points: 0 };
+      }
+      let next: MysteryRound;
+      let guess: MysteryGuess | undefined;
+      if (action.type === "reveal") next = revealMystery(round);
+      else {
+        if (action.type !== "answer" || typeof action.countryCode !== "string") return no("Name a country to guess.");
+        const guessed = guessMystery(round, action.countryCode);
+        if ("error" in guessed) return no(MYSTERY_GUESS_ERRORS[guessed.error]);
+        ({ round: next, guess } = guessed);
+        if (!guess.clues.correct) { run.wrong += 1; run.wrongTotal += 1; }
+      }
+      run.mystery = next;
+      const points = mysteryRoundPoints(next);
+      const over = next.status !== "playing";
+      detail(guess ? (guess.clues.correct ? "correct" : "wrong") : "revealed", { mystery: { ...(guess ? { guess } : {}), status: next.status, points, ...(over ? { target: next.target } : {}) } });
+      run.feedback = next.status === "solved" ? `Found it · +${points} points` : over ? "No points for this country." : `${guess!.clues.distanceKm.toLocaleString("en-US")} km away.`;
+      return over ? { advance: true, points } : { advance: false, points: 0 };
+    }
     if (current.route) {
       const graph = overlandGraph();
       const round = run.overland!;
@@ -377,6 +417,7 @@ export class RankedGames {
     if (!current) return;
     if (current.mode === "flag-colors") run.reveal = new FlagReveal(current.country!.flagSrc);
     if (current.route) run.overland = createOverlandRound(current.route);
+    if (current.mystery) run.mystery = createMysteryRound(current.mystery);
     const frames = current.street?.frames ?? (current.geo ? [current.geo] : null);
     if (frames) {
       if (!this.options.resolvePanorama) throw new Error("Server Street View metadata key required.");
@@ -399,6 +440,7 @@ export class RankedGames {
         if (current.location) question = { ...common, kind: "pin", text: `Pin ${current.location.name}.`, mapTap: { id: run.questionId, name: current.location.name, category: current.location.category, difficulty: current.location.difficulty } };
         else if (current.geo || current.street) question = { ...common, kind: current.geo ? "pin" : "street", text: current.geo ? "Look around the street, then pin the starting location." : "Name this country.", frames: (run.privateFrames ?? []).map((_, index) => ({ asset: `${asset}?frame=${index}` })) };
         else if (current.split) question = { ...common, kind: "split", text: current.split.prompt };
+        else if (current.mystery) question = { ...common, kind: "mystery", text: "Find the mystery country.", mystery: { guessesAllowed: MYSTERY_MAX_GUESSES } };
         else if (current.route) {
           const name = (code: string) => INDEX.byCode.get(code)?.name ?? code;
           question = { ...common, kind: "route", text: `Link ${name(current.route.start)} and ${name(current.route.end)} by land.`, route: current.route };
@@ -444,8 +486,8 @@ export class RankedGames {
     const run = this.find(userId, runId);
     if (!run || run.finishedAt === null || run.mode === "daily") return null;
     const mapMode = ["name-all", "click-country", "spot-country", "puzzle"].includes(run.mode);
-    // Overland counts the routes found; the other modes the countries found.
-    const correctAnswers = run.flight?.score ?? (run.mode === "overland" ? run.marks.filter((mark) => mark === "correct").length : run.found.size);
+    // Overland and Mystery country count the rounds won; the other modes the countries found.
+    const correctAnswers = run.flight?.score ?? (run.mode === "overland" || run.mode === "mystery" ? run.marks.filter((mark) => mark === "correct").length : run.found.size);
     return { mode: mapMode ? "world-map" : "solo", categoryIds: [run.mode], score: run.score, correctAnswers, wrongAnswers: run.wrongTotal, bestStreak: 0,
       ...(mapMode ? { durationMs: this.elapsed(run), completed: true, countriesFound: run.found.size, countriesTotal: run.queue.length, playMode: run.mode } : {}) };
   }

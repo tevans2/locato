@@ -3,7 +3,7 @@ import { createGameEngine, createRandomSeed, type GameEngine, type GameState } f
 import { createDailyChallenge, createDailyChallengeWithoutOverland, dailyRoundMark, getLocalDailyDate, scoreDailyOverlandRound, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
-import { isFlyoverGameModeId, isMapTapGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isFlyoverGameModeId, isMapTapGameModeId, isMysteryGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -149,7 +149,7 @@ export function createApp(options: AppOptions): App {
       } else if (mode === "map-tap") {
         navigate({ type: mode, run: "timed" });
       } else {
-        // Single-run modes (Worldsplit, Flyover, Overland, GeoGuessr, Street View country) have one way to play.
+        // Single-run modes (Worldsplit, Flyover, Overland, Mystery country, GeoGuessr, Street View country) have one way to play.
         handleGameModeChange(mode);
       }
       return;
@@ -829,6 +829,11 @@ export function createApp(options: AppOptions): App {
 
     if (isOverlandGameModeId(gameMode)) {
       navigate({ type: "overland" });
+      return;
+    }
+
+    if (isMysteryGameModeId(gameMode)) {
+      navigate({ type: "mystery" });
     }
   }
 
@@ -873,7 +878,7 @@ export function createApp(options: AppOptions): App {
     const world = await loadWorldCountryFeatures();
     if (run !== navigationRun) return true;
     const screen = await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser(),
-      onOverlandToday: () => navigate({ type: "overland", daily: true }) });
+      onOverlandToday: () => navigate({ type: "overland", daily: true }), onMysteryToday: () => navigate({ type: "mystery", daily: true }) });
     if (run === navigationRun) mount(screen);
     else screen.destroy();
     return true;
@@ -1051,6 +1056,38 @@ export function createApp(options: AppOptions): App {
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
           onTodaysRoute: () => navigate({ type: "overland", daily: true }),
           onPlayRun: () => navigate({ type: "overland" }),
+          ...(daily ? { today: { date: getLocalDailyDate() } } : {}),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
+  async function startMystery(daily = false): Promise<void> {
+    // Today's mystery is the same for everyone and kept on this device, so it never needs the server.
+    if (!daily && await startVerified("mystery")) return;
+    const run = navigationRun;
+    mount(createLoadingScreen("Hiding a country..."));
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/MysteryScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createMysteryScreen({ shell,
+          worldCountryFeatures,
+          countryIndex: options.countryIndex,
+          storage: options.storage,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onToday: () => navigate({ type: "mystery", daily: true }),
+          onPlayRun: () => navigate({ type: "mystery" }),
           ...(daily ? { today: { date: getLocalDailyDate() } } : {}),
         }),
       );
@@ -1248,6 +1285,10 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "overland") {
       runNavigation(startOverland(route.daily === true));
+      return;
+    }
+    if (route.type === "mystery") {
+      runNavigation(startMystery(route.daily === true));
       return;
     }
     if (route.type === "multiplayer") {

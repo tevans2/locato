@@ -40,18 +40,18 @@ afterEach(() => {
 });
 
 describe("game mode catalogue", () => {
-  it("groups all 16 modes as Clues, Map and Street View exactly once", () => {
+  it("groups all 17 modes as Clues, Map and Street View exactly once", () => {
     expect(GAME_MODE_GROUPS.map((group) => group.label)).toEqual(["Clues", "Map", "Street View"]);
     const ids = GAME_MODE_GROUPS.flatMap((group) => group.modes.map((mode) => mode.id));
-    expect(ids).toHaveLength(16);
+    expect(ids).toHaveLength(17);
     expect(new Set(ids)).toEqual(new Set(gameModeOptions.map((option) => option.id)));
     expect(GAME_MODE_GROUPS[0]!.modes.map((mode) => mode.id)).toEqual(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"]);
     expect(GAME_MODE_GROUPS[2]!.modes.map((mode) => mode.id)).toEqual(["geoguessr", "streetview-country"]);
   });
 
-  it("marks exactly the server's leaderboard modes (all 16) as having a board", () => {
+  it("marks exactly the server's leaderboard modes (all 17) as having a board", () => {
     expect([...LEADERBOARD_GAME_MODE_IDS].sort()).toEqual([...GAME_MODE_IDS].sort());
-    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(16);
+    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(17);
     expect(isLeaderboardMode("flags")).toBe(true);
     expect(isLeaderboardMode("flag-colors")).toBe(true);
     expect(isLeaderboardMode("geoguessr")).toBe(true);
@@ -240,7 +240,7 @@ describe("GameBar and game picker", () => {
     const onPick = vi.fn();
     const onClose = vi.fn();
     openGamePicker({ onPick, onClose });
-    expect(document.querySelectorAll(".shell-picker-row")).toHaveLength(16);
+    expect(document.querySelectorAll(".shell-picker-row")).toHaveLength(17);
     keydown("Escape");
     expect(document.querySelector(".shell-picker")).toBeNull();
     expect(onPick).not.toHaveBeenCalled();

@@ -8,17 +8,17 @@ describe("leaderboard modes", () => {
     expect([...LEADERBOARD_GAME_MODE_IDS].sort()).toEqual([...GAME_MODE_IDS].sort());
   });
 
-  it("give every one of the 16 modes a board", () => {
-    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(16);
+  it("give every one of the 17 modes a board", () => {
+    expect(LEADERBOARD_GAME_MODE_IDS).toHaveLength(17);
     expect(new Set(LEADERBOARD_GAME_MODE_IDS)).toEqual(new Set(gameModeOptions.map((option) => option.id)));
     for (const option of gameModeOptions) expect(isLeaderboardMode(option.id)).toBe(true);
     const withBoards = GAME_MODE_GROUPS.flatMap((group) => group.modes).filter((mode) => mode.leaderboard).map((mode) => mode.id);
-    expect(withBoards).toHaveLength(16);
+    expect(withBoards).toHaveLength(17);
     expect(isLeaderboardMode("nope")).toBe(false);
   });
 
   it("split into time boards (fastest first) and score boards (highest first)", () => {
-    expect([...SCORE_GAME_MODE_IDS].sort()).toEqual(["flyover", "geoguessr", "map-tap", "overland", "streetview-country", "worldsplit"]);
+    expect([...SCORE_GAME_MODE_IDS].sort()).toEqual(["flyover", "geoguessr", "map-tap", "mystery", "overland", "streetview-country", "worldsplit"]);
     expect([...TIME_GAME_MODE_IDS].sort()).toEqual(["capital-recall", "capitals", "click-country", "codes", "flag-colors", "flags", "name-all", "puzzle", "shapes", "spot-country"]);
     for (const config of LEADERBOARD_MODES) {
       if (config.metric === "score") expect(config.maxScore).toBeGreaterThan(0);
@@ -31,7 +31,7 @@ describe("leaderboard modes", () => {
 
   it("keep practice apart only where it offers something the board can't", () => {
     const single = LEADERBOARD_MODES.filter((config) => config.runs === "single").map((config) => config.mode).sort();
-    expect(single).toEqual(["flyover", "geoguessr", "overland", "streetview-country", "worldsplit"]);
+    expect(single).toEqual(["flyover", "geoguessr", "mystery", "overland", "streetview-country", "worldsplit"]);
     expect(isSingleRunMode("map-tap")).toBe(false);
     expect(isSingleRunMode("flags")).toBe(false);
     expect(runLabels("map-tap")).toEqual({ practice: "Custom", timed: "Ranked" });

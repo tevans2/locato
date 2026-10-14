@@ -18,6 +18,8 @@ interface Options {
   readonly getAuthUser: () => AuthUser | null;
   /** Overland's link to Today's route. */
   readonly onOverlandToday?: () => void;
+  /** Mystery country's link to Today's mystery. */
+  readonly onMysteryToday?: () => void;
 }
 
 /** Use the same screens as practice, with server-owned challenges and scoring behind them. */
@@ -58,6 +60,9 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
     } else if (mode === "overland") {
       const { createOverlandScreen } = await import("./OverlandScreen");
       screen = createOverlandScreen({ ...common, worldCountryFeatures: world, ranked: session, ...(options.onOverlandToday ? { onTodaysRoute: options.onOverlandToday } : {}) });
+    } else if (mode === "mystery") {
+      const { createMysteryScreen } = await import("./MysteryScreen");
+      screen = createMysteryScreen({ ...common, worldCountryFeatures: world, ranked: session, ...(options.onMysteryToday ? { onToday: options.onMysteryToday } : {}) });
     } else if (mode === "geoguessr") {
       const { createGeoGuessrScreen } = await import("./GeoGuessrScreen");
       screen = createGeoGuessrScreen({ ...common, ranked: session });
