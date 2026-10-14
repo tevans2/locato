@@ -45,6 +45,8 @@ import type {
   BannedUser,
   IpBan,
   UserBan,
+  PlayerRating,
+  RatingLeaderboardEntry,
 } from "../auth/types";
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
@@ -250,6 +252,16 @@ function migrate(db: Database): void {
       progress TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS player_ratings (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      games INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, game)
+    );
+    CREATE INDEX IF NOT EXISTS player_ratings_game_rating ON player_ratings(game, rating DESC);
   `);
 
   // Additive migrations: columns added after initial schema deployment.
@@ -822,7 +834,7 @@ export class SqliteUserStore implements UserStore {
   }
 
   // Foreign keys (PRAGMA enabled in openDatabase) cascade the delete to sessions, oauth_accounts,
-  // user_stats, mode_best_times, mode_best_scores, and academy_progress.
+  // user_stats, mode_best_times, mode_best_scores, academy_progress and player_ratings.
   deleteUser(id: string): boolean {
     if (!this.findUserById(id)) return false;
     for (const table of ["legacy_mode_best_times", "legacy_mode_best_scores", "legacy_daily_challenge_results"]) this.db.query(`DELETE FROM ${table} WHERE user_id = ?`).run(id);
@@ -1038,6 +1050,34 @@ export class SqliteUserStore implements UserStore {
        WHERE display_name LIKE ? COLLATE NOCASE AND id != ?
        ORDER BY display_name COLLATE NOCASE LIMIT ?`,
     ).all(`%${query}%`, excludeId, limit);
+  }
+
+  getRating(userId: string, game: string): PlayerRating | null {
+    return this.db.query<PlayerRating>("SELECT game, rating, games, updated_at AS updatedAt FROM player_ratings WHERE user_id = ? AND game = ?").get(userId, game);
+  }
+
+  saveRating(userId: string, rating: PlayerRating): void {
+    this.db
+      .query(
+        `INSERT INTO player_ratings (user_id, game, rating, games, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, game) DO UPDATE SET rating = excluded.rating, games = excluded.games, updated_at = excluded.updated_at`,
+      )
+      .run(userId, rating.game, rating.rating, rating.games, rating.updatedAt);
+  }
+
+  listUserRatings(userId: string): readonly PlayerRating[] {
+    return this.db.query<PlayerRating>("SELECT game, rating, games, updated_at AS updatedAt FROM player_ratings WHERE user_id = ? ORDER BY game").all(userId);
+  }
+
+  listTopRatings(game: string, limit: number): readonly RatingLeaderboardEntry[] {
+    const rows = this.db
+      .query<{ id: string; username: string; avatarEmoji: string | null; rating: number; games: number }>(
+        `SELECT u.id, u.display_name AS username, u.avatar_emoji AS avatarEmoji, r.rating, r.games
+         FROM player_ratings r JOIN users u ON u.id = r.user_id
+         WHERE r.game = ? ORDER BY r.rating DESC, r.games DESC, u.display_name LIMIT ?`,
+      )
+      .all(game, limit);
+    return rows.map((row, index) => ({ rank: index + 1, user: { id: row.id, username: row.username, avatarEmoji: row.avatarEmoji }, rating: row.rating, games: row.games }));
   }
 
   getAcademyProgress(userId: string): StoredAcademyProgress | null {

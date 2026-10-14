@@ -127,6 +127,7 @@ export function createMultiplayerLobby(options: MultiplayerLobbyOptions): Multip
       ...room.players.map((player) => {
         const isYou = player.id === localPlayerId;
         const tags = [
+          ...(player.rating !== undefined ? [el("span", { className: "mp-tag is-rating", text: String(player.rating), attrs: { title: `${roomKindInfo(room!.kind).label} rating` } })] : []),
           ...(player.id === room!.hostPlayerId ? [el("span", { className: "mp-tag is-host", text: "Host" })] : []),
           ...(player.spectator ? [el("span", { className: "mp-tag", text: "Watching" })] : []),
           ...(!player.connected ? [el("span", { className: "mp-tag is-offline", text: "Offline" })] : []),

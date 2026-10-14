@@ -119,6 +119,10 @@ describe("shareable game routes", () => {
       expect(parse(`/?game=${mode}`)).toEqual({ type: mode });
       expect(buildRouteUrl({ type: mode }, { pathname: "/" })).toBe(`/?game=${mode}`);
     }
+    // Overland's Today's route has its own URL; the five-route run is the plain one.
+    expect(buildRouteUrl({ type: "overland", daily: true }, { pathname: "/" })).toBe("/?game=overland&daily=1");
+    expect(parse("/?game=overland&daily=1")).toEqual({ type: "overland", daily: true });
+    expect(parse("/?game=overland&daily=0")).toEqual({ type: "overland" });
     const flagColours: AppRoute = { type: "solo-game", categoryIds: ["flag-colors"], continueSaved: false, run: "timed" };
     expect(buildRouteUrl(flagColours, { pathname: "/" })).toBe("/?game=flag-colors&run=timed");
     expect(parse("/?game=flag-colors&run=timed")).toEqual(flagColours);

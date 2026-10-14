@@ -3,7 +3,7 @@
  * server has told us. No DOM: the multiplayer screen renders `state` and plays the sounds.
  */
 
-import type { ClientMessage, FinalResult, MultiplayerTransport, PublicRoomState, PublicRoundState, RoundResult, ServerMessage, TransportStatus } from "../../../core/multiplayer";
+import type { ClientMessage, FinalResult, MultiplayerTransport, RoomKind, PublicRoomState, PublicRoundState, RoundResult, ServerMessage, TransportStatus } from "../../../core/multiplayer";
 import type { MapTapMultiplayerReveal } from "../../components/MultiplayerMapTapGameView";
 import type { GeoGuessrMultiplayerReveal } from "../../components/MultiplayerGeoGuessrGameView";
 import { MULTIPLAYER_SESSION_KEY } from "../../../core/multiplayer/localPlayer";
@@ -24,6 +24,12 @@ export interface RoomNotice {
   readonly text: string;
 }
 
+/** After a rated game: each signed-in player's new rating for the game type, and its change. */
+export interface RatingUpdate {
+  readonly game: RoomKind;
+  readonly changes: readonly { readonly playerId: string; readonly rating: number; readonly delta: number }[];
+}
+
 export interface RoomSessionState {
   readonly status: TransportStatus;
   readonly room: PublicRoomState | null;
@@ -33,6 +39,7 @@ export interface RoomSessionState {
   readonly mapTapReveal: MapTapMultiplayerReveal | null;
   readonly geoGuessrReveal: GeoGuessrMultiplayerReveal | null;
   readonly finalResults: readonly FinalResult[] | null;
+  readonly ratingUpdate: RatingUpdate | null;
   /** The in-game line under the prompt ("Ana took the round."). */
   readonly feedback: string;
   /** Something to tell the player outside the game: a failed join, a lost connection, a new host. */
@@ -82,6 +89,7 @@ const IDLE: RoomSessionState = {
   mapTapReveal: null,
   geoGuessrReveal: null,
   finalResults: null,
+  ratingUpdate: null,
   feedback: "",
   notice: null,
   pending: null,
@@ -215,7 +223,7 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
           notice,
           pending: null,
           // A new game (or the lobby) drops the last game's standings and reveals.
-          ...(room.status === "lobby" ? { finalResults: null, quizReveal: null, mapTapReveal: null, geoGuessrReveal: null, feedback: "" } : {}),
+          ...(room.status === "lobby" ? { finalResults: null, ratingUpdate: null, quizReveal: null, mapTapReveal: null, geoGuessrReveal: null, feedback: "" } : {}),
           ...(room.status === "playing" ? { quizReveal: null } : {}),
         });
         return;
@@ -228,6 +236,7 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
           mapTapReveal: null,
           geoGuessrReveal: null,
           finalResults: null,
+          ratingUpdate: null,
           feedback: message.round.prompt.kind === "flyover-flight" ? "The race is on." : `Round ${message.round.roundNumber} is live.`,
         });
         return;
@@ -264,6 +273,9 @@ export function createRoomSession(options: RoomSessionOptions): RoomSession {
       }
       case "GAME_COMPLETED":
         set({ finalResults: message.results, feedback: "" });
+        return;
+      case "RATING_UPDATED":
+        set({ ratingUpdate: { game: message.game, changes: message.changes } });
         return;
       case "PLAYER_JOINED":
         if (message.player.id !== before.localPlayerId) set({ notice: { tone: "info", text: `${message.player.name} joined${message.player.spectator ? " and is watching" : ""}.` } });

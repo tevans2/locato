@@ -25,7 +25,8 @@ describe("daily introduction and review", () => {
     const onStart = vi.fn();
     const root = mount(createDailyIntroScreen({ shell: shellOrFallback(undefined, vi.fn()), challenge, roundsPlayed: 0, onStart }));
     expect(root.querySelector("h1")!.textContent).toBe(challenge.theme!.title);
-    expect([...root.querySelectorAll(".daily-format strong")].map((el) => el.textContent)).toEqual(["Flags", "Capitals", "Country shapes", "Country locations", "Map Tap", "Street View"]);
+    expect([...root.querySelectorAll(".daily-format strong")].map((el) => el.textContent)).toEqual(["Flags", "Capitals", "Country shapes", "Country location", "Overland", "Map Tap", "Street View"]);
+    expect(root.textContent).toContain("In Overland, every guess beyond the shortest route's length counts as a wrong guess.");
     expect(root.textContent).toContain("A hint costs 3 points and a wrong guess costs 2 points");
     for (const id of challenge.countryIds) expect(root.textContent).not.toContain(index.byId[id]!.name);
     root.querySelector<HTMLButtonElement>('[data-action="start-daily"]')!.click();
@@ -43,9 +44,11 @@ describe("daily introduction and review", () => {
     const rounds: DailyRoundResult[] = challenge.promptSlots!.map((slot) => ({ categoryId: slot.categoryId, countryCode: index.byId[slot.countryId]!.code, points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false }));
     rounds[0] = { ...rounds[0]!, points: 5, hintsUsed: 1, wrongGuesses: 1 };
     rounds[2] = { ...rounds[2]!, points: 0, missed: true };
-    rounds.push({ categoryId: "map-tap", targetId: challenge.mapTapTargetId, points: 5, hintsUsed: 0, wrongGuesses: 0, missed: false, distanceKm: 1_234 },
+    const route = challenge.overlandRoute!;
+    rounds.push({ categoryId: "overland", targetId: `${route.start}-${route.end}`, points: 8, hintsUsed: 0, wrongGuesses: 1, missed: false },
+      { categoryId: "map-tap", targetId: challenge.mapTapTargetId, points: 5, hintsUsed: 0, wrongGuesses: 0, missed: false, distanceKm: 1_234 },
       { categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, points: 8, hintsUsed: 0, wrongGuesses: 1, missed: false });
-    const result = createDailyResultSave({ date: challenge.date, seed: challenge.seed, score: 78, timeMs: 100_000, hintsUsed: 1,
+    const result = createDailyResultSave({ date: challenge.date, seed: challenge.seed, score: 76, timeMs: 100_000, hintsUsed: 1,
       marks: ["hint", "correct", "miss", "correct", "correct", "correct", "correct", "correct", "hint", "hint"], rounds, challengeVersion: 2 });
     const onPractice = vi.fn();
     const root = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result, countryIndex: index, onPractice }));
@@ -54,9 +57,11 @@ describe("daily introduction and review", () => {
     expect(root.textContent).toContain("Passed or revealed · 0 points");
     expect(root.textContent).toContain("1,234 km from target · 5 points lost");
     expect(root.textContent).toContain(index.byCode.get(rounds[2]!.countryCode!)!.capital);
-    expect(root.textContent).toContain("Revisit 4 questions");
+    expect(root.textContent).toContain(`${index.byCode.get(route.start)!.name} → ${index.byCode.get(route.end)!.name}`);
+    expect(root.textContent).toContain("1 extra guess · 2 points lost");
+    expect(root.textContent).toContain("Revisit 5 questions");
     root.querySelector<HTMLButtonElement>('[data-action="practice-daily"]')!.click();
     expect(onPractice).toHaveBeenCalledOnce();
-    expect(result.score).toBe(78);
+    expect(result.score).toBe(76);
   });
 });

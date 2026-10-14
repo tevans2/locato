@@ -1,6 +1,6 @@
 import type { FlagPool } from "../flagPools";
 import type { MapTapCategory } from "../maptap/types";
-import type { FinalResult, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
+import type { FinalResult, FlyoverPlanePosition, RoomKind, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PublicPlayerState, PublicRoomState, PublicRoundState, RoundResult } from "./roomTypes";
 
 export type ClientMessage =
   | { readonly type: "CREATE_ROOM"; readonly playerName: string; readonly avatarEmoji?: string; readonly categoryIds: readonly string[]; readonly roundLimit?: number; readonly roundDurationMs?: number; readonly flagPool?: FlagPool; readonly mapTapCategories?: readonly MapTapCategory[] }
@@ -45,7 +45,15 @@ export type ServerMessage =
    */
   | { readonly type: "FLYOVER_PROGRESS"; readonly playerId: string; readonly index: number; readonly score: number; readonly event: FlyoverProgressEvent; readonly target?: string | null }
   | { readonly type: "GAME_COMPLETED"; readonly results: readonly FinalResult[] }
+  /** After a game with two or more signed-in players: their new ratings for the room's game type. */
+  | { readonly type: "RATING_UPDATED"; readonly game: RoomKind; readonly changes: readonly RatingChange[] }
   | { readonly type: "ERROR"; readonly code: string; readonly message: string };
+
+export interface RatingChange {
+  readonly playerId: string;
+  readonly rating: number;
+  readonly delta: number;
+}
 
 export type TransportStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
 

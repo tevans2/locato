@@ -88,6 +88,8 @@ export function modeName(mode: string): string {
     "map-tap": "MapTap",
     worldsplit: "Worldsplit",
     flyover: "Flyover",
+    overland: "Overland",
+    mystery: "Mystery country",
     geoguessr: "GeoGuessr",
     "streetview-country": "Street View country",
   };

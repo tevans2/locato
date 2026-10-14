@@ -5,11 +5,13 @@ import type { Hint } from "./game";
 import type { MapTapGuessResult, MapTapRoundTarget } from "./maptap/types";
 import type { GeoGuessrGuessResult } from "./geoguessr";
 import type { WorldSplitResult } from "./worldsplit";
+import type { OverlandGuess, OverlandHint, OverlandRoundStatus, OverlandRoute } from "./overland";
+import type { MysteryClues } from "./mystery/clues";
 
 /** Only the current challenge crosses the wire. Future queues stay on the server. */
 export interface RankedQuestion {
   readonly id: string;
-  readonly kind: "text" | "image" | "flag-colors" | "name-all" | "click" | "spot" | "puzzle" | "pin" | "street" | "split" | "flight";
+  readonly kind: "text" | "image" | "flag-colors" | "name-all" | "click" | "spot" | "puzzle" | "pin" | "street" | "split" | "flight" | "route" | "mystery";
   readonly text: string;
   readonly asset?: string;
   /** "shape": `asset` is a white country outline, drawn with the outline styling. */
@@ -17,6 +19,10 @@ export interface RankedQuestion {
   readonly paths?: readonly (readonly ProjectedPoint[])[];
   readonly frames?: readonly { readonly asset: string }[];
   readonly mapTap?: MapTapRoundTarget;
+  /** Overland: the route to link (both ends are public; the answer follows from the border map). */
+  readonly route?: OverlandRoute;
+  /** Mystery country: only how many guesses there are; the country itself stays on the server. */
+  readonly mystery?: { readonly guessesAllowed: number };
   /** Current-clue presentation only. Never authorizes an answer or exposes future questions. */
   readonly answerToken?: string;
 }
@@ -30,6 +36,27 @@ export interface RankedMoveResult {
   readonly mapTap?: MapTapGuessResult;
   readonly geo?: GeoGuessrGuessResult;
   readonly split?: WorldSplitResult;
+  readonly overland?: OverlandMoveResult;
+  readonly mystery?: MysteryMoveResult;
+}
+
+/** Mystery country: the checked guess (with its clues) or hint, and, once over, the answer. */
+export interface MysteryMoveResult {
+  readonly guess?: { readonly code: string; readonly clues: MysteryClues };
+  readonly hint?: { readonly level: number; readonly text: string };
+  readonly status: "playing" | "solved" | "failed" | "revealed";
+  readonly points: number;
+  /** The hidden country, sent only once its round is over. */
+  readonly target?: string;
+}
+
+/** Overland: the checked guess or hint, and where the route stands after it. */
+export interface OverlandMoveResult {
+  readonly guess?: OverlandGuess;
+  readonly hint?: OverlandHint;
+  readonly status: OverlandRoundStatus;
+  /** The route's points once it's over (0 while playing). */
+  readonly points: number;
 }
 
 export interface RankedState {

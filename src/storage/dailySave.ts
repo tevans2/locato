@@ -93,7 +93,7 @@ export function readDailyResult(storage: Storage, date: string, userId?: string 
 const DAILY_PROGRESS_PREFIX = "locato:daily-progress:";
 const DAILY_PROGRESS_SUFFIX = ":v1";
 
-export type DailyStage = "prompt" | "map-tap" | "street-view";
+export type DailyStage = "prompt" | "overland" | "map-tap" | "street-view";
 
 export interface DailyProgressSave {
   readonly version: 1;
@@ -115,6 +115,8 @@ export interface DailyProgressSave {
   readonly updatedAt: number;
   /** Preserve the generator used when an attempt began. */
   readonly themeScoped?: true;
+  /** Round 8 is an Overland route (dailies started before it keep eight prompt rounds). */
+  readonly overlandRound?: true;
   readonly challengeVersion?: 2;
   readonly rounds?: readonly DailyRoundResult[];
 }
@@ -131,7 +133,7 @@ export function clearDailyProgress(storage: Storage, userId?: string | null): vo
   storage.removeItem(dailyProgressKey(userId));
 }
 
-const DAILY_STAGES: readonly DailyStage[] = ["prompt", "map-tap", "street-view"];
+const DAILY_STAGES: readonly DailyStage[] = ["prompt", "overland", "map-tap", "street-view"];
 
 /** Today's in-progress daily, or null. A stored run for any other date (or seed) is discarded. */
 export function readDailyProgress(storage: Storage, date: string, seed: string, userId?: string | null): DailyProgressSave | null {

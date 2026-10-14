@@ -49,6 +49,13 @@ export interface RoomManagerOptions {
   readonly flyoverCountries?: () => readonly FlyoverCountry[];
   readonly positionRateLimitPerSecond?: number;
   readonly onGameComplete?: (userId: string, result: GameResult) => void;
+  /** A signed-in player's rating for a game type (shown beside their name in the room). */
+  readonly getRating?: (userId: string, game: RoomKind) => number;
+  /**
+   * Rate a finished game: every signed-in entrant with their finishing position (anyone who left
+   * mid-game is ranked last). Returns their new ratings; nothing when fewer than two are signed in.
+   */
+  readonly rateGame?: (game: RoomKind, standings: readonly { readonly userId: string; readonly rank: number }[]) => readonly { readonly userId: string; readonly rating: number; readonly delta: number }[];
 }
 
 export interface RoomManagerStats {
@@ -153,6 +160,10 @@ export class RoomManager {
   private readonly flyoverCountries: () => readonly FlyoverCountry[];
   private readonly positionRateLimitPerSecond: number;
   private readonly onGameComplete: RoomManagerOptions["onGameComplete"];
+  private readonly getRating: RoomManagerOptions["getRating"];
+  private readonly rateGame: RoomManagerOptions["rateGame"];
+  /** Games in play: who started each one (player id → account), so leavers are still rated. */
+  private readonly entrants = new Map<RoomCode, Map<string, string>>();
   private readonly rooms = new Map<RoomCode, AnyRoom>();
   private readonly sessionByConnection = new WeakMap<MultiplayerConnection, PlayerSession>();
   private readonly connectionByPlayerId = new Map<string, MultiplayerConnection>();
@@ -162,6 +173,8 @@ export class RoomManager {
 
   constructor(options: RoomManagerOptions = {}) {
     this.onGameComplete = options.onGameComplete;
+    this.getRating = options.getRating;
+    this.rateGame = options.rateGame;
     this.countryIndex = options.countryIndex ?? defaultCountryIndex();
     this.maxRooms = options.maxRooms ?? DEFAULT_MAX_ROOMS;
     this.maxPlayersPerRoom = options.maxPlayersPerRoom ?? DEFAULT_MAX_PLAYERS_PER_ROOM;
@@ -421,11 +434,37 @@ export class RoomManager {
       return;
     }
     this.detach(connection, now);
+    const hostRating = this.ratingFor(connection.authenticatedUserId, room.kind);
+    if (hostRating !== undefined) room.setRating(playerId, hostRating);
     this.rooms.set(roomCode, room);
     const sessionToken = this.issueToken(playerId, roomCode, connection.authenticatedUserId ?? null);
     this.assignSession(connection, { playerId, roomCode, sessionToken, answerWindowStartedAt: now, answerCount: 0 });
     send(connection, { type: "SESSION_ASSIGNED", playerId, roomCode, sessionToken });
     send(connection, { type: "ROOM_SNAPSHOT", room: room.snapshot() });
+  }
+
+  /** The rating to show for a signed-in player in a room of this kind. */
+  private ratingFor(userId: string | null | undefined, kind: RoomKind): number | undefined {
+    return userId && this.getRating ? this.getRating(userId, kind) : undefined;
+  }
+
+  /** A finished game: rate its signed-in entrants and tell the room their new ratings. */
+  private rateFinishedGame(room: AnyRoom, results: readonly { readonly playerId: string; readonly rank: number }[]): ServerMessage | null {
+    const game = room.kind;
+    const entrants = this.entrants.get(room.code);
+    this.entrants.delete(room.code);
+    if (!entrants || !this.rateGame) return null;
+    const last = results.length + 1;
+    const standings = [...entrants].map(([playerId, userId]) => ({ playerId, userId, rank: results.find((result) => result.playerId === playerId)?.rank ?? last }));
+    if (standings.length < 2) return null;
+    const rated = this.rateGame(game, standings.map(({ userId, rank }) => ({ userId, rank })));
+    const changes = rated.flatMap((change) => {
+      const entry = standings.find((standing) => standing.userId === change.userId);
+      if (!entry) return [];
+      room.setRating(entry.playerId, change.rating);
+      return [{ playerId: entry.playerId, rating: change.rating, delta: change.delta }];
+    });
+    return changes.length ? { type: "RATING_UPDATED", game, changes } : null;
   }
 
   /** A new room of `kind` with these settings (each kind keeps its own defaults for the rest). */
@@ -489,6 +528,12 @@ export class RoomManager {
       return;
     }
     next.adoptRoster(room as RoomBase<PublicPlayerState>);
+    // Ratings are per game type: show everyone's rating for the new one.
+    for (const claim of this.sessionsByToken.values()) {
+      if (claim.roomCode !== room.code) continue;
+      const rating = this.ratingFor(claim.userId, next.kind);
+      if (rating !== undefined) next.setRating(claim.playerId, rating);
+    }
     this.rooms.set(room.code, next);
     this.broadcastMessages(next, [{ type: "ROOM_SNAPSHOT", room: next.snapshot() }]);
   }
@@ -502,7 +547,7 @@ export class RoomManager {
 
     this.detach(connection, now);
     const playerId = createId("player");
-    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now, playerAvatar(connection, requestedAvatar));
+    const result = room.addPlayer(playerId, connection.authenticatedName ?? playerName, now, playerAvatar(connection, requestedAvatar), this.ratingFor(connection.authenticatedUserId, room.kind));
     if (!result.ok) {
       sendError(connection, result.code, result.message);
       return;
@@ -616,7 +661,21 @@ export class RoomManager {
   }
 
   private broadcastMessages(room: AnyRoom, messages: readonly ServerMessage[]): void {
+    const followUps: ServerMessage[] = [];
     for (const message of messages) {
+      if (message.type === "GAME_STARTED" && this.rateGame) {
+        // Who started this game, by account: they're rated even if they leave before the end.
+        const snapshot = room.snapshot();
+        const seated = snapshot.players.filter((player) => player.connected && !player.spectator).map((player) => player.id);
+        this.entrants.set(room.code, new Map(seated.flatMap((playerId) => {
+          const seat = [...this.sessionsByToken.values()].find((claim) => claim.playerId === playerId && claim.roomCode === room.code);
+          return seat?.userId ? [[playerId, seat.userId] as const] : [];
+        })));
+      }
+      if (message.type === "GAME_COMPLETED") {
+        const rating = this.rateFinishedGame(room, message.results);
+        if (rating) followUps.push(rating);
+      }
       if (message.type === "GAME_COMPLETED" && this.onGameComplete) {
         for (const result of message.results) {
           const seat = [...this.sessionsByToken.values()].find((s) => s.playerId === result.playerId && s.roomCode === room.code);
@@ -633,6 +692,7 @@ export class RoomManager {
         }
       }
     }
+    if (followUps.length) this.broadcastMessages(room, followUps);
   }
 
   private deleteRoom(roomCode: RoomCode): void {
@@ -640,6 +700,7 @@ export class RoomManager {
     if (!room) return;
     for (const player of room.snapshot().players) this.connectionByPlayerId.delete(player.id);
     for (const [token, claim] of this.sessionsByToken) if (claim.roomCode === roomCode) this.sessionsByToken.delete(token);
+    this.entrants.delete(roomCode);
     this.rooms.delete(roomCode);
   }
 }

@@ -307,7 +307,7 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     }
 
     if (view === "lobby") lobby.update({ room, localPlayerId });
-    if (view === "results" && state.finalResults) results.update({ room, localPlayerId, results: state.finalResults });
+    if (view === "results" && state.finalResults) results.update({ room, localPlayerId, results: state.finalResults, ratingUpdate: state.ratingUpdate });
 
     const me = room.players.find((player) => player.id === localPlayerId);
     const spectating = Boolean(me?.spectator);
@@ -366,6 +366,10 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
         }
         return;
       }
+      case "RATING_UPDATED":
+        // Home shows your ratings; have them current for when you get back there.
+        home.refreshUser();
+        return;
       case "GAME_COMPLETED": {
         playVictory();
         // Account records are written from server standings, never uploaded from this page.

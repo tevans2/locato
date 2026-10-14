@@ -301,3 +301,53 @@ describe("multiplayer screen", () => {
     expect(server.sent.at(-1)).toEqual({ type: "LEAVE_ROOM" });
   });
 });
+
+describe("ratings", () => {
+  function makeRatingShell(): ShellContext {
+    return { openSection() {}, goHome() {}, goBack() {}, openGame() {}, openGamePicker() {}, openCountry() {}, openLeaderboards() {}, openAccount() {}, controls: document.createElement("div"), confirmLeave: async () => true, signedIn: () => true };
+  }
+
+  it("shows your rating for each game and the top players for the chosen one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      if (input === "/api/ratings/me") return new Response(JSON.stringify({ ratings: [{ game: "map-tap", rating: 1084, games: 12 }] }));
+      if (input.startsWith("/api/ratings?game=map-tap")) return new Response(JSON.stringify({ entries: [{ rank: 1, user: { id: "u1", username: "atlas_amy", avatarEmoji: null }, rating: 1210, games: 40 }] }));
+      if (input.startsWith("/api/ratings?game=")) return new Response(JSON.stringify({ entries: [] }));
+      return new Response("{}", { status: 404 });
+    }));
+    const controller = new AbortController();
+    const home = createMultiplayerHome({ shell: makeRatingShell(), storage: window.localStorage, signal: controller.signal, getUser: () => ({ displayName: "Ana", avatarEmoji: null }), onCreate: vi.fn(), onJoin: vi.fn() });
+    document.body.append(home.element);
+    await flush();
+    const value = (kind: string) => document.querySelector(`.mp-rating-kind[data-kind='${kind}'] .mp-rating-value`)?.textContent;
+    expect(value("map-tap")).toBe("1084");
+    expect(value("quiz")).toBe("1000");
+    expect(document.querySelector(".mp-rating-top")?.textContent).toContain("No ratings yet");
+    document.querySelector<HTMLButtonElement>(".mp-rating-kind[data-kind='map-tap']")!.click();
+    await flush();
+    expect([...document.querySelectorAll(".mp-rating-row")].map((row) => row.textContent)).toEqual(["1Aatlas_amy1210"]);
+    expect(document.querySelector(".mp-quick")).toBeNull();
+    controller.abort();
+  });
+
+  it("shows ratings beside names in the lobby and their change on the results", async () => {
+    window.localStorage.setItem("locato.mp.name", "Ana");
+    const server = fakeTransport();
+    const screen = createMultiplayerScreen({ shell: makeRatingShell(), countryIndex: indexCountries(rawCountries), worldCountryFeatures: [], createOnlineTransport: () => server.transport, storage: window.localStorage, sessionStorage: window.sessionStorage, initialJoinCode: "K7QMR" });
+    document.body.append(screen.element);
+    await flush();
+    const players = [player("p1", "Ana", { rating: 1000 }), player("p2", "Ben", { rating: 1040 })];
+    server.emit({ type: "SESSION_ASSIGNED", playerId: "p1", roomCode: "K7QMR", sessionToken: "t1" });
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ players }) });
+    expect([...screen.element.querySelectorAll(".mp-tag.is-rating")].map((tag) => tag.textContent)).toEqual(["1000", "1040"]);
+    expect(screen.element.querySelector<HTMLElement>(".mp-settings-editor")!.hidden).toBe(false);
+
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ players, status: "complete" }) });
+    server.emit({ type: "GAME_COMPLETED", results: [{ playerId: "p1", name: "Ana", rank: 1, score: 900, correctAnswers: 6, wrongAnswers: 1 }, { playerId: "p2", name: "Ben", rank: 2, score: 400, correctAnswers: 3, wrongAnswers: 2 }] });
+    server.emit({ type: "RATING_UPDATED", game: "quiz", changes: [{ playerId: "p1", rating: 1016, delta: 16 }, { playerId: "p2", rating: 1024, delta: -16 }] });
+    expect([...screen.element.querySelectorAll(".mp-standing-rating")].map((item) => item.textContent)).toEqual(["1,016 (+16)", "1,024 (−16)"]);
+    // The host still gets the usual Play again.
+    screen.element.querySelector<HTMLButtonElement>(".mp-results .mp-start-game")!.click();
+    expect(server.sent.at(-1)).toEqual({ type: "PLAY_AGAIN" });
+    screen.destroy();
+  });
+});

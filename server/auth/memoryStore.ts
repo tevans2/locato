@@ -39,6 +39,8 @@ import type {
   BannedUser,
   IpBan,
   UserBan,
+  PlayerRating,
+  RatingLeaderboardEntry,
 } from "./types";
 
 const EMPTY_STATS: UserStats = { totalGames: 0, totalCorrect: 0, totalWrong: 0, bestStreak: 0, soloGames: 0, soloCorrect: 0, soloWrong: 0, soloBestStreak: 0, multiplayerGames: 0, multiplayerWins: 0, multiplayerCorrect: 0, multiplayerWrong: 0, multiplayerBestStreak: 0, worldMapGames: 0, worldMapCompletions: 0, worldBestTimeMs: 0, worldBestCountries: 0 };
@@ -63,6 +65,8 @@ export function createMemoryUserStore(): UserStore {
   const events: AdminEvent[] = [];
   let nextEventId = 1;
   const academyProgress = new Map<string, StoredAcademyProgress>();
+  /** `${userId}:${game}` → rating. */
+  const ratings = new Map<string, PlayerRating>();
   const runs = new Map<string, StoredRun>();
 
   // Public boards leave banned accounts out.
@@ -365,6 +369,7 @@ export function createMemoryUserStore(): UserStore {
       gameRecords.delete(id);
       for (const [key, f] of friendships) if (f.low === id || f.high === id) friendships.delete(key);
       academyProgress.delete(id);
+      for (const key of ratings.keys()) if (key.startsWith(`${id}:`)) ratings.delete(key);
       for (const [key, run] of runs) if (run.userId === id) runs.delete(key);
       return true;
     },
@@ -547,6 +552,19 @@ export function createMemoryUserStore(): UserStore {
         .sort((a, b) => a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()))
         .slice(0, limit)
         .map((u) => ({ id: u.id, username: u.displayName, avatarEmoji: u.avatarEmoji }));
+    },
+    getRating: (userId, game) => ratings.get(`${userId}:${game}`) ?? null,
+    saveRating(userId: string, rating: PlayerRating): void {
+      ratings.set(`${userId}:${rating.game}`, rating);
+    },
+    listUserRatings: (userId) => [...ratings].filter(([key]) => key.startsWith(`${userId}:`)).map(([, rating]) => rating).sort((a, b) => a.game.localeCompare(b.game)),
+    listTopRatings(game: string, limit: number): readonly RatingLeaderboardEntry[] {
+      return [...ratings]
+        .filter(([key, rating]) => rating.game === game && usersById.has(key.slice(0, key.length - game.length - 1)))
+        .map(([key, rating]) => ({ user: usersById.get(key.slice(0, key.length - game.length - 1))!, rating }))
+        .sort((a, b) => b.rating.rating - a.rating.rating || b.rating.games - a.rating.games || a.user.displayName.localeCompare(b.user.displayName))
+        .slice(0, limit)
+        .map(({ user, rating }, index) => ({ rank: index + 1, user: { id: user.id, username: user.displayName, avatarEmoji: user.avatarEmoji }, rating: rating.rating, games: rating.games }));
     },
     getAcademyProgress: (userId) => academyProgress.get(userId) ?? null,
     saveAcademyProgress(userId: string, progress: string, updatedAt: number): void {

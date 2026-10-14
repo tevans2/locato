@@ -1,0 +1,482 @@
+/*
+ * Overland: link two countries by land. A map of the route (land as one silhouette, guesses
+ * coloured by verdict) beside a panel with the route, the guess box and the guesses so far.
+ * Map colours are shared by the map, the guess list, the legend and the How to play dialog.
+ * Buttons and the input are scoped under #app so the app-wide control defaults don't win.
+ */
+
+.overland-screen,
+.overland-howto {
+  --ov-end: var(--earth);
+  --ov-route: var(--good);
+  --ov-close: #d29b12;
+  --ov-detour: #df6f27;
+  --ov-off: var(--bad);
+  --ov-missed: color-mix(in srgb, var(--good) 28%, var(--land));
+  --ov-land: var(--land);
+  --ov-border: color-mix(in srgb, var(--text) 30%, var(--land));
+  --ov-line: color-mix(in srgb, var(--text) 72%, transparent);
+}
+
+:root[data-theme="dark"] .overland-screen,
+:root[data-theme="dark"] .overland-howto {
+  --ov-close: #f0c64a;
+  --ov-detour: #f59a52;
+  --ov-missed: color-mix(in srgb, var(--good) 34%, var(--land));
+  --ov-border: color-mix(in srgb, #0b1410 55%, var(--land));
+  --ov-line: rgba(10, 16, 13, .78);
+}
+
+#app > .overland-screen.gb-screen[data-shell] { height: 100dvh; min-height: 0; }
+
+.overland-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  gap: clamp(16px, 2vw, 28px);
+}
+
+/* ---------- Map ---------- */
+
+.overland-map-shell {
+  position: relative;
+  min-width: 0;
+  min-height: 360px;
+  display: grid;
+}
+
+.overland-map-shell > .world-map-panel { min-height: 360px; }
+
+.overland-screen .overland-map .world-map-svg { cursor: grab; }
+.overland-screen .overland-map .world-map-svg.is-panning { cursor: grabbing; }
+
+.overland-screen .overland-map .world-map-country {
+  fill: var(--ov-land);
+  stroke: var(--ov-land);
+  stroke-width: .8;
+  stroke-dasharray: none;
+  filter: none;
+  transition: fill 220ms ease, stroke 220ms ease;
+}
+
+.overland-screen .overland-map.has-borders .world-map-country { stroke: var(--ov-border); stroke-width: .6; }
+
+.overland-screen .overland-map .world-map-country.is-ov-hinted {
+  fill: color-mix(in srgb, var(--ov-route) 10%, var(--ov-land));
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+
+.overland-screen .overland-map .world-map-country:is(.is-ov-start, .is-ov-end, .is-ov-route, .is-ov-close, .is-ov-detour, .is-ov-off) {
+  stroke: var(--ov-line);
+  stroke-width: 1;
+  stroke-dasharray: none;
+}
+
+.overland-screen .overland-map .world-map-country:is(.is-ov-start, .is-ov-end) { fill: var(--ov-end); stroke-width: 1.3; }
+.overland-screen .overland-map .world-map-country.is-ov-route { fill: var(--ov-route); }
+.overland-screen .overland-map .world-map-country.is-ov-close { fill: var(--ov-close); }
+.overland-screen .overland-map .world-map-country.is-ov-detour { fill: var(--ov-detour); }
+.overland-screen .overland-map .world-map-country.is-ov-off { fill: var(--ov-off); }
+.overland-screen .overland-map .world-map-country.is-ov-missed {
+  fill: var(--ov-missed);
+  stroke: var(--ov-route);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 2;
+}
+
+/* Microstates and other tiny countries get a ring so they can be seen at all. */
+.overland-screen .overland-map .world-map-missing-dot:is(.is-ov-marked, .is-ov-hinted) { opacity: 1; stroke-width: 5; pointer-events: none; }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-hinted { fill: transparent; stroke: var(--text); stroke-width: 2; stroke-dasharray: 2 2; }
+.overland-screen .overland-map .world-map-missing-dot:is(.is-ov-start, .is-ov-end) { fill: var(--ov-end); stroke: var(--ov-end); }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-route { fill: var(--ov-route); stroke: var(--ov-route); }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-close { fill: var(--ov-close); stroke: var(--ov-close); }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-detour { fill: var(--ov-detour); stroke: var(--ov-detour); }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-off { fill: var(--ov-off); stroke: var(--ov-off); }
+.overland-screen .overland-map .world-map-missing-dot.is-ov-missed { fill: var(--ov-missed); stroke: var(--ov-route); }
+
+.overland-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  font-size: .66rem;
+  font-weight: 700;
+  list-style: none;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.overland-legend li { display: inline-flex; align-items: center; gap: 6px; }
+
+.overland-swatch {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--ov-land);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.overland-swatch.is-end { background: var(--ov-end); }
+.overland-swatch.is-route { background: var(--ov-route); }
+.overland-swatch.is-close { background: var(--ov-close); }
+.overland-swatch.is-detour { background: var(--ov-detour); }
+.overland-swatch.is-off { background: var(--ov-off); }
+
+/* ---------- Panel ---------- */
+
+.overland-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(20px, 2.6vw, 28px);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.overland-panel-title { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.overland-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.overland-eyebrow {
+  color: var(--brand);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+#app .overland-link {
+  padding: 4px 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: .72rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+#app .overland-link:hover { color: var(--text); }
+#app .overland-link:disabled { opacity: .5; }
+
+.overland-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 10px 0 10px;
+  font-family: var(--font-editorial);
+  font-size: clamp(1.55rem, 2.6vw, 2.15rem);
+  font-weight: 460;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+.overland-end { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.overland-end-flag {
+  width: 30px;
+  height: 20px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.overland-end-flag[hidden] { display: none; }
+.overland-arrow { display: inline-flex; color: var(--ov-end); }
+.overland-route-detail { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+
+.overland-progress { display: grid; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.overland-progress > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.overland-progress-label { color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.overland-running-score { font-size: .82rem; font-variant-numeric: tabular-nums; }
+.overland-progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.overland-progress-dot { height: 4px; border-radius: 99px; background: var(--surface-soft); }
+.overland-progress-dot.is-active { background: var(--ov-end); }
+.overland-progress-dot.is-complete { background: var(--accent); }
+
+.overland-play-controls[hidden],
+.overland-outcome[hidden] { display: none; }
+
+/* ---------- Guess box ---------- */
+
+.overland-guess-form { position: relative; display: grid; gap: 7px; margin-top: 16px; }
+.overland-input-label { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.overland-input-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+
+#app .overland-input {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+#app .overland-input:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent); }
+#app .overland-input:disabled { opacity: .55; }
+#app .overland-add { min-width: 74px; min-height: 48px; padding: 0 16px; }
+
+.overland-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  list-style: none;
+}
+
+.overland-suggestions[hidden] { display: none; }
+
+.overland-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: .9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.overland-suggestion img { width: 22px; height: 15px; flex: none; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+.overland-suggestion:hover,
+.overland-suggestion.is-active { background: var(--accent-soft); }
+
+.overland-feedback { min-height: 1.3em; margin: 0; color: var(--muted); font-size: .78rem; font-weight: 650; }
+.overland-feedback[data-tone="warn"] { color: var(--bad); }
+.overland-feedback[data-tone="route"] { color: color-mix(in srgb, var(--ov-route) 75%, var(--text)); }
+.overland-feedback[data-tone="close"] { color: color-mix(in srgb, var(--ov-close) 60%, var(--text)); }
+.overland-feedback[data-tone="detour"] { color: color-mix(in srgb, var(--ov-detour) 70%, var(--text)); }
+.overland-feedback[data-tone="off"] { color: color-mix(in srgb, var(--ov-off) 80%, var(--text)); }
+
+/* ---------- Guesses ---------- */
+
+.overland-meter { display: grid; gap: 7px; margin-top: 12px; }
+.overland-meter-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.overland-meter-label { color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
+.overland-meter-pips { display: flex; gap: 4px; }
+.overland-pip { flex: 1 1 0; height: 8px; border-radius: 99px; background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--border); }
+.overland-pip.is-needed { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.overland-pip.is-route { background: var(--ov-route); box-shadow: none; }
+.overland-pip.is-close { background: var(--ov-close); box-shadow: none; }
+.overland-pip.is-detour { background: var(--ov-detour); box-shadow: none; }
+.overland-pip.is-off { background: var(--ov-off); box-shadow: none; }
+
+.overland-guesses { display: grid; gap: 5px; margin: 12px 0 0; padding: 0; list-style: none; }
+.overland-guesses:empty { display: none; }
+
+.overland-guess {
+  display: grid;
+  grid-template-columns: 18px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--ov-off);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  animation: overland-guess-in 220ms ease both;
+}
+
+.overland-guess.is-route { border-left-color: var(--ov-route); }
+.overland-guess.is-close { border-left-color: var(--ov-close); }
+.overland-guess.is-detour { border-left-color: var(--ov-detour); }
+.overland-guess-index { color: var(--subtle); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overland-guess-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+.overland-guess-name { overflow: hidden; font-size: .88rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.overland-guess-verdict { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .7rem; font-weight: 750; white-space: nowrap; }
+
+@keyframes overland-guess-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Hints and giving up ---------- */
+
+.overland-hints { display: grid; gap: 6px; margin-top: 14px; }
+
+#app .overland-hint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  background: transparent;
+  font-size: .76rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+#app .overland-hint:hover:not(:disabled) { border-style: solid; background: var(--surface-soft); }
+#app .overland-hint:disabled { color: var(--subtle); cursor: not-allowed; }
+#app .overland-hint .shell-icon { color: var(--ov-close); }
+.overland-hint-cost { color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+.overland-hint-note { min-height: 0; margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+.overland-hint-note:empty { display: none; }
+
+.overland-initial {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 1px 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.overland-give-up { margin-top: 12px; }
+
+/* ---------- End of a route ---------- */
+
+.overland-outcome {
+  margin-top: 16px;
+  padding: 16px;
+  border-left: 4px solid var(--ov-route);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--ov-route) 9%, var(--surface));
+}
+
+.overland-outcome[data-status="failed"],
+.overland-outcome[data-status="revealed"] { border-left-color: var(--ov-detour); background: color-mix(in srgb, var(--ov-detour) 8%, var(--surface)); }
+
+.overland-outcome-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.overland-outcome-title { font-family: var(--font-editorial); font-size: 1.35rem; font-weight: 480; letter-spacing: -.02em; }
+.overland-outcome-points { flex: none; font-size: .86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overland-outcome-detail { margin: 4px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.5; }
+.overland-chain-label { margin: 13px 0 6px; color: var(--muted); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.overland-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.overland-chain-arrow { color: var(--subtle); font-size: .8rem; }
+
+.overland-chain-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.overland-chain-stop img { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+.overland-chain-stop.is-end { border-color: color-mix(in srgb, var(--ov-end) 55%, var(--border)); }
+.overland-chain-stop.is-found { border-color: color-mix(in srgb, var(--ov-route) 60%, var(--border)); }
+.overland-chain-stop.is-missed { border-style: dashed; border-color: var(--ov-route); color: var(--muted); }
+.overland-all { margin-top: 10px; }
+.overland-all-routes { display: grid; gap: 8px; margin-top: 8px; }
+.overland-all-routes[hidden] { display: none; }
+.overland-note { margin: 12px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--muted); font-size: .72rem; line-height: 1.5; }
+#app .overland-next { width: 100%; min-height: 46px; margin-top: 16px; }
+
+/* ---------- Today's route ---------- */
+
+.overland-title-links { display: flex; align-items: center; gap: 14px; }
+#app .overland-today-link { color: var(--ov-end); }
+.overland-today-summary { display: grid; gap: 10px; margin-top: 16px; }
+
+.overland-today-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.overland-today-stats div { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
+.overland-today-stats dt { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.overland-today-stats dd { margin: 3px 0 0; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overland-share-preview {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: .82rem;
+  font-weight: 650;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.overland-today-next { margin: 0; color: var(--muted); font-size: .76rem; }
+#app .overland-share { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; }
+#app .overland-play-run { justify-self: center; }
+.overland-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .74rem; text-align: center; }
+
+/* ---------- How to play (in the shell layer) ---------- */
+
+#shell-layer .overland-howto { width: min(470px, 100%); }
+#shell-layer .overland-howto .shell-dialog-message + .shell-dialog-message { margin-top: 10px; }
+#shell-layer .overland-howto-legend { display: grid; gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+
+#shell-layer .overland-howto-legend li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  font-size: .86rem;
+}
+
+#shell-layer .overland-howto-legend .overland-swatch { width: 14px; height: 14px; }
+#shell-layer .overland-howto-legend span:last-child { color: var(--muted); }
+
+/* ---------- Smaller screens ---------- */
+
+@media (max-width: 1100px) {
+  #app > .overland-screen.gb-screen[data-shell] { height: auto; min-height: 100dvh; }
+}
+
+@media (max-width: 980px) {
+  .overland-layout { grid-template-columns: 1fr; }
+  .overland-map-shell,
+  .overland-map-shell > .world-map-panel { min-height: 0; height: clamp(260px, 46dvh, 440px); }
+  .overland-panel { overflow: visible; }
+}
+
+@media (max-width: 700px) {
+  .overland-layout { gap: 10px; }
+  .overland-panel { padding: 18px 16px; }
+  .overland-route { font-size: 1.5rem; }
+  .overland-legend { left: 8px; bottom: 8px; gap: 4px 9px; padding: 6px 8px; font-size: .6rem; }
+  #shell-layer .overland-howto-legend li { grid-template-columns: auto minmax(0, 1fr); }
+  #shell-layer .overland-howto-legend li > span:last-child { grid-column: 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overland-screen .overland-map .world-map-country,
+  .overland-guess { transition: none; animation: none; }
+}

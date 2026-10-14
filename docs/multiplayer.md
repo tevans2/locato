@@ -32,6 +32,22 @@ with its own server class. They share everything but the game itself through `Ro
 - **Host hand-off.** If the host drops or leaves, the first connected player takes over; clients
   announce it.
 
+## Ratings
+
+Signed-in players have a skill rating for each game type (quiz race, MapTap, GeoGuessr,
+Flyover), Elo-style (`src/core/multiplayer/ratings.ts`): start 1000, K 40 for the first 10
+games, then 24. Every finished room game with two or more signed-in players is rated.
+
+- **Scoring.** Every pair of entrants is a game scored by finishing position; each player's
+  change is the average over their pairings, so a game counts the same whatever the room size.
+- **Leavers.** Who started a game is recorded at `GAME_STARTED`, so leaving mid-game counts as
+  finishing last. Guests and spectators aren't rated; an account in a room twice counts once.
+- **On the wire.** Ratings show beside signed-in players' names (`PublicPlayerState.rating`, for
+  the room's game type; re-sent when the host switches game). After `GAME_COMPLETED` the room
+  gets `RATING_UPDATED { game, changes }`, shown on the results.
+- **Storage and API.** `player_ratings` (deleted with the account); `GET /api/ratings/me` and
+  `GET /api/ratings?game=&limit=` for the top players. The Multiplayer home shows both.
+
 ## Race model
 
 Everyone in a room sees the same prompt stream (flags or any other category) in the same seeded order. The first correct typed answer takes the round and the round closes immediately; wrong guesses never eliminate a player. Defaults (`server/rooms/Room.ts`):
@@ -68,7 +84,7 @@ Defined in `src/core/multiplayer/protocol.ts` (the source of truth) and validate
 
 **Client → server (`ClientMessage`):** `CREATE_ROOM` (`playerName`, `avatarEmoji?`, `categoryIds`, optional settings), `JOIN_ROOM` (`roomCode`, `playerName`, `avatarEmoji?`), `REJOIN_ROOM` (`roomCode`, `playerId`, `sessionToken`), `LEAVE_ROOM`, `SET_ROOM_OPTIONS`, `START_GAME`, `PLAY_AGAIN`, `RETURN_TO_LOBBY`, `SUBMIT_ANSWER` (`answer`, `clientSentAt`), `REQUEST_HINT`; Flyover adds `FLYOVER_POSITION` (`x`, `y`, `heading`), `FLYOVER_REACHED` (`index`, `x`, `y`, `clientSentAt`) and `FLYOVER_SKIP` (`index`).
 
-**Server → client (`ServerMessage`):** `SESSION_ASSIGNED`, `ROOM_SNAPSHOT`, `PLAYER_JOINED`, `PLAYER_LEFT`, `GAME_STARTED`, `ROUND_STARTED`, `ANSWER_ACCEPTED` (`playerId`, `points`), `ANSWER_REJECTED` (`reason`, sent only to the guesser), `ROUND_ENDED` (`answer`, `results`), `GAME_COMPLETED` (`results`), `ERROR`; Flyover adds `FLYOVER_PLANES` (`planes`) and `FLYOVER_PROGRESS` (`playerId`, `index`, `score`, `event`: reached, skipped or sync).
+**Server → client (`ServerMessage`):** `SESSION_ASSIGNED`, `ROOM_SNAPSHOT`, `PLAYER_JOINED`, `PLAYER_LEFT`, `GAME_STARTED`, `ROUND_STARTED`, `ANSWER_ACCEPTED` (`playerId`, `points`), `ANSWER_REJECTED` (`reason`, sent only to the guesser), `ROUND_ENDED` (`answer`, `results`), `GAME_COMPLETED` (`results`), `RATING_UPDATED` (`game`, `changes`), `ERROR`; Flyover adds `FLYOVER_PLANES` (`planes`) and `FLYOVER_PROGRESS` (`playerId`, `index`, `score`, `event`: reached, skipped or sync).
 
 ## Code map
 

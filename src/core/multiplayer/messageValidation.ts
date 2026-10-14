@@ -234,7 +234,8 @@ function isPlayer(value: unknown): value is PublicPlayerState {
     isFiniteNumber(value.streak) &&
     isFiniteNumber(value.correctAnswers) &&
     isFiniteNumber(value.wrongAnswers) &&
-    (value.routeIndex === undefined || isFiniteNumber(value.routeIndex))
+    (value.routeIndex === undefined || isFiniteNumber(value.routeIndex)) &&
+    (value.rating === undefined || isFiniteNumber(value.rating))
   );
 }
 
@@ -379,6 +380,11 @@ export function parseServerMessage(value: unknown): MessageParseResult<ServerMes
     case "GAME_COMPLETED":
       if (!Array.isArray(value.results) || !value.results.every(isFinalResult)) return reject("invalid-final-result", "Final result is invalid.");
       return { ok: true, message: { type: "GAME_COMPLETED", results: value.results } };
+    case "RATING_UPDATED":
+      if (!isRoomKind(value.game) || !Array.isArray(value.changes) || !value.changes.every((change) => isRecord(change) && typeof change.playerId === "string" && isFiniteNumber(change.rating) && isFiniteNumber(change.delta))) {
+        return reject("invalid-rating", "Rating update is invalid.");
+      }
+      return { ok: true, message: { type: "RATING_UPDATED", game: value.game, changes: value.changes as { playerId: string; rating: number; delta: number }[] } };
     case "ERROR":
       if (typeof value.code !== "string" || typeof value.message !== "string") return reject("invalid-error", "Error message is invalid.");
       return { ok: true, message: { type: "ERROR", code: value.code, message: value.message } };

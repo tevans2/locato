@@ -16,3 +16,5 @@ export type { MessageParseResult } from "./messageValidation";
 export type { ClientMessage, MultiplayerTransport, ServerMessage, TransportStatus } from "./protocol";
 export type { FinalResult, FlyoverFlightPrompt, FlyoverPlanePosition, FlyoverProgressEvent, GeoGuessrRoundResult, MapTapRoundResult, PlayerId, PublicChatMessage, PublicPlayerState, PublicPromptContent, PublicRoomSettings, PublicRoomState, PublicRoundState, RoomCode, RoomKind, RoundResult } from "./roomTypes";
 export { ROOM_KINDS, isRoomKind, roomKindForCategories } from "./roomTypes";
+export { RATING_START, ratingChanges } from "./ratings";
+export type { RatedStanding } from "./ratings";

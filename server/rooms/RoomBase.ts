@@ -54,6 +54,8 @@ export abstract class RoomBase<P extends PublicPlayerState> {
   private chatMessages: readonly PublicChatMessage[] = [];
   private chatSequence = 0;
   private touchedAt: number;
+  /** Signed-in players' ratings for this room's game type, shown beside their names. */
+  private readonly ratings = new Map<PlayerId, number>();
 
   constructor(options: RoomBaseOptions) {
     this.code = options.code;
@@ -69,10 +71,12 @@ export abstract class RoomBase<P extends PublicPlayerState> {
   /** Only the public fields go on the wire; per-kind private stats stay on the server. */
   protected publicPlayer(player: P): PublicPlayerState {
     const { id, name, avatarEmoji, connected, spectator, score, streak, correctAnswers, wrongAnswers, routeIndex } = player;
+    const rating = this.ratings.get(id);
     return {
       id,
       name,
       ...(avatarEmoji ? { avatarEmoji } : {}),
+      ...(rating !== undefined ? { rating } : {}),
       connected,
       ...(spectator ? { spectator } : {}),
       score,
@@ -142,14 +146,21 @@ export abstract class RoomBase<P extends PublicPlayerState> {
     };
   }
 
+  // ---------- ratings ----------
+
+  setRating(playerId: PlayerId, rating: number): void {
+    this.ratings.set(playerId, rating);
+  }
+
   /** Joins as a player in the lobby, or as a spectator while a game is running. */
-  addPlayer(playerId: PlayerId, name: string, now: number, avatarEmoji?: string): RoomResult {
+  addPlayer(playerId: PlayerId, name: string, now: number, avatarEmoji?: string, rating?: number): RoomResult {
     this.touch(now);
     if (this.players.size >= this.maxPlayers) return fail("room-full", "This room is full.");
     if (this.players.has(playerId)) return fail("duplicate-player", "Player is already in this room.");
     const fresh = this.newPlayer(playerId, name, avatarEmoji);
     const player: P = this.status === "lobby" ? fresh : { ...fresh, spectator: true };
     this.players.set(playerId, player);
+    if (rating !== undefined) this.ratings.set(playerId, rating);
     return ok([{ type: "PLAYER_JOINED", player: this.publicPlayer(player) }, this.snapshotMessage()]);
   }
 

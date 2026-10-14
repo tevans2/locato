@@ -1,9 +1,9 @@
 import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
-import { createDailyChallenge, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
+import { createDailyChallenge, createDailyChallengeWithoutOverland, dailyRoundMark, getLocalDailyDate, scoreDailyOverlandRound, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
-import { isFlyoverGameModeId, isMapTapGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { isFlyoverGameModeId, isMapTapGameModeId, isMysteryGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
 import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
@@ -11,6 +11,7 @@ import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map"
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
 import { type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { findMapTapLocation } from "../core/maptap/locations";
+import { overlandRouteBetween } from "../core/overland";
 import { streetViewCountryRounds } from "../core/streetview";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createDailyIntroScreen, createDailyPracticeCompleteScreen } from "../ui/screens/DailyIntroScreen";
@@ -148,7 +149,7 @@ export function createApp(options: AppOptions): App {
       } else if (mode === "map-tap") {
         navigate({ type: mode, run: "timed" });
       } else {
-        // Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one way to play.
+        // Single-run modes (Worldsplit, Flyover, Overland, Mystery country, GeoGuessr, Street View country) have one way to play.
         handleGameModeChange(mode);
       }
       return;
@@ -424,6 +425,7 @@ export function createApp(options: AppOptions): App {
     const saved = readDailyProgress(options.storage, challenge.date, challenge.seed, progressUserId);
     if (saved && saved.challengeVersion !== 2) challenge = createLegacyDailyChallenge(options.countryIndex, challenge.date);
     else if (saved && saved.themeScoped !== true) challenge = createMixedThemeDailyChallenge(options.countryIndex, challenge.date);
+    else if (saved && saved.overlandRound !== true) challenge = createDailyChallengeWithoutOverland(options.countryIndex, challenge.date);
     if (!play && saved?.marks.length !== DAILY_COUNTRY_COUNT) {
       mount(createDailyIntroScreen({ shell, challenge, roundsPlayed: saved?.roundIndex ?? 0,
         onStart: () => runNavigation(startDailyChallenge(true)) }));
@@ -447,7 +449,8 @@ export function createApp(options: AppOptions): App {
     const restoredPromptState = hydratedPromptState ? { ...hydratedPromptState, hintLevel: Math.min(3, saved?.roundHintsUsed ?? 0) } : null;
     // A prompt stage saved as complete (it should have handed off) resumes at the next stage.
     const promptAlreadyDone = saved?.stage === "prompt" && restoredPromptState?.status === "complete";
-    const resumeStage: DailyStage = promptAlreadyDone ? "map-tap" : saved?.stage ?? "prompt";
+    const afterPrompt: DailyStage = challenge.overlandRoute ? "overland" : "map-tap";
+    const resumeStage: DailyStage = promptAlreadyDone ? afterPrompt : saved?.stage ?? "prompt";
     // Prompt-stage totals live in the prompt screen until it completes; later stages add to these.
     const carryTotals = saved !== null && (saved.stage !== "prompt" || promptAlreadyDone);
     let dailyScore = carryTotals ? saved.score : 0;
@@ -478,6 +481,7 @@ export function createApp(options: AppOptions): App {
         updatedAt: now,
         ...(challenge.challengeVersion === 2 ? { challengeVersion: 2, rounds: [...(prompt?.rounds ?? dailyRounds)] } : {}),
         ...(challenge.themeScoped ? { themeScoped: true } : {}),
+        ...(challenge.overlandRoute ? { overlandRound: true } : {}),
       }, progressUserId);
     }
 
@@ -569,6 +573,49 @@ export function createApp(options: AppOptions): App {
       );
     }
 
+    async function startDailyOverlandRound(): Promise<void> {
+      const route = challenge.overlandRoute;
+      if (!route) {
+        await startDailyMapTapRound();
+        return;
+      }
+      persistDaily("overland");
+      const { createOverlandScreen } = await import("../ui/screens/OverlandScreen");
+      if (run !== navigationRun) return;
+      let recorded = false;
+      function recordResult(round: import("../core/overland").OverlandRound): void {
+        if (recorded) return;
+        recorded = true;
+        const result = scoreDailyOverlandRound(round);
+        dailyScore += result.points;
+        dailyHintsUsed += result.hintsUsed;
+        dailyRounds.push(result);
+        addDailyMark(dailyRoundMark(result));
+        // Save the scored round (and move on) before the answer shows, so refreshing can't replay it.
+        persistDaily("map-tap");
+      }
+
+      mountDaily(
+        createOverlandScreen({ shell,
+          worldCountryFeatures,
+          countryIndex: options.countryIndex,
+          storage: options.storage,
+          ...dailyStageNav,
+          dailyChallenge: {
+            date: challenge.date,
+            title: challenge.theme?.title ?? "Daily challenge",
+            route,
+            progress: { round: Math.min(DAILY_COUNTRY_COUNT, dailyMarks.length + 1), total: DAILY_COUNTRY_COUNT },
+            onResult: recordResult,
+            onComplete: (round) => {
+              recordResult(round);
+              runNavigation(startDailyMapTapRound());
+            },
+          },
+        }),
+      );
+    }
+
     async function startDailyMapTapRound(): Promise<void> {
       persistDaily("map-tap");
       const location = findMapTapLocation(challenge.mapTapTargetId);
@@ -612,6 +659,10 @@ export function createApp(options: AppOptions): App {
 
     if (dailyMarks.length === DAILY_COUNTRY_COUNT) {
       finishDailyChallenge();
+      return;
+    }
+    if (resumeStage === "overland") {
+      await startDailyOverlandRound();
       return;
     }
     if (resumeStage === "map-tap") {
@@ -667,7 +718,7 @@ export function createApp(options: AppOptions): App {
             dailyHintsUsed += dailyResult.hintsUsed;
             dailyRounds.push(...dailyResult.rounds);
             for (const mark of dailyResult.marks) addDailyMark(mark);
-            runNavigation(startDailyMapTapRound());
+            runNavigation(startDailyOverlandRound());
           },
         },
       }),
@@ -687,8 +738,12 @@ export function createApp(options: AppOptions): App {
     }
     if (run !== navigationRun || (authControls.getUser()?.id ?? null) !== userId) return;
     if (!result?.rounds) { navigate({ type: "daily-challenge" }); return; }
+    const overlandRouteOf = (targetId: string | undefined) => {
+      const [start, end] = (targetId ?? "").split("-");
+      return start && end ? overlandRouteBetween(start, end) : null;
+    };
     const rounds = result.rounds.filter((round) => round.points < DAILY_POINTS_PER_ROUND &&
-      (round.categoryId === "map-tap" ? Boolean(findMapTapLocation(round.targetId ?? "")) : options.countryIndex.byCode.has(round.countryCode ?? "")));
+      (round.categoryId === "map-tap" ? Boolean(findMapTapLocation(round.targetId ?? "")) : round.categoryId === "overland" ? Boolean(overlandRouteOf(round.targetId)) : options.countryIndex.byCode.has(round.countryCode ?? "")));
     const originalResult = result;
     const backToResult = () => {
       if (run !== navigationRun) return;
@@ -696,8 +751,8 @@ export function createApp(options: AppOptions): App {
       mountDailyResult(originalResult);
     };
     if (!rounds.length) { backToResult(); return; }
-    const [features, { createSoloGameScreen }, { createMapTapScreen }, { createStreetViewCountryScreen }] = await Promise.all([
-      loadWorldCountryFeatures(), import("../ui/screens/SoloGameScreen"), import("../ui/screens/MapTapScreen"), import("../ui/screens/StreetViewCountryScreen"),
+    const [features, { createSoloGameScreen }, { createMapTapScreen }, { createStreetViewCountryScreen }, { createOverlandScreen }] = await Promise.all([
+      loadWorldCountryFeatures(), import("../ui/screens/SoloGameScreen"), import("../ui/screens/MapTapScreen"), import("../ui/screens/StreetViewCountryScreen"), import("../ui/screens/OverlandScreen"),
     ]);
     if (run !== navigationRun || (authControls.getUser()?.id ?? null) !== userId) return;
     let position = 0;
@@ -716,6 +771,11 @@ export function createApp(options: AppOptions): App {
         if (!target) { onComplete(); return; }
         mount(createMapTapScreen({ ...nav, dailyChallenge: { date, title, practice: true, target,
           progress: { round: position + 1, total: rounds.length }, onComplete } }));
+      } else if (round.categoryId === "overland") {
+        const route = overlandRouteOf(round.targetId);
+        if (!route) { onComplete(); return; }
+        mount(createOverlandScreen({ ...nav, worldCountryFeatures: features, countryIndex: options.countryIndex, storage: options.storage,
+          dailyChallenge: { date, title, practice: true, route, progress: { round: position + 1, total: rounds.length }, onComplete } }));
       } else if (round.categoryId === "streetview-country") {
         const streetRound = streetViewCountryRounds.find((candidate) => candidate.countryCode === round.countryCode);
         if (!streetRound) { onComplete(); return; }
@@ -764,6 +824,16 @@ export function createApp(options: AppOptions): App {
 
     if (isFlyoverGameModeId(gameMode)) {
       navigate({ type: "flyover" });
+      return;
+    }
+
+    if (isOverlandGameModeId(gameMode)) {
+      navigate({ type: "overland" });
+      return;
+    }
+
+    if (isMysteryGameModeId(gameMode)) {
+      navigate({ type: "mystery" });
     }
   }
 
@@ -807,7 +877,8 @@ export function createApp(options: AppOptions): App {
     mount(createLoadingScreen("Preparing your game…"));
     const world = await loadWorldCountryFeatures();
     if (run !== navigationRun) return true;
-    const screen = await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser() });
+    const screen = await (await import("../ui/screens/RankedGameScreen")).createRankedGameScreen({ mode, ...(variant ? { variant } : {}), shell, world, countryIndex: options.countryIndex, storage: options.storage, getAuthUser: () => authControls.getUser(),
+      onOverlandToday: () => navigate({ type: "overland", daily: true }), onMysteryToday: () => navigate({ type: "mystery", daily: true }) });
     if (run === navigationRun) mount(screen);
     else screen.destroy();
     return true;
@@ -954,6 +1025,70 @@ export function createApp(options: AppOptions): App {
           worldCountryFeatures,
           storage: options.storage,
           onHome: () => navigate({ type: "landing" }),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
+  async function startOverland(daily = false): Promise<void> {
+    // Today's route is the same for everyone and kept on this device, so it never needs the server.
+    if (!daily && await startVerified("overland")) return;
+    const run = navigationRun;
+    mount(createLoadingScreen("Unfolding the map..."));
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/OverlandScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createOverlandScreen({ shell,
+          worldCountryFeatures,
+          countryIndex: options.countryIndex,
+          storage: options.storage,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onTodaysRoute: () => navigate({ type: "overland", daily: true }),
+          onPlayRun: () => navigate({ type: "overland" }),
+          ...(daily ? { today: { date: getLocalDailyDate() } } : {}),
+        }),
+      );
+    } catch (error) {
+      if (run !== navigationRun) return;
+      showLoadError(error);
+    }
+  }
+
+  async function startMystery(daily = false): Promise<void> {
+    // Today's mystery is the same for everyone and kept on this device, so it never needs the server.
+    if (!daily && await startVerified("mystery")) return;
+    const run = navigationRun;
+    mount(createLoadingScreen("Hiding a country..."));
+
+    try {
+      const [worldCountryFeatures, screenModule] = await Promise.all([
+        loadWorldCountryFeatures(),
+        import("../ui/screens/MysteryScreen"),
+      ]);
+      if (run !== navigationRun) return;
+
+      mount(
+        screenModule.createMysteryScreen({ shell,
+          worldCountryFeatures,
+          countryIndex: options.countryIndex,
+          storage: options.storage,
+          onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
+          onHome: () => navigate({ type: "landing" }),
+          onDailyChallenge: () => navigate({ type: "daily-challenge" }),
+          onToday: () => navigate({ type: "mystery", daily: true }),
+          onPlayRun: () => navigate({ type: "mystery" }),
+          ...(daily ? { today: { date: getLocalDailyDate() } } : {}),
         }),
       );
     } catch (error) {
@@ -1146,6 +1281,14 @@ export function createApp(options: AppOptions): App {
     }
     if (route.type === "flyover") {
       runNavigation(startFlyover());
+      return;
+    }
+    if (route.type === "overland") {
+      runNavigation(startOverland(route.daily === true));
+      return;
+    }
+    if (route.type === "mystery") {
+      runNavigation(startMystery(route.daily === true));
       return;
     }
     if (route.type === "multiplayer") {

@@ -35,6 +35,8 @@ export interface PublicPlayerState {
   readonly streak: number;
   readonly correctAnswers: number;
   readonly wrongAnswers: number;
+  /** A signed-in player's rating for the room's game type. */
+  readonly rating?: number;
   /** Flyover: how far along the shared route this racer is (reached + skipped). */
   readonly routeIndex?: number;
 }

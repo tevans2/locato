@@ -9,6 +9,7 @@ import { getPlayerEmoji } from "../../../core/auth/avatars";
 import { el } from "../../dom/createElement";
 import { shellIcon } from "../../shell";
 import { describeRoom, roomKindInfo } from "./roomModes";
+import type { RatingUpdate } from "./roomSession";
 
 export interface MultiplayerResultsOptions {
   readonly signal: AbortSignal;
@@ -20,6 +21,8 @@ export interface MultiplayerResultsState {
   readonly room: PublicRoomState;
   readonly localPlayerId: string | null;
   readonly results: readonly FinalResult[];
+  /** Signed-in players' new ratings, once the server sends them (games with two or more of them). */
+  readonly ratingUpdate?: RatingUpdate | null;
 }
 
 export interface MultiplayerResults {
@@ -67,7 +70,7 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
 
   return {
     element,
-    update: ({ room, localPlayerId, results }) => {
+    update: ({ room, localPlayerId, results, ratingUpdate }) => {
       const isHost = localPlayerId === room.hostPlayerId;
       const winner = results[0];
       const mine = results.find((result) => result.playerId === localPlayerId);
@@ -83,8 +86,9 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
         ...results.map((result) => {
           const player = room.players.find((candidate) => candidate.id === result.playerId);
           const isYou = result.playerId === localPlayerId;
+          const change = ratingUpdate?.changes.find((item) => item.playerId === result.playerId);
           return el("li", {
-            className: `mp-standing rank-${Math.min(result.rank, 4)}${isYou ? " is-you" : ""}`,
+            className: `mp-standing rank-${Math.min(result.rank, 4)}${isYou ? " is-you" : ""}${change ? " has-rating" : ""}`,
             children: [
               el("span", { className: "mp-standing-rank", text: String(result.rank) }),
               el("span", { className: "mp-avatar is-emoji", text: getPlayerEmoji(player ?? { id: result.playerId }, isYou), attrs: { "aria-hidden": "true" } }),
@@ -96,6 +100,11 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
                 ],
               }),
               el("span", { className: "mp-standing-score", text: numberFormat.format(result.score) }),
+              ...(change ? [el("span", {
+                className: `mp-standing-rating ${change.delta > 0 ? "is-up" : change.delta < 0 ? "is-down" : ""}`.trim(),
+                text: `${numberFormat.format(change.rating)} (${change.delta > 0 ? "+" : change.delta < 0 ? "−" : "±"}${Math.abs(change.delta)})`,
+                attrs: { title: `${roomKindInfo(room.kind).label} rating after this game` },
+              })] : []),
             ],
           });
         }),

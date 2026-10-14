@@ -479,3 +479,40 @@ export function saveAvatarToServer(emoji: string): void {
 }
 
 export { AVATAR_OPTIONS, clearStoredAvatar, getLocalAvatar, getPlayerEmoji, getStoredAvatar, isAvatarEmoji, storeAvatar } from "./avatars";
+
+// ---- Multiplayer ratings ------------------------------------------------------------------------
+
+export interface PlayerRatingInfo {
+  readonly game: string;
+  readonly rating: number;
+  readonly games: number;
+}
+
+export interface RatingBoardEntry {
+  readonly rank: number;
+  readonly user: { readonly id: string; readonly username: string; readonly avatarEmoji: string | null };
+  readonly rating: number;
+  readonly games: number;
+}
+
+/** The signed-in player's multiplayer ratings (empty when they have none, null when signed out or offline). */
+export async function fetchMyRatings(): Promise<readonly PlayerRatingInfo[] | null> {
+  try {
+    const response = await fetch("/api/ratings/me");
+    if (!response.ok) return null;
+    return ((await response.json()) as { ratings: PlayerRatingInfo[] }).ratings;
+  } catch {
+    return null;
+  }
+}
+
+/** The top-rated players for one multiplayer game type, or null when it can't be loaded. */
+export async function fetchTopRatings(game: string, limit = 5): Promise<readonly RatingBoardEntry[] | null> {
+  try {
+    const response = await fetch(`/api/ratings?game=${encodeURIComponent(game)}&limit=${limit}`);
+    if (!response.ok) return null;
+    return ((await response.json()) as { entries: RatingBoardEntry[] }).entries;
+  } catch {
+    return null;
+  }
+}

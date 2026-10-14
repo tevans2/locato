@@ -4,9 +4,9 @@
  * lives in the lobby once the room exists.
  */
 
-import type { RoomKind } from "../../../core/multiplayer";
+import { RATING_START, type RoomKind } from "../../../core/multiplayer";
 import { cleanJoinCode, MAX_PLAYER_NAME_LENGTH, readPlayerName, writePlayerName } from "../../../core/multiplayer/localPlayer";
-import { fetchFriends, type FriendInfo } from "../../../core/auth";
+import { fetchFriends, fetchMyRatings, fetchTopRatings, type FriendInfo, type PlayerRatingInfo, type RatingBoardEntry } from "../../../core/auth";
 import { getLocalAvatar } from "../../../core/auth/avatars";
 import { el } from "../../dom/createElement";
 import { shellIcon, type ShellContext } from "../../shell";
@@ -280,6 +280,82 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     renderFriends();
   }
 
+  // ---------- Ratings ----------
+
+  let ratingKind: RoomKind = "quiz";
+  let myRatings: readonly PlayerRatingInfo[] | null = null;
+  const topCache = new Map<RoomKind, readonly RatingBoardEntry[] | null>();
+  const ratingButtons = ROOM_KIND_INFO.map((info) => {
+    const value = el("span", { className: "mp-rating-value" });
+    const button = el("button", {
+      className: "mp-rating-kind",
+      attrs: { type: "button", role: "radio", "aria-checked": "false", "data-kind": info.kind },
+      children: [shellIcon(info.icon, 16, 2), el("span", { className: "mp-rating-label", text: info.label }), value],
+      on: { click: () => { ratingKind = info.kind; renderRatings(); void loadTop(); } },
+    });
+    return { info, button, value };
+  });
+  const ratingsBody = el("div", { className: "mp-ratings-body", attrs: { "aria-live": "polite" } });
+  const ratingsCard = el("section", {
+    className: "mp-card mp-ratings",
+    attrs: { "aria-labelledby": "mp-ratings-title" },
+    children: [
+      el("header", { className: "mp-card-head", children: [el("h2", { className: "mp-card-title", text: "Ratings", attrs: { id: "mp-ratings-title" } })] }),
+      el("p", { className: "mp-muted mp-small", text: "Every game with two or more signed-in players is rated, separately for each game. Leaving mid-game counts as finishing last." }),
+      el("div", { className: "mp-rating-kinds", attrs: { role: "radiogroup", "aria-label": "Game" }, children: ratingButtons.map((entry) => entry.button) }),
+      ratingsBody,
+    ],
+  });
+
+  function renderRatings(): void {
+    const user = options.getUser();
+    for (const entry of ratingButtons) {
+      const active = entry.info.kind === ratingKind;
+      entry.button.classList.toggle("is-active", active);
+      entry.button.setAttribute("aria-checked", String(active));
+      const mine = myRatings?.find((rating) => rating.game === entry.info.kind);
+      entry.value.textContent = user ? String(mine?.rating ?? RATING_START) : "";
+      entry.value.title = user ? (mine ? `Your rating · ${mine.games} rated game${mine.games === 1 ? "" : "s"}` : "Your starting rating") : "";
+    }
+    const top = topCache.get(ratingKind);
+    ratingsBody.replaceChildren(
+      el("h3", { className: "mp-subtitle", text: `Top rated · ${ROOM_KIND_INFO.find((info) => info.kind === ratingKind)!.label}` }),
+      el("ol", {
+        className: "mp-rating-top",
+        children: top === undefined
+          ? [el("li", { className: "mp-muted", text: "Loading…" })]
+          : top === null
+            ? [el("li", { className: "mp-muted", text: "Couldn't load the ratings." })]
+            : top.length === 0
+              ? [el("li", { className: "mp-muted", text: "No ratings yet. Play a game with signed-in friends to be first." })]
+              : top.map((entry) => el("li", {
+                  className: "mp-rating-row",
+                  children: [
+                    el("span", { className: "mp-rating-rank", text: String(entry.rank) }),
+                    el("span", { className: `mp-avatar${entry.user.avatarEmoji ? " is-emoji" : ""}`, text: entry.user.avatarEmoji ?? entry.user.username.charAt(0).toUpperCase(), attrs: { "aria-hidden": "true" } }),
+                    el("span", { className: "mp-rating-name", text: entry.user.username }),
+                    el("strong", { className: "mp-rating-score", text: String(entry.rating) }),
+                  ],
+                })),
+      }),
+      ...(user ? [] : [el("button", { className: "shell-btn shell-btn-quiet mp-signin", text: "Sign in to get rated", attrs: { type: "button" }, on: { click: () => options.shell.openAccount() } })]),
+    );
+  }
+
+  async function loadTop(): Promise<void> {
+    const kind = ratingKind;
+    if (topCache.has(kind)) return;
+    const entries = await fetchTopRatings(kind);
+    if (signal.aborted) return;
+    topCache.set(kind, entries);
+    if (kind === ratingKind) renderRatings();
+  }
+
+  async function loadMyRatings(): Promise<void> {
+    myRatings = options.getUser() ? await fetchMyRatings() : null;
+    if (!signal.aborted) renderRatings();
+  }
+
   const steps = el("section", {
     className: "mp-card mp-steps",
     attrs: { "aria-labelledby": "mp-steps-title" },
@@ -303,7 +379,7 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     className: "mp-home",
     children: [
       homeMain,
-      el("div", { className: "mp-home-side", children: [onlineCard, steps] }),
+      el("div", { className: "mp-home-side", children: [onlineCard, ratingsCard, steps] }),
     ],
   });
 
@@ -323,7 +399,10 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
 
   renderUser();
   renderFriends();
+  renderRatings();
   void loadFriends();
+  void loadTop();
+  void loadMyRatings();
   const unsubscribeFriends = options.subscribeFriends?.(() => void loadFriends());
 
   return {
@@ -348,6 +427,10 @@ export function createMultiplayerHome(options: MultiplayerHomeOptions): Multipla
     refreshUser: () => {
       renderUser();
       void loadFriends();
+      // Fresh standings too: a rated game may just have moved them.
+      topCache.clear();
+      void loadTop();
+      void loadMyRatings();
     },
     destroy: () => unsubscribeFriends?.(),
   };

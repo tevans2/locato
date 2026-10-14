@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("Leaderboards screen", () => {
-  it("offers all 15 modes grouped Clues, Map and Street View", async () => {
+  it("offers all 17 modes grouped Clues, Map and Street View", async () => {
     mockFetch();
     mount({ shell: makeShell() });
     await flush();
@@ -105,7 +105,7 @@ describe("Leaderboards screen", () => {
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Clues", "Map", "Street View"]);
     const modes = [...document.querySelectorAll<HTMLElement>(".lb-mode")].map((item) => item.dataset.mode);
     expect(modes).toEqual(LEADERBOARD_MODES.map((config) => config.mode).sort((a, b) => GAME_ORDER.indexOf(a) - GAME_ORDER.indexOf(b)));
-    expect(modes).toHaveLength(15);
+    expect(modes).toHaveLength(17);
     expect(q(".lb-mode[data-mode='flags']")?.getAttribute("aria-pressed")).toBe("true");
     expect(q(".lb-title")?.textContent).toBe("Flags");
     expect(q(".lb-attempt")?.textContent).toBe(leaderboardConfig("flags")!.attempt);

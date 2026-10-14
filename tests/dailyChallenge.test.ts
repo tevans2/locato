@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createDailyChallenge, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, formatDailyTime, scoreDailyMapTapRound, scoreDailyRound, parseDailyRoundResults } from "../src/core/dailyChallenge";
+import { createDailyChallenge, createDailyChallengeWithoutOverland, createDailyShareText, DAILY_PROMPT_COUNTRY_COUNT, dailyRoundMark, formatDailyTime, scoreDailyMapTapRound, scoreDailyOverlandRound, scoreDailyRound, parseDailyRoundResults } from "../src/core/dailyChallenge";
+import { createOverlandRound, guessOverland, hintOverland, overlandGraph, overlandRouteBetween, revealOverland, type OverlandRound } from "../src/core/overland";
 import { indexCountries, rawCountries } from "../src/core/countries";
 import { fameTier } from "../src/core/countries/fame";
 import { createGameEngine } from "../src/core/game";
@@ -15,10 +16,39 @@ describe("daily challenge", () => {
 
     expect(first.seed).toBe("daily:2026-06-11");
     expect(first.categoryIds).toEqual(["flags", "shapes", "capitals", "pick-country", "spot-country"]);
-    expect(first.countryIds).toHaveLength(DAILY_PROMPT_COUNTRY_COUNT);
+    // Round 8 is an Overland route, so the prompt stage keeps the first seven rounds.
+    expect(first.countryIds).toHaveLength(DAILY_PROMPT_COUNTRY_COUNT - 1);
+    expect(first.overlandRoute).toBeDefined();
     expect(first.mapTapTargetId).toBeTruthy();
     expect(first.streetViewCountryCode).toBeTruthy();
     expect(second).toEqual(first);
+  });
+
+  it("keeps eight prompt rounds and no Overland route for dailies started before it", () => {
+    const index = indexCountries(rawCountries);
+    const old = createDailyChallengeWithoutOverland(index, "2026-10-14");
+    expect(old.promptSlots!.map((slot) => slot.categoryId).at(-1)).toBe("spot-country");
+    expect(old.countryIds).toHaveLength(DAILY_PROMPT_COUNTRY_COUNT);
+    expect(old.overlandRoute).toBeUndefined();
+    expect(createDailyChallenge(index, "2026-10-14").promptSlots!.slice(0, 7)).toEqual(old.promptSlots!.slice(0, 7));
+  });
+
+  it("scores the Overland round on the daily's scale, counting extra guesses as wrong ones", () => {
+    const graph = overlandGraph();
+    const route = overlandRouteBetween("PT", "PL")!;
+    const play = (round: OverlandRound, ...codes: string[]) => codes.reduce((current, code) => (guessOverland(graph, current, code) as { round: OverlandRound }).round, round);
+    const perfect = scoreDailyOverlandRound(play(createOverlandRound(route), "ES", "FR", "DE"));
+    expect(perfect).toEqual({ categoryId: "overland", targetId: "PT-PL", points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false });
+    expect(dailyRoundMark(perfect)).toBe("correct");
+    const hinted = (hintOverland(graph, play(createOverlandRound(route), "IT")) as { round: OverlandRound }).round;
+    const slow = scoreDailyOverlandRound(play(hinted, "ES", "FR", "DE"));
+    expect(slow).toMatchObject({ points: scoreDailyRound(1, false, 1), hintsUsed: 1, wrongGuesses: 1 });
+    expect(dailyRoundMark(slow)).toBe("hint");
+    const missed = scoreDailyOverlandRound(revealOverland(createOverlandRound(route)));
+    expect(missed).toMatchObject({ points: 0, missed: true });
+    expect(dailyRoundMark(missed)).toBe("miss");
+    expect(parseDailyRoundResults([perfect, slow, missed])).toEqual([perfect, slow, missed]);
+    for (const targetId of ["PT-XX", "PT", "pt-pl", "ES-FR", "JP-PL"]) expect(parseDailyRoundResults([{ ...perfect, targetId }])).toBeNull();
   });
 
   it("changes the selection when the date changes", () => {
@@ -35,10 +65,14 @@ describe("daily challenge", () => {
     for (let day = 1; day <= 31; day++) {
       const challenge = createDailyChallenge(index, `2026-10-${String(day).padStart(2, "0")}`);
       themes.add(challenge.theme!.id);
-      expect(challenge.promptSlots!.map((slot) => slot.categoryId)).toEqual(["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"]);
+      expect(challenge.promptSlots!.map((slot) => slot.categoryId)).toEqual(["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country"]);
       expect(challenge.themeScoped).toBe(true);
       expect(challenge.countryIds.slice(0, 5).map((id) => fameTier(index.byId[id]!.code))).toEqual([1, 1, 2, 2, 1]);
-      expect(new Set(challenge.countryIds).size).toBe(8);
+      expect(new Set(challenge.countryIds).size).toBe(7);
+      const route = challenge.overlandRoute!;
+      expect([2, 3]).toContain(route.minimum);
+      expect(overlandGraph().distance(route.start, route.end)).toBe(route.minimum + 1);
+      expect([route.start, route.end].some((code) => challenge.theme!.countryCodes.includes(code))).toBe(true);
       for (const id of challenge.countryIds) expect(challenge.theme!.countryCodes).toContain(index.byId[id]!.code);
       expect(challenge.theme!.mapTapTargetIds).toContain(challenge.mapTapTargetId);
       expect(findMapTapLocation(challenge.mapTapTargetId)!.difficulty).not.toBe("hard");
@@ -54,7 +88,7 @@ describe("daily challenge", () => {
       const date = new Date(Date.UTC(2026, 9, day)).toISOString().slice(0, 10);
       const challenge = createDailyChallenge(index, date);
       expect(challenge.theme!.id).toBe("southern");
-      expect(challenge.countryIds).toHaveLength(8);
+      expect(challenge.countryIds).toHaveLength(7);
       for (const id of challenge.countryIds) expect(challenge.theme!.countryCodes).toContain(index.byId[id]!.code);
       expect(findMapTapLocation(challenge.mapTapTargetId)!.lat).toBeLessThan(0);
       const streetRound = streetViewCountryRounds.find((round) => round.countryCode === challenge.streetViewCountryCode)!;
