@@ -30,6 +30,7 @@ import {
   type OverlandRoute,
   type OverlandVerdict,
 } from "../../core/overland";
+import { fameTier } from "../../core/countries/fame";
 import type { ResultsMissedCountry } from "../shell/ResultsCard";
 import { createOverlandMap } from "../components/OverlandMap";
 import { el } from "../dom/createElement";
@@ -64,6 +65,8 @@ export interface OverlandScreenServices {
 
 const MAX_POINTS = OVERLAND_ATTEMPT_ROUTES * OVERLAND_ROUTE_MAX_POINTS;
 const LEGEND: readonly OverlandVerdict[] = ["route", "close", "detour", "off"];
+/** Shortest routes listed under "Show all shortest routes"; any beyond this are counted. */
+const MAX_LISTED_ROUTES = 8;
 let howToCount = 0;
 
 function guessErrorText(error: OverlandGuessError, name: string): string {
@@ -360,11 +363,16 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     const detail = current.status === "solved"
       ? perfect ? "Shortest possible, no hints." : `${current.guesses.length} guesses for a ${current.route.minimum}-country route${current.hintsUsed ? ` · ${current.hintsUsed} hint${current.hintsUsed === 1 ? "" : "s"}` : ""}.`
       : "Here's a shortest route.";
+    const { start, end } = current.route;
+    const shortestCount = graph.countShortestRoutes(start, end);
+    const yoursIsShortest = yours !== null && yours.length === best.length;
     const chains: HTMLElement[] = [];
     if (yours) {
-      chains.push(el("p", { className: "overland-chain-label", text: "Your route" }), routeChain(yours, guessed));
-      if (yours.length > best.length) chains.push(el("p", { className: "overland-chain-label", text: "Shortest route" }), routeChain(best, guessed));
-    } else chains.push(el("p", { className: "overland-chain-label", text: "Shortest route" }), routeChain(best, guessed));
+      const verdict = !yoursIsShortest ? "" : shortestCount === 1 ? " · the shortest possible" : ` · one of ${shortestCount} shortest`;
+      chains.push(el("p", { className: "overland-chain-label", text: `Your route${verdict}` }), routeChain(yours, guessed));
+      if (!yoursIsShortest) chains.push(el("p", { className: "overland-chain-label", text: shortestCount === 1 ? "Shortest route" : `A shortest route (1 of ${shortestCount})` }), routeChain(best, guessed));
+    } else chains.push(el("p", { className: "overland-chain-label", text: shortestCount === 1 ? "Shortest route" : `A shortest route (1 of ${shortestCount})` }), routeChain(best, guessed));
+    if (shortestCount > 1) chains.push(createAllRoutesToggle(current, best, guessed, shortestCount));
     const notes = exclaveNotesFor(yours ?? best);
     const last = finished.length >= OVERLAND_ATTEMPT_ROUTES;
     nextButton.textContent = last ? "See final score" : "Next route";
@@ -384,6 +392,37 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     setBusy(false);
     updateProgress();
     nextButton.focus({ preventScroll: true });
+  }
+
+  /**
+   * "Show all N shortest routes": lists them (the best-known first) and marks every country on
+   * any of them on the map; hiding it puts the map back to the one route shown.
+   */
+  function createAllRoutesToggle(current: OverlandRound, best: readonly string[], guessed: ReadonlySet<string>, count: number): HTMLElement {
+    const { start, end } = current.route;
+    const listId = `overland-all-routes-${finished.length}`;
+    const routes = graph.shortestRoutes(start, end, MAX_LISTED_ROUTES, fameTier);
+    const extra = graph.routeCountries(start, end).filter((code) => !guessed.has(code) && !best.includes(code));
+    const list = el("div", {
+      className: "overland-all-routes",
+      attrs: { id: listId },
+      children: [
+        ...routes.map((route) => routeChain(route, guessed)),
+        ...(count > routes.length ? [el("p", { className: "overland-chain-label", text: `…and ${count - routes.length} more` })] : []),
+      ],
+    });
+    list.hidden = true;
+    const label = `Show all ${count} shortest routes`;
+    const toggle = el("button", { className: "overland-link overland-all-toggle", text: label, attrs: { type: "button", "aria-expanded": "false", "aria-controls": listId } });
+    toggle.addEventListener("click", () => {
+      const open = list.hidden;
+      list.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.textContent = open ? "Hide the other routes" : label;
+      for (const code of extra) open ? map.mark(code, "missed") : map.unmark(code);
+      map.frame({ animate: true });
+    }, { signal });
+    return el("div", { className: "overland-all", children: [toggle, list] });
   }
 
   function finishRun(): void {

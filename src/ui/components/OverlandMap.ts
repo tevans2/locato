@@ -27,6 +27,8 @@ export interface OverlandMap {
   /** Clear the map for a new route: only its two ends are filled in, and they're framed. */
   readonly showRoute: (start: string, end: string) => void;
   readonly mark: (code: string, tone: OverlandMapTone) => void;
+  /** Take a country off the map again. */
+  readonly unmark: (code: string) => void;
   /** Dashed outlines drawn by hints (replaces the previous set). */
   readonly setOutlined: (codes: readonly string[]) => void;
   /** Country borders: hidden while playing, shown once a route is over. */
@@ -133,6 +135,10 @@ export function createOverlandMap(features: readonly WorldCountryFeature[], coun
       frame();
     },
     mark,
+    unmark(code) {
+      clearTone(code);
+      tones.delete(code);
+    },
     setOutlined,
     setBordersVisible(visible) {
       view.element.classList.toggle("has-borders", visible);

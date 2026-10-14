@@ -395,6 +395,9 @@
 .overland-chain-stop.is-end { border-color: color-mix(in srgb, var(--ov-end) 55%, var(--border)); }
 .overland-chain-stop.is-found { border-color: color-mix(in srgb, var(--ov-route) 60%, var(--border)); }
 .overland-chain-stop.is-missed { border-style: dashed; border-color: var(--ov-route); color: var(--muted); }
+.overland-all { margin-top: 10px; }
+.overland-all-routes { display: grid; gap: 8px; margin-top: 8px; }
+.overland-all-routes[hidden] { display: none; }
 .overland-note { margin: 12px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--muted); font-size: .72rem; line-height: 1.5; }
 #app .overland-next { width: 100%; min-height: 46px; margin-top: 16px; }
 

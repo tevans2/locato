@@ -145,7 +145,33 @@ describe("Overland (single-run: every run counts)", () => {
     for (const code of [detour, ...graph.shortestRoute(detour, route.end)!.slice(1, -1)]) ui.guess(nameOf(code));
     expect(ui.$(".overland-outcome-title")?.textContent).toBe("Route found");
     expect(ui.$(".overland-outcome-points")?.textContent).toBe("+90 points");
-    expect(ui.all(".overland-chain-label").map((label) => label.textContent)).toEqual(["Your route", "Shortest route"]);
+    const count = graph.countShortestRoutes(route.start, route.end);
+    expect(ui.all(".overland-chain-label").slice(0, 2).map((label) => label.textContent)).toEqual(["Your route", count === 1 ? "Shortest route" : `A shortest route (1 of ${count})`]);
+  });
+
+  it("says when your route was a shortest one and can show every other shortest route", () => {
+    const ui = setup();
+    const position = routes.findIndex((route) => graph.countShortestRoutes(route.start, route.end) > 1);
+    expect(position).toBeGreaterThanOrEqual(0);
+    for (let earlier = 0; earlier < position; earlier++) ui.playRoute(earlier);
+    const route = routes[position]!;
+    const count = graph.countShortestRoutes(route.start, route.end);
+    const mine = graph.shortestRoute(route.start, route.end)!;
+    for (const code of mine.slice(1, -1)) ui.guess(nameOf(code));
+    expect(ui.all(".overland-chain-label")[0]?.textContent).toBe(`Your route · one of ${count} shortest`);
+    const toggle = ui.$<HTMLButtonElement>(".overland-all-toggle")!;
+    const list = ui.$<HTMLElement>(".overland-all-routes")!;
+    expect(toggle.textContent).toBe(`Show all ${count} shortest routes`);
+    expect(list.hidden).toBe(true);
+    toggle.click();
+    expect(list.hidden).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(list.querySelectorAll(".overland-chain")).toHaveLength(Math.min(count, 8));
+    const others = graph.routeCountries(route.start, route.end).filter((code) => !mine.includes(code));
+    expect(ui.all(".world-map-country.is-ov-missed")).toHaveLength(others.length);
+    toggle.click();
+    expect(list.hidden).toBe(true);
+    expect(ui.all(".world-map-country.is-ov-missed")).toHaveLength(0);
   });
 
   it("gives up a route after asking, scores nothing and reveals a shortest route", async () => {
@@ -157,8 +183,9 @@ describe("Overland (single-run: every run counts)", () => {
     expect(confirmLeave).toHaveBeenCalledWith("This route won't score, and a shortest route will be shown.", expect.objectContaining({ title: "Give up on this route?", confirmLabel: "Give up" }));
     expect(ui.$(".overland-outcome-title")?.textContent).toBe("Route revealed");
     expect(ui.$(".overland-outcome-points")?.textContent).toBe("No points");
-    expect(ui.all(".overland-chain-stop")).toHaveLength(route.minimum + 2);
-    expect(ui.all(".overland-chain-stop.is-missed")).toHaveLength(route.minimum);
+    const shown = ui.$(".overland-chain")!;
+    expect(shown.querySelectorAll(".overland-chain-stop")).toHaveLength(route.minimum + 2);
+    expect(shown.querySelectorAll(".overland-chain-stop.is-missed")).toHaveLength(route.minimum);
     expect(ui.all(".world-map-country.is-ov-missed")).toHaveLength(route.minimum);
     expect(ui.$(".overland-map")?.classList.contains("has-borders")).toBe(true);
     expect(ui.$(".overland-next")?.textContent).toBe("Next route");

@@ -32,6 +32,10 @@ export interface BorderGraph {
    * as possible; ties go to better-known countries (lower `rank`), then alphabetical order.
    */
   readonly shortestRoute: (start: string, end: string, prefer?: ReadonlySet<string>, rank?: (code: string) => number) => readonly string[] | null;
+  /** How many different shortest routes join `start` and `end` (0 when none). */
+  readonly countShortestRoutes: (start: string, end: string) => number;
+  /** Up to `limit` shortest routes (endpoints included), better-known countries (lower `rank`) first. */
+  readonly shortestRoutes: (start: string, end: string, limit: number, rank?: (code: string) => number) => readonly (readonly string[])[];
 }
 
 export function createBorderGraph(borders: Readonly<Record<string, readonly string[]>>): BorderGraph {
@@ -135,6 +139,51 @@ export function createBorderGraph(borders: Readonly<Record<string, readonly stri
     return path;
   }
 
+  /** Next steps along a shortest route from `code`, which is `step` crossings from `start`. */
+  function onwardSteps(start: string, end: string, code: string, step: number): readonly string[] {
+    const total = distance(start, end);
+    if (total === null) return [];
+    const fromStart = distancesFrom(start);
+    const fromEnd = distancesFrom(end);
+    return neighbours(code).filter((next) => fromStart.get(next) === step + 1 && fromEnd.get(next) === total - step - 1);
+  }
+
+  function countShortestRoutes(start: string, end: string): number {
+    const total = distance(start, end);
+    if (total === null) return 0;
+    const ways = new Map<string, number>([[start, 1]]);
+    let layer = [start];
+    for (let step = 0; step < total; step += 1) {
+      const next = new Set<string>();
+      for (const code of layer) {
+        for (const onward of onwardSteps(start, end, code, step)) {
+          ways.set(onward, (ways.get(onward) ?? 0) + ways.get(code)!);
+          next.add(onward);
+        }
+      }
+      layer = [...next];
+    }
+    return ways.get(end) ?? 0;
+  }
+
+  function shortestRoutes(start: string, end: string, limit: number, rank: (code: string) => number = () => 0): readonly (readonly string[])[] {
+    const total = distance(start, end);
+    if (total === null || limit <= 0) return [];
+    const routes: string[][] = [];
+    const walk = (path: string[]): void => {
+      if (routes.length >= limit) return;
+      const current = path[path.length - 1]!;
+      if (current === end) {
+        routes.push([...path]);
+        return;
+      }
+      const options = [...onwardSteps(start, end, current, path.length - 1)].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+      for (const next of options) walk([...path, next]);
+    };
+    walk([start]);
+    return routes;
+  }
+
   return {
     codes,
     has: (code) => adjacency.has(code),
@@ -146,6 +195,8 @@ export function createBorderGraph(borders: Readonly<Record<string, readonly stri
     connects: (start, end, via) => routeWithin(start, end, via) !== null,
     routeWithin,
     shortestRoute,
+    countShortestRoutes,
+    shortestRoutes,
   };
 }
 

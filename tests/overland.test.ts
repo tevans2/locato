@@ -92,6 +92,19 @@ describe("Overland border graph", () => {
     expect(tiny.shortestRoute("A", "E", new Set(), (code) => (code === "C" ? 0 : 1))).toEqual(["A", "C", "D", "E"]);
     expect(graph.shortestRoute("PT", "PL")).toEqual(["PT", "ES", "FR", "DE", "PL"]);
   });
+
+  it("counts and lists every shortest route", () => {
+    expect(tiny.countShortestRoutes("A", "E")).toBe(2);
+    expect(tiny.shortestRoutes("A", "E", 5)).toEqual([["A", "B", "D", "E"], ["A", "C", "D", "E"]]);
+    expect(tiny.shortestRoutes("A", "E", 1)).toEqual([["A", "B", "D", "E"]]);
+    expect(tiny.countShortestRoutes("A", "F")).toBe(0);
+    expect(tiny.shortestRoutes("A", "F", 5)).toEqual([]);
+    expect(graph.countShortestRoutes("ES", "DE")).toBe(1);
+    const balkans = graph.shortestRoutes("AT", "BG", 10);
+    expect(balkans).toHaveLength(graph.countShortestRoutes("AT", "BG"));
+    expect(balkans).toContainEqual(["AT", "HU", "RS", "BG"]);
+    expect(balkans).toContainEqual(["AT", "HU", "RO", "BG"]);
+  });
 });
 
 describe("Overland verdicts", () => {
