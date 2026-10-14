@@ -1,4 +1,4 @@
-import { DAILY_FORMAT, DAILY_HINT_PENALTY, DAILY_WRONG_GUESS_PENALTY, type DailyChallenge } from "../../core/dailyChallenge";
+import { DAILY_FORMAT, DAILY_FORMAT_WITHOUT_OVERLAND, DAILY_HINT_PENALTY, DAILY_WRONG_GUESS_PENALTY, type DailyChallenge } from "../../core/dailyChallenge";
 import type { Screen } from "../../app/router";
 import type { ShellContext } from "../shell/types";
 import { el } from "../dom/createElement";
@@ -13,7 +13,7 @@ export function createDailyIntroScreen(options: {
   readonly onStart: () => void;
 }): Screen {
   const { challenge, roundsPlayed } = options;
-  const format = challenge.challengeVersion === 2 ? DAILY_FORMAT : [
+  const format = challenge.challengeVersion === 2 ? (challenge.overlandRoute ? DAILY_FORMAT : DAILY_FORMAT_WITHOUT_OVERLAND) : [
     { label: "Mixed country questions", rounds: "1–8", icon: "flag" as const },
     { label: "Map Tap", rounds: "9", icon: "globe" as const },
     { label: "Street View", rounds: "10", icon: "binoculars" as const },
@@ -39,7 +39,7 @@ export function createDailyIntroScreen(options: {
         : "Your saved challenge continues with its original questions and order." }),
       el("section", { className: "daily-scoring", children: [
         el("h2", { text: "How scoring works" }),
-        el("p", { text: `Each round is worth 10 points. A hint costs ${DAILY_HINT_PENALTY} points and a wrong guess costs ${DAILY_WRONG_GUESS_PENALTY} points. Passing or revealing an answer earns 0. Map Tap awards points for how close you pin the location.` }),
+        el("p", { text: `Each round is worth 10 points. A hint costs ${DAILY_HINT_PENALTY} points and a wrong guess costs ${DAILY_WRONG_GUESS_PENALTY} points. Passing or revealing an answer earns 0. Map Tap awards points for how close you pin the location.${challenge.overlandRoute ? ` In Overland, every guess beyond the shortest route's length counts as a wrong guess.` : ""}` }),
         el("p", { className: "muted", text: "Score comes first on the leaderboard; time breaks ties. Your progress saves as you play." }),
       ] }),
     ] })],

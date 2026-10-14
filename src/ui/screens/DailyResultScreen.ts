@@ -39,7 +39,8 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     if (round.missed) return "Passed or revealed · 0 points";
     if (round.categoryId === "map-tap") return `${Math.round(round.distanceKm ?? 0).toLocaleString("en-US")} km from target · ${10 - round.points} points lost`;
     if (round.points === 10) return "Correct first time";
-    const reasons = [round.hintsUsed > 0 ? `${round.hintsUsed} hint${round.hintsUsed === 1 ? "" : "s"}` : "", round.wrongGuesses > 0 ? `${round.wrongGuesses} wrong guess${round.wrongGuesses === 1 ? "" : "es"}` : ""].filter(Boolean);
+    const wrong = round.categoryId === "overland" ? "extra guess" : "wrong guess";
+    const reasons = [round.hintsUsed > 0 ? `${round.hintsUsed} hint${round.hintsUsed === 1 ? "" : "s"}` : "", round.wrongGuesses > 0 ? `${round.wrongGuesses} ${wrong}${round.wrongGuesses === 1 ? "" : "es"}` : ""].filter(Boolean);
     return `${reasons.join(" · ")} · ${10 - round.points} points lost`;
   }
 
@@ -48,10 +49,11 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     result.rounds?.length
       ? el("ol", { className: "daily-recap-list", children: result.rounds.map((round, position) => {
           const country = round.countryCode ? options.countryIndex.byCode.get(round.countryCode) : undefined;
-          const location = round.targetId ? findMapTapLocation(round.targetId) : undefined;
-          const answer = location ? `${location.name} (${location.lat.toFixed(2)}°, ${location.lng.toFixed(2)}°)`
+          const location = round.targetId && round.categoryId === "map-tap" ? findMapTapLocation(round.targetId) : undefined;
+          const routeEnds = round.categoryId === "overland" ? (round.targetId ?? "").split("-").map((code) => options.countryIndex.byCode.get(code)?.name ?? code) : null;
+          const answer = routeEnds ? routeEnds.join(" → ") : location ? `${location.name} (${location.lat.toFixed(2)}°, ${location.lng.toFixed(2)}°)`
             : round.categoryId === "capitals" ? `${country?.capital ?? ""} → ${country?.name ?? round.countryCode}` : country?.name ?? round.countryCode ?? "";
-          const label = round.categoryId === "map-tap" ? "Map Tap" : round.categoryId === "streetview-country" ? "Street View" : getCategory(round.categoryId)?.label ?? round.categoryId;
+          const label = round.categoryId === "map-tap" ? "Map Tap" : round.categoryId === "streetview-country" ? "Street View" : round.categoryId === "overland" ? "Overland" : getCategory(round.categoryId)?.label ?? round.categoryId;
           return el("li", { className: `daily-recap-row${round.points < 10 ? " has-loss" : ""}`, children: [
             el("span", { className: "daily-recap-number", text: String(position + 1) }),
             el("div", { className: "daily-recap-answer", children: [el("span", { className: "daily-recap-mode", text: label }), el("strong", { text: answer }), el("span", { className: "daily-recap-reason", text: roundExplanation(round) })] }),

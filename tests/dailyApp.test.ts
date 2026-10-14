@@ -2,7 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app/App";
 import { indexCountries, rawCountries } from "../src/core/countries";
-import { createDailyChallenge, createMixedThemeDailyChallenge, getLocalDailyDate, scoreDailyRound, type DailyRoundResult } from "../src/core/dailyChallenge";
+import { createDailyChallenge, createDailyChallengeWithoutOverland, createMixedThemeDailyChallenge, getLocalDailyDate, scoreDailyRound, type DailyRoundResult } from "../src/core/dailyChallenge";
+import { createOverlandRound, guessOverland, overlandGraph, type OverlandRound, type OverlandRoute } from "../src/core/overland";
+import type { OverlandScreenOptions } from "../src/ui/screens/OverlandScreen";
 import { createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult } from "../src/storage/dailySave";
 import { createGameEngine } from "../src/core/game";
 import { createSoloSave } from "../src/storage/localSave";
@@ -15,7 +17,7 @@ import { handleAuthRequest } from "../server/auth/routes";
 import { SESSION_COOKIE_NAME } from "../server/auth/cookies";
 import type { AuthUser } from "../server/auth/types";
 
-const captured = vi.hoisted(() => ({ user: null as AuthUser | null, solo: [] as SoloGameScreenOptions[], map: [] as MapTapScreenOptions[], street: [] as StreetViewCountryScreenOptions[] }));
+const captured = vi.hoisted(() => ({ user: null as AuthUser | null, solo: [] as SoloGameScreenOptions[], map: [] as MapTapScreenOptions[], street: [] as StreetViewCountryScreenOptions[], overland: [] as OverlandScreenOptions[] }));
 vi.mock("../src/ui/components/AuthPanel", () => ({ createAuthControls: (options: { onAuthChange: (state: { user: AuthUser | null; stats: null }) => void }) => {
   queueMicrotask(() => options.onAuthChange({ user: captured.user, stats: null }));
   return { trigger: document.createElement("button"), panel: document.createElement("div"), getUser: () => captured.user, refreshStats: vi.fn(), openPanel: vi.fn() };
@@ -24,17 +26,24 @@ vi.mock("../src/core/map", async (importOriginal) => ({ ...await importOriginal<
 vi.mock("../src/ui/screens/LandingScreen", () => ({ createLandingScreen: () => ({ element: document.createElement("section"), destroy: vi.fn() }) }));
 vi.mock("../src/ui/screens/SoloGameScreen", () => ({ createSoloGameScreen: (options: SoloGameScreenOptions) => { captured.solo.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
 vi.mock("../src/ui/screens/MapTapScreen", () => ({ createMapTapScreen: (options: MapTapScreenOptions) => { captured.map.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
+vi.mock("../src/ui/screens/OverlandScreen", () => ({ createOverlandScreen: (options: OverlandScreenOptions) => { captured.overland.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
 vi.mock("../src/ui/screens/StreetViewCountryScreen", () => ({ createStreetViewCountryScreen: (options: StreetViewCountryScreenOptions) => { captured.street.push(options); return { element: document.createElement("section"), destroy: vi.fn() }; } }));
 
 const index = indexCountries(rawCountries);
 beforeEach(() => {
-  captured.solo.length = captured.map.length = captured.street.length = 0;
+  captured.solo.length = captured.map.length = captured.street.length = captured.overland.length = 0;
   captured.user = null;
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ entries: [], summary: null }), { status: 200 })));
 });
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+/** A route played perfectly: a shortest route's countries, in order. */
+function solve(route: OverlandRoute): OverlandRound {
+  const graph = overlandGraph();
+  return graph.shortestRoute(route.start, route.end)!.slice(1, -1).reduce((round, code) => (guessOverland(graph, round, code) as { round: OverlandRound }).round, createOverlandRound(route));
+}
 
 function setup() {
   const root = document.createElement("div"); root.id = "app"; document.body.append(root);
@@ -94,7 +103,16 @@ describe("daily app orchestration", () => {
     expect(resumed.engine.getState().currentCategoryId).toBe("capitals");
     expect(resumed.dailyChallenge!.initialProgress!.rounds).toEqual(rounds);
     for (const slot of challenge.promptSlots!.slice(2)) rounds.push({ categoryId: slot.categoryId, countryCode: index.byId[slot.countryId]!.code, points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false });
-    resumed.dailyChallenge!.onComplete({ score: 77, timeMs: 50_000, hintsUsed: 1, marks: ["hint", ...Array(7).fill("correct")], rounds });
+    resumed.dailyChallenge!.onComplete({ score: 67, timeMs: 50_000, hintsUsed: 1, marks: ["hint", ...Array(6).fill("correct")], rounds });
+    // Round 8: link two of the theme's countries by land.
+    await vi.waitFor(() => expect(captured.overland).toHaveLength(1));
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ stage: "overland", roundIndex: 7, score: 67, overlandRound: true });
+    const overland = captured.overland[0]!.dailyChallenge!;
+    expect(overland.route).toEqual(challenge.overlandRoute);
+    expect(overland.progress).toEqual({ round: 8, total: 10 });
+    overland.onResult!(solve(overland.route));
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ stage: "map-tap", roundIndex: 8, score: 77 });
+    overland.onComplete(solve(overland.route));
     await vi.waitFor(() => expect(captured.map).toHaveLength(1));
     const pin = { target: (await import("../src/core/maptap/locations")).findMapTapLocation(challenge.mapTapTargetId)!, guess: { lat: 0, lng: 0 }, distanceKm: 1000, score: 2500, maxScore: 5000, decayKm: 1000, toleranceKm: 0 };
     captured.map[0]!.dailyChallenge!.onResult!(pin);
@@ -165,24 +183,47 @@ describe("daily app orchestration", () => {
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed)?.themeScoped).toBeUndefined();
   });
 
+  it("resumes a themed attempt started before round 8 became an Overland route with eight prompt rounds", async () => {
+    const challenge = createDailyChallengeWithoutOverland(index, getLocalDailyDate());
+    saveDailyProgress(window.localStorage, { version: 1, date: challenge.date, seed: challenge.seed,
+      stage: "prompt", roundIndex: 0, score: 0, marks: [], hintsUsed: 0, elapsedMs: 1000, engine: null, roundHintsUsed: 0, roundWrongGuesses: 0,
+      updatedAt: Date.now(), challengeVersion: 2, themeScoped: true, rounds: [] });
+    const { root, app } = setup();
+    app.navigate({ type: "daily-challenge" });
+    await vi.waitFor(() => expect(root.querySelector("#daily-intro")).not.toBeNull());
+    expect([...root.querySelectorAll(".daily-format strong")].map((item) => item.textContent)).toContain("Country locations");
+    root.querySelector<HTMLButtonElement>('[data-action="start-daily"]')!.click();
+    await vi.waitFor(() => expect(captured.solo).toHaveLength(1));
+    expect(captured.solo[0]!.dailyChallenge!.promptSlots).toHaveLength(8);
+    captured.solo[0]!.dailyChallenge!.onComplete({ score: 80, timeMs: 1000, hintsUsed: 0, marks: Array(8).fill("correct"), rounds: [] });
+    await vi.waitFor(() => expect(captured.map).toHaveLength(1));
+    expect(captured.overland).toHaveLength(0);
+  });
+
   it("replays only losses across all modes without changing the daily result or other practice saves", async () => {
     const { root, app } = setup();
     const date = getLocalDailyDate();
     const challenge = createDailyChallenge(index, date);
     const rounds: DailyRoundResult[] = challenge.promptSlots!.map((slot) => ({ categoryId: slot.categoryId, countryCode: index.byId[slot.countryId]!.code, points: 10, hintsUsed: 0, wrongGuesses: 0, missed: false }));
     rounds[2] = { ...rounds[2]!, points: 0, missed: true };
-    rounds.push({ categoryId: "map-tap", targetId: challenge.mapTapTargetId, points: 5, hintsUsed: 0, wrongGuesses: 0, missed: false, distanceKm: 1000 },
+    const route = challenge.overlandRoute!;
+    rounds.push({ categoryId: "overland", targetId: `${route.start}-${route.end}`, points: scoreDailyRound(0, false, 1), hintsUsed: 0, wrongGuesses: 1, missed: false },
+      { categoryId: "map-tap", targetId: challenge.mapTapTargetId, points: 5, hintsUsed: 0, wrongGuesses: 0, missed: false, distanceKm: 1000 },
       { categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, points: scoreDailyRound(0, false, 1), hintsUsed: 0, wrongGuesses: 1, missed: false });
-    const result = createDailyResultSave({ date, seed: challenge.seed, score: 83, timeMs: 100_000, hintsUsed: 0,
-      marks: ["correct", "correct", "miss", "correct", "correct", "correct", "correct", "correct", "hint", "hint"], rounds, challengeVersion: 2 });
+    const result = createDailyResultSave({ date, seed: challenge.seed, score: 81, timeMs: 100_000, hintsUsed: 0,
+      marks: ["correct", "correct", "miss", "correct", "correct", "correct", "correct", "hint", "hint", "hint"], rounds, challengeVersion: 2 });
     saveDailyResult(window.localStorage, result);
     window.localStorage.setItem("locato:solo:v3:flags@countries", "existing practice");
     app.navigate({ type: "daily-practice", date });
     await vi.waitFor(() => expect(captured.solo).toHaveLength(1));
     const prompt = captured.solo[0]!;
     expect(prompt.engine.getState()).toMatchObject({ currentCountryId: challenge.countryIds[2], currentCategoryId: "capitals" });
-    expect(prompt.dailyChallenge).toMatchObject({ practice: true, totalRounds: 3, roundOffset: 0 });
+    expect(prompt.dailyChallenge).toMatchObject({ practice: true, totalRounds: 4, roundOffset: 0 });
     prompt.dailyChallenge!.onComplete({ score: 10, hintsUsed: 0, timeMs: 1000, marks: ["correct"], rounds: [] });
+    const replay = captured.overland[0]!.dailyChallenge!;
+    expect(replay).toMatchObject({ practice: true, route, progress: { round: 2, total: 4 } });
+    expect(replay.onResult).toBeUndefined();
+    replay.onComplete(solve(route));
     expect(captured.map[0]!.dailyChallenge!.target.id).toBe(challenge.mapTapTargetId);
     captured.map[0]!.dailyChallenge!.onComplete({ target: (await import("../src/core/maptap/locations")).findMapTapLocation(challenge.mapTapTargetId)!, guess: { lat: 0, lng: 0 }, distanceKm: 0, score: 5000, maxScore: 5000, decayKm: 1000, toleranceKm: 0 });
     expect(captured.street[0]!.dailyChallenge!.round.countryCode).toBe(challenge.streetViewCountryCode);

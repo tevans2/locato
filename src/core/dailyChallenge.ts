@@ -5,6 +5,7 @@ import { dailyThemeForDate, type DailyTheme } from "./dailyThemes";
 import { createSeededRandom, shuffle } from "./game";
 import { MAP_TAP_LOCATIONS } from "./maptap/locations";
 import { streetViewCountryRounds } from "./streetview";
+import { createThemedOverlandRoute, overlandRouteBetween, type OverlandRound, type OverlandRoute } from "./overland";
 
 export const DAILY_PROMPT_COUNTRY_COUNT = 8;
 export const DAILY_MAP_TAP_ROUND_COUNT = 1;
@@ -19,9 +20,16 @@ export const DAILY_FORMAT = [
   { label: "Flags", rounds: "1–2", icon: "flag" },
   { label: "Capitals", rounds: "3–4", icon: "crown" },
   { label: "Country shapes", rounds: "5–6", icon: "shapes" },
-  { label: "Country locations", rounds: "7–8", icon: "map-pin" },
+  { label: "Country location", rounds: "7", icon: "map-pin" },
+  { label: "Overland", rounds: "8", icon: "route" },
   { label: "Map Tap", rounds: "9", icon: "globe" },
   { label: "Street View", rounds: "10", icon: "binoculars" },
+] as const;
+/** The order of dailies started before round 8 became an Overland route. */
+export const DAILY_FORMAT_WITHOUT_OVERLAND = [
+  ...DAILY_FORMAT.slice(0, 3),
+  { label: "Country locations", rounds: "7–8", icon: "map-pin" },
+  ...DAILY_FORMAT.slice(5),
 ] as const;
 
 export interface DailyRoundResult {
@@ -42,11 +50,17 @@ export function parseDailyRoundResults(value: unknown): readonly DailyRoundResul
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
     const r = item as DailyRoundResult;
-    if (![...DAILY_CATEGORY_IDS, "map-tap", "streetview-country"].includes(r.categoryId) ||
+    if (![...DAILY_CATEGORY_IDS, "map-tap", "streetview-country", "overland"].includes(r.categoryId) ||
       !Number.isInteger(r.points) || r.points < 0 || r.points > DAILY_POINTS_PER_ROUND ||
       !Number.isInteger(r.hintsUsed) || r.hintsUsed < 0 || r.hintsUsed > 1000 ||
       !Number.isInteger(r.wrongGuesses) || r.wrongGuesses < 0 || r.wrongGuesses > 1_000_000 ||
       typeof r.missed !== "boolean" || (r.missed && r.points !== 0)) return null;
+    if (r.categoryId === "overland") {
+      const [start, end] = typeof r.targetId === "string" && /^[A-Z]{2}-[A-Z]{2}$/.test(r.targetId) ? r.targetId.split("-") : [];
+      if (!start || !end || !overlandRouteBetween(start, end)) return null;
+      results.push({ categoryId: r.categoryId, targetId: r.targetId!, points: r.points, hintsUsed: r.hintsUsed, wrongGuesses: r.wrongGuesses, missed: r.missed });
+      continue;
+    }
     if (r.categoryId === "map-tap") {
       if (typeof r.targetId !== "string" || !MAP_TAP_LOCATIONS.some((location) => location.id === r.targetId) ||
         (r.distanceKm !== undefined && (!Number.isFinite(r.distanceKm) || r.distanceKm < 0 || r.distanceKm > 21_000))) return null;
@@ -68,6 +82,8 @@ export interface DailyChallenge {
   readonly streetViewCountryCode: string;
   readonly promptSlots?: readonly PromptSlot[];
   readonly theme?: DailyTheme;
+  /** Round 8: link two of the theme's countries by land. Absent on dailies started before it. */
+  readonly overlandRoute?: OverlandRoute;
   readonly challengeVersion?: 2;
   readonly themeScoped?: true;
 }
@@ -99,7 +115,7 @@ export function createLegacyDailyChallenge(index: CountryIndex, date: string): D
 }
 
 export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate()): DailyChallenge {
-  return buildThemedDailyChallenge(index, date, true);
+  return buildThemedDailyChallenge(index, date, true, `daily:${date}`, true);
 }
 
 /** Preserve the questions of attempts started before every round followed its theme. */
@@ -107,14 +123,20 @@ export function createMixedThemeDailyChallenge(index: CountryIndex, date: string
   return buildThemedDailyChallenge(index, date, false);
 }
 
+/** Preserve the questions of themed attempts started before round 8 became an Overland route. */
+export function createDailyChallengeWithoutOverland(index: CountryIndex, date: string): DailyChallenge {
+  return buildThemedDailyChallenge(index, date, true);
+}
+
 /** Server callers supply a private seed; the public date must not reveal the ranked queue. */
 export function createServerDailyChallenge(index: CountryIndex, date: string, seed: string): DailyChallenge {
   return buildThemedDailyChallenge(index, date, true, seed);
 }
 
-function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`): DailyChallenge {
+function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`, withOverland = false): DailyChallenge {
   const theme = dailyThemeForDate(date);
-  const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"];
+  // With an Overland round 8, the prompt stage keeps the first seven rounds.
+  const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"].slice(0, withOverland ? 7 : 8);
   const tiers: readonly FameTier[] = [1, 1, 2, 2, 1, 3, 2, 3];
   const used = new Set<CountryId>();
   const candidates = shuffle(index.countries.filter((country) => !country.allowedCategoryIds &&
@@ -141,7 +163,8 @@ function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScope
     : streetRounds.length ? streetRounds : streetViewCountryRounds;
   const streetViewCountryCode = shuffle(streetSource, createSeededRandom(`${seed}:streetview`))[0]?.countryCode ?? "";
   return { date, seed, categoryIds: DAILY_CATEGORY_IDS, countryIds: promptSlots.map((slot) => slot.countryId), promptSlots, theme, challengeVersion: 2,
-    ...(themeScoped ? { themeScoped: true } : {}), mapTapTargetId, streetViewCountryCode };
+    ...(themeScoped ? { themeScoped: true } : {}), mapTapTargetId, streetViewCountryCode,
+    ...(withOverland ? { overlandRoute: createThemedOverlandRoute(theme.countryCodes, seed) } : {}) };
 }
 
 export function formatDailyTime(milliseconds: number): string {
@@ -155,6 +178,21 @@ export function scoreDailyRound(hintsUsed: number, missed = false, wrongGuesses 
   if (missed) return 0;
   const penalty = Math.max(0, hintsUsed) * DAILY_HINT_PENALTY + Math.max(0, wrongGuesses) * DAILY_WRONG_GUESS_PENALTY;
   return Math.max(0, Math.round(DAILY_POINTS_PER_ROUND - penalty));
+}
+
+/**
+ * A finished Overland round as a daily round. Every guess beyond the shortest route's length
+ * counts as a wrong guess and hints cost as usual, so the server's standard check applies.
+ */
+export function scoreDailyOverlandRound(round: OverlandRound): DailyRoundResult {
+  const missed = round.status !== "solved";
+  const wrongGuesses = Math.max(0, round.guesses.length - round.route.minimum);
+  return { categoryId: "overland", targetId: `${round.route.start}-${round.route.end}`, points: scoreDailyRound(round.hintsUsed, missed, wrongGuesses), hintsUsed: round.hintsUsed, wrongGuesses, missed };
+}
+
+/** The daily mark for a scored round: full points, points lost, or none. */
+export function dailyRoundMark(round: DailyRoundResult): DailyRoundMark {
+  return round.missed ? "miss" : round.hintsUsed > 0 || round.wrongGuesses > 0 ? "hint" : "correct";
 }
 
 export function scoreDailyMapTapRound(score: number, maxScore: number): number {

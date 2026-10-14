@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createOverlandScreen } from "../src/ui/screens/OverlandScreen";
-import { createOverlandRoutes, overlandGraph } from "../src/core/overland";
+import { createDailyOverlandRoute, createOverlandRoutes, overlandGraph, overlandRouteBetween, type OverlandRound } from "../src/core/overland";
+import { readOverlandDailyStats } from "../src/storage/overlandDaily";
 import { indexCountries, rawCountries } from "../src/core/countries";
 import { OVERLAND_ATTEMPT_ROUTES } from "../src/core/leaderboards";
 import { rankedWorld } from "../server/ranked/assets";
@@ -265,5 +266,110 @@ describe("Overland (single-run: every run counts)", () => {
     expect(stage.querySelector(".shell-results-stat.is-hero strong")?.textContent).toBe("0");
     expect(stage.textContent).toContain("Countries you missed");
     expect(stage.textContent).toContain(nameOf(graph.shortestRoute(routes[0]!.start, routes[0]!.end)![1]!));
+  });
+});
+
+describe("Overland in the daily challenge (round 8)", () => {
+  const route = overlandRouteBetween("PT", "PL")!;
+  function mountDaily(daily: { onResult?: (round: OverlandRound) => void; onComplete: (round: OverlandRound) => void; practice?: boolean }) {
+    const screen = createOverlandScreen({
+      worldCountryFeatures: world, countryIndex: index, storage: localStorage, onGameModeChange() {}, onHome() {},
+      dailyChallenge: { date: "2026-10-14", title: "Around the Mediterranean", route, progress: { round: 8, total: 10 }, ...daily },
+    });
+    screens.push(screen);
+    document.body.append(screen.element);
+    return screen;
+  }
+
+  it("plays one route under the daily's bar and scores it out of 10", () => {
+    const onResult = vi.fn();
+    const onComplete = vi.fn();
+    const screen = mountDaily({ onResult, onComplete });
+    const $ = <T extends HTMLElement = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector)!;
+    expect(screen.element.querySelector(".shell-focusbar")).not.toBeNull();
+    expect(screen.element.querySelector(".shell-gamebar")).toBeNull();
+    expect($(".gb-daily-count").textContent).toBe("Round 8 of 10");
+    expect($(".overland-progress").hidden).toBe(true);
+    expect($(".overland-eyebrow").textContent).toBe("Daily challenge · Overland");
+    for (const name of ["Italy", "Spain", "France", "Germany"]) {
+      $<HTMLInputElement>("#overland-guess-input").value = name;
+      $(".overland-guess-form").dispatchEvent(new Event("submit", { cancelable: true }));
+    }
+    expect(onResult).toHaveBeenCalledOnce();
+    expect(onResult.mock.calls[0]![0]).toMatchObject({ status: "solved" });
+    expect($(".overland-outcome-points").textContent).toBe("+8 of 10");
+    expect($(".overland-next").textContent).toBe("Continue daily challenge");
+    $(".overland-next").click();
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("says Continue practice when replaying a missed round", () => {
+    const screen = mountDaily({ practice: true, onComplete: vi.fn() });
+    expect(screen.element.querySelector(".overland-eyebrow")?.textContent).toBe("Daily practice · Overland");
+  });
+});
+
+describe("Overland: today's route", () => {
+  const DATE = "2026-10-14";
+  const todays = createDailyOverlandRoute(DATE);
+  function mountToday(onPlayRun = vi.fn()) {
+    const screen = createOverlandScreen({ shell: stubShell(), worldCountryFeatures: world, countryIndex: index, storage: localStorage, onGameModeChange() {}, onHome() {}, today: { date: DATE }, onPlayRun });
+    screens.push(screen);
+    document.body.append(screen.element);
+    const $ = <T extends HTMLElement = HTMLElement>(selector: string) => screen.element.querySelector<T>(selector);
+    const guess = (code: string) => {
+      $<HTMLInputElement>("#overland-guess-input")!.value = nameOf(code);
+      $(".overland-guess-form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    };
+    return { screen, $, guess };
+  }
+
+  it("is the same route for everyone that day, longer at the weekend", () => {
+    expect(createDailyOverlandRoute(DATE)).toEqual(todays);
+    expect(createDailyOverlandRoute("2026-10-12").minimum).toBe(3); // Monday
+    expect(createDailyOverlandRoute("2026-10-18").minimum).toBe(6); // Sunday
+    expect(graph.distance(todays.start, todays.end)).toBe(todays.minimum + 1);
+  });
+
+  it("resumes a route in progress and can't be replayed once it's over", () => {
+    const first = mountToday();
+    expect(first.$(".overland-eyebrow")?.textContent).toBe("Today's route · 14 Oct");
+    expect(first.$(".overland-progress")?.hidden).toBe(true);
+    const path = graph.shortestRoute(todays.start, todays.end)!.slice(1, -1);
+    first.guess(path[0]!);
+    first.screen.destroy();
+
+    const again = mountToday();
+    expect([...again.screen.element.querySelectorAll(".overland-guess-name")].map((item) => item.textContent)).toEqual([nameOf(path[0]!)]);
+    for (const code of path.slice(1)) again.guess(code);
+    expect(again.$(".overland-outcome-title")?.textContent).toBe("Perfect route!");
+    expect(again.$(".overland-next")).toBeNull();
+    expect(again.$(".overland-today-stats")?.textContent).toContain("Streak1 day");
+    expect(readOverlandDailyStats(localStorage, DATE)).toEqual({ streak: 1, bestStreak: 1, played: 1, solved: 1 });
+    again.screen.destroy();
+
+    const done = mountToday();
+    expect(done.$<HTMLElement>(".overland-outcome")?.hidden).toBe(false);
+    expect(done.$<HTMLElement>(".overland-play-controls")?.hidden).toBe(true);
+    expect(done.$(".overland-outcome-title")?.textContent).toBe("Perfect route!");
+  });
+
+  it("shares a spoiler-free grid and links to the five-route run", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const onPlayRun = vi.fn();
+    const ui = mountToday(onPlayRun);
+    ui.guess("JP");
+    for (const code of graph.shortestRoute(todays.start, todays.end)!.slice(1, -1)) ui.guess(code);
+    ui.$<HTMLButtonElement>(".overland-share")!.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    const text = (writeText.mock.calls[0] as unknown as [string])[0];
+    expect(text).toContain(`Locato Overland · ${DATE}`);
+    expect(text).toContain(`${nameOf(todays.start)} → ${nameOf(todays.end)}`);
+    expect(text).toContain(`🟥${"🟩".repeat(todays.minimum)} (+1)`);
+    for (const code of graph.shortestRoute(todays.start, todays.end)!.slice(1, -1)) expect(text).not.toContain(nameOf(code));
+    ui.$<HTMLButtonElement>(".overland-play-run")!.click();
+    expect(onPlayRun).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
   });
 });

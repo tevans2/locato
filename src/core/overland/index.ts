@@ -4,10 +4,13 @@ export {
   EXCLAVE_BORDERS,
   OVERLAND_ROUTE_PLAN,
   OVERLAND_SPARE_GUESSES,
+  createDailyOverlandRoute,
   createOverlandRoutes,
+  createThemedOverlandRoute,
   exclaveBorderNote,
   exclaveNotesFor,
   overlandGuessAllowance,
+  overlandRouteBetween,
   overlandRouteCandidates,
 } from "./routes";
 export type { OverlandRoute, OverlandRouteStep } from "./routes";

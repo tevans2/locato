@@ -1,6 +1,7 @@
 import type { Screen } from "../../app/router";
 import type { Country, CountryIndex } from "../../core/countries";
 import { createRandomSeed } from "../../core/game/random";
+import { scoreDailyOverlandRound } from "../../core/dailyChallenge";
 import type { GameModeId } from "../../core/gameModes";
 import { OVERLAND_ATTEMPT_ROUTES } from "../../core/leaderboards";
 import type { WorldCountryFeature } from "../../core/map";
@@ -11,6 +12,7 @@ import {
   OVERLAND_MAX_HINTS,
   OVERLAND_ROUTE_MAX_POINTS,
   OVERLAND_VERDICTS,
+  createDailyOverlandRoute,
   createOverlandRound,
   createOverlandRoutes,
   exclaveNotesFor,
@@ -31,14 +33,15 @@ import {
   type OverlandVerdict,
 } from "../../core/overland";
 import { fameTier } from "../../core/countries/fame";
-import type { ResultsMissedCountry } from "../shell/ResultsCard";
+import { shareResult, type ResultsMissedCountry } from "../shell/ResultsCard";
+import { readOverlandDailyStats, readOverlandDay, saveOverlandDay } from "../../storage/overlandDaily";
 import { createOverlandMap } from "../components/OverlandMap";
 import { el } from "../dom/createElement";
 import { shouldAutoFocusTextInput } from "../dom/mobileKeyboard";
 import { shellIcon } from "../shell/icons";
 import { shellLayer, trapOverlay } from "../shell/layer";
 import type { ShellContext } from "../shell/types";
-import { createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback } from "./practiceRun";
+import { createDailyStageBar, createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback, type DailyStageProgress } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import type { RankedSession } from "./RankedSession";
 import "../../styles/overland.css";
@@ -54,6 +57,22 @@ export interface OverlandScreenOptions {
   readonly onDailyChallenge?: () => void;
   /** Signed in: the server deals the routes and checks every guess, hint and give-up. */
   readonly ranked?: RankedSession;
+  /** Round 8 of the daily challenge (or its practice): one route under the daily's FocusBar. */
+  readonly dailyChallenge?: {
+    readonly date: string;
+    readonly title?: string;
+    readonly practice?: boolean;
+    readonly route: OverlandRoute;
+    readonly progress?: DailyStageProgress;
+    /** Called once when the route ends, before the answer shows, so refreshing can't replay it. */
+    readonly onResult?: (round: OverlandRound) => void;
+    readonly onComplete: (round: OverlandRound) => void;
+  };
+  /** Today's route: one route for everyone on `date` (YYYY-MM-DD), saved on this device with a streak. */
+  readonly today?: { readonly date: string };
+  /** Links between today's route and the five-route run. */
+  readonly onTodaysRoute?: () => void;
+  readonly onPlayRun?: () => void;
 }
 
 export interface OverlandScreenServices {
@@ -124,7 +143,12 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   const country = (code: string): Country | undefined => countryIndex.byCode.get(code);
   const nameOf = (code: string): string => country(code)?.name ?? code;
 
-  let localRoutes: readonly OverlandRoute[] = ranked ? [] : createOverlandRoutes(services.seed ?? createRandomSeed());
+  const daily = options.dailyChallenge;
+  const today = options.today;
+  const todayRoute = today ? createDailyOverlandRoute(today.date) : null;
+  /** The daily round and today's route are one route; a run is five. */
+  const totalRoutes = daily || today ? 1 : OVERLAND_ATTEMPT_ROUTES;
+  let localRoutes: readonly OverlandRoute[] = ranked || daily || today ? [] : createOverlandRoutes(services.seed ?? createRandomSeed());
   let routeIndex = 0;
   let round: OverlandRound | null = null;
   const finished: { readonly round: OverlandRound; readonly points: number }[] = [];
@@ -160,10 +184,16 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   });
   const routeDetail = el("p", { className: "overland-route-detail" });
   const howToButton = el("button", { className: "overland-link", text: "How to play", attrs: { type: "button" } });
+  const switchLink = today && options.onPlayRun
+    ? el("button", { className: "overland-link", text: "5-route run", attrs: { type: "button" }, on: { click: () => options.onPlayRun?.() } })
+    : !daily && !today && options.onTodaysRoute
+      ? el("button", { className: "overland-link overland-today-link", text: "Today's route", attrs: { type: "button" }, on: { click: () => options.onTodaysRoute?.() } })
+      : null;
 
   const progressLabel = el("span", { className: "overland-progress-label" });
   const scoreLabel = el("strong", { className: "overland-running-score", text: "0 pts" });
   const progressDots = Array.from({ length: OVERLAND_ATTEMPT_ROUTES }, () => el("span", { className: "overland-progress-dot" }));
+  const todayLabel = today ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${today.date}T12:00:00Z`)) : "";
 
   const inputId = "overland-guess-input";
   const listId = "overland-suggestions";
@@ -202,11 +232,13 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   outcome.hidden = true;
   const nextButton = el("button", { className: "primary-action overland-next", attrs: { type: "button" } });
 
+  const progressSection = el("div", { className: "overland-progress", children: [el("div", { children: [progressLabel, scoreLabel] }), el("div", { className: "overland-progress-dots", children: progressDots })] });
+  progressSection.hidden = totalRoutes === 1;
   const panel = el("aside", {
     className: "overland-panel",
     children: [
-      el("div", { className: "overland-panel-title", children: [el("div", { className: "overland-title-row", children: [eyebrow, howToButton] }), routeTitle, routeDetail] }),
-      el("div", { className: "overland-progress", children: [el("div", { children: [progressLabel, scoreLabel] }), el("div", { className: "overland-progress-dots", children: progressDots })] }),
+      el("div", { className: "overland-panel-title", children: [el("div", { className: "overland-title-row", children: [eyebrow, el("div", { className: "overland-title-links", children: [...(switchLink ? [switchLink] : []), howToButton] })] }), routeTitle, routeDetail] }),
+      progressSection,
       playControls,
       outcome,
     ],
@@ -308,13 +340,13 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   }
 
   function startRoute(): void {
-    const route = ranked ? ranked.state.question?.route ?? null : localRoutes[routeIndex] ?? null;
+    const route = daily?.route ?? todayRoute ?? (ranked ? ranked.state.question?.route ?? null : localRoutes[routeIndex] ?? null);
     if (!route) {
       setFeedback("This route couldn't be loaded. Restart the run to try again.", "warn");
       return;
     }
     round = createOverlandRound(route);
-    eyebrow.textContent = `Overland · Route ${routeIndex + 1}`;
+    eyebrow.textContent = daily ? `${daily.practice ? "Daily practice" : "Daily challenge"} · Overland` : today ? `Today's route · ${todayLabel}` : `Overland · Route ${routeIndex + 1}`;
     startName.textContent = nameOf(route.start);
     endName.textContent = nameOf(route.end);
     const startSrc = country(route.start)?.flagSrc;
@@ -335,7 +367,25 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     renderGuesses();
     setBusy(false);
     updateProgress();
+    const saved = today ? readOverlandDay(options.storage, today.date, route) : null;
+    if (saved) {
+      // Today's route resumes where it was left, or shows its result again once it's over.
+      round = saved;
+      for (const guess of saved.guesses) map.mark(guess.code, guess.verdict);
+      map.setOutlined(saved.outlined);
+      map.frame();
+      renderGuesses();
+      setBusy(false);
+      if (saved.status !== "playing") {
+        endRoute(overlandRoundPoints(saved), true);
+        return;
+      }
+    }
     if (shouldFocusInput()) input.focus({ preventScroll: true });
+  }
+
+  function saveToday(): void {
+    if (today && round) saveOverlandDay(options.storage, today.date, round);
   }
 
   function shouldFocusInput(): boolean {
@@ -346,10 +396,16 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     }
   }
 
-  function endRoute(points: number): void {
+  function endRoute(points: number, restored = false): void {
     if (!round) return;
     const current = round;
     finished.push({ round: current, points });
+    if (!restored) {
+      saveToday();
+      daily?.onResult?.(current);
+    }
+    // The daily scores on its own 10-point scale.
+    const shownPoints = daily ? scoreDailyOverlandRound(current).points : points;
     const guessed = guessedCodes();
     const best = overlandBestRoute(graph, current);
     const yours = overlandPlayerRoute(graph, current);
@@ -374,24 +430,60 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     } else chains.push(el("p", { className: "overland-chain-label", text: shortestCount === 1 ? "Shortest route" : `A shortest route (1 of ${shortestCount})` }), routeChain(best, guessed));
     if (shortestCount > 1) chains.push(createAllRoutesToggle(current, best, guessed, shortestCount));
     const notes = exclaveNotesFor(yours ?? best);
-    const last = finished.length >= OVERLAND_ATTEMPT_ROUTES;
-    nextButton.textContent = last ? "See final score" : "Next route";
+    const last = finished.length >= totalRoutes;
+    nextButton.textContent = daily ? (daily.practice ? "Continue practice" : "Continue daily challenge") : last ? "See final score" : "Next route";
     outcome.dataset.status = current.status;
     outcome.replaceChildren(
       el("div", {
         className: "overland-outcome-head",
-        children: [el("strong", { className: "overland-outcome-title", text: title }), el("span", { className: "overland-outcome-points", text: points > 0 ? `+${points} points` : "No points" })],
+        children: [el("strong", { className: "overland-outcome-title", text: title }), el("span", { className: "overland-outcome-points", text: shownPoints > 0 ? `+${shownPoints} ${daily ? "of 10" : "points"}` : "No points" })],
       }),
       el("p", { className: "overland-outcome-detail", text: detail }),
       ...chains,
       ...notes.map((note) => el("p", { className: "overland-note", text: note })),
-      nextButton,
+      today ? todaySummary(current) : nextButton,
     );
     playControls.hidden = true;
     outcome.hidden = false;
     setBusy(false);
     updateProgress();
-    nextButton.focus({ preventScroll: true });
+    if (!restored) (today ? outcome.querySelector<HTMLElement>(".overland-share") ?? nextButton : nextButton).focus({ preventScroll: true });
+  }
+
+  /** Today's route, once it's over: the streak, a share grid, and when the next route comes. */
+  function todaySummary(current: OverlandRound): HTMLElement {
+    const stats = readOverlandDailyStats(options.storage, today!.date);
+    const extra = Math.max(0, current.guesses.length - current.route.minimum);
+    const tally = current.status === "solved" ? `(+${extra})` : current.status === "failed" ? "✗" : "gave up";
+    const squares = current.guesses.map((guess) => OVERLAND_VERDICTS[guess.verdict].emoji).join("");
+    const shareText = `Locato Overland · ${today!.date}\n${nameOf(current.route.start)} → ${nameOf(current.route.end)}\n${squares} ${"💡".repeat(current.hintsUsed)}${current.hintsUsed ? " " : ""}${tally}`;
+    const status = el("p", { className: "overland-share-status", attrs: { role: "status" } });
+    const shareButton = el("button", { className: "primary-action overland-share", attrs: { type: "button" }, children: [shellIcon("share-2", 17, 2), el("span", { text: "Share" })] });
+    shareButton.addEventListener("click", () => {
+      void shareResult({ title: "Locato Overland", text: shareText, url: "https://locato.quest/?game=overland&daily=1" }).then((outcome) => {
+        status.textContent = outcome === "copied" ? "Copied to your clipboard." : outcome === "shared" ? "Thanks for sharing!" : "";
+      });
+    }, { signal });
+    const nextDay = new Date(`${today!.date}T00:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const minutes = Math.max(0, Math.round((nextDay.getTime() - Date.now()) / 60_000));
+    return el("div", {
+      className: "overland-today-summary",
+      children: [
+        el("dl", {
+          className: "overland-today-stats",
+          children: [
+            ["Streak", `${stats.streak} day${stats.streak === 1 ? "" : "s"}`],
+            ["Best streak", String(stats.bestStreak)],
+            ["Played", String(stats.played)],
+          ].map(([label, value]) => el("div", { children: [el("dt", { text: label! }), el("dd", { text: value! })] })),
+        }),
+        el("p", { className: "overland-today-next", text: `A new route in ${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m.` }),
+        shareButton,
+        ...(options.onPlayRun ? [el("button", { className: "overland-link overland-play-run", text: "Play a five-route run", attrs: { type: "button" }, on: { click: () => options.onPlayRun?.() } })] : []),
+        status,
+      ],
+    });
   }
 
   /**
@@ -430,7 +522,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     const perfectRoutes = finished.filter((item) => isPerfectOverlandRound(item.round)).length;
     const previousBest = readSingleBest(options.storage, "overland");
     const posting = submitRankedAttempt({ shell, mode: "overland", total, storage: options.storage, ...(ranked ? { post: ranked.post } : services.postAttempt ? { post: services.postAttempt } : {}) });
-    bar.refreshBest();
+    bestBar?.refreshBest();
     const ratio = total / MAX_POINTS;
     const missed: ResultsMissedCountry[] = [];
     for (const item of finished) {
@@ -489,6 +581,10 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
 
   function nextRoute(): void {
     if (!round || round.status === "playing") return;
+    if (daily) {
+      daily.onComplete(round);
+      return;
+    }
     if (finished.length >= OVERLAND_ATTEMPT_ROUTES) {
       finishRun();
       return;
@@ -525,6 +621,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
       if (signal.aborted) return;
     }
     round = next;
+    if (round.status === "playing") saveToday();
     const guess = next.guesses[next.guesses.length - 1]!;
     input.value = "";
     hideSuggestions();
@@ -580,6 +677,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
       if (signal.aborted) return;
     }
     round = next;
+    saveToday();
     map.setOutlined(round.outlined);
     map.frame({ animate: true });
     setBusy(false);
@@ -687,13 +785,28 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   const layout = el("main", { className: "overland-layout", children: [mapShell, panel] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen overland-screen gb-screen" });
-  const bar = createBestBar(element, shell, {
+  const bar = daily
+    ? createDailyStageBar(element, {
+        stage: "Overland",
+        ...(daily.title ? { title: daily.title } : {}),
+        practice: daily.practice ?? false,
+        ...(daily.progress ? { progress: daily.progress } : {}),
+        onLeave: options.onHome,
+      })
+    : null;
+  const bestBar = daily ? null : createBestBar(element, shell, {
     gameMode: "overland",
     storage: options.storage,
     onHowToPlay: openHowToPlay,
-    extraMenuItems: [{ label: "Restart run", icon: "rotate-ccw", onSelect: () => void playAgain() }],
+    extraMenuItems: today
+      ? options.onPlayRun ? [{ label: "Play a five-route run", icon: "route", onSelect: () => options.onPlayRun?.() }] : []
+      : [
+          { label: "Restart run", icon: "rotate-ccw", onSelect: () => void playAgain() },
+          ...(options.onTodaysRoute ? [{ label: "Today's route", icon: "calendar-days" as const, onSelect: () => options.onTodaysRoute?.() }] : []),
+        ],
   });
-  element.append(bar.element, layout, resultsStage.element);
+  if (today) element.classList.add("is-today");
+  element.append((bar ?? bestBar)!.element, layout, resultsStage.element);
 
   startRoute();
 
@@ -701,7 +814,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     element,
     destroy: () => {
       controller.abort();
-      bar.destroy();
+      bestBar?.destroy();
       map.destroy();
     },
   };

@@ -401,6 +401,27 @@
 .overland-note { margin: 12px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--muted); font-size: .72rem; line-height: 1.5; }
 #app .overland-next { width: 100%; min-height: 46px; margin-top: 16px; }
 
+/* ---------- Today's route ---------- */
+
+.overland-title-links { display: flex; align-items: center; gap: 14px; }
+#app .overland-today-link { color: var(--ov-end); }
+.overland-today-summary { display: grid; gap: 10px; margin-top: 16px; }
+
+.overland-today-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.overland-today-stats div { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
+.overland-today-stats dt { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.overland-today-stats dd { margin: 3px 0 0; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overland-today-next { margin: 0; color: var(--muted); font-size: .76rem; }
+#app .overland-share { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; }
+#app .overland-play-run { justify-self: center; }
+.overland-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .74rem; text-align: center; }
+
 /* ---------- How to play (in the shell layer) ---------- */
 
 #shell-layer .overland-howto { width: min(470px, 100%); }

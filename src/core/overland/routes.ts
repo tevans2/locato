@@ -142,3 +142,48 @@ export function createOverlandRoutes(seed: string, plan: readonly OverlandRouteS
     return { start, end, minimum: step.minimum, guessesAllowed: overlandGuessAllowance(step.minimum) };
   });
 }
+
+/** The route between two countries with its usual guess allowance (null when no land route joins them). */
+export function overlandRouteBetween(start: string, end: string): OverlandRoute | null {
+  const crossings = overlandGraph().distance(start, end);
+  if (crossings === null || crossings < 2) return null;
+  return { start, end, minimum: crossings - 1, guessesAllowed: overlandGuessAllowance(crossings - 1) };
+}
+
+function pickRoute(steps: readonly OverlandRouteStep[], seed: string, accept: (candidate: Candidate) => boolean = () => true): OverlandRoute | null {
+  const random = createSeededRandom(seed);
+  for (const step of steps) {
+    const pick = shuffle(candidatesFor(step), random).find(accept);
+    if (pick) {
+      const [start, end] = random() < 0.5 ? [pick.a, pick.b] : [pick.b, pick.a];
+      return { start, end, minimum: step.minimum, guessesAllowed: overlandGuessAllowance(step.minimum) };
+    }
+  }
+  return null;
+}
+
+/** Today's route lengths by weekday (Sunday first): short early in the week, longest at the weekend. */
+const TODAY_ROUTE_LENGTHS: readonly number[] = [6, 3, 3, 4, 4, 5, 5];
+
+/**
+ * "Today's route" in Overland: one route for everyone on a date (YYYY-MM-DD), Travle-style.
+ * Routes run from three countries in between on Mondays to six on Sundays.
+ */
+export function createDailyOverlandRoute(date: string): OverlandRoute {
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  const minimum = TODAY_ROUTE_LENGTHS[Number.isFinite(day) ? day : 1]!;
+  const pathTier: FameTier = minimum >= 5 ? 3 : 2;
+  return pickRoute([{ minimum, endpointTier: 2, pathTier }, { minimum, endpointTier: 2, pathTier: 3 }], `overland-today:${date}`)!;
+}
+
+/**
+ * The Overland round of the daily challenge: a short route (two or three countries in between)
+ * between two of the day's theme countries, or from one of them when the theme is mostly islands.
+ */
+export function createThemedOverlandRoute(themeCountryCodes: readonly string[], seed: string): OverlandRoute {
+  const theme = new Set(themeCountryCodes);
+  const steps: readonly OverlandRouteStep[] = [2, 3].map((minimum) => ({ minimum, endpointTier: 2, pathTier: 2 }));
+  return pickRoute(steps, `${seed}:overland`, (candidate) => theme.has(candidate.a) && theme.has(candidate.b))
+    ?? pickRoute(steps, `${seed}:overland`, (candidate) => theme.has(candidate.a) || theme.has(candidate.b))
+    ?? pickRoute(steps, `${seed}:overland`)!;
+}

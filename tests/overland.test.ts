@@ -256,3 +256,38 @@ describe("Overland guess names", () => {
     expect(suggestCountryNames(index, "korea").map((country) => country.code).sort()).toEqual(["KP", "KR"]);
   });
 });
+
+describe("Overland's daily routes", () => {
+  it("deals the daily challenge's short route among the theme's countries", async () => {
+    const { DAILY_THEMES } = await import("../src/core/dailyThemes");
+    const { createThemedOverlandRoute } = await import("../src/core/overland");
+    for (const theme of DAILY_THEMES) {
+      const routeForTheme = createThemedOverlandRoute(theme.countryCodes, `daily:${theme.id}`);
+      expect([2, 3]).toContain(routeForTheme.minimum);
+      expect(graph.distance(routeForTheme.start, routeForTheme.end)).toBe(routeForTheme.minimum + 1);
+      expect([routeForTheme.start, routeForTheme.end].some((code) => theme.countryCodes.includes(code))).toBe(true);
+      if (theme.id !== "islands") expect([routeForTheme.start, routeForTheme.end].every((code) => theme.countryCodes.includes(code))).toBe(true);
+    }
+  });
+});
+
+describe("Overland today's route streaks", () => {
+  it("counts consecutive solved days up to today, or yesterday while today is unplayed", async () => {
+    const { saveOverlandDay, readOverlandDailyStats, readOverlandDay } = await import("../src/storage/overlandDaily");
+    const { createDailyOverlandRoute } = await import("../src/core/overland");
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => void values.set(key, value), removeItem: (key: string) => void values.delete(key) } as unknown as Storage;
+    const solveOn = (date: string) => {
+      const dayRoute = createDailyOverlandRoute(date);
+      let round = createOverlandRound(dayRoute);
+      for (const code of graph.shortestRoute(dayRoute.start, dayRoute.end)!.slice(1, -1)) round = (guessOverland(graph, round, code) as { round: OverlandRound }).round;
+      saveOverlandDay(storage, date, round);
+    };
+    for (const date of ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-09", "2026-10-10"]) solveOn(date);
+    saveOverlandDay(storage, "2026-10-08", revealOverland(createOverlandRound(createDailyOverlandRoute("2026-10-08"))));
+    expect(readOverlandDailyStats(storage, "2026-10-11")).toEqual({ streak: 2, bestStreak: 3, played: 6, solved: 5 });
+    expect(readOverlandDailyStats(storage, "2026-10-12")).toMatchObject({ streak: 0 });
+    expect(readOverlandDay(storage, "2026-10-08", createDailyOverlandRoute("2026-10-08"))?.status).toBe("revealed");
+    expect(readOverlandDay(storage, "2026-10-08", createDailyOverlandRoute("2026-10-09"))).toBeNull();
+  });
+});
