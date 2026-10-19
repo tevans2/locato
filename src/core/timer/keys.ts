@@ -48,7 +48,14 @@ const PROMPT_TIMER_KEYS: Record<PromptGameModeId, TimerStorageKeys> = {
   },
 };
 
-export function timerKeysForMode(mode: TimerGameModeId, flagPool: FlagPool = "countries"): TimerStorageKeys {
+export function timerKeysForMode(mode: TimerGameModeId, flagPool: FlagPool = "countries", nameAllContinent?: string): TimerStorageKeys {
+  if (mode === "name-all" && nameAllContinent) {
+    const slug = nameAllContinent.toLowerCase().replace(/ /g, "-");
+    return {
+      last: `locato:country-guessing:${slug}:timer-last-ms:v1`,
+      best: `locato:country-guessing:${slug}:timer-best-ms:v1`,
+    };
+  }
   if (mode in MAP_TIMER_KEYS) {
     return MAP_TIMER_KEYS[mode as WorldMapGameModeId];
   }

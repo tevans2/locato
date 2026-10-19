@@ -72,6 +72,27 @@ describe("CountryGuessingScreen practice vs timed", () => {
     expect(root.querySelector(".answer-panel > .country-guess-score")).not.toBeNull();
   });
 
+  it("practice Name all can be narrowed to one continent", () => {
+    const { root, type, onRecordGame } = setup();
+    const select = root.querySelector<HTMLSelectElement>("#name-all-continent")!;
+    select.value = "Asia";
+    select.dispatchEvent(new Event("change"));
+    expect(root.querySelector(".panel-title h2")?.textContent).toBe("Name every country in Asia");
+    type("Brazil");
+    expect(root.querySelector(".feedback")?.textContent).toContain("Brazil isn't in Asia.");
+    type("Japan");
+    expect(root.querySelector(".feedback")?.textContent).toContain("Asia complete. All 1 countries found.");
+    // A finished continent isn't a finished world.
+    expect(onRecordGame).toHaveBeenLastCalledWith(expect.objectContaining({ completed: false, countriesFound: 1, countriesTotal: 1 }));
+  });
+
+  it("a timed continent run is locked to its board", () => {
+    const { root } = setup({ run: "timed", nameAllContinent: "Africa" });
+    expect(root.querySelector("#name-all-continent")).toBeNull();
+    expect(root.querySelector(".name-all-prompt .puzzle-continent-locked")?.textContent).toBe("Africa");
+    expect(root.querySelector(".panel-title h2")?.textContent).toBe("Name every country in Africa");
+  });
+
   it("timed shows the clock in the GameBar", () => {
     const { root } = setup({ run: "timed" });
     expect(root.querySelector(".shell-run-pill .game-run-clock-value")).not.toBeNull();

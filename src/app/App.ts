@@ -145,7 +145,7 @@ export function createApp(options: AppOptions): App {
         const flagPool = mode === "flags" && isFlagPool(variant) ? { flagPool: variant } : {};
         navigate({ type: "solo-game", categoryIds: [mode], run: "timed", ...flagPool });
       } else if (isWorldMapGameModeId(mode)) {
-        navigate({ type: "country-guessing", mode, run: "timed", ...(mode === "puzzle" && variant ? { continent: variant } : {}) });
+        navigate({ type: "country-guessing", mode, run: "timed", ...((mode === "puzzle" || mode === "name-all") && variant ? { continent: variant } : {}) });
       } else if (mode === "map-tap") {
         navigate({ type: mode, run: "timed" });
       } else {
@@ -904,7 +904,7 @@ export function createApp(options: AppOptions): App {
           storage: options.storage,
           initialMode,
           run: runType,
-          ...(continent ? { puzzleContinent: continent } : {}),
+          ...(continent ? (initialMode === "name-all" ? { nameAllContinent: continent } : { puzzleContinent: continent }) : {}),
           onGameModeChange: (gameMode) => handleGameModeChange(gameMode),
           onHome: () => navigate({ type: "landing" }),
           onDailyChallenge: () => navigate({ type: "daily-challenge" }),
