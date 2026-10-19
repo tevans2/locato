@@ -146,6 +146,18 @@ describe("ranked authority", () => {
     expect(service.ranked.consume(user.id, state.runId, "name-all", "Europe", state.timeMs)).toMatchObject({ variant: "Europe" });
   });
 
+  it("counts Turkey and Cyprus on both the Europe and Asia Name all boards", async () => {
+    const { service, user } = await harness(true);
+    for (const variant of ["Europe", "Asia"]) {
+      let state = stateOf(await service.startRankedGame(user.id, { gameMode: "name-all", variant }));
+      for (const answer of ["Turkey", "Cyprus"]) {
+        state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer }));
+        expect(state.result?.kind).toBe("correct");
+      }
+      expect(state.index).toBe(2);
+    }
+  });
+
   it("expires idle runs from creation even when their timer has never started", async () => {
     const { time, service, user } = await harness();
     const state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));

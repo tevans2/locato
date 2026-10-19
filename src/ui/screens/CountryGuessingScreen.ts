@@ -1,6 +1,6 @@
 import type { AuthUser } from "../../core/auth";
 import { markShellScreen, type RunType, type ShellContext } from "../shell/types";
-import { CONTINENTS, type Continent, type Country, type CountryId, type CountryIndex } from "../../core/countries";
+import { CONTINENTS, isInContinent, type Continent, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { getGameModeOption, type GameModeId, type WorldMapGameModeId } from "../../core/gameModes";
 import { detectCountryGuess, submitCountryGuess, type WorldCountryFeature } from "../../core/map";
 import { timerKeysForMode } from "../../core/timer/keys";
@@ -111,7 +111,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let auditEnded = false;
   /** The countries this run asks for: one continent in a narrowed Name all run, otherwise the world. */
   function runCountries(): readonly Country[] {
-    return nameAllContinent ? countryIndex.countries.filter((country) => country.continent === nameAllContinent) : countryIndex.countries;
+    return nameAllContinent ? countryIndex.countries.filter((country) => isInContinent(country, nameAllContinent!)) : countryIndex.countries;
   }
 
   /** The leaderboard this run belongs to. */
@@ -557,7 +557,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const country = showMiss
       ? submitCountryGuess(countryIndex, input.value, guessedCountryIds)
       : detectCountryGuess(countryIndex, input.value, guessedCountryIds);
-    if (country && nameAllContinent && country.continent !== nameAllContinent) {
+    if (country && nameAllContinent && !isInContinent(country, nameAllContinent)) {
       showFeedback(feedback, `${country.name} isn't in ${nameAllContinent}.`, showMiss ? "bad" : "neutral");
       if (showMiss && shouldAutoFocusTextInput()) input.select();
       return;

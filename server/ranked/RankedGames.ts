@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { indexCountries, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
+import { indexCountries, isInContinent, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
 import { getCategory, matchesCountryName } from "../../src/core/categories";
 import { rankedAnswerToken } from "../../src/core/rankedPresentation";
 import { detectCountryGuess, submitCountryGuess } from "../../src/core/map/countryGuessing";
@@ -150,7 +150,7 @@ export class RankedGames {
     if (config?.metric === "time") {
       const category = getCategory(mode);
       // Puzzle and continent Name all boards play one continent; the rest play the whole pool.
-      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : !variant || c.continent === variant), rng);
+      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : !variant || (mode === "name-all" ? isInContinent(c, variant) : c.continent === variant)), rng);
       for (const country of countries) {
         const mapCountry = this.map.find((c) => c.code === country.code);
         queue.push({ mode, country, ...(mapCountry ? { mapCountry } : {}) });
@@ -389,7 +389,7 @@ export class RankedGames {
       const foundIds = new Set([...run.found].map((code) => this.countries.byCode.get(code)!.id));
       const match = (action.auto ? detectCountryGuess : submitCountryGuess)(this.countries, action.answer, foundIds);
       if (!match) { run.feedback = "Not a new country. Try again."; return { advance: false, points: 0 }; }
-      if (run.variant && match.continent !== run.variant) { run.feedback = `${match.name} isn't in ${run.variant}.`; return { advance: false, points: 0 }; }
+      if (run.variant && !isInContinent(match, run.variant)) { run.feedback = `${match.name} isn't in ${run.variant}.`; return { advance: false, points: 0 }; }
       run.found.add(match.code);
       detail("correct", { countryCode: match.code });
       run.feedback = `Correct · ${match.name}`;
