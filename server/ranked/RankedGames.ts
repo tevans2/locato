@@ -149,7 +149,8 @@ export class RankedGames {
     const pool = mode === "flags" ? createPromptCountryIndex(this.countries, [mode], variant === "" ? "countries" : variant as "territories" | "both") : this.countries;
     if (config?.metric === "time") {
       const category = getCategory(mode);
-      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : mode === "puzzle" ? c.continent === variant : true), rng);
+      // Puzzle and continent Name all boards play one continent; the rest play the whole pool.
+      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : !variant || c.continent === variant), rng);
       for (const country of countries) {
         const mapCountry = this.map.find((c) => c.code === country.code);
         queue.push({ mode, country, ...(mapCountry ? { mapCountry } : {}) });
@@ -388,6 +389,7 @@ export class RankedGames {
       const foundIds = new Set([...run.found].map((code) => this.countries.byCode.get(code)!.id));
       const match = (action.auto ? detectCountryGuess : submitCountryGuess)(this.countries, action.answer, foundIds);
       if (!match) { run.feedback = "Not a new country. Try again."; return { advance: false, points: 0 }; }
+      if (run.variant && match.continent !== run.variant) { run.feedback = `${match.name} isn't in ${run.variant}.`; return { advance: false, points: 0 }; }
       run.found.add(match.code);
       detail("correct", { countryCode: match.code });
       run.feedback = `Correct · ${match.name}`;

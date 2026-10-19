@@ -71,9 +71,9 @@ export function routeFromLocation(location: Pick<Location, "search">): AppRoute 
     };
   }
   if (game && isWorldMapGameModeId(game)) {
-    // Puzzle boards are per continent, so a timed puzzle link names the continent it's for.
+    // Puzzle and Name all have a board per continent, so a timed link names the continent it's for.
     const continent = params.get("continent")?.trim();
-    return { type: "country-guessing", mode: game, ...timed, ...(game === "puzzle" && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
+    return { type: "country-guessing", mode: game, ...timed, ...((game === "puzzle" || game === "name-all") && continent && /^[A-Za-z ]{4,20}$/.test(continent) ? { continent } : {}) };
   }
   if (game === "map-tap") return { type: game, ...timed };
   if (game === "overland" || game === "mystery") return params.get("daily") === "1" ? { type: game, daily: true } : { type: game };

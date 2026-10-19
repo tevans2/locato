@@ -100,11 +100,11 @@ export function createLeaderboardsScreen(options: LeaderboardsScreenOptions): Sc
   let user: AuthUser | null = null;
   let authKnown = false;
 
-  /** Time modes keep a best on this device (per flag set; one for all puzzle continents). */
+  /** Time modes keep a best on this device (per flag set and Name all continent; one for all puzzle continents). */
   function localBest(mode: BoardMode): number | null {
     if (mode.config.metric !== "time" || !isTimerGameModeId(mode.id)) return null;
     const variant = variantFor(mode);
-    return readStoredTime(storage, timerKeysForMode(mode.id, mode.id === "flags" && (variant === "territories" || variant === "both") ? variant : "countries").best);
+    return readStoredTime(storage, timerKeysForMode(mode.id, mode.id === "flags" && (variant === "territories" || variant === "both") ? variant : "countries", mode.id === "name-all" ? variant : undefined).best);
   }
 
   function formatValue(mode: BoardMode, value: { readonly timeMs?: number; readonly score?: number }): string {
@@ -201,7 +201,7 @@ export function createLeaderboardsScreen(options: LeaderboardsScreenOptions): Sc
       return;
     }
     variantHost.hidden = false;
-    const label = selected.id === "flags" ? "Flag set" : selected.id === "puzzle" ? "Continent" : "Board";
+    const label = selected.id === "flags" ? "Flag set" : selected.id === "puzzle" || selected.id === "name-all" ? "Continent" : "Board";
     const current = variantFor(selected);
     variantHost.replaceChildren(
       el("span", { className: "lb-variants-label", text: label, attrs: { id: "lb-variant-label" } }),
@@ -211,7 +211,7 @@ export function createLeaderboardsScreen(options: LeaderboardsScreenOptions): Sc
         children: choices.map((choice) =>
           el("button", {
             className: `lb-segment${choice === current ? " is-selected" : ""}`,
-            text: VARIANT_LABELS[choice] ?? choice,
+            text: selected.id === "name-all" && choice === "" ? "World" : VARIANT_LABELS[choice] ?? choice,
             attrs: { type: "button", role: "radio", "aria-checked": String(choice === current), "data-variant": choice },
             on: { click: () => selectVariant(choice) },
           }),
