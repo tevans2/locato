@@ -58,7 +58,7 @@ map geography remain public: a browser needs visible geography to render a playa
   account-bound game. Its queue and private random seed remain on the server.
 - `POST /api/ranked/action` accepts the current question ID and a move. A server checks the
   answer, pin, placement, split line or flight controls. Hint, Pass and Reveal are also
-  server actions. Puzzle drops record each piece offset; Check accuracy only completes a
+  server actions; each Reveal adds 20 seconds to a timed run's verified time. Puzzle drops record each piece offset; Check accuracy only completes a
   timed game after every piece is within the permitted placement tolerance. Stale question IDs, invalid moves and
   excessive requests fail. The legacy ranked flight API never accepts client position, radius, speed or score; the active Flyover screen does not use it.
 - `POST /api/leaderboard` outside Flyover requires a completed, unexpired, account-owned run and the exact

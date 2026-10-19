@@ -59,6 +59,9 @@ export interface OverlandMoveResult {
   readonly points: number;
 }
 
+/** Revealing an answer in a timed ranked run adds this much to the clock. */
+export const REVEAL_PENALTY_MS = 20_000;
+
 export interface RankedState {
   readonly runId: string;
   readonly mode: GameModeId | "daily";
@@ -71,6 +74,8 @@ export interface RankedState {
   readonly total: number;
   readonly score: number;
   readonly timeMs: number | null;
+  /** Timed runs: reveal penalties already included in timeMs, so live clocks can add them too. */
+  readonly penaltyMs?: number;
   readonly question: RankedQuestion | null;
   readonly plane?: PlaneState;
   readonly reaches?: readonly { readonly code: string; readonly seconds: number }[];
