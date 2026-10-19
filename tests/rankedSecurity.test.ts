@@ -112,6 +112,19 @@ describe("ranked authority", () => {
     expect(state.timeMs).toBe(10_000);
   });
 
+  it("plays a continent Name all board with only that continent's countries", async () => {
+    const { time, service, user } = await harness();
+    let state = stateOf(await service.startRankedGame(user.id, { gameMode: "name-all", variant: "Europe" }));
+    expect(state.total).toBe(1);
+    const act = (answer: string) => service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer });
+    state = stateOf(await act("Brazil"));
+    expect(state).toMatchObject({ status: "playing", index: 0, feedback: "Brazil isn't in Europe." });
+    time.value += 6_000;
+    state = stateOf(await act("France"));
+    expect(state.status).toBe("complete");
+    expect(service.ranked.consume(user.id, state.runId, "name-all", "Europe", state.timeMs)).toMatchObject({ variant: "Europe" });
+  });
+
   it("expires idle runs from creation even when their timer has never started", async () => {
     const { time, service, user } = await harness();
     const state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));

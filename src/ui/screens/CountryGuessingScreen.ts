@@ -48,6 +48,8 @@ export interface CountryGuessingScreenOptions {
   readonly run?: RunType;
   /** Puzzle continent (`&continent=` on timed puzzle links). A timed puzzle is locked to it. */
   readonly puzzleContinent?: string;
+  /** Name all continent (`&continent=`): a timed run is locked to that continent's board; practice starts on it. */
+  readonly nameAllContinent?: string;
   /** Legacy callbacks; the GameBar navigates through `shell` now. */
   readonly onGameModeChange?: (gameMode: GameModeId) => void;
   readonly onHome?: () => void;
@@ -80,6 +82,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let puzzleContinent: Continent = CONTINENTS.find((continent) => continent.toLowerCase() === options.puzzleContinent?.trim().toLowerCase()) ?? "Africa";
   let puzzlePlacedCount = 0;
   let puzzleTotalCount = countryIndex.countries.filter((country) => country.continent === puzzleContinent).length;
+  // Name all countries can be narrowed to one continent (null = the whole world). A timed run keeps the board it opened on.
+  let nameAllContinent: Continent | null = playMode === "name-all" ? CONTINENTS.find((continent) => continent.toLowerCase() === options.nameAllContinent?.trim().toLowerCase()) ?? null : null;
   let reviewCountryIds: readonly CountryId[] = [];
   let activeReviewCountryId: CountryId | null = null;
   let reviewTitle = "Missed countries";
@@ -105,9 +109,23 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   let recorder: RunRecorder | null = null;
   let auditTicket: Promise<string | null> | null = null;
   let auditEnded = false;
+  /** The countries this run asks for: one continent in a narrowed Name all run, otherwise the world. */
+  function runCountries(): readonly Country[] {
+    return nameAllContinent ? countryIndex.countries.filter((country) => country.continent === nameAllContinent) : countryIndex.countries;
+  }
+
+  /** The leaderboard this run belongs to. */
+  function boardVariant(): string {
+    return playMode === "puzzle" ? puzzleContinent : nameAllContinent ?? "";
+  }
+
+  function freshRunMessage(): string {
+    return nameAllContinent ? `Fresh ${nameAllContinent} run ready.` : "Fresh world map ready.";
+  }
+
   function complete(): boolean {
     if (playMode === "puzzle") return puzzleTotalCount > 0 && puzzlePlacedCount >= puzzleTotalCount;
-    return guessedCountryIds.size >= countryIndex.countries.length;
+    return guessedCountryIds.size >= runCountries().length;
   }
 
   function roundEnded(): boolean {
@@ -120,13 +138,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const countriesFound = playMode === "puzzle" ? puzzlePlacedCount : guessedCountryIds.size;
     if (countriesFound === 0 || currentRunRecorded) return;
     currentRunRecorded = true;
-    const countriesTotal = playMode === "puzzle" ? puzzleTotalCount : countryIndex.countries.length;
-    options.onRecordGame?.({ playMode, timed, completed, durationMs: timed ? Math.round(playTimer.currentElapsedMs()) : 0, countriesFound, countriesTotal });
+    const countriesTotal = playMode === "puzzle" ? puzzleTotalCount : runCountries().length;
+    // A finished continent isn't a finished world, so it records as progress only.
+    options.onRecordGame?.({ playMode, timed, completed: completed && nameAllContinent === null, durationMs: timed ? Math.round(playTimer.currentElapsedMs()) : 0, countriesFound, countriesTotal });
   }
 
   function missedCountryIdsForCurrentRun(): readonly CountryId[] {
     if (playMode === "puzzle") return [];
-    return countryIndex.countries
+    return runCountries()
       .filter((country) => !guessedCountryIds.has(country.id))
       .sort((left, right) => left.continent.localeCompare(right.continent) || left.name.localeCompare(right.name))
       .map((country) => country.id);
@@ -198,7 +217,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   function recordWorldProgress(completed: boolean): void {
     showAchievements(recordWorldAchievements(options.storage, {
       playMode,
-      completed,
+      completed: completed && nameAllContinent === null,
       countryIndex,
       guessedCountryIds,
     }));
@@ -208,7 +227,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const activeSet = new Set(reviewCountryIds);
     const visibleMissingCountryIds =
       showMissingCountries && !roundEnded()
-        ? new Set(countryIndex.countries.filter((country) => !guessedCountryIds.has(country.id)).map((country) => country.id))
+        ? new Set(runCountries().filter((country) => !guessedCountryIds.has(country.id)).map((country) => country.id))
         : new Set<CountryId>();
 
     setWorldMapReviewCountries(map, activeSet, activeReviewCountryId);
@@ -240,7 +259,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     }
     const posting = await postTimedRun({
       gameMode: playMode,
-      variant: playMode === "puzzle" ? puzzleContinent : "",
+      variant: boardVariant(),
       timeMs: finalTimeMs,
       isLoggedIn: options.getAuthUser() !== null,
       ...(run ? { run } : {}),
@@ -292,7 +311,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     panelHeading.textContent = puzzleModeActive
       ? "Puzzle the continent"
       : namingModeActive
-        ? "Name every country"
+        ? nameAllContinent ? `Name every country in ${nameAllContinent}` : "Name every country"
         : spotCountryModeActive
           ? "Name the highlighted country"
           : "Click the country";
@@ -302,7 +321,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     submitButton.disabled = finished || !typingModeActive;
     foundLabel.textContent = puzzleModeActive ? "Placed" : "Found";
     foundCount.textContent = String(puzzleModeActive ? puzzlePlacedCount : guessedCountryIds.size);
-    remainingCount.textContent = String(puzzleModeActive ? Math.max(0, puzzleTotalCount - puzzlePlacedCount) : Math.max(0, countryIndex.countries.length - guessedCountryIds.size));
+    remainingCount.textContent = String(puzzleModeActive ? Math.max(0, puzzleTotalCount - puzzlePlacedCount) : Math.max(0, runCountries().length - guessedCountryIds.size));
+    nameAllPrompt.hidden = !namingModeActive || (timed && !nameAllContinent);
     showMissingButton.hidden = puzzleModeActive;
     mapSurfaceButton.hidden = puzzleModeActive;
     fullscreenButton.hidden = puzzleModeActive;
@@ -378,12 +398,12 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     if (timed) {
       const posting = finishTimerRun(finalTimeMs);
       void posting.then((result) => {
-        showFeedback(feedback, `World complete. All ${countryIndex.countries.length} countries found in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`, "good");
+        showFeedback(feedback, `${nameAllContinent ?? "World"} complete. All ${runCountries().length} countries found in ${formatTimerCompletionSuffix(finalTimeMs, result, options.getAuthUser() !== null)}`, "good");
       });
       presentResults({ outcome: "complete", finalTimeMs, posting });
       return;
     }
-    showFeedback(feedback, `World complete. All ${countryIndex.countries.length} countries found.`, "good");
+    showFeedback(feedback, `${nameAllContinent ?? "World"} complete. All ${runCountries().length} countries found.`, "good");
     presentResults({ outcome: "complete" });
   }
 
@@ -393,7 +413,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   /** A country found in an audited run: ask for the run's ticket on the first, then note it. */
   function noteAuditedFind(country: Country): void {
-    if (!audited || !recorder || auditEnded) return;
+    if (!audited || !recorder || auditEnded || nameAllContinent) return;
     if (auditTicket === null && options.getAuthUser() !== null) auditTicket = startAuditedRun({ gameMode: playMode, timed });
     recorder.mark(country.code, timed ? playTimer.currentElapsedMs() : Date.now() - (runStartedAt ?? Date.now()));
   }
@@ -533,11 +553,16 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
 
   function checkInput(showMiss = false): void {
     if (playMode !== "name-all" || roundEnded()) return;
-    if (options.ranked) { requestRankedAnswer(showMiss); return; }
 
     const country = showMiss
       ? submitCountryGuess(countryIndex, input.value, guessedCountryIds)
       : detectCountryGuess(countryIndex, input.value, guessedCountryIds);
+    if (country && nameAllContinent && country.continent !== nameAllContinent) {
+      showFeedback(feedback, `${country.name} isn't in ${nameAllContinent}.`, showMiss ? "bad" : "neutral");
+      if (showMiss && shouldAutoFocusTextInput()) input.select();
+      return;
+    }
+    if (options.ranked) { requestRankedAnswer(showMiss); return; }
     if (country) {
       recordGuess(country);
       return;
@@ -678,14 +703,14 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     const givenUp = input.outcome === "given-up";
     const label = getGameModeOption(playMode).label;
     const found = playMode === "puzzle" ? puzzlePlacedCount : guessedCountryIds.size;
-    const total = playMode === "puzzle" ? puzzleTotalCount : countryIndex.countries.length;
+    const total = playMode === "puzzle" ? puzzleTotalCount : runCountries().length;
     const spentMs = runStartedAt === null ? 0 : Date.now() - runStartedAt;
     const attempts = found + runWrongGuesses;
     const accuracy = attempts > 0 ? `${Math.round((found / attempts) * 100)}%` : "—";
     const missed = givenUp ? reviewCountryIds.map((id) => countryIndex.byId[id]).filter((country): country is Country => Boolean(country)) : [];
     const time = formatRunTime(input.finalTimeMs ?? 0);
-    const variant = playMode === "puzzle" ? puzzleContinent : "";
-    const kind = playMode === "puzzle" ? `the ${puzzleContinent} puzzle` : label;
+    const variant = boardVariant();
+    const kind = playMode === "puzzle" ? `the ${puzzleContinent} puzzle` : nameAllContinent ? `${label} (${nameAllContinent})` : label;
 
     const stats = input.puzzle
       ? [
@@ -703,18 +728,18 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       mode: playMode,
       run: runType,
       variant,
-      title: givenUp ? (timed ? "Run ended" : "Round over") : timed ? time : input.puzzle ? `${input.puzzle.accuracyPercent}% accurate` : "World complete",
+      title: givenUp ? (timed ? "Run ended" : "Round over") : timed ? time : input.puzzle ? `${input.puzzle.accuracyPercent}% accurate` : `${nameAllContinent ?? "World"} complete`,
       ...(givenUp
         ? { subtitle: `You named ${found} of ${total} countries.${timed ? " Given-up runs aren't posted." : ""}` }
         : !timed
-          ? { subtitle: input.puzzle ? `Every ${puzzleContinent} country is on the board.` : `All ${total} countries found.` }
+          ? { subtitle: input.puzzle ? `Every ${puzzleContinent} country is on the board.` : `All ${total} countries${nameAllContinent ? ` in ${nameAllContinent}` : ""} found.` }
           : {}),
       stats,
       missed,
       ...(givenUp ? { missedTitle: `${missed.length} missed` } : {}),
       onPlayAgain: () => {
         hideResults();
-        resetGame(timed ? `New timed run. The clock starts on your first ${options.ranked ? "guess" : "correct move"}.` : playMode === "puzzle" ? `Fresh ${puzzleContinent} puzzle ready.` : "Fresh world map ready.", false);
+        resetGame(timed ? `New timed run. The clock starts on your first ${options.ranked ? "guess" : "correct move"}.` : playMode === "puzzle" ? `Fresh ${puzzleContinent} puzzle ready.` : freshRunMessage(), false);
       },
       extraActions: givenUp ? [{ label: "Review on the map", icon: "globe", onClick: () => hideResults() }] : [],
       shareText: givenUp
@@ -723,7 +748,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
           ? `I finished ${kind} on Locato in ${time} (timed run).`
           : input.puzzle
             ? `I rebuilt ${kind} on Locato — ${input.puzzle.accuracyPercent}% accurate.`
-            : `I found all ${total} countries in ${label} on Locato.`,
+            : `I found all ${total} countries${nameAllContinent ? ` in ${nameAllContinent}` : ""} in ${label} on Locato.`,
       tone: givenUp ? "neutral" : "celebrate",
       ...(input.posting && !givenUp ? { posting: input.posting } : {}),
     });
@@ -802,6 +827,18 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
       el("p", { text: "Drag every cutout onto the continent. Nothing snaps into place; press Check accuracy when you are done." }),
     ],
   });
+  const nameAllContinentSelect = el("select", {
+    className: "puzzle-continent-select",
+    attrs: { id: "name-all-continent", name: "nameAllContinent", "aria-label": "Countries to name" },
+    children: [el("option", { text: "Whole world", attrs: { value: "" } }), ...CONTINENTS.map((continent) => el("option", { text: continent, attrs: { value: continent } }))],
+  });
+  const nameAllPrompt = el("div", {
+    className: "country-click-prompt name-all-prompt",
+    // A timed run is locked to the continent its board is for.
+    children: timed
+      ? [el("span", { className: "country-click-target-label", text: "Timed continent" }), el("strong", { className: "country-click-target-name puzzle-continent-locked", text: nameAllContinent ?? "World" })]
+      : [el("label", { className: "country-click-target-label", text: "Countries to name", attrs: { for: "name-all-continent" } }), nameAllContinentSelect],
+  });
   // Found / remaining stay visible on phones (the score line); last + times fold into Details.
   const statsPanel = el("div", {
     className: "stats-panel country-guess-stats country-guess-score",
@@ -831,7 +868,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const mobileExtrasPanel = el("div", { className: "mobile-extras-panel" });
   playTimer = createPlayTimer({
     storage: options.storage,
-    keys: timerKeysForMode(playMode),
+    keys: timerKeysForMode(playMode, "countries", nameAllContinent ?? undefined),
     isComplete: roundEnded,
     onTick: renderTimer,
   });
@@ -956,6 +993,16 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
+  nameAllContinentSelect.value = nameAllContinent ?? "";
+  nameAllContinentSelect.addEventListener(
+    "change",
+    () => {
+      recordCurrentRun(false); // abandoning the current scope's run before its total changes
+      nameAllContinent = CONTINENTS.find((continent) => continent === nameAllContinentSelect.value) ?? null;
+      resetGame(nameAllContinent ? `Name every country in ${nameAllContinent}.` : "Fresh world map ready.", false);
+    },
+    { signal: controller.signal },
+  );
   resetButton.addEventListener(
     "click",
     () => {
@@ -969,7 +1016,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
               ? "Fresh spot challenge ready."
               : playMode === "puzzle"
                 ? `Fresh ${puzzleContinent} puzzle ready.`
-                : "Fresh world map ready.",
+                : freshRunMessage(),
       );
     },
     { signal: controller.signal },
@@ -1002,12 +1049,12 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
         run: runType,
         ...(timed ? { clock: clockValue } : {}),
         // A cold timed link backs out to its own board rather than the first board.
-        onBack: () => shell.goBack(timed ? () => shell.openLeaderboards(playMode, playMode === "puzzle" ? puzzleContinent : undefined) : "play"),
+        onBack: () => shell.goBack(timed ? () => shell.openLeaderboards(playMode, boardVariant() || undefined) : "play"),
         backLabel: timed ? "Back to leaderboards" : "Back",
         onHowToPlay: () => showFeedback(feedback, getGameModeOption(playMode).description, "neutral"),
         extraMenuItems: [{ label: timed ? "Restart run" : "Start a fresh run", icon: "rotate-ccw", onSelect: () => resetButton.click() }],
         leaveGuard: () => (timed && !roundEnded() && progressOfRun() > 0 ? "This timed run is still going — it won't be posted." : null),
-        timedVariant: () => (playMode === "puzzle" ? puzzleContinent : undefined),
+        timedVariant: () => boardVariant() || undefined,
       })
     : null;
 
@@ -1031,6 +1078,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
               clickPrompt,
               spotPrompt,
               puzzlePrompt,
+              nameAllPrompt,
               form,
               feedback.element,
               statsPanel,

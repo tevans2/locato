@@ -41,7 +41,7 @@ export async function createRankedGameScreen(options: Options): Promise<Screen> 
         onStateChange() {}, onReset() {}, onOpenCountry: shell.openCountry, onLeaderboard: () => shell.openLeaderboards(mode, variant) });
     } else if (isWorldMapGameModeId(mode)) {
       const { createCountryGuessingScreen } = await import("./CountryGuessingScreen");
-      screen = createCountryGuessingScreen({ ...common, worldCountryFeatures: world, initialMode: mode, run: "timed", ...(mode === "puzzle" ? { puzzleContinent: variant } : {}), ranked: session,
+      screen = createCountryGuessingScreen({ ...common, worldCountryFeatures: world, initialMode: mode, run: "timed", ...(mode === "puzzle" ? { puzzleContinent: variant } : mode === "name-all" && variant ? { nameAllContinent: variant } : {}), ranked: session,
         getAuthUser: options.getAuthUser, onLeaderboard: () => shell.openLeaderboards(mode, variant) });
     } else if (mode === "flyover") {
       const { createFlyoverScreen } = await import("./FlyoverScreen");

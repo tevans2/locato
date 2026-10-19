@@ -23,7 +23,7 @@ export type RunStyle = "split" | "single";
 export interface LeaderboardModeConfig {
   readonly mode: GameModeId;
   readonly metric: LeaderboardMetric;
-  /** Allowed variants; "" is the default board. Flags: flag sets. Puzzle: one board per continent. */
+  /** Allowed variants; "" is the default board. Flags: flag sets. Puzzle: one board per continent. Name all: the world or one continent. */
   readonly variants: readonly string[];
   /** Score boards: the best possible total for one attempt (the server rejects anything above it). */
   readonly maxScore?: number;
@@ -61,7 +61,7 @@ export const LEADERBOARD_MODES: readonly LeaderboardModeConfig[] = [
   time("codes", "Decode every country code as fast as you can."),
   time("capitals", "Name the country for every capital as fast as you can."),
   time("capital-recall", "Name the capital of every country as fast as you can."),
-  time("name-all", "Type every country in the world as fast as you can."),
+  time("name-all", "Type every country in the world, or in one continent, as fast as you can.", ["", ...PUZZLE_CONTINENT_VARIANTS]),
   time("click-country", "Click every named country on the map as fast as you can."),
   time("spot-country", "Name every highlighted country as fast as you can."),
   time("puzzle", "Place every country of a continent as fast as you can.", PUZZLE_CONTINENT_VARIANTS),
