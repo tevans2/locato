@@ -64,4 +64,19 @@ describe("daily introduction and review", () => {
     expect(onPractice).toHaveBeenCalledOnce();
     expect(result.score).toBe(76);
   });
+
+  it("shows the player's rank, pins their row under the top ten and uses the account streak", async () => {
+    const entries = Array.from({ length: 12 }, (_, n) => ({ rank: n + 1, user: { id: `u${n + 1}`, username: `player${n + 1}`, avatarEmoji: null },
+      result: { date: challenge.date, score: 100 - n, timeMs: 60_000 } }));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => new Response(JSON.stringify(String(input).includes("/leaderboard")
+      ? { entries }
+      : { summary: { history: [], streak: 9, best: null, friendsToday: [] } }), { status: 200 })));
+    const result = createDailyResultSave({ date: challenge.date, seed: challenge.seed, score: 89, timeMs: 60_000, hintsUsed: 0, marks: Array(10).fill("correct") });
+    const root = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result, countryIndex: index, onPractice: vi.fn(), currentUserId: "u12" }));
+    await vi.waitFor(() => expect(root.querySelector(".daily-result-rank")?.textContent).toBe("#12 of 12 today"));
+    const rows = root.querySelectorAll(".daily-board-row");
+    expect(rows).toHaveLength(11);
+    expect(rows[10]!.classList.contains("is-you")).toBe(true);
+    await vi.waitFor(() => expect(root.querySelector(".daily-result-stats")?.textContent).toContain("Daily streak9"));
+  });
 });

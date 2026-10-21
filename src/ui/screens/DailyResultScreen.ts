@@ -1,10 +1,10 @@
-import { DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, formatDailyTime, type DailyRoundResult } from "../../core/dailyChallenge";
+import { DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, formatDailyTime, getLocalDailyDate, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
 import { dailyThemeForDate } from "../../core/dailyThemes";
 import { getCategory } from "../../core/categories";
 import type { CountryIndex } from "../../core/countries";
 import { findMapTapLocation } from "../../core/maptap/locations";
 import type { ShellContext } from "../shell/types";
-import { fetchDailyLeaderboard, fetchDailySummary, type DailyChallengeResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
+import { fetchDailyLeaderboard, fetchDailySummary, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
 import type { DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
@@ -21,18 +21,43 @@ export interface DailyResultScreenOptions {
   readonly storage: Storage;
   readonly countryIndex: CountryIndex;
   readonly onPractice: () => void;
+  /** The signed-in player, to find their row on today's leaderboard. */
+  readonly currentUserId?: string | null;
+}
+
+/** Leaderboard rows shown before the list folds down to the player's own row. */
+const LEADERBOARD_TOP = 10;
+const MARK_LABELS: Record<DailyRoundMark, string> = { correct: "Full points", hint: "Assisted or partial", miss: "Missed or passed" };
+
+/** "Tuesday 21 October" / "Tue 21 Oct" for a daily's YYYY-MM-DD date. */
+export function formatDailyDate(date: string, style: "long" | "short" = "long"): string {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("en-GB", style === "long" ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** "7h 12m" until the next local midnight, when a new daily opens. */
+export function formatUntilNextDaily(now: Date): string {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const minutes = Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
 
 export function createDailyResultScreen(options: DailyResultScreenOptions): Screen {
   let destroyed = false;
   const { result } = options;
+  const isToday = result.date === getLocalDailyDate();
   const achievementResult = recordDailyAchievement(options.storage, result.date);
   const shareLabel = el("span", { text: "Share" });
   const shareButton = el("button", { className: "shell-btn shell-btn-primary", attrs: { type: "button", "data-action": "share" }, children: [shellIcon("share-2", 17, 2), shareLabel] });
   const homeButton = el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "button", "data-action": "home" }, children: [el("span", { text: "Back to games" }), shellIcon("arrow-right", 17, 2)] });
-  const share = el("pre", { className: "daily-share-text", text: result.shareText });
-  const leaderboardPanel = el("section", { className: "daily-retention-panel daily-leaderboard-panel", children: [el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
-  const retentionPanel = el("section", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
+  // Streak: this device's count until the account's (every device) arrives.
+  const streakValue = el("strong", { text: String(achievementResult.streak) });
+  const rankBadge = el("p", { className: "daily-result-rank", attrs: { hidden: "" } });
+  const nextDaily = el("span", { className: "daily-next-countdown" });
+  const leaderboardPanel = el("section", { className: "daily-side-panel daily-leaderboard-panel", children: [el("h2", { text: "Today's leaderboard" }), el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
+  const retentionPanel = el("div", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
   const practiceRounds = result.rounds?.filter((round) => round.points < DAILY_POINTS_PER_ROUND) ?? [];
 
   function roundExplanation(round: DailyRoundResult): string {
@@ -44,131 +69,118 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     return `${reasons.join(" · ")} · ${10 - round.points} points lost`;
   }
 
+  // The share grid, drawn as tiles (the Share button copies the text version).
+  const tiles = el("ol", { className: "daily-tiles", attrs: { "aria-label": "Rounds at a glance" }, children: result.marks.map((mark, position) =>
+    el("li", { className: `daily-tile is-${mark}`, attrs: { title: `Round ${position + 1}: ${MARK_LABELS[mark]}`, "aria-label": `Round ${position + 1}: ${MARK_LABELS[mark]}` } })) });
+
   const recap = el("section", { className: "daily-recap", attrs: { "aria-label": "Round by round review" }, children: [
-    el("div", { className: "daily-recap-heading", children: [el("h2", { text: "Your world tour" }), el("span", { className: "muted", text: "Answers & points" })] }),
+    el("div", { className: "daily-recap-heading", children: [el("h2", { text: "Your world tour" }),
+      el("div", { className: "daily-legend", children: (["correct", "hint", "miss"] as const).map((mark) => el("span", { children: [el("i", { className: `daily-tile is-${mark}` }), el("span", { text: MARK_LABELS[mark] })] })) })] }),
     result.rounds?.length
       ? el("ol", { className: "daily-recap-list", children: result.rounds.map((round, position) => {
           const country = round.countryCode ? options.countryIndex.byCode.get(round.countryCode) : undefined;
           const location = round.targetId && round.categoryId === "map-tap" ? findMapTapLocation(round.targetId) : undefined;
           const routeEnds = round.categoryId === "overland" ? (round.targetId ?? "").split("-").map((code) => options.countryIndex.byCode.get(code)?.name ?? code) : null;
-          const answer = routeEnds ? routeEnds.join(" → ") : location ? `${location.name} (${location.lat.toFixed(2)}°, ${location.lng.toFixed(2)}°)`
+          const answer = routeEnds ? routeEnds.join(" → ") : location ? location.name
             : round.categoryId === "capitals" ? `${country?.capital ?? ""} → ${country?.name ?? round.countryCode}` : country?.name ?? round.countryCode ?? "";
           const label = round.categoryId === "map-tap" ? "Map Tap" : round.categoryId === "streetview-country" ? "Street View" : round.categoryId === "overland" ? "Overland" : getCategory(round.categoryId)?.label ?? round.categoryId;
-          return el("li", { className: `daily-recap-row${round.points < 10 ? " has-loss" : ""}`, children: [
+          const mark = result.marks[position] ?? (round.points === DAILY_POINTS_PER_ROUND ? "correct" : round.points > 0 ? "hint" : "miss");
+          return el("li", { className: `daily-recap-row is-${mark}${round.points < 10 ? " has-loss" : ""}`, children: [
             el("span", { className: "daily-recap-number", text: String(position + 1) }),
             el("div", { className: "daily-recap-answer", children: [el("span", { className: "daily-recap-mode", text: label }), el("strong", { text: answer }), el("span", { className: "daily-recap-reason", text: roundExplanation(round) })] }),
             el("strong", { className: "daily-recap-points", text: `${round.points}/10` }),
           ] });
         }) })
       : el("p", { className: "muted", text: "Detailed review is available for newly played daily challenges." }),
-    ...(practiceRounds.length ? [el("button", { className: "shell-btn shell-btn-primary", text: "Practise what you missed", attrs: { type: "button", "data-action": "practice-daily" }, on: { click: options.onPractice } }), el("p", { className: "muted", text: `Revisit ${practiceRounds.length} question${practiceRounds.length === 1 ? "" : "s"} where you lost points. Practice won't change your daily score.` })] : result.rounds ? [el("p", { className: "daily-clean-sweep", text: "A perfect tour — every round earned full points." })] : []),
+    ...(practiceRounds.length ? [el("div", { className: "daily-practice-cta", children: [
+        el("p", { text: `Revisit ${practiceRounds.length} question${practiceRounds.length === 1 ? "" : "s"} where you lost points. Practice won't change your daily score.` }),
+        el("button", { className: "shell-btn shell-btn-primary", text: "Practise what you missed", attrs: { type: "button", "data-action": "practice-daily" }, on: { click: options.onPractice } })] })]
+      : result.rounds ? [el("p", { className: "daily-clean-sweep", text: "A perfect tour — every round earned full points." })] : []),
   ] });
 
-  function summaryStat(label: string, value: string): HTMLElement {
-    return el("article", { children: [el("span", { text: label }), el("strong", { text: value })] });
+  function summaryStat(label: string, value: string | HTMLElement): HTMLElement {
+    return el("article", { children: [el("span", { text: label }), typeof value === "string" ? el("strong", { text: value }) : value] });
   }
 
-  function achievementList(unlocked: readonly Achievement[]): HTMLElement {
-    return el("section", {
-      className: "achievement-panel",
-      children: [
-        el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: unlocked.length > 0 ? "Unlocked" : "Daily streak" }), el("strong", { text: `${achievementResult.streak} day${achievementResult.streak === 1 ? "" : "s"}` })] }),
-        unlocked.length > 0
-          ? el("div", {
-              className: "achievement-list",
-              children: unlocked.map((achievement) =>
-                el("article", {
-                  className: "achievement-chip",
-                  children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })],
-                }),
-              ),
-            })
-          : el("p", { className: "muted", text: "Come back tomorrow to keep the chain going." }),
-      ],
-    });
+  function playerName(user: { readonly avatarEmoji: string | null; readonly username: string }): HTMLElement {
+    return el("span", { className: "daily-friend-name", children: [el("span", { className: "daily-avatar", text: user.avatarEmoji ?? "", attrs: { "aria-hidden": "true" } }), el("span", { text: user.username })] });
   }
 
-  function dailyLine(entry: DailyChallengeResult): HTMLElement {
+  function leaderboardRow(entry: DailyLeaderboardEntry, mine: boolean): HTMLElement {
     return el("li", {
-      className: "daily-history-row",
+      className: `daily-history-row daily-board-row${mine ? " is-you" : ""}`,
       children: [
-        el("span", { text: entry.date }),
-        el("strong", { text: `${entry.score}/${DAILY_MAX_SCORE}` }),
-        el("span", { text: formatDailyTime(entry.timeMs) }),
+        el("span", { className: "daily-board-rank", text: `#${entry.rank}` }),
+        playerName(entry.user),
+        ...(mine ? [el("span", { className: "daily-you-pill", text: "You" })] : []),
+        el("strong", { text: `${entry.result.score}` }),
+        el("span", { className: "daily-board-time", text: formatDailyTime(entry.result.timeMs) }),
       ],
     });
+  }
+
+  /** The board API returns at most 100 rows, so a full page means "100 or more". */
+  function playerCount(entries: readonly DailyLeaderboardEntry[]): string {
+    return entries.length >= 100 ? "100+" : String(entries.length);
   }
 
   function renderLeaderboard(entries: readonly DailyLeaderboardEntry[] | null): void {
+    const heading = el("div", { className: "daily-side-heading", children: [el("h2", { text: isToday ? "Today's leaderboard" : "Leaderboard" }), ...(entries?.length ? [el("span", { className: "muted", text: `${playerCount(entries)} player${entries.length === 1 ? "" : "s"}` })] : [])] });
     if (!entries) {
-      leaderboardPanel.replaceChildren(el("h2", { text: "Today's leaderboard" }), el("p", { className: "muted", text: "Leaderboard is unavailable right now." }));
+      leaderboardPanel.replaceChildren(heading, el("p", { className: "muted", text: "Leaderboard is unavailable right now." }));
       return;
     }
-
+    const mine = options.currentUserId ? entries.find((entry) => entry.user.id === options.currentUserId) : undefined;
+    if (mine) {
+      rankBadge.hidden = false;
+      rankBadge.replaceChildren(el("strong", { text: `#${mine.rank}` }), el("span", { text: ` of ${playerCount(entries)} today` }));
+    }
+    const top = entries.slice(0, LEADERBOARD_TOP);
+    const rows = top.map((entry) => leaderboardRow(entry, entry === mine));
+    if (mine && mine.rank > LEADERBOARD_TOP) rows.push(el("li", { className: "daily-board-gap", text: "…", attrs: { "aria-hidden": "true" } }), leaderboardRow(mine, true));
     leaderboardPanel.replaceChildren(
-      el("h2", { text: "Today's leaderboard" }),
-      el("ul", {
-        className: "daily-history-list daily-leaderboard-list",
-        children:
-          entries.length > 0
-            ? entries.map((entry) =>
-                el("li", {
-                  className: "daily-history-row daily-friend-row",
-                  children: [
-                    el("span", { className: "daily-friend-name", text: `#${entry.rank} ${entry.user.avatarEmoji ?? ""} ${entry.user.username}`.trim() }),
-                    el("strong", { text: `${entry.result.score}/${DAILY_MAX_SCORE}` }),
-                    el("span", { text: `${formatDailyTime(entry.result.timeMs)} · ${entry.result.hintsUsed} hints` }),
-                  ],
-                }),
-              )
-            : [el("li", { className: "daily-history-row", text: "No completed results yet." })],
-      }),
+      heading,
+      el("ol", { className: "daily-history-list daily-leaderboard-list", children: rows.length > 0 ? rows : [el("li", { className: "daily-history-row", text: "No completed results yet." })] }),
     );
   }
 
   function renderSummary(summary: DailySummary | null): void {
     if (!summary) {
-      retentionPanel.replaceChildren(el("p", { className: "muted", text: "Sign in to sync daily history and compare with friends." }));
+      retentionPanel.replaceChildren(el("section", { className: "daily-side-panel daily-guest-cta", children: [
+        el("h2", { text: "Keep your streak" }),
+        el("p", { className: "muted", text: "Sign in to save this result to your account, keep your streak on every device and compare with friends." }),
+        el("button", { className: "shell-btn shell-btn-primary", text: "Sign in", attrs: { type: "button" }, on: { click: () => options.shell.openAccount() } }),
+      ] }));
       return;
     }
 
-    const best = summary.best;
+    streakValue.textContent = String(summary.streak);
     const friendRows = summary.friendsToday.map((entry) =>
       el("li", {
         className: "daily-history-row daily-friend-row",
-        children: [
-          el("span", { className: "daily-friend-name", text: `${entry.user.avatarEmoji ?? ""} ${entry.user.username}`.trim() }),
-          el("strong", { text: `${entry.result.score}/${DAILY_MAX_SCORE}` }),
-          el("span", { text: formatDailyTime(entry.result.timeMs) }),
-        ],
+        children: [playerName(entry.user), el("strong", { text: `${entry.result.score}` }), el("span", { className: "daily-board-time", text: formatDailyTime(entry.result.timeMs) })],
       }),
     );
+    const best = summary.best;
 
     retentionPanel.replaceChildren(
-      el("div", {
-        className: "daily-result-stats daily-retention-stats",
-        children: [
-          summaryStat("Current streak", String(summary.streak)),
-          summaryStat("Best recent", best ? `${best.score}/${DAILY_MAX_SCORE}` : "-"),
-        ],
-      }),
-      el("div", {
-        className: "daily-retention-grid",
-        children: [
-          el("section", {
-            children: [
-              el("h2", { text: "Recent dailies" }),
-              el("ul", { className: "daily-history-list", children: summary.history.length > 0 ? summary.history.map(dailyLine) : [el("li", { className: "daily-history-row", text: "No recent results." })] }),
-            ],
-          }),
-          el("section", {
-            children: [
-              el("h2", { text: "Friends today" }),
-              el("ul", { className: "daily-history-list", children: friendRows.length > 0 ? friendRows : [el("li", { className: "daily-history-row", text: "No friend results yet." })] }),
-            ],
-          }),
-        ],
-      }),
+      el("section", { className: "daily-side-panel", children: [
+        el("div", { className: "daily-side-heading", children: [el("h2", { text: "Friends today" })] }),
+        el("ul", { className: "daily-history-list", children: friendRows.length > 0 ? friendRows : [el("li", { className: "daily-history-row daily-empty-row", text: "No friend results yet." })] }),
+      ] }),
+      el("section", { className: "daily-side-panel", children: [
+        el("div", { className: "daily-side-heading", children: [el("h2", { text: "Your recent dailies" }), ...(best ? [el("span", { className: "muted", text: `Best ${best.score}` })] : [])] }),
+        el("ul", { className: "daily-history-list", children: summary.history.length > 0
+          ? summary.history.map((entry) => el("li", {
+              className: `daily-history-row${entry.date === result.date ? " is-you" : ""}`,
+              children: [
+                el("span", { text: formatDailyDate(entry.date, "short") }),
+                el("span", { className: "daily-history-bar", attrs: { "aria-hidden": "true" }, children: [el("i", { attrs: { style: `width: ${Math.round((entry.score / DAILY_MAX_SCORE) * 100)}%` } })] }),
+                el("strong", { text: `${entry.score}` }),
+              ],
+            }))
+          : [el("li", { className: "daily-history-row daily-empty-row", text: "No recent results." })] }),
+      ] }),
     );
   }
 
@@ -181,6 +193,10 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   });
   homeButton.addEventListener("click", () => options.shell.goHome());
 
+  const renderCountdown = () => { nextDaily.textContent = `Next daily in ${formatUntilNextDaily(new Date())}`; };
+  renderCountdown();
+  const countdownTimer = isToday ? window.setInterval(renderCountdown, 30_000) : null;
+
   const page = createSitePage(options.shell, {
     section: "daily",
     id: "daily-result",
@@ -189,24 +205,32 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       el("div", {
         className: "daily-result-panel",
         children: [
-          el("p", { className: "daily-result-kicker", text: `Daily challenge · ${result.date}` }),
-          ...(result.challengeVersion === 2 ? [el("h2", { className: "daily-result-theme", text: dailyThemeForDate(result.date).title })] : []),
-          el("h1", { className: "daily-result-score", children: [el("strong", { text: String(result.score) }), el("span", { text: `/${DAILY_MAX_SCORE}` })] }),
-          el("div", {
-            className: "daily-result-stats",
-            children: [
-              el("article", { children: [el("span", { text: "Time" }), el("strong", { text: formatDailyTime(result.timeMs) })] }),
-              el("article", { children: [el("span", { text: "Hints used" }), el("strong", { text: String(result.hintsUsed) })] }),
-              el("article", { children: [el("span", { text: "Daily streak" }), el("strong", { text: String(achievementResult.streak) })] }),
-            ],
-          }),
-          el("div", { className: "daily-result-actions", children: [shareButton, homeButton] }),
-          share,
-          el("div", { className: "daily-legend", children: [el("span", { text: "🟩 full points" }), el("span", { text: "🟨 assisted or partial" }), el("span", { text: "🟥 missed or passed" })] }),
-          recap,
-          achievementList(achievementResult.unlocked),
-          leaderboardPanel,
-          retentionPanel,
+          el("header", { className: "daily-result-hero", children: [
+            el("p", { className: "daily-result-kicker", text: `Daily challenge · ${formatDailyDate(result.date)}` }),
+            ...(result.challengeVersion === 2 ? [el("h2", { className: "daily-result-theme", text: dailyThemeForDate(result.date).title })] : []),
+            el("div", { className: "daily-result-headline", children: [
+              el("h1", { className: "daily-result-score", children: [el("strong", { text: String(result.score) }), el("span", { text: `/${DAILY_MAX_SCORE}` })] }),
+              rankBadge,
+            ] }),
+            tiles,
+            el("div", {
+              className: "daily-result-stats",
+              children: [
+                summaryStat("Time", formatDailyTime(result.timeMs)),
+                summaryStat("Hints used", String(result.hintsUsed)),
+                summaryStat("Daily streak", streakValue),
+              ],
+            }),
+            el("div", { className: "daily-result-actions", children: [shareButton, homeButton, ...(isToday ? [nextDaily] : [])] }),
+            ...(achievementResult.unlocked.length > 0 ? [el("section", { className: "achievement-panel", children: [
+              el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: "Unlocked" }), el("strong", { text: `${achievementResult.unlocked.length} achievement${achievementResult.unlocked.length === 1 ? "" : "s"}` })] }),
+              el("div", { className: "achievement-list", children: achievementResult.unlocked.map((achievement: Achievement) => el("article", { className: "achievement-chip", children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })] })) }),
+            ] })] : []),
+          ] }),
+          el("div", { className: "daily-result-layout", children: [
+            el("div", { className: "daily-result-main", children: [recap] }),
+            el("aside", { className: "daily-result-side", children: [leaderboardPanel, retentionPanel] }),
+          ] }),
         ],
       }),
     ],
@@ -224,6 +248,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     element,
     destroy: () => {
       destroyed = true;
+      if (countdownTimer !== null) window.clearInterval(countdownTimer);
       page.destroy();
     },
   };

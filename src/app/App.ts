@@ -303,7 +303,7 @@ export function createApp(options: AppOptions): App {
 
   function mountDailyResult(result: DailyResultSave): void {
     mount(
-      createDailyResultScreen({ shell, result, storage: options.storage, countryIndex: options.countryIndex,
+      createDailyResultScreen({ shell, result, storage: options.storage, countryIndex: options.countryIndex, currentUserId: authControls.getUser()?.id ?? null,
         onPractice: () => navigate({ type: "daily-practice", date: result.date }) }),
     );
   }
