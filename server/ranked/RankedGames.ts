@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { indexCountries, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
+import { indexCountries, isInContinent, rawCountries, type Country, type CountryIndex } from "../../src/core/countries";
 import { getCategory, matchesCountryName } from "../../src/core/categories";
 import { rankedAnswerToken } from "../../src/core/rankedPresentation";
 import { detectCountryGuess, submitCountryGuess } from "../../src/core/map/countryGuessing";
@@ -16,7 +16,7 @@ import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFr
 import { buildWorldSplitCountries, scoreWorldSplit, splitLineLength, WORLD_SPLIT_ROUNDS, type WorldSplitRound } from "../../src/core/worldsplit";
 import { MYSTERY_MAX_GUESSES, createMysteryRound, createMysteryTargets, guessMystery, hintMystery, mysteryRoundPoints, revealMystery, type MysteryGuess, type MysteryGuessError, type MysteryRound } from "../../src/core/mystery";
 import { OVERLAND_HINT_LABELS, OVERLAND_VERDICTS, createOverlandRound, createOverlandRoutes, guessOverland, hintOverland, overlandGraph, overlandRoundPoints, revealOverland, type OverlandGuess, type OverlandGuessError, type OverlandRound, type OverlandRoute } from "../../src/core/overland";
-import type { RankedAction, RankedQuestion, RankedState, RankedMoveResult } from "../../src/core/ranked";
+import { REVEAL_PENALTY_MS, type RankedAction, type RankedQuestion, type RankedState, type RankedMoveResult } from "../../src/core/ranked";
 import type { GameModeId } from "../../src/core/gameModes";
 import type { WorldCountryFeature } from "../../src/core/map";
 import type { DailyChallengeResult, DailyRoundMark, GameResult } from "../auth/types";
@@ -79,6 +79,8 @@ interface Run {
   readonly marks: DailyRoundMark[];
   readonly rounds: DailyRoundResult[];
   hints: number;
+  /** Timed runs: reveal penalties, added on top of the real elapsed time. */
+  penaltyMs: number;
   result?: RankedMoveResult;
   readonly placements: Map<string, { dx: number; dy: number }>;
   /** Overland: the current route's guesses and hints. */
@@ -147,7 +149,8 @@ export class RankedGames {
     const pool = mode === "flags" ? createPromptCountryIndex(this.countries, [mode], variant === "" ? "countries" : variant as "territories" | "both") : this.countries;
     if (config?.metric === "time") {
       const category = getCategory(mode);
-      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : mode === "puzzle" ? c.continent === variant : true), rng);
+      // Puzzle and continent Name all boards play one continent; the rest play the whole pool.
+      const countries = shuffle(pool.countries.filter((c) => category ? category.eligible(c) : !variant || (mode === "name-all" ? isInContinent(c, variant) : c.continent === variant)), rng);
       for (const country of countries) {
         const mapCountry = this.map.find((c) => c.code === country.code);
         queue.push({ mode, country, ...(mapCountry ? { mapCountry } : {}) });
@@ -182,7 +185,7 @@ export class RankedGames {
       catch { return { error: "Street View is unavailable. Please try again later." }; }
     }
     const now = this.clock();
-    const run: Run = { id: id(), userId, mode: mode as Run["mode"], variant, createdAt: now, startedAt: config?.metric === "time" ? null : now, queue, questionId: id(), questionAt: now, index: 0, score: 0, wrong: 0, wrongTotal: 0, revision: 0, finishedAt: null, busy: false, found: new Set(), marks: [], rounds: [], hints: 0, placements: new Map() };
+    const run: Run = { id: id(), userId, mode: mode as Run["mode"], variant, createdAt: now, startedAt: config?.metric === "time" ? null : now, queue, questionId: id(), questionAt: now, index: 0, score: 0, wrong: 0, wrongTotal: 0, revision: 0, finishedAt: null, busy: false, found: new Set(), marks: [], rounds: [], hints: 0, penaltyMs: 0, placements: new Map() };
     if (mode === "flyover") run.flight = new AuthoritativeFlight(this.map, rng, now, now + 90_000);
     this.runs.set(run.id, run);
     try { await this.prepare(run); } catch { this.runs.delete(run.id); return { error: "Street View is unavailable. Please try again later." }; }
@@ -276,7 +279,8 @@ export class RankedGames {
       if (action.type === "reveal") {
         if (run.hints < 3) return no("Use the available hints before revealing the answer.");
         detail("revealed", { countryCode: current.country.code }); run.found.add(current.country.code);
-        run.feedback = `Answer: ${current.mode === "capital-recall" ? current.country.capital : current.country.name}.`;
+        run.penaltyMs += REVEAL_PENALTY_MS;
+        run.feedback = `Answer: ${current.mode === "capital-recall" ? current.country.capital : current.country.name}. +${REVEAL_PENALTY_MS / 1000}s`;
         return { advance: true, points: 0 };
       }
     }
@@ -385,6 +389,7 @@ export class RankedGames {
       const foundIds = new Set([...run.found].map((code) => this.countries.byCode.get(code)!.id));
       const match = (action.auto ? detectCountryGuess : submitCountryGuess)(this.countries, action.answer, foundIds);
       if (!match) { run.feedback = "Not a new country. Try again."; return { advance: false, points: 0 }; }
+      if (run.variant && !isInContinent(match, run.variant)) { run.feedback = `${match.name} isn't in ${run.variant}.`; return { advance: false, points: 0 }; }
       run.found.add(match.code);
       detail("correct", { countryCode: match.code });
       run.feedback = `Correct · ${match.name}`;
@@ -463,7 +468,7 @@ export class RankedGames {
     }
     return { runId: run.id, mode: run.mode, variant: run.variant, status: run.finishedAt === null ? "playing" : "complete", startedAt: run.startedAt, serverNow: this.clock(), endsAt: run.flight?.endsAt ?? null,
       index: run.index, total: run.flight ? this.map.filter((c) => c.targetable).length : run.queue.length, score: run.score,
-      timeMs: run.finishedAt === null ? null : this.elapsed(run), question,
+      timeMs: run.finishedAt === null ? null : this.elapsed(run), ...(run.penaltyMs ? { penaltyMs: run.penaltyMs } : {}), question,
       ...(run.flight ? { plane: run.flight.plane, reaches: run.flight.reaches } : {}), found: [...(run.flight?.visited ?? run.found)], hints: run.hints, wrongAnswers: run.wrongTotal, ...(run.result ? { result: run.result } : {}), ...(run.feedback ? { feedback: run.feedback } : {}) };
   }
 
@@ -520,5 +525,5 @@ export class RankedGames {
     for (const [key, run] of this.runs) if (now - run.createdAt > LIFETIME_MS || (run.finishedAt !== null && now - run.finishedAt > RECEIPT_LIFETIME_MS)) this.runs.delete(key);
     for (const [userId, times] of this.rates) if (times.at(-1)! < now - 1000) this.rates.delete(userId);
   }
-  private elapsed(run: Run): number { return Math.max(1, Math.round((run.finishedAt ?? this.clock()) - (run.startedAt ?? run.finishedAt ?? this.clock()))); }
+  private elapsed(run: Run): number { return Math.max(1, Math.round((run.finishedAt ?? this.clock()) - (run.startedAt ?? run.finishedAt ?? this.clock()) + run.penaltyMs)); }
 }

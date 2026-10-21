@@ -32,7 +32,7 @@ export interface StepAnswer {
   readonly canonical?: string;
   /** "I don't know". */
   readonly gaveUp?: boolean;
-  /** Found on the map after a hint. */
+  /** Found on the map after a hint, or typed after revealing letters. */
   readonly hinted?: boolean;
 }
 
@@ -386,11 +386,16 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
       autocorrect: "off",
       spellcheck: "false",
       enterkeyhint: "done",
-      placeholder: scaffold === "none" ? (skill === "capital" ? "Type the capital" : "Type the country") : `${firstLetter}…`,
+      // One clue per rung: the first letter, or the letter count, never both.
+      placeholder: scaffold === "first-letter" ? `${firstLetter}…` : skill === "capital" ? "Type the capital" : "Type the country",
     },
   });
 
-  const slots = scaffold === "length" ? letterSlots(answer) : null;
+  const answerLetters = [...answer.replace(/[^\p{L}]/gu, "")];
+  // The first-letter rung already gives away the first letter, so reveals start after it.
+  const revealed = new Set<number>(scaffold === "first-letter" ? [0] : []);
+  const initialReveals = revealed.size;
+  let slots = scaffold === "length" ? letterSlots(answer) : null;
   const hintText =
     scaffold === "first-letter"
       ? `Starts with “${firstLetter}”`
@@ -398,6 +403,7 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
         ? `${answer.replace(/[^\p{L}]/gu, "").length} letters`
         : "Spelling doesn't need to be perfect";
   const hint = el("p", { className: "lx-type-hint", text: hintText });
+  const showLetter = el("button", { className: "lx-show-letter", text: "Show a letter", attrs: { type: "button" } });
 
   const check = primaryButton("Check", "lx-check");
   check.disabled = true;
@@ -411,9 +417,26 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
       el("label", { className: "lx-sr-only", text: skill === "capital" ? `Capital of ${name}` : "Country name", attrs: { for: id } }),
       el("div", { className: "lx-type-field", children: [field, el("span", { className: "lx-type-mark", attrs: { "aria-hidden": "true" } })] }),
       ...(slots ? [slots.element] : []),
-      hint,
+      el("div", { className: "lx-type-hint-row", children: [hint, showLetter] }),
     ],
   });
+
+  // First press shows the first letter, later presses a random hidden one; the last letter is always left to type.
+  function revealLetter(): void {
+    if (answered || revealed.size >= answerLetters.length - 1) return;
+    const hidden = answerLetters.map((_, index) => index).filter((index) => !revealed.has(index));
+    revealed.add(revealed.has(0) ? hidden[Math.floor(ctx.random() * hidden.length)]! : 0);
+    if (!slots) {
+      slots = letterSlots(answer);
+      form.insertBefore(slots.element, hint.parentElement);
+    }
+    slots.update(field.value, revealed);
+    const shown = revealed.size;
+    hint.textContent = `${shown} of ${answerLetters.length} letters shown`;
+    showLetter.disabled = shown >= answerLetters.length - 1;
+    ctx.announce?.(`Letter ${[...revealed].sort((a, b) => a - b).map((index) => `${index + 1}: ${answerLetters[index]}`).join(", ")}`);
+    field.focus({ preventScroll: true });
+  }
 
   function submit(): void {
     if (answered) return;
@@ -424,7 +447,8 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
     }
     const result = checkTypedAnswer(ctx.countryIndex, code, skill, value);
     answered = true;
-    ctx.onAnswer({ correct: result.correct, near: result.near, typed: value, canonical: result.canonical || answer });
+    const hinted = revealed.size > initialReveals;
+    ctx.onAnswer({ correct: result.correct, near: result.near, typed: value, canonical: result.canonical || answer, ...(hinted ? { hinted } : {}) });
   }
 
   form.addEventListener("submit", (event) => {
@@ -433,9 +457,12 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
   });
   field.addEventListener("input", () => {
     check.disabled = field.value.trim().length === 0;
-    slots?.update(field.value);
+    slots?.update(field.value, revealed);
   });
   check.addEventListener("click", submit);
+  // Keep focus in the field: blurring it reflows the step on phones and the tap lands on the wrong spot.
+  showLetter.addEventListener("mousedown", (event) => event.preventDefault());
+  showLetter.addEventListener("click", revealLetter);
   dontKnow.addEventListener("click", () => {
     if (answered) return;
     answered = true;
@@ -461,6 +488,7 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
       field.readOnly = true;
       check.disabled = true;
       dontKnow.disabled = true;
+      showLetter.disabled = true;
       form.classList.add(result.correct ? "is-correct" : "is-missed");
       form.querySelector(".lx-type-mark")?.replaceChildren(icon(result.correct ? "check" : "nudge"));
       if (result.correct && result.canonical) field.value = result.canonical;
@@ -471,7 +499,7 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
   };
 }
 
-function letterSlots(answer: string): { element: HTMLElement; update: (value: string) => void } {
+function letterSlots(answer: string): { element: HTMLElement; update: (value: string, revealed?: ReadonlySet<number>) => void } {
   const element = el("div", { className: "lx-slots", attrs: { "aria-hidden": "true" } });
   const cells: HTMLElement[] = [];
   // One unbreakable group per word, so long names wrap between words, never mid-word.
@@ -488,11 +516,15 @@ function letterSlots(answer: string): { element: HTMLElement; update: (value: st
   }
   return {
     element,
-    update: (value) => {
+    update: (value, revealed) => {
       const letters = [...value.replace(/[^\p{L}]/gu, "")];
+      const answerLetters = [...answer.replace(/[^\p{L}]/gu, "")];
       cells.forEach((cell, index) => {
-        cell.textContent = letters[index]?.toLocaleUpperCase() ?? "";
+        // Typed letters win; a revealed letter shows faintly until the player types over it.
+        const shown = index >= letters.length && revealed?.has(index);
+        cell.textContent = (shown ? answerLetters[index] : letters[index])?.toLocaleUpperCase() ?? "";
         cell.classList.toggle("is-filled", index < letters.length);
+        cell.classList.toggle("is-revealed", Boolean(shown));
       });
     },
   };

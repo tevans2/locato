@@ -10,3 +10,4 @@ export type {
 } from "./validateCountries";
 export type { AnswerOptions, Continent, Country, CountryCode, CountryId, CountryIndex, RawCountry } from "./types";
 export { CONTINENTS } from "./types";
+export { isInContinent } from "./continents";

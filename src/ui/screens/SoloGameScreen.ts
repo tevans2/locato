@@ -3,6 +3,7 @@ import type { RunType, ShellContext } from "../shell/types";
 import { isCorrectAnswer, type Country, type CountryId, type CountryIndex } from "../../core/countries";
 import { buildPromptSlots, getCategory, type PromptSlot, type PromptContent } from "../../core/categories";
 import type { RankedSession } from "./RankedSession";
+import { REVEAL_PENALTY_MS } from "../../core/ranked";
 import { matchesCapitalName } from "../../core/categories/matching";
 import { DAILY_COUNTRY_COUNT, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
 import { DEFAULT_FLAG_POOL, type FlagPool } from "../../core/flagPools";
@@ -739,7 +740,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     if (state.hintLevel >= TOTAL_HINTS) {
       if (!revealAnswerArmed) {
         revealAnswerArmed = true;
-        showHintPopover("Reveal answer?", "No hints left for this prompt. Tap Reveal answer again to show the answer.");
+        showHintPopover("Reveal answer?", `No hints left for this prompt. Tap Reveal answer again to show the answer${options.ranked ? ` (+${REVEAL_PENALTY_MS / 1000}s on your time)` : ""}.`);
         showFeedback(views.feedback, "No hints left. Confirm before revealing the answer.", "neutral");
         render(false);
         return;

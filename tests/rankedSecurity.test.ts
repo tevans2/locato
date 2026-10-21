@@ -112,6 +112,52 @@ describe("ranked authority", () => {
     expect(state.timeMs).toBe(10_000);
   });
 
+  it("adds a 20 second penalty to timed runs for each revealed answer", async () => {
+    const { time, service, user } = await harness();
+    let state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));
+    const act = (action: Record<string, unknown>) => service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, ...action });
+    state = stateOf(await act({ type: "answer", answer: "Not a country" }));
+    expect(await act({ type: "reveal" })).toHaveProperty("error");
+    for (let i = 0; i < 3; i++) state = stateOf(await act({ type: "hint" }));
+    time.value += 5_000;
+    state = stateOf(await act({ type: "reveal" }));
+    expect(state.result?.kind).toBe("revealed");
+    expect(state.penaltyMs).toBe(20_000);
+    while (state.status === "playing") {
+      time.value += 5_000;
+      state = stateOf(await act(answerFor(service.ranked, state)));
+    }
+    const elapsed = 5_000 * state.total;
+    expect(state.timeMs).toBe(elapsed + 20_000);
+    expect(service.ranked.consume(user.id, state.runId, "flags", "", elapsed)).toBeNull();
+    expect(service.ranked.consume(user.id, state.runId, "flags", "", elapsed + 20_000)).toMatchObject({ value: elapsed + 20_000 });
+  });
+
+  it("plays a continent Name all board with only that continent's countries", async () => {
+    const { time, service, user } = await harness();
+    let state = stateOf(await service.startRankedGame(user.id, { gameMode: "name-all", variant: "Europe" }));
+    expect(state.total).toBe(1);
+    const act = (answer: string) => service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer });
+    state = stateOf(await act("Brazil"));
+    expect(state).toMatchObject({ status: "playing", index: 0, feedback: "Brazil isn't in Europe." });
+    time.value += 6_000;
+    state = stateOf(await act("France"));
+    expect(state.status).toBe("complete");
+    expect(service.ranked.consume(user.id, state.runId, "name-all", "Europe", state.timeMs)).toMatchObject({ variant: "Europe" });
+  });
+
+  it("counts Turkey and Cyprus on both the Europe and Asia Name all boards", async () => {
+    const { service, user } = await harness(true);
+    for (const variant of ["Europe", "Asia"]) {
+      let state = stateOf(await service.startRankedGame(user.id, { gameMode: "name-all", variant }));
+      for (const answer of ["Turkey", "Cyprus"]) {
+        state = stateOf(await service.ranked.action(user.id, { runId: state.runId, questionId: state.question!.id, type: "answer", answer }));
+        expect(state.result?.kind).toBe("correct");
+      }
+      expect(state.index).toBe(2);
+    }
+  });
+
   it("expires idle runs from creation even when their timer has never started", async () => {
     const { time, service, user } = await harness();
     const state = stateOf(await service.startRankedGame(user.id, { gameMode: "flags", variant: "" }));

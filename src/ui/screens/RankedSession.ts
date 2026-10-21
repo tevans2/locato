@@ -15,8 +15,9 @@ export class RankedSession {
   get signal(): AbortSignal { return this.controller.signal; }
   elapsedMs(): number {
     if (this.state.timeMs !== null) return this.state.timeMs;
-    if (this.firstGuessAt !== null) return Math.max(0, performance.now() - this.firstGuessAt);
-    return this.state.startedAt === null ? 0 : Math.max(0, this.now() - this.state.startedAt);
+    const penalty = this.state.penaltyMs ?? 0;
+    if (this.firstGuessAt !== null) return Math.max(0, performance.now() - this.firstGuessAt) + penalty;
+    return this.state.startedAt === null ? penalty : Math.max(0, this.now() - this.state.startedAt) + penalty;
   }
   noteGuess(): void { this.firstGuessAt ??= performance.now(); }
   now(): number { return performance.now() + this.offset; }
