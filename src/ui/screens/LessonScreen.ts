@@ -308,7 +308,9 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       const detail = answer.near
         ? `Close enough — it's spelled “${answer.canonical ?? name}”.`
         : answer.hinted
-          ? `Found ${name} with a hint — nice recovery.`
+          ? step.kind === "place"
+            ? `Found ${name} with a hint — nice recovery.`
+            : `Got ${skill === "capital" ? answerLabel(countryIndex, step.code, skill) : name} with a few letters shown.`
           : current.retry
             ? `Got it this time — ${skill === "capital" ? `${answerLabel(countryIndex, step.code, skill)} is the capital of ${name}` : name}.`
             : skill === "capital"

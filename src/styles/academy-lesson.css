@@ -1033,10 +1033,45 @@
   color: var(--lx-warm);
 }
 
-#app .lx .lx-type-hint {
+#app .lx .lx-type-hint-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   margin: 10px 4px 0;
+}
+
+#app .lx .lx-type-hint {
+  margin: 0;
   color: var(--muted);
   font: 700 0.86rem/1.3 var(--font-sans);
+}
+
+#app .lx .lx-show-letter {
+  flex: none;
+  width: auto;
+  padding: 4px 0;
+  border: 0;
+  color: var(--brand);
+  background: none;
+  font: 800 0.86rem/1.3 var(--font-sans);
+  cursor: pointer;
+}
+
+#app .lx .lx-show-letter:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+#app .lx .lx-show-letter:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+#app .lx .lx-show-letter:disabled {
+  color: var(--subtle);
+  cursor: default;
 }
 
 #app .lx .lx-slots {
@@ -1063,6 +1098,10 @@
 
 #app .lx .lx-slot.is-filled {
   border-color: var(--brand);
+}
+
+#app .lx .lx-slot.is-revealed {
+  color: var(--subtle);
 }
 
 #app .lx .lx-slot-gap {

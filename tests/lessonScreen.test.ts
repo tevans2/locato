@@ -136,6 +136,7 @@ describe("Lesson player", () => {
         promoted += 1;
         expect(ui.root.querySelector(".lx-type")?.getAttribute("data-scaffold")).toBe("length");
         expect(ui.root.querySelectorAll(".lx-slot").length).toBeGreaterThan(2);
+        expect(ui.root.querySelector<HTMLInputElement>(".lx-type-input")!.placeholder).not.toMatch(/…$/);
         expect(ui.root.querySelector(".lx-kicker-levelup")).not.toBeNull();
       }
       ui.answer(true);
@@ -218,6 +219,35 @@ describe("Lesson player", () => {
     expect(tray.querySelector(".lx-tray-headline")?.textContent).toBe("Correct!");
     expect(tray.querySelector(".lx-tray-detail")?.textContent).toContain(`spelled “${name}”`);
     expect(getCard(ui.store.get(), step.code, "flag").box).toBe(4);
+  });
+
+  it("reveals the first letter, then random ones, when typing", () => {
+    const group = findGroup("europe-big-names")!;
+    const past = Date.UTC(2026, 8, 1);
+    const cards: Record<string, CardProgress> = {};
+    for (const code of group.countryCodes) cards[cardKey(code, "flag")] = { box: 4, correct: 4, wrong: 0, lastSeenAt: past, dueAt: past };
+    const ui = setup({ progressStore: memoryStore({ ...emptyProgress(), cards }) });
+    let guard = 0;
+    while (ui.info().kind !== "type" && guard++ < 40) {
+      ui.answer(true);
+      if (ui.info().phase === "feedback") ui.cont();
+    }
+    const step = ui.info();
+    expect(ui.root.querySelector(".lx-type")?.getAttribute("data-scaffold")).toBe("none");
+    expect(ui.root.querySelector(".lx-slots")).toBeNull();
+    const name = countryIndex.byCode.get(step.code)!.name;
+    const showLetter = ui.root.querySelector<HTMLButtonElement>(".lx-show-letter")!;
+    showLetter.click();
+    const revealed = () => [...ui.root.querySelectorAll<HTMLElement>(".lx-slot.is-revealed")];
+    expect(revealed()).toHaveLength(1);
+    expect(ui.root.querySelector(".lx-slot")?.textContent).toBe(name[0]!.toUpperCase());
+    showLetter.click();
+    expect(revealed()).toHaveLength(2);
+    ui.answerTyped(name);
+    const tray = ui.root.querySelector<HTMLElement>(".lx-tray")!;
+    expect(tray.dataset.tone).toBe("good");
+    expect(tray.querySelector(".lx-tray-detail")?.textContent).toContain("letters shown");
+    expect(showLetter.disabled).toBe(true);
   });
 
   it("gives place steps one hint before counting a miss", () => {
