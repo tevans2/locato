@@ -160,6 +160,24 @@ describe("daily app orchestration", () => {
     expect(account.requests.some((path) => path.startsWith("/api/ranked/"))).toBe(false);
   });
 
+  it("moves dailies played as a guest to the account that signs in", async () => {
+    const account = await signIn();
+    const marks = [...Array(8).fill("correct"), "miss", "miss"] as const;
+    const older = createDailyResultSave({ date: "2026-10-01", seed: "daily:2026-10-01", score: 80, timeMs: 120_000, hintsUsed: 0, marks: [...marks] });
+    const challenge = createDailyChallenge(index);
+    const today = createDailyResultSave({ date: challenge.date, seed: challenge.seed, score: 70, timeMs: 90_000, hintsUsed: 0, marks: [...Array(7).fill("correct"), "miss", "miss", "miss"] });
+    saveDailyResult(window.localStorage, older);
+    saveDailyResult(window.localStorage, today);
+    const { app } = setup();
+    app.start();
+    await vi.waitFor(() => expect(account.service.getDailyResult(account.userId, "2026-10-01")?.score).toBe(80));
+    await vi.waitFor(() => expect(account.service.getDailyResult(account.userId, challenge.date)?.score).toBe(70));
+    expect(readDailyResult(window.localStorage, challenge.date, account.userId)?.score).toBe(70);
+    // The guest copies are gone, so another account signing in here can't claim them.
+    expect(readDailyResult(window.localStorage, challenge.date)).toBeNull();
+    expect(readDailyResult(window.localStorage, "2026-10-01")).toBeNull();
+  });
+
   it("resumes an earlier mixed-theme attempt with its original assignments", async () => {
     const challenge = createMixedThemeDailyChallenge(index, getLocalDailyDate());
     const engine = createGameEngine({ countryIndex: index, categoryIds: challenge.categoryIds, seed: challenge.seed,

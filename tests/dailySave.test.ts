@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearDailyProgress, createDailyResultSave, dailyProgressKey, dailySaveKey, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyProgressSave } from "../src/storage/dailySave";
+import { adoptGuestDailies, clearDailyProgress, createDailyResultSave, dailyProgressKey, dailySaveKey, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, readDailySyncQueue, type DailyProgressSave } from "../src/storage/dailySave";
 import { indexCountries, type RawCountry } from "../src/core/countries";
 import { createGameEngine } from "../src/core/game";
 import { createSoloSave, hydrateGameState } from "../src/storage/localSave";
@@ -148,5 +148,37 @@ describe("daily progress save", () => {
     expect(readDailyProgress(storage, "2026-09-27", "daily:2026-09-27")).toBeNull();
     saveDailyProgress(storage, makeProgress("2026-09-27", { score: 999 }));
     expect(readDailyProgress(storage, "2026-09-27", "daily:2026-09-27")).toBeNull();
+  });
+});
+
+describe("guest dailies at sign-in", () => {
+  it("moves finished guest dailies to the account and queues them for upload", () => {
+    const storage = new MemoryStorage();
+    saveDailyResult(storage, makeResult("2026-10-01", 90));
+    storage.setItem("locato:daily:2026-09-30:v2", JSON.stringify(makeResult("2026-09-30", 70)));
+    expect(adoptGuestDailies(storage, "user-1")).toEqual(["2026-09-30", "2026-10-01"]);
+    expect(readDailyResult(storage, "2026-10-01", "user-1")?.score).toBe(90);
+    expect(readDailyResult(storage, "2026-09-30", "user-1")?.score).toBe(70);
+    expect(readDailyResult(storage, "2026-10-01")).toBeNull();
+    expect(readDailyResult(storage, "2026-09-30")).toBeNull();
+    // Nothing left for a second account on the same device.
+    expect(adoptGuestDailies(storage, "user-2")).toEqual([]);
+    expect(readDailySyncQueue(storage, "user-1")).toEqual(["2026-09-30", "2026-10-01"]);
+  });
+
+  it("keeps the account's own result for a day it already played", () => {
+    const storage = new MemoryStorage();
+    saveDailyResult(storage, makeResult("2026-10-01", 50), "user-1");
+    saveDailyResult(storage, makeResult("2026-10-01", 100));
+    expect(adoptGuestDailies(storage, "user-1")).toEqual([]);
+    expect(readDailyResult(storage, "2026-10-01", "user-1")?.score).toBe(50);
+  });
+
+  it("carries a guest daily in progress over to the account", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(dailyProgressKey(), JSON.stringify({ version: 1, date: "2026-10-01" }));
+    adoptGuestDailies(storage, "user-1");
+    expect(storage.getItem(dailyProgressKey("user-1"))).toContain("2026-10-01");
+    expect(storage.getItem(dailyProgressKey())).toBeNull();
   });
 });

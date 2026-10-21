@@ -175,3 +175,68 @@ export function readDailyProgress(storage: Storage, date: string, seed: string, 
   storage.removeItem(key);
   return null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Guest → account: dailies played before signing in move to the account that signs in on this
+// device, so they count toward its history and streak. Guest copies are removed once moved, so a
+// second account signing in later can't claim them too.
+
+const DAILY_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function dailySyncQueueKey(userId: string): string {
+  return `${DAILY_SAVE_PREFIX}${dailySaveScope(userId)}:pending-sync:v1`;
+}
+
+/** Dates of this account's local dailies that still need uploading. */
+export function readDailySyncQueue(storage: Storage, userId: string): readonly string[] {
+  try {
+    const parsed = JSON.parse(storage.getItem(dailySyncQueueKey(userId)) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((date): date is string => typeof date === "string" && DAILY_DATE_PATTERN.test(date)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeDailySyncQueue(storage: Storage, userId: string, dates: readonly string[]): void {
+  if (dates.length === 0) storage.removeItem(dailySyncQueueKey(userId));
+  else storage.setItem(dailySyncQueueKey(userId), JSON.stringify([...new Set(dates)].sort()));
+}
+
+/** Every finished guest daily on this device (current and legacy keys), with the keys holding it. */
+function guestDailyEntries(storage: Storage): Map<string, string[]> {
+  const byDate = new Map<string, string[]>();
+  const guest = `${DAILY_SAVE_PREFIX}${GUEST_DAILY_SAVE_SCOPE}:`;
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (!key?.endsWith(DAILY_SAVE_SUFFIX)) continue;
+    const rest = key.startsWith(guest) ? key.slice(guest.length) : key.startsWith(DAILY_SAVE_PREFIX) ? key.slice(DAILY_SAVE_PREFIX.length) : null;
+    const date = rest?.slice(0, -DAILY_SAVE_SUFFIX.length);
+    if (!date || !DAILY_DATE_PATTERN.test(date)) continue;
+    byDate.set(date, [...(byDate.get(date) ?? []), key]);
+  }
+  return byDate;
+}
+
+/**
+ * Move guest dailies (finished and in progress) to `userId` on this device and queue the finished
+ * ones for upload. A day the account already has locally keeps the account's copy. Returns the
+ * dates waiting to upload, including any left over from an earlier failed sync.
+ */
+export function adoptGuestDailies(storage: Storage, userId: string): readonly string[] {
+  const queue = new Set(readDailySyncQueue(storage, userId));
+  for (const [date, keys] of guestDailyEntries(storage)) {
+    const result = readDailyResult(storage, date, null);
+    if (result && !readDailyResult(storage, date, userId)) {
+      saveDailyResult(storage, result, userId);
+      queue.add(date);
+    }
+    for (const key of keys) storage.removeItem(key);
+  }
+  const guestProgress = storage.getItem(dailyProgressKey(null));
+  if (guestProgress !== null) {
+    if (storage.getItem(dailyProgressKey(userId)) === null) storage.setItem(dailyProgressKey(userId), guestProgress);
+    storage.removeItem(dailyProgressKey(null));
+  }
+  writeDailySyncQueue(storage, userId, [...queue]);
+  return readDailySyncQueue(storage, userId);
+}

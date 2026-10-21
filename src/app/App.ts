@@ -5,7 +5,7 @@ import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isFlyoverGameModeId, isMapTapGameModeId, isMysteryGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, persistSoloRun, readLatestSoloSave, readSoloSave } from "../storage/localSave";
-import { clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult, type DailyResultSave, type DailyStage } from "../storage/dailySave";
+import { adoptGuestDailies, clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, readDailySyncQueue, saveDailyProgress, saveDailyResult, writeDailySyncQueue, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
 import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
@@ -93,6 +93,7 @@ export function createApp(options: AppOptions): App {
       else social.disconnect();
       if (state.user) void academyProgress.syncWithAccount();
       else academyProgress.detachAccount();
+      if (state.user) void syncGuestDailies(state.user.id);
       markAuthResolved();
       const userId = state.user?.id ?? null;
       if (userId === authUserId) return;
@@ -280,9 +281,29 @@ export function createApp(options: AppOptions): App {
     return payload;
   }
 
+  /** Move dailies played as a guest to the account that just signed in and upload them (retried next sign-in if offline). */
+  const dailySyncs = new Set<string>();
+  async function syncGuestDailies(userId: string): Promise<void> {
+    if (dailySyncs.has(userId)) return;
+    dailySyncs.add(userId);
+    try { await uploadDailies(userId); } finally { dailySyncs.delete(userId); }
+  }
+
+  async function uploadDailies(userId: string): Promise<void> {
+    const pending = adoptGuestDailies(options.storage, userId);
+    for (const date of pending) {
+      const local = readDailyResult(options.storage, date, userId);
+      const synced = local ? await saveDailyChallengeResult(dailyLocalResultToAccount(local)) : null;
+      if (local && !synced) continue;
+      // The account keeps its first result for a day, so adopt whatever it now holds.
+      if (synced && authControls.getUser()?.id === userId) saveDailyResult(options.storage, dailyAccountResultToLocal(synced), userId);
+      writeDailySyncQueue(options.storage, userId, readDailySyncQueue(options.storage, userId).filter((queued) => queued !== date));
+    }
+  }
+
   function mountDailyResult(result: DailyResultSave): void {
     mount(
-      createDailyResultScreen({ shell, result, storage: options.storage, countryIndex: options.countryIndex,
+      createDailyResultScreen({ shell, result, storage: options.storage, countryIndex: options.countryIndex, currentUserId: authControls.getUser()?.id ?? null,
         onPractice: () => navigate({ type: "daily-practice", date: result.date }) }),
     );
   }
