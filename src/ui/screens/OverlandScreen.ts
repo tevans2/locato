@@ -228,7 +228,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     onUnknown: (text, ambiguous) => setFeedback(ambiguous ? "Which one? Pick a country from the list." : `No country called “${text}”. Check the spelling.`, "warn"),
     onType: () => { if (feedback.dataset.tone === "warn") setFeedback(""); },
   });
-  const { form, input, feedback } = guessInput;
+  const { form, feedback } = guessInput;
 
   const meterLabel = el("span", { className: "overland-meter-label" });
   const meterPips = el("div", { className: "overland-meter-pips", attrs: { "aria-hidden": "true" } });
@@ -389,7 +389,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
         return;
       }
     }
-    if (shouldFocusInput()) input.focus({ preventScroll: true });
+    if (shouldFocusInput()) guessInput.focus();
   }
 
   function saveToday(): void {
@@ -647,7 +647,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
       return;
     }
     setBusy(false);
-    input.focus({ preventScroll: true });
+    guessInput.focus();
   }
 
   async function useHint(): Promise<void> {

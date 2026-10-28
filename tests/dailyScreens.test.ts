@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDailyChallenge, type DailyRoundResult } from "../src/core/dailyChallenge";
 import { indexCountries, rawCountries } from "../src/core/countries";
 import { createDailyIntroScreen } from "../src/ui/screens/DailyIntroScreen";
-import { createDailyResultScreen } from "../src/ui/screens/DailyResultScreen";
+import { createDailyResultScreen, keepPlayingGames } from "../src/ui/screens/DailyResultScreen";
 import { createDailyResultSave } from "../src/storage/dailySave";
 import { shellOrFallback } from "../src/ui/screens/practiceRun";
 import type { Screen } from "../src/app/router";
@@ -78,5 +78,43 @@ describe("daily introduction and review", () => {
     expect(rows).toHaveLength(11);
     expect(rows[10]!.classList.contains("is-you")).toBe(true);
     await vi.waitFor(() => expect(root.querySelector(".daily-result-stats")?.textContent).toContain("Daily streak9"));
+  });
+});
+
+describe("daily results lead on to the full games", () => {
+  const round = (categoryId: string, points: number): DailyRoundResult => ({ categoryId, points, hintsUsed: 0, wrongGuesses: 0, missed: points === 0, ...(categoryId === "map-tap" || categoryId === "overland" ? { targetId: "x" } : { countryCode: "JP" }) });
+
+  it("suggests the games behind today's rounds, the costliest first", () => {
+    const rounds = [round("flags", 10), round("flags", 10), round("capitals", 8), round("capitals", 2), round("shapes", 10), round("shapes", 7),
+      round("pick-country", 10), round("overland", 4), round("map-tap", 9), round("streetview-country", 10)];
+    expect(keepPlayingGames({ rounds })).toEqual([{ game: "capitals", lost: 10 }, { game: "overland", lost: 6 }, { game: "shapes", lost: 3 }]);
+    // A perfect daily still points somewhere: its first games, in the daily's order.
+    expect(keepPlayingGames({ rounds: rounds.map((r) => ({ ...r, points: 10, missed: false })) }).map((g) => g.game)).toEqual(["flags", "capitals", "shapes"]);
+    expect(keepPlayingGames({}).map((g) => g.lost)).toEqual([null, null, null]);
+  });
+
+  it("puts a Keep playing section right under the score that opens those games", () => {
+    const openGame = vi.fn();
+    const openGamePicker = vi.fn();
+    const openDailyPuzzle = vi.fn();
+    const shell = { ...shellOrFallback(undefined, vi.fn()), openGame, openGamePicker, openDailyPuzzle };
+    const today = new Date();
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const rounds = [round("flags", 10), round("flags", 10), round("capitals", 4), round("capitals", 10), round("shapes", 10), round("shapes", 10), round("pick-country", 10), round("overland", 10), round("map-tap", 6), round("streetview-country", 10)];
+    const result = createDailyResultSave({ date, seed: `daily:${date}`, score: 90, timeMs: 120_000, hintsUsed: 0, marks: rounds.map((r) => (r.points === 10 ? "correct" : "hint")), challengeVersion: 2, rounds });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    const root = mount(createDailyResultScreen({ shell, storage: window.localStorage, result, countryIndex: index, onPractice: vi.fn() }));
+    const section = root.querySelector(".daily-keep-playing")!;
+    expect(section.compareDocumentPosition(root.querySelector(".daily-recap")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const cards = [...section.querySelectorAll<HTMLButtonElement>(".daily-keep-card")];
+    expect(cards.map((card) => card.dataset.game)).toEqual(["capitals", "map-tap", "flags"]);
+    expect(cards[0]!.textContent).toContain("You dropped 6 points here today");
+    cards[1]!.click();
+    expect(openGame).toHaveBeenCalledWith("map-tap", "practice");
+    root.querySelector<HTMLButtonElement>('[data-action="all-games"]')!.click();
+    expect(openGamePicker).toHaveBeenCalled();
+    root.querySelector<HTMLButtonElement>('[data-action="daily-mystery"]')!.click();
+    expect(openDailyPuzzle).toHaveBeenCalledWith("mystery");
+    expect(root.querySelector('[data-action="more-games"]')!.textContent).toBe("Play more games");
   });
 });

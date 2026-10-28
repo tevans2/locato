@@ -244,3 +244,34 @@ export function adoptGuestDailies(storage: Storage, userId: string): readonly st
   writeDailySyncQueue(storage, userId, [...queue]);
   return readDailySyncQueue(storage, userId);
 }
+
+// ---------------------------------------------------------------------------------------------
+// The landing page's view of today's daily: whatever this device holds for the date, whether a
+// guest or any account played it (the page doesn't wait for the session check).
+
+export interface DailyOnDevice {
+  readonly result: DailyResultSave | null;
+  /** Rounds finished in an unfinished attempt (0 when none). */
+  readonly roundsPlayed: number;
+}
+
+export function readDailyOnDevice(storage: Storage, date: string): DailyOnDevice {
+  let result: DailyResultSave | null = null;
+  let roundsPlayed = 0;
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key) continue;
+    if (key.startsWith(DAILY_SAVE_PREFIX) && key.endsWith(`:${date}${DAILY_SAVE_SUFFIX}`)) {
+      const parsed = parseDailyResult(storage.getItem(key) ?? "", date);
+      if (parsed && (!result || parsed.completedAt < result.completedAt)) result = parsed;
+    } else if (key.startsWith(DAILY_PROGRESS_PREFIX)) {
+      try {
+        const progress = JSON.parse(storage.getItem(key) ?? "null") as { date?: unknown; roundIndex?: unknown } | null;
+        if (progress?.date === date && typeof progress.roundIndex === "number") roundsPlayed = Math.max(roundsPlayed, Math.max(0, Math.min(DAILY_COUNTRY_COUNT, progress.roundIndex)));
+      } catch {
+        // unreadable progress: ignore
+      }
+    }
+  }
+  return { result, roundsPlayed: result ? 0 : roundsPlayed };
+}

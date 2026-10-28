@@ -54,6 +54,18 @@ function setup(options: { shell?: Partial<ShellContext>; postAttempt?: PostRanke
 }
 
 describe("Overland (single-run: every run counts)", () => {
+  it("puts the cursor in the guess box when the screen opens on a desktop", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal("innerWidth", 1440);
+    try {
+      const ui = setup();
+      await Promise.resolve();
+      expect(document.activeElement).toBe(ui.input);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("deals five routes with a Best badge instead of a Practice / Ranked choice", () => {
     expect(routes).toHaveLength(OVERLAND_ATTEMPT_ROUTES);
     localStorage.setItem("locato:ranked-best:overland:v1", "312");

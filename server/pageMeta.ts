@@ -9,7 +9,7 @@ export interface PageMeta {
 }
 
 const DEFAULT_META: PageMeta = {
-  title: "Locato — Geography games",
+  title: "Locato — A daily geography challenge",
   description: "A new geography challenge every day, plus flags, borders, maps and multiplayer. Free to play, no sign-up.",
 };
 
@@ -69,6 +69,7 @@ export function renderPageMeta(html: string, url: URL, origin: string): string {
   let out = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttribute(meta.title)}</title>`);
   out = setContent(out, "property", "og:title", meta.title);
   out = setContent(out, "name", "twitter:title", meta.title);
+  out = setContent(out, "name", "description", meta.description);
   out = setContent(out, "property", "og:description", meta.description);
   out = setContent(out, "name", "twitter:description", meta.description);
   out = setContent(out, "property", "og:url", canonical.toString());
