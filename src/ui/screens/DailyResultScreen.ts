@@ -13,6 +13,9 @@ import { createSitePage } from "../shell/SiteHeader";
 import { shareResult } from "../shell/ResultsCard";
 import { shareLink } from "../../core/shareLink";
 import { shellIcon } from "../shell/icons";
+import { GAME_MODE_GROUPS, gameModeCatalogueEntry, type GameModeId } from "../../core/gameModes";
+import { overlandDailyNumber } from "../../core/overland/routes";
+import { mysteryDailyNumber } from "../../core/mystery/round";
 import "../../styles/daily-result.css";
 
 export interface DailyResultScreenOptions {
@@ -29,6 +32,34 @@ export interface DailyResultScreenOptions {
 /** Leaderboard rows shown before the list folds down to the player's own row. */
 const LEADERBOARD_TOP = 10;
 const MARK_LABELS: Record<DailyRoundMark, string> = { correct: "Full points", hint: "Assisted or partial", miss: "Missed or passed" };
+
+// Each kind of daily round, and the full game it comes from.
+const DAILY_ROUND_GAMES: Readonly<Record<string, GameModeId>> = {
+  flags: "flags", capitals: "capitals", shapes: "shapes", "pick-country": "click-country", "spot-country": "spot-country",
+  overland: "overland", "map-tap": "map-tap", "streetview-country": "streetview-country",
+};
+// Older dailies have no per-round detail: suggest the games most unlike a quiz.
+const FALLBACK_GAMES: readonly GameModeId[] = ["overland", "map-tap", "flags"];
+const KEEP_PLAYING_COUNT = 3;
+const GAME_COUNT = GAME_MODE_GROUPS.reduce((sum, group) => sum + group.modes.length, 0);
+
+export interface KeepPlayingGame {
+  readonly game: GameModeId;
+  /** Points dropped on this game's rounds today, or null for an older daily without detail. */
+  readonly lost: number | null;
+}
+
+/** The full games behind today's rounds, the ones that cost the most points first. */
+export function keepPlayingGames(result: Pick<DailyResultSave, "rounds">): readonly KeepPlayingGame[] {
+  if (!result.rounds?.length) return FALLBACK_GAMES.map((game) => ({ game, lost: null }));
+  const lost = new Map<GameModeId, number>();
+  for (const round of result.rounds) {
+    const game = DAILY_ROUND_GAMES[round.categoryId];
+    if (game) lost.set(game, (lost.get(game) ?? 0) + Math.max(0, DAILY_POINTS_PER_ROUND - round.points));
+  }
+  // Map order is first appearance, so ties keep the daily's own order.
+  return [...lost].sort((a, b) => b[1] - a[1]).slice(0, KEEP_PLAYING_COUNT).map(([game, points]) => ({ game, lost: points }));
+}
 
 /** "Tuesday 21 October" / "Tue 21 Oct" for a daily's YYYY-MM-DD date. */
 export function formatDailyDate(date: string, style: "long" | "short" = "long"): string {
@@ -52,7 +83,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const achievementResult = recordDailyAchievement(options.storage, result.date);
   const shareLabel = el("span", { text: "Share" });
   const shareButton = el("button", { className: "shell-btn shell-btn-primary", attrs: { type: "button", "data-action": "share" }, children: [shellIcon("share-2", 17, 2), shareLabel] });
-  const homeButton = el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "button", "data-action": "home" }, children: [el("span", { text: "Back to games" }), shellIcon("arrow-right", 17, 2)] });
+  const homeButton = el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "button", "data-action": "more-games" }, children: [el("span", { text: "Play more games" }), shellIcon("arrow-right", 17, 2)] });
   // Streak: this device's count until the account's (every device) arrives.
   const streakValue = el("strong", { text: String(achievementResult.streak) });
   const rankBadge = el("p", { className: "daily-result-rank", attrs: { hidden: "" } });
@@ -97,6 +128,39 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
         el("p", { text: `Revisit ${practiceRounds.length} question${practiceRounds.length === 1 ? "" : "s"} where you lost points. Practice won't change your daily score.` }),
         el("button", { className: "shell-btn shell-btn-primary", text: "Practise what you missed", attrs: { type: "button", "data-action": "practice-daily" }, on: { click: options.onPractice } })] })]
       : result.rounds ? [el("p", { className: "daily-clean-sweep", text: "A perfect tour — every round earned full points." })] : []),
+  ] });
+
+  // Straight after the score: the games behind today's rounds, so the daily leads into the rest of Locato.
+  const keepPlaying = el("section", { className: "daily-keep-playing", attrs: { "aria-labelledby": "daily-keep-playing-title", tabindex: "-1" }, children: [
+    el("div", { className: "daily-keep-heading", children: [
+      el("h2", { attrs: { id: "daily-keep-playing-title" }, text: "Keep playing" }),
+      el("p", { className: "muted", text: `Every round today comes from a full game you can play as much as you like.${isToday ? " The daily is once a day; these aren't." : ""}` }),
+    ] }),
+    el("ul", { className: "daily-keep-games", children: keepPlayingGames(result).map(({ game, lost }) => {
+      const mode = gameModeCatalogueEntry(game);
+      const note = lost === null ? null : lost > 0 ? `You dropped ${lost} point${lost === 1 ? "" : "s"} here today` : "Full marks today";
+      return el("li", { children: [el("button", {
+        className: "daily-keep-card", attrs: { type: "button", "data-action": "keep-playing", "data-game": game },
+        on: { click: () => options.shell.openGame(game, "practice") },
+        children: [
+          el("span", { className: "daily-keep-icon", attrs: { "aria-hidden": "true" }, children: [shellIcon(mode.icon, 20, 1.7)] }),
+          el("span", { className: "daily-keep-copy", children: [
+            el("strong", { text: mode.label }),
+            ...(note ? [el("span", { className: `daily-keep-note${lost ? " is-loss" : ""}`, text: note })] : []),
+            el("span", { className: "daily-keep-description", text: mode.blurb }),
+          ] }),
+          el("span", { className: "daily-keep-cta", children: [el("span", { text: "Play" }), shellIcon("arrow-right", 16, 2)] }),
+        ],
+      })] });
+    }) }),
+    el("div", { className: "daily-keep-more", children: [
+      ...(isToday && options.shell.openDailyPuzzle ? [el("p", { children: [
+        el("span", { text: "Two more daily puzzles:" }),
+        el("button", { className: "daily-keep-link", attrs: { type: "button", "data-action": "daily-overland" }, on: { click: () => options.shell.openDailyPuzzle?.("overland") }, children: [shellIcon("route", 15, 1.8), el("span", { text: `Overland #${overlandDailyNumber(result.date)}` })] }),
+        el("button", { className: "daily-keep-link", attrs: { type: "button", "data-action": "daily-mystery" }, on: { click: () => options.shell.openDailyPuzzle?.("mystery") }, children: [shellIcon("compass", 15, 1.8), el("span", { text: `Mystery country #${mysteryDailyNumber(result.date)}` })] }),
+      ] })] : []),
+      el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "button", "data-action": "all-games" }, on: { click: () => options.shell.openGamePicker() }, children: [shellIcon("layout-grid", 16, 1.8), el("span", { text: `Browse all ${GAME_COUNT} games` })] }),
+    ] }),
   ] });
 
   function summaryStat(label: string, value: string | HTMLElement): HTMLElement {
@@ -192,7 +256,10 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       window.setTimeout(() => { shareLabel.textContent = "Share"; }, 1600);
     });
   });
-  homeButton.addEventListener("click", () => options.shell.goHome());
+  homeButton.addEventListener("click", () => {
+    keepPlaying.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    keepPlaying.focus({ preventScroll: true });
+  });
 
   const renderCountdown = () => { nextDaily.textContent = `Next daily in ${formatUntilNextDaily(new Date())}`; };
   renderCountdown();
@@ -228,6 +295,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
               el("div", { className: "achievement-list", children: achievementResult.unlocked.map((achievement: Achievement) => el("article", { className: "achievement-chip", children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })] })) }),
             ] })] : []),
           ] }),
+          keepPlaying,
           el("div", { className: "daily-result-layout", children: [
             el("div", { className: "daily-result-main", children: [recap] }),
             el("aside", { className: "daily-result-side", children: [leaderboardPanel, retentionPanel] }),
