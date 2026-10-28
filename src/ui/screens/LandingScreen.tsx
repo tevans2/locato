@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Route,
   Shapes,
+  Share2,
   Split,
   Users,
 } from "lucide-react";
@@ -29,9 +30,13 @@ import { SiteHeaderMount } from "../shell/react";
 import { isSoloSaveResumable, readLatestSoloSave, readSoloSave } from "../../storage/localSave";
 import { readAcademyProgress } from "../../storage/academySave";
 import { getAchievementState } from "../../storage/achievements";
-import { dailyProgressKey } from "../../storage/dailySave";
+import { readDailyOnDevice, type DailyResultSave } from "../../storage/dailySave";
 import { academyLevel } from "../../core/academy/mastery";
-import { DAILY_COUNTRY_COUNT, getLocalDailyDate } from "../../core/dailyChallenge";
+import { DAILY_COUNTRY_COUNT, DAILY_FORMAT, DAILY_MAX_SCORE, getLocalDailyDate, type DailyRoundMark } from "../../core/dailyChallenge";
+import { overlandDailyNumber } from "../../core/overland/routes";
+import { mysteryDailyNumber } from "../../core/mystery/round";
+import { shareLink } from "../../core/shareLink";
+import { shareResult } from "../shell/ResultsCard";
 import { dailyThemeForDate } from "../../core/dailyThemes";
 import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
@@ -39,7 +44,8 @@ import type { CountryIndex } from "../../core/countries";
 import { LandingGlobe } from "../components/landing/LandingGlobe";
 
 /*
- * Play → the landing page (docs/navigation.md). Split modes start a PRACTICE run here: no clock,
+ * Play → the landing page (docs/navigation.md). It leads with today's daily challenge (the
+ * thing new visitors arrive for), then the game library. Split modes start a PRACTICE run here: no clock,
  * nothing posted. Single-run modes (Worldsplit, Flyover, GeoGuessr, Street View country) have one
  * way to play, so they open the real thing. Timed runs live in Leaderboards, live games in Multiplayer; the daily in Daily. The shared SiteHeader carries
  * the navigation, so the page itself has no nav links of its own.
@@ -102,6 +108,8 @@ export interface DailyStatus {
   readonly roundsPlayed: number;
   /** Consecutive days completed, counting today or (if today isn't done yet) up to yesterday. */
   readonly streak: number;
+  /** Today's result as this device has it, once done. */
+  readonly result: DailyResultSave | null;
 }
 
 function dayNumber(key: string): number | null {
@@ -111,23 +119,96 @@ function dayNumber(key: string): number | null {
 
 /** Today's daily from local storage: done, in progress, and the running streak. */
 export function readDailyStatus(storage: Storage | undefined, now = new Date()): DailyStatus {
-  if (!storage) return { done: false, roundsPlayed: 0, streak: 0 };
+  if (!storage) return { done: false, roundsPlayed: 0, streak: 0, result: null };
   const today = getLocalDailyDate(now);
   const days = new Set(getAchievementState(storage).dailyDates.map(dayNumber).filter((day): day is number => day !== null));
   const todayNumber = dayNumber(today);
-  const done = todayNumber !== null && days.has(todayNumber);
+  const onDevice = readDailyOnDevice(storage, today);
+  const done = onDevice.result !== null || (todayNumber !== null && days.has(todayNumber));
+  if (done && todayNumber !== null) days.add(todayNumber);
   let streak = 0;
   if (todayNumber !== null) for (let day = done ? todayNumber : todayNumber - 1; days.has(day); day -= 1) streak += 1;
-  let roundsPlayed = 0;
-  if (!done) {
-    try {
-      const progress = JSON.parse(storage.getItem(dailyProgressKey(null)) ?? "null") as { date?: string; roundIndex?: number } | null;
-      if (progress?.date === today && typeof progress.roundIndex === "number") roundsPlayed = Math.max(0, Math.min(DAILY_COUNTRY_COUNT, progress.roundIndex));
-    } catch {
-      roundsPlayed = 0;
-    }
-  }
-  return { done, roundsPlayed, streak };
+  return { done, roundsPlayed: done ? 0 : onDevice.roundsPlayed, streak, result: onDevice.result };
+}
+
+const FORMAT_ICONS: Readonly<Record<(typeof DAILY_FORMAT)[number]["icon"], LucideIcon>> = {
+  flag: Flag, crown: Crown, shapes: Shapes, "map-pin": MapPin, route: Route, globe: Orbit, binoculars: Binoculars,
+};
+
+const MARK_LABELS: Readonly<Record<DailyRoundMark, string>> = { correct: "correct", hint: "with a hint", miss: "missed" };
+
+/** "9h 12m" until the next local midnight, when a new daily starts. */
+export function untilNextDaily(now: Date): string {
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  const minutes = Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
+/** The page's lead: today's daily, to play, continue or share. */
+function LandingDaily({ shell, storage, now }: LandingScreenOptions) {
+  const [clock, setClock] = useState(() => now?.() ?? new Date());
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  useEffect(() => {
+    // Keeps the countdown current, and rolls the card over at midnight on an open page.
+    const timer = window.setInterval(() => setClock(now?.() ?? new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [now]);
+  const date = getLocalDailyDate(clock);
+  const theme = dailyThemeForDate(date);
+  const daily = readDailyStatus(storage, clock);
+  const state = daily.done ? "done" : daily.roundsPlayed > 0 ? "in-progress" : "new";
+  const dateLabel = clock.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const result = daily.result;
+  const open = () => shell.openSection("daily");
+  const share = () => {
+    if (!result) return;
+    void shareResult({ text: `${result.shareText}\n${shareLink({ view: "daily-challenge" })}`, title: "Locato daily challenge" }).then((outcome) => {
+      if (outcome === "shared") return;
+      setShareNote(outcome === "copied" ? "Copied" : "Couldn't share");
+      window.setTimeout(() => setShareNote(null), 1600);
+    });
+  };
+
+  return <section className="landing-daily" data-testid="landing-daily" data-state={state} aria-labelledby="landing-daily-title">
+    <div className="landing-daily-main">
+      <p className="landing-daily-kicker"><CalendarDays size={15} strokeWidth={1.8} aria-hidden="true" /> Daily challenge <span aria-hidden="true">·</span> <time dateTime={date}>{dateLabel}</time></p>
+      <h1 id="landing-daily-title">{state === "done" ? "Today's challenge, done." : "Today's geography challenge"}</h1>
+      <p className="landing-daily-theme"><strong>{theme.title}.</strong> {state === "done" ? "A new one starts at midnight. Same puzzle for everyone, so compare with friends." : `${theme.description} Ten rounds, the same for everyone today. Free, no sign-up.`}</p>
+      <div className="landing-daily-actions">
+        {state === "done"
+          ? <>
+            <button type="button" className="lp-btn lp-btn-primary" data-testid="button-daily-result" onClick={open}>See your result <ArrowRight size={17} /></button>
+            {result ? <button type="button" className="lp-btn" data-testid="button-daily-share" onClick={share}><Share2 size={16} /> {shareNote ?? "Share"}</button> : null}
+          </>
+          : <button type="button" className="lp-btn lp-btn-primary landing-daily-play" data-testid="button-daily-play" onClick={open}>
+            {state === "in-progress" ? `Continue · round ${daily.roundsPlayed + 1} of ${DAILY_COUNTRY_COUNT}` : "Play today's challenge"} <ArrowRight size={17} />
+          </button>}
+        {daily.streak > 0 ? <span className="landing-daily-streak" data-testid="daily-streak">{daily.streak}-day streak{state === "done" ? "" : " · keep it going"}</span> : null}
+      </div>
+      <p className="landing-daily-more">
+        <span>Also today:</span>
+        <button type="button" data-testid="button-daily-overland" onClick={() => shell.openDailyPuzzle?.("overland")}><Route size={14} aria-hidden="true" /> Overland #{overlandDailyNumber(date)}</button>
+        <button type="button" data-testid="button-daily-mystery" onClick={() => shell.openDailyPuzzle?.("mystery")}><Compass size={14} aria-hidden="true" /> Mystery country #{mysteryDailyNumber(date)}</button>
+      </p>
+    </div>
+    <div className="landing-daily-side">
+      {result
+        ? <div className="landing-daily-score">
+          <p><strong>{result.score}</strong><span>/{DAILY_MAX_SCORE}</span></p>
+          <ol className="landing-daily-grid" aria-label="Your rounds">
+            {result.marks.map((mark, index) => <li key={index} className={`is-${mark}`} aria-label={`Round ${index + 1}: ${MARK_LABELS[mark]}`} />)}
+          </ol>
+          <p className="landing-daily-next">Next challenge in {untilNextDaily(clock)}</p>
+        </div>
+        : <ol className="landing-daily-format" aria-label="Today's rounds">
+          {DAILY_FORMAT.map((stage) => { const Icon = FORMAT_ICONS[stage.icon]; const first = Number(stage.rounds.split("–")[0]); return <li key={stage.label} data-done={first <= daily.roundsPlayed ? "true" : undefined}>
+            <Icon size={17} strokeWidth={1.6} aria-hidden="true" /><span>{stage.label}</span><small>{stage.rounds.includes("–") ? "Rounds" : "Round"} {stage.rounds}</small>
+          </li>; })}
+        </ol>}
+    </div>
+  </section>;
 }
 
 function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOptions) {
@@ -141,7 +222,7 @@ function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOption
     <div className="mode-picker-menu">
       <header className="mode-picker-heading">
         <div>
-          <h1 id="landing-title">Choose a game.</h1>
+          <h2 id="landing-title">Or pick a game.</h2>
           <p className="mode-picker-sub">Practice at your own pace. Score games like GeoGuessr and Flyover post your best.</p>
         </div>
         <span>{allModes.length} games</span>
@@ -166,21 +247,8 @@ function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOption
   </section>;
 }
 
-function LandingMoreWays({ shell, storage, now }: LandingScreenOptions) {
-  const today = now?.() ?? new Date();
-  const daily = readDailyStatus(storage, today);
-  const dailyLine = daily.done
-    ? `Done for today${daily.streak > 1 ? ` · ${daily.streak}-day streak` : ""}. See your result.`
-    : daily.roundsPlayed > 0
-      ? `In progress · round ${daily.roundsPlayed + 1} of ${DAILY_COUNTRY_COUNT}. Pick up where you left off.`
-      : `${dailyThemeForDate(getLocalDailyDate(today)).title} · ${DAILY_COUNTRY_COUNT} rounds, the same for everyone today.${daily.streak > 0 ? ` Keep your ${daily.streak}-day streak going.` : ""}`;
+function LandingMoreWays({ shell }: LandingScreenOptions) {
   return <section className="landing-more" aria-label="More ways to play">
-    <button type="button" className="landing-more-card is-daily" data-testid="card-daily" data-state={daily.done ? "done" : daily.roundsPlayed > 0 ? "in-progress" : "new"} onClick={() => shell.openSection("daily")}>
-      <span className="landing-more-icon" aria-hidden="true">{daily.done ? <Check size={22} strokeWidth={2} /> : <CalendarDays size={22} strokeWidth={1.6} />}</span>
-      <span className="landing-more-copy"><strong>Today’s daily challenge</strong><span>{dailyLine}</span></span>
-      {daily.streak > 0 ? <span className="landing-more-streak" aria-label={`${daily.streak}-day streak`}>{daily.streak}<small>day{daily.streak === 1 ? "" : "s"}</small></span> : null}
-      <ArrowRight className="landing-more-arrow" size={18} />
-    </button>
     <button type="button" className="landing-more-card is-compete" data-testid="card-multiplayer" onClick={() => shell.openSection("multiplayer")}>
       <span className="landing-more-icon" aria-hidden="true"><Users size={22} strokeWidth={1.6} /></span>
       <span className="landing-more-copy"><strong>Play friends live</strong><span>Open a room, share the link, and race up to 7 friends in real time.</span></span>
@@ -214,6 +282,7 @@ function LandingHome(options: LandingScreenOptions) {
       <a className="landing-skip-link" href="#games">Skip to games</a>
       <SiteHeaderMount ctx={options.shell} section="play" />
       <main className="landing-scroll" id="landing-main">
+        <LandingDaily {...options} />
         <LandingGamePicker {...options} />
         <LandingMoreWays {...options} />
         <LandingAcademyBanner {...options} />

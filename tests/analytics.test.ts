@@ -188,13 +188,13 @@ describe("client analytics helpers", () => {
 });
 
 describe("link previews", () => {
-  const html = `<title>Locato — Geography games</title><meta property="og:title" content="x"><meta property="og:description" content="x"><meta property="og:url" content="x"><meta property="og:image" content="x"><meta name="twitter:title" content="x"><meta name="twitter:description" content="x"><meta name="twitter:image" content="x">`;
+  const html = `<title>Locato — Geography games</title><meta property="og:title" content="x"><meta property="og:description" content="x"><meta property="og:url" content="x"><meta property="og:image" content="x"><meta name="twitter:title" content="x"><meta name="twitter:description" content="x"><meta name="twitter:image" content="x"><meta name="description" content="x">`;
 
   it("titles shared dailies and room invites", () => {
     expect(pageMetaFor(new URL("https://locato.quest/?view=daily-challenge&ref=share")).title).toBe("Locato Daily — today's geography challenge");
     expect(pageMetaFor(new URL("https://locato.quest/?game=overland&daily=1")).title).toContain("today's route");
     expect(pageMetaFor(new URL("https://locato.quest/?room=ab12")).description).toContain("AB12");
-    expect(pageMetaFor(new URL("https://locato.quest/?room=<b>")).title).toBe("Locato — Geography games");
+    expect(pageMetaFor(new URL("https://locato.quest/?room=<b>")).title).toBe("Locato — A daily geography challenge");
   });
 
   it("rewrites the tags with the public origin and drops ref", () => {
@@ -202,6 +202,7 @@ describe("link previews", () => {
     expect(out).toContain(`<title>Locato Daily — today's geography challenge</title>`);
     expect(out).toContain(`<meta property="og:url" content="https://locato.quest/?view=daily-challenge">`);
     expect(out).toContain(`<meta property="og:image" content="https://locato.quest/og-image.png">`);
+    expect(out).toMatch(/<meta name="description" content="Ten rounds of flags/);
     expect(out).toContain(`<meta name="twitter:title" content="Locato Daily — today&#39;s geography challenge">`.replace("&#39;", "'"));
   });
 });

@@ -119,6 +119,7 @@ export function createApp(options: AppOptions): App {
       else navigate(SECTION_ROUTES[fallback]);
     },
     openGame: (mode, run = "practice", variant) => openGame(mode, run, variant),
+    openDailyPuzzle: (game) => navigate({ type: game, daily: true }),
     openGamePicker: (picker) => {
       openGamePicker({
         ...(picker?.current ? { current: picker.current } : {}),
