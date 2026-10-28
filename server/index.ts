@@ -17,7 +17,7 @@ import { serveGameAsset } from "./ranked/GameAssets";
 import { AnalyticsService } from "./analytics/AnalyticsService";
 import { SqliteAnalyticsStore } from "./analytics/sqliteStore";
 import { handleAnalyticsEvents } from "./analytics/routes";
-import { clientIp } from "./clientIp";
+import { clientIp, cloudflareCountry } from "./clientIp";
 import { renderPageMeta } from "./pageMeta";
 
 interface WebSocketData {
@@ -261,7 +261,7 @@ const server = Bun.serve<WebSocketData>({
         excludedUser: user !== null && analyticsExcludedEmails.has(user.email.toLowerCase()),
         ip: clientIp(request),
         userAgent: request.headers.get("user-agent"),
-        country: request.headers.get("cf-ipcountry"),
+        country: cloudflareCountry(request),
       });
     }
 
