@@ -31,6 +31,7 @@ import { el } from "../dom/createElement";
 import { createResultsStage, createRunList, formatNumber, insertIntoResults, shareSquare, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import type { RankedSession } from "./RankedSession";
+import { shareLink } from "../../core/shareLink";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MIN_DRAW_LENGTH = 24;
@@ -370,7 +371,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
     const bestRound = rounds[bestIndex];
     const ratio = score / maximum;
     updateProgress();
-    const shareText = `Locato Worldsplit ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
+    const shareText = `Locato Worldsplit ${score}/${maximum}\n${scores.map((roundScore) => shareSquare(roundScore / WORLD_SPLIT_MAX_ROUND_SCORE)).join("")}\n${shareLink({ game: "worldsplit" })}`;
     const runList = createRunList("Your splits", scores.map((roundScore, index) => ({
       label: rounds[index]!.label,
       detail: rounds[index]!.prompt,

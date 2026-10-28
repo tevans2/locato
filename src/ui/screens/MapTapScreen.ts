@@ -24,6 +24,7 @@ import {
   type DailyStageProgress,
 } from "./practiceRun";
 import { createRankedBar, createRankedResults, rankedCrossLink, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { shareLink } from "../../core/shareLink";
 
 /** A practice run is this many targets; then the results screen. */
 export const MAP_TAP_RUN_LENGTH = 10;
@@ -423,7 +424,7 @@ export function createMapTapScreen(options: MapTapScreenOptions, overrides: Part
     const averageKm = runResults.reduce((sum, item) => sum + item.distanceKm, 0) / Math.max(1, runResults.length);
     const best = runResults.reduce<MapTapGuessResult | null>((top, item) => (!top || item.score > top.score ? item : top), null);
     const ratio = total / maximum;
-    const shareText = `Locato MapTap${ranked ? " (ranked)" : ""} ${formatNumber(total)}/${formatNumber(maximum)}\n${runResults.map((item) => shareSquare(item.score / item.maxScore)).join("")}\nAverage ${formatKm(averageKm)} off\nlocato.quest`;
+    const shareText = `Locato MapTap${ranked ? " (ranked)" : ""} ${formatNumber(total)}/${formatNumber(maximum)}\n${runResults.map((item) => shareSquare(item.score / item.maxScore)).join("")}\nAverage ${formatKm(averageKm)} off\n${shareLink({ game: "map-tap" })}`;
     const runList = createRunList("Your targets", runResults.map((item) => ({
       label: item.target.name,
       detail: `${formatCategory(item.target.category)} · ${formatKm(item.distanceKm)} away`,

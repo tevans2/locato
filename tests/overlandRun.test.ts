@@ -363,7 +363,7 @@ describe("Overland: today's route", () => {
     const path = graph.shortestRoute(todays.start, todays.end)!.slice(1, -1);
     ui.guess("JP");
     for (const code of path) ui.guess(code);
-    const expected = `#locato Overland #1 (+1)\n${nameOf(todays.start)} → ${nameOf(todays.end)}\n🟥${"🟩".repeat(todays.minimum)}\n${window.location.origin}/?game=overland&daily=1`;
+    const expected = `#locato Overland #1 (+1)\n${nameOf(todays.start)} → ${nameOf(todays.end)}\n🟥${"🟩".repeat(todays.minimum)}\n${window.location.origin}/?game=overland&daily=1&ref=share`;
     expect(ui.$(".overland-share-preview")?.textContent).toBe(expected);
     ui.$<HTMLButtonElement>(".overland-share")!.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(expected));

@@ -11,6 +11,7 @@ import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createSitePage } from "../shell/SiteHeader";
 import { shareResult } from "../shell/ResultsCard";
+import { shareLink } from "../../core/shareLink";
 import { shellIcon } from "../shell/icons";
 import "../../styles/daily-result.css";
 
@@ -185,7 +186,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   }
 
   shareButton.addEventListener("click", () => {
-    void shareResult({ text: result.shareText, title: "Locato daily challenge" }).then((outcome) => {
+    void shareResult({ text: `${result.shareText}\n${shareLink({ view: "daily-challenge" })}`, title: "Locato daily challenge" }).then((outcome) => {
       if (destroyed || outcome === "shared") return;
       shareLabel.textContent = outcome === "copied" ? "Copied" : "Couldn't share";
       window.setTimeout(() => { shareLabel.textContent = "Share"; }, 1600);

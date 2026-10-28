@@ -14,6 +14,7 @@ import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt
 import type { RankedSession } from "./RankedSession";
 import { createPrivateStreetView } from "../components/PrivateStreetView";
 import { rankedGuessCountry } from "../../core/rankedPresentation";
+import { shareLink } from "../../core/shareLink";
 
 /** A practice run is this many countries; then the results screen. */
 export const STREETVIEW_RUN_LENGTH = 5;
@@ -745,7 +746,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       missed: countries,
       missedTitle: "The countries in this run",
       shareTitle: "Locato Street View",
-      shareText: `Locato Street View ${total}/${maximum}\n${squares}\nlocato.quest`,
+      shareText: `Locato Street View ${total}/${maximum}\n${squares}\n${shareLink({ game: "streetview-country" })}`,
       onTryAgain: restartRun,
       posting,
       tone: correct >= 3 ? "celebrate" : "neutral",

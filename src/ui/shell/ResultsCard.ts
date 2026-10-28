@@ -1,6 +1,7 @@
 import { el } from "../dom/createElement";
 import { shellIcon, type ShellIconName } from "./icons";
 import type { ShellContext } from "./types";
+import { trackRunComplete, trackShare } from "../../app/analytics";
 import "../../styles/shell.css";
 
 export interface ResultsStat {
@@ -62,6 +63,12 @@ export interface ResultsCardHandle {
 
 /** Share `text` with the OS sheet, or copy it. Resolves with what happened. */
 export async function shareResult(share: ResultsShare): Promise<"shared" | "copied" | "failed"> {
+  const outcome = await deliverShare(share);
+  trackShare(outcome);
+  return outcome;
+}
+
+async function deliverShare(share: ResultsShare): Promise<"shared" | "copied" | "failed"> {
   const nav = typeof navigator === "undefined" ? undefined : navigator;
   const payload: ShareData = { text: share.text, ...(share.title ? { title: share.title } : {}), ...(share.url ? { url: share.url } : {}) };
   if (nav && typeof nav.share === "function" && (typeof nav.canShare !== "function" || nav.canShare(payload))) {
@@ -98,6 +105,8 @@ function actionButton(action: ResultsAction, className: string, fallbackIcon?: S
  */
 export function createResultsCard(ctx: ShellContext, options: ResultsCardOptions): ResultsCardHandle {
   const tone = options.tone ?? "celebrate";
+  // Every solo run ends here, so this is where a finished game is counted.
+  trackRunComplete();
   const heading = el("h2", { className: "shell-results-title", text: options.title, attrs: { tabindex: "-1" } });
 
   const stats = el("dl", {

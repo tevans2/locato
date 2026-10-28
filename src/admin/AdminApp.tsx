@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Ban, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, Users } from "lucide-react";
+import { Activity, Ban, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, TrendingUp, Users } from "lucide-react";
 import { checkSession, createClient, signIn, signOut as endSession, type AdminSessionState } from "./api";
 import { ConfirmDialog, Toasts, type ConfirmRequest, type Toast } from "./ui";
 import { OverviewView } from "./views/Overview";
+import { GrowthView } from "./views/Growth";
 import { UsersView, type ActionHelpers } from "./views/Users";
 import { ModerationView } from "./views/Moderation";
 import { BansView } from "./views/Bans";
@@ -11,10 +12,11 @@ import { EventsView } from "./views/Events";
 import { SystemView } from "./views/System";
 import { currentTheme, toggleTheme } from "../ui/theme";
 
-type ViewId = "overview" | "users" | "moderation" | "bans" | "live" | "events" | "system";
+type ViewId = "overview" | "growth" | "users" | "moderation" | "bans" | "live" | "events" | "system";
 
 const NAV: readonly { id: ViewId; label: string; icon: typeof Users; description: string }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, description: "Activity and health at a glance" },
+  { id: "growth", label: "Growth", icon: TrendingUp, description: "Visitors, retention, sources and which games keep people coming back" },
   { id: "users", label: "Users", icon: Users, description: "Accounts, stats and account actions" },
   { id: "moderation", label: "Leaderboards", icon: ShieldCheck, description: "Review and remove daily results and best times" },
   { id: "bans", label: "Bans", icon: Ban, description: "Banned accounts and IP addresses" },
@@ -179,6 +181,7 @@ export function AdminApp() {
           <p>{active.description}</p>
         </header>
         {route.view === "overview" && <OverviewView client={client} onOpenUser={openUser} />}
+        {route.view === "growth" && <GrowthView client={client} />}
         {route.view === "users" && <UsersView client={client} currentAdminId={signedInAs.id} selectedId={route.param} onSelect={(id) => navigate("users", id)} helpers={helpers} />}
         {route.view === "moderation" && <ModerationView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "bans" && <BansView client={client} onOpenUser={openUser} helpers={helpers} />}

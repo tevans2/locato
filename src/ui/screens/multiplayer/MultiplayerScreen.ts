@@ -28,6 +28,7 @@ import { createMultiplayerHome } from "./MultiplayerHome";
 import { createMultiplayerLobby } from "./MultiplayerLobby";
 import { createMultiplayerResults } from "./MultiplayerResults";
 import { roomKindInfo } from "./roomModes";
+import { trackGameComplete } from "../../../app/analytics";
 import "../../../styles/multiplayer-hub.css";
 
 export interface MultiplayerScreenOptions {
@@ -265,7 +266,11 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
 
     const { room, localPlayerId } = state;
     const view = !room ? "home" : room.status === "lobby" ? "lobby" : room.status === "complete" && state.finalResults ? "results" : "game";
-    if (page.element.dataset.view !== view) page.element.scrollTop = 0;
+    if (page.element.dataset.view !== view) {
+      page.element.scrollTop = 0;
+      const player = room?.players.find((p) => p.id === localPlayerId);
+      if (view === "results" && room && player && !player.spectator) trackGameComplete({ game: "multiplayer", mode: "multiplayer", detail: room.kind });
+    }
     page.element.dataset.view = view;
     // App-level exits (another invite, the browser Back button) read this to ask first.
     const message = leaveMessage();
