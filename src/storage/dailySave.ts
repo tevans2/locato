@@ -17,6 +17,8 @@ export interface DailyResultSave {
   readonly completedAt: number;
   readonly challengeVersion?: 2;
   readonly rounds?: readonly DailyRoundResult[];
+  /** The server's signed note of when this attempt started; sent with the result. */
+  readonly startTicket?: string;
 }
 
 function dailySaveScope(userId?: string | null): string {
@@ -119,6 +121,8 @@ export interface DailyProgressSave {
   readonly overlandRound?: true;
   readonly challengeVersion?: 2;
   readonly rounds?: readonly DailyRoundResult[];
+  /** The server's signed note of when this attempt started (requested when play begins). */
+  readonly startTicket?: string;
 }
 
 export function dailyProgressKey(userId?: string | null): string {

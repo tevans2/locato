@@ -15,6 +15,8 @@ import { auditRun, isAuditedMode, parseRunTimeline, runVerdict, type RunFlag, ty
 import { indexCountries, rawCountries } from "../../src/core/countries";
 import type { AcademyProgress } from "../../src/core/academy/types";
 import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
+import { assessDailyResult, createStartTicket, isCurrentDailyDate, readStartTicket } from "../daily/startTickets";
+import { randomBytes } from "node:crypto";
 import { RATING_START, ratingChanges } from "../../src/core/multiplayer/ratings";
 import type {
   AuthUser,
@@ -307,8 +309,37 @@ export class AuthService {
     return this.store.getDailyResult(userId, date);
   }
 
-  saveDailyResult(userId: string, result: DailyChallengeResult): DailyChallengeResult {
-    return this.store.saveDailyResult(userId, result, false);
+  // Signs daily start tickets. Kept in the database so tickets survive a restart or deploy mid-game.
+  private dailyTicketSecret(): string {
+    return this.store.getOrCreateSecret("daily-start-ticket", () => randomBytes(32).toString("base64url"));
+  }
+
+  /** A signed note of when this daily was started (anyone may ask: guests play the daily too). */
+  startDaily(date: string): { readonly ticket: string } | { readonly error: string } {
+    const now = this.clock();
+    if (!isCurrentDailyDate(date, now)) return { error: "That isn't today's daily challenge." };
+    return { ticket: createStartTicket(this.dailyTicketSecret(), date, now) };
+  }
+
+  /**
+   * Saves a local daily result (completed results are immutable). A new result is checked against
+   * its start ticket; one that fails stays visible to its own player but off everyone else's boards.
+   */
+  saveDailyResult(userId: string, result: DailyChallengeResult, startTicket?: unknown): DailyChallengeResult {
+    const existing = this.store.getDailyResult(userId, result.date);
+    if (existing) return existing;
+    const saved = this.store.saveDailyResult(userId, result, false);
+    const ticket = readStartTicket(this.dailyTicketSecret(), startTicket);
+    const reused = ticket !== null && this.store.isDailyStartUsed(result.date, ticket.nonce, userId);
+    const hiddenReason = assessDailyResult(saved, ticket, this.clock(), reused);
+    this.store.setDailyReview(userId, result.date, { hiddenReason, startNonce: ticket?.nonce ?? null });
+    return saved;
+  }
+
+  /** Results on `date` that other players can see; `viewerId` always sees their own. */
+  private visibleDailyResults(date: string, entries: readonly { readonly userId: string; readonly result: DailyChallengeResult }[], viewerId: string | null) {
+    const reviews = this.store.listDailyReviews(date);
+    return entries.filter((entry) => entry.userId === viewerId || !reviews.get(entry.userId)?.hiddenReason);
   }
 
   getDailySummary(userId: string, date: string, limit = DEFAULT_DAILY_HISTORY_LIMIT): DailySummary {
@@ -327,8 +358,7 @@ export class AuthService {
       return result.hintsUsed < currentBest.hintsUsed ? result : currentBest;
     }, null);
 
-    const friendsToday = this.store
-      .listDailyResultsForUsers(this.store.friendIds(userId), date)
+    const friendsToday = this.visibleDailyResults(date, this.store.listDailyResultsForUsers(this.store.friendIds(userId), date), userId)
       .map((entry) => {
         const friend = this.store.findUserById(entry.userId);
         const { rounds: _rounds, ...publicResult } = entry.result;
@@ -340,9 +370,8 @@ export class AuthService {
     return { history, streak, best, friendsToday };
   }
 
-  getDailyLeaderboard(date: string, limit = 100): readonly DailyLeaderboardEntry[] {
-    return this.store
-      .listDailyResultsForDate(date)
+  getDailyLeaderboard(date: string, limit = 100, viewerId: string | null = null): readonly DailyLeaderboardEntry[] {
+    return this.visibleDailyResults(date, this.store.listDailyResultsForDate(date), viewerId)
       .map((entry) => {
         const user = this.store.findUserById(entry.userId);
         const { rounds: _rounds, ...publicResult } = entry.result;

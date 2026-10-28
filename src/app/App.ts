@@ -8,7 +8,7 @@ import { clearSoloRun, createSoloSave, hydrateGameState, isSoloSaveResumable, pe
 import { adoptGuestDailies, clearDailyProgress, createDailyResultSave, readDailyProgress, readDailyResult, readDailySyncQueue, saveDailyProgress, saveDailyResult, writeDailySyncQueue, type DailyResultSave, type DailyStage } from "../storage/dailySave";
 import { createWebSocketMultiplayerTransport, resolveDefaultWebSocketUrl, type MultiplayerTransport } from "../core/multiplayer";
 import { loadWorldCountryFeatures, type WorldCountryFeature } from "../core/map";
-import { fetchDailyChallengeResult, recordGame, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
+import { fetchDailyChallengeResult, recordGame, requestDailyStartTicket, saveDailyChallengeResult, type DailyChallengeResult } from "../core/auth";
 import { type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { findMapTapLocation } from "../core/maptap/locations";
 import { overlandRouteBetween } from "../core/overland";
@@ -279,7 +279,7 @@ export function createApp(options: AppOptions): App {
     return { version: 2, ...result, shareText: createDailyShareText(result.date, result.score, result.timeMs, result.marks) };
   }
 
-  function dailyLocalResultToAccount(result: DailyResultSave): DailyChallengeResult {
+  function dailyLocalResultToAccount(result: DailyResultSave): DailyChallengeResult & { readonly startTicket?: string } {
     const { version: _version, ...payload } = result;
     return payload;
   }
@@ -482,6 +482,17 @@ export function createApp(options: AppOptions): App {
     const dailyMarks: DailyRoundMark[] = carryTotals ? [...saved.marks] : [];
     const dailyRounds: DailyRoundResult[] = carryTotals ? [...(saved.rounds ?? [])] : [];
     let dailyFinishedAt: number | null = dailyMarks.length === DAILY_COUNTRY_COUNT ? Date.now() : null;
+    // The server's note of when this attempt began, kept with the progress and sent with the result.
+    let startTicket = saved?.startTicket ?? null;
+    if (!startTicket) {
+      void requestDailyStartTicket(challenge.date).then((ticket) => {
+        if (!ticket || startTicket) return;
+        startTicket = ticket;
+        // Write it into a progress save made before it arrived, so a refresh keeps it.
+        const current = readDailyProgress(options.storage, challenge.date, challenge.seed, progressUserId);
+        if (current && !current.startTicket) saveDailyProgress(options.storage, { ...current, startTicket: ticket }, progressUserId);
+      });
+    }
 
     function persistDaily(
       stage: DailyStage,
@@ -506,6 +517,7 @@ export function createApp(options: AppOptions): App {
         ...(challenge.challengeVersion === 2 ? { challengeVersion: 2, rounds: [...(prompt?.rounds ?? dailyRounds)] } : {}),
         ...(challenge.themeScoped ? { themeScoped: true } : {}),
         ...(challenge.overlandRoute ? { overlandRound: true } : {}),
+        ...(startTicket ? { startTicket } : {}),
       }, progressUserId);
     }
 
@@ -534,6 +546,7 @@ export function createApp(options: AppOptions): App {
         hintsUsed: dailyHintsUsed,
         marks: normalizedDailyMarks(),
         ...(challenge.challengeVersion === 2 && dailyRounds.length === DAILY_COUNTRY_COUNT ? { challengeVersion: 2, rounds: [...dailyRounds] } : {}),
+        ...(startTicket ? { startTicket } : {}),
       });
       const completionUserId = authControls.getUser()?.id ?? null;
       saveDailyResult(options.storage, result, completionUserId);

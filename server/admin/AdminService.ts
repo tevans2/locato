@@ -3,6 +3,7 @@ import type { AcademyProgress } from "../../src/core/academy/types";
 import { LEADERBOARD_MODES, type LeaderboardMetric } from "../../src/core/leaderboards";
 import { isLeaderboardGameMode, leaderboardMetric, leaderboardModeConfig, normalizeLeaderboardVariant } from "../leaderboard/validation";
 import type { AdminRoomSummary, RoomManagerStats } from "../rooms/RoomManager";
+import type { DailyHiddenReason } from "../daily/startTickets";
 import type {
   AdminBestScore,
   StoredRun,
@@ -177,6 +178,8 @@ export interface AdminDailyEntry {
   readonly user: { readonly id: string; readonly displayName: string; readonly email: string };
   readonly result: DailyChallengeResult;
   readonly flags: readonly ("too-fast" | "backdated")[];
+  /** Why it's kept off other players' boards (its own player still sees it), or null when shown. */
+  readonly hidden: DailyHiddenReason | null;
 }
 
 export type AdminResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly status: number; readonly error: string };
@@ -525,6 +528,7 @@ export class AdminService {
   }
 
   daily(date: string): readonly AdminDailyEntry[] {
+    const reviews = this.store.listDailyReviews(date);
     return this.store
       .listDailyResultsForDate(date)
       .flatMap((entry) => {
@@ -537,8 +541,16 @@ export class AdminService {
         if (entry.result.timeMs < SUSPICIOUS_DAILY_MS) flags.push("too-fast");
         // Allow a day either side for timezones; anything further was submitted for another day.
         if (Math.abs(Date.parse(`${date}T12:00:00.000Z`) - entry.result.completedAt) > 1.5 * DAY_MS) flags.push("backdated");
-        return { rank: index + 1, ...entry, flags };
+        return { rank: index + 1, ...entry, flags, hidden: reviews.get(entry.user.id)?.hiddenReason ?? null };
       });
+  }
+
+  /** Shows a hidden daily result on the boards, or hides one. False when there's no result. */
+  setDailyHidden(userId: string, date: string, hidden: boolean): boolean {
+    if (!this.store.getDailyResult(userId, date)) return false;
+    const review = this.store.listDailyReviews(date).get(userId);
+    this.store.setDailyReview(userId, date, { hiddenReason: hidden ? "admin" : null, startNonce: review?.startNonce ?? null });
+    return true;
   }
 
   deleteDailyResult(userId: string, date: string): boolean {

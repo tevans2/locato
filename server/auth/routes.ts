@@ -100,6 +100,25 @@ function isDurationMs(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 86_400_000;
 }
 
+// Start tickets are cheap and stateless, but nobody needs more than a handful an hour.
+const dailyStartLimiter = (() => {
+  const LIMIT = 60;
+  const counts = new Map<string, { window: number; count: number }>();
+  return {
+    take(key: string, now: number): boolean {
+      const window = Math.floor(now / 3_600_000);
+      const entry = counts.get(key);
+      if (!entry || entry.window !== window) {
+        if (counts.size > 20_000) counts.clear();
+        counts.set(key, { window, count: 1 });
+        return true;
+      }
+      entry.count += 1;
+      return entry.count <= LIMIT;
+    },
+  };
+})();
+
 function isDailyDate(v: unknown): v is string {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
@@ -275,7 +294,17 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
   if (pathname === "/api/daily/leaderboard" && method === "GET") {
     const date = url.searchParams.get("date");
     if (!isDailyDate(date)) return json({ error: "Invalid daily challenge date." }, 400);
-    return json({ entries: service.getDailyLeaderboard(date, intParam(url, "limit") ?? 100) });
+    // Signed in, your own result is on the board even while it's hidden from everyone else.
+    const viewer = service.authenticate(readSessionToken(request));
+    return json({ entries: service.getDailyLeaderboard(date, intParam(url, "limit") ?? 100, viewer?.id ?? null) });
+  }
+
+  if (pathname === "/api/daily/start" && method === "POST") {
+    if (!dailyStartLimiter.take(ip(request), Date.now())) return json({ error: "Too many requests." }, 429);
+    const body = await readJsonBody(request);
+    if (!body || !isDailyDate(body.date)) return json({ error: "Invalid daily challenge date." }, 400);
+    const started = service.startDaily(body.date);
+    return "error" in started ? json({ error: started.error }, 400) : json(started);
   }
 
   const dailyMatch = pathname.match(/^\/api\/daily\/(\d{4}-\d{2}-\d{2})$/);
@@ -295,7 +324,7 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     // with older clients, but never fall back to client totals for a supplied invalid receipt.
     const result = body.runId === undefined ? parseDailyResult(body) : null;
     if (body.runId === undefined && !result) return json({ error: "Invalid daily challenge result." }, 400);
-    const saved = result ? service.saveDailyResult(user.id, result) : service.submitVerifiedDaily(user.id, body.runId);
+    const saved = result ? service.saveDailyResult(user.id, result, body.startTicket) : service.submitVerifiedDaily(user.id, body.runId);
     if ("error" in saved) return json({ error: saved.error }, 400);
     log("info", "daily.recorded", { ip: ip(request), userId: user.id, date: saved.date, score: saved.score });
     return json({ result: saved });

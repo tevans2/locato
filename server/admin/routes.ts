@@ -192,6 +192,17 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
     return json({ entries: service.daily(date) });
   }
 
+  const dailyVisibility = pathname.match(/^\/api\/admin\/daily\/([^/]+)\/(\d{4}-\d{2}-\d{2})\/visibility$/);
+  if (dailyVisibility && method === "PUT") {
+    const body = await readJsonBody(request);
+    if (!body || typeof body.hidden !== "boolean") return json({ error: "Send { hidden: true | false }." }, 400);
+    const userId = decodeURIComponent(dailyVisibility[1]!);
+    const date = dailyVisibility[2]!;
+    const changed = service.setDailyHidden(userId, date, body.hidden);
+    audit(body.hidden ? "admin.daily.hide" : "admin.daily.show", { targetUserId: userId, date, changed });
+    return changed ? json({ ok: true }) : json({ error: "Daily result not found." }, 404);
+  }
+
   const dailyMatch = pathname.match(/^\/api\/admin\/daily\/([^/]+)\/(\d{4}-\d{2}-\d{2})$/);
   if (dailyMatch && method === "DELETE") {
     const userId = decodeURIComponent(dailyMatch[1]!);
