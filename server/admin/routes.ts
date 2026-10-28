@@ -1,5 +1,6 @@
 import { logEvent } from "./events";
 import type { AdminService } from "./AdminService";
+import type { AnalyticsService } from "../analytics/AnalyticsService";
 import type { AuthUser } from "../auth/types";
 import { clientIp } from "../clientIp";
 
@@ -7,6 +8,8 @@ export interface AdminRouteContext {
   readonly service: AdminService;
   // Host/process snapshot (uptime, memory, database, pools). Supplied by the Bun entrypoint.
   readonly system?: () => Promise<Record<string, unknown>> | Record<string, unknown>;
+  // First-party visitor analytics (retention, sources, games) behind the Growth view.
+  readonly analytics?: AnalyticsService;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -50,6 +53,11 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
   }
 
   if (pathname === "/api/admin/overview" && method === "GET") return json(service.overview());
+
+  if (pathname === "/api/admin/growth" && method === "GET") {
+    if (!context.analytics) return json({ error: "Analytics is not configured." }, 404);
+    return json(context.analytics.report(intParam(url, "days")));
+  }
 
   if (pathname === "/api/admin/system" && method === "GET") return json(context.system ? await context.system() : {});
 

@@ -91,6 +91,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .adm-link-btn:hover { text-decoration-color: var(--brand); color: var(--brand); }
 .adm-chip-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-weight: 600; cursor: pointer; }
 .adm-chip-btn:hover { background: var(--surface-soft); }
+.adm-chip-btn[aria-pressed="true"] { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
 
 .adm-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--muted); }
 .adm-field.is-inline { flex-direction: row; align-items: center; gap: 8px; }
@@ -313,3 +314,9 @@ g.is-hovered .adm-hit { fill: var(--row-hover); }
 .adm-ban-form input, .adm-ban-form select { flex: 1 1 140px; min-width: 0; }
 .adm-ban-form select { min-height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .adm-switch-track, .adm-switch-thumb { transition: none; } }
+
+/* ---------- Growth ---------- */
+.adm-growth-link { display: grid; grid-template-columns: minmax(140px, 180px) minmax(180px, 1fr); gap: 12px; align-items: end; }
+.adm-growth-link-url { grid-column: 1 / -1; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); font-size: 12.5px; word-break: break-all; }
+.adm-growth-link .adm-btn { justify-self: start; }
+@media (max-width: 700px) { .adm-growth-link { grid-template-columns: 1fr; } }

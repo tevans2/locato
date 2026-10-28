@@ -40,7 +40,9 @@ import type { ShellContext } from "../shell/types";
 import { createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import type { RankedSession } from "./RankedSession";
+import { trackGameComplete } from "../../app/analytics";
 import "../../styles/mystery.css";
+import { shareLink } from "../../core/shareLink";
 
 export interface MysteryScreenOptions {
   /** Navigation shell (docs/navigation.md). */
@@ -521,6 +523,8 @@ export function createMysteryScreen(options: MysteryScreenOptions, services: Mys
 
   function endCountry(restored: boolean): void {
     finished.push(state);
+    // Five-country runs are counted by their results card; Today's mystery ends here.
+    if (today && !restored) trackGameComplete({ game: "mystery", mode: "daily" });
     const target = state.target;
     if (target) {
       paint(target, state.status === "solved" ? "found" : "answer");
@@ -562,7 +566,7 @@ export function createMysteryScreen(options: MysteryScreenOptions, services: Mys
 
   function todaySummary(): HTMLElement {
     const stats = readMysteryDailyStats(options.storage, today!.date);
-    const shareText = mysteryDailyShareText(localRound!, { number: mysteryDailyNumber(today!.date), url: `${typeof window === "undefined" ? "https://locato.quest" : window.location.origin}/?game=mystery&daily=1` });
+    const shareText = mysteryDailyShareText(localRound!, { number: mysteryDailyNumber(today!.date), url: shareLink({ game: "mystery", daily: "1" }) });
     const status = el("p", { className: "mystery-share-status", attrs: { role: "status" } });
     const shareButton = el("button", { className: "primary-action mystery-share", attrs: { type: "button" }, children: [shellIcon("copy", 17, 2), el("span", { text: "Share" })] });
     shareButton.addEventListener("click", () => {
@@ -620,7 +624,7 @@ export function createMysteryScreen(options: MysteryScreenOptions, services: Mys
         { label: "Your best", value: formatNumber(Math.max(previousBest, total)), note: total > previousBest ? "New best" : "On this device" },
       ],
       shareTitle: "Locato Mystery country",
-      shareText: `Locato Mystery country ${total}/${MAX_RUN_POINTS}\n${shareLines.join("\n")}\nlocato.quest`,
+      shareText: `Locato Mystery country ${total}/${MAX_RUN_POINTS}\n${shareLines.join("\n")}\n${shareLink({ game: "mystery" })}`,
       onTryAgain: () => void playAgain(),
       posting,
       ...(missed.length ? { missed, missedTitle: "Countries you missed" } : {}),

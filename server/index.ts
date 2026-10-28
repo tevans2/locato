@@ -14,6 +14,11 @@ import { panoramaResolver } from "./ranked/panoramas";
 import { streetViewCountryRounds } from "../src/core/streetview";
 import { createSeededRandom, shuffle } from "../src/core/game";
 import { serveGameAsset } from "./ranked/GameAssets";
+import { AnalyticsService } from "./analytics/AnalyticsService";
+import { SqliteAnalyticsStore } from "./analytics/sqliteStore";
+import { handleAnalyticsEvents } from "./analytics/routes";
+import { clientIp, cloudflareCountry } from "./clientIp";
+import { renderPageMeta } from "./pageMeta";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -75,13 +80,17 @@ function safeStaticPath(pathname: string): string | null {
   }
 }
 
-function serveStatic(pathname: string): Response {
-  const filePath = safeStaticPath(pathname);
-  if (!filePath) {
-    const indexPath = safeStaticPath("/index.html");
-    if (!indexPath) return new Response("Not found", { status: 404 });
-    return new Response(Bun.file(indexPath), { headers: { "content-type": "text/html; charset=utf-8" } });
-  }
+// The app shell, with link-preview tags for the URL being opened (server/pageMeta.ts).
+async function serveIndex(url: URL): Promise<Response> {
+  const indexPath = safeStaticPath("/index.html");
+  if (!indexPath) return new Response("Not found", { status: 404 });
+  const html = renderPageMeta(await Bun.file(indexPath).text(), url, new URL(baseUrl).origin);
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+async function serveStatic(url: URL): Promise<Response> {
+  const filePath = url.pathname === "/" || url.pathname === "/index.html" ? null : safeStaticPath(url.pathname);
+  if (!filePath) return serveIndex(url);
   const ext = extname(filePath);
   return new Response(Bun.file(filePath), { headers: { "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream" } });
 }
@@ -106,7 +115,9 @@ setInterval(() => roomManager.sweep(Date.now()), TICK_INTERVAL_MS).unref?.();
 
 const SESSION_TTL_MS = readIntegerEnv("SESSION_TTL_DAYS", 30) * 24 * 60 * 60 * 1000;
 const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/locato.db");
-const userStore = new SqliteUserStore(openDatabase(databasePath));
+const database = openDatabase(databasePath);
+const userStore = new SqliteUserStore(database);
+const analyticsService = new AnalyticsService(new SqliteAnalyticsStore(database));
 // Ranked verification is mandatory. Optional legacy telemetry cannot authorize results.
 const enforceRunAudit = process.env.RUN_AUDIT_ENFORCE === "1";
 const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit,
@@ -118,6 +129,8 @@ const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs
 });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
+// Our own accounts, comma-separated: devices signed in to them are left out of Growth analytics.
+const analyticsExcludedEmails = new Set((process.env.ANALYTICS_EXCLUDE_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
 // Accounts that are always admins, comma-separated. Further admins are granted from the console.
 const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map((email) => email.trim()).filter(Boolean);
 // Presence + friend/invite push hub, backed by the persistent /social socket.
@@ -135,6 +148,8 @@ streetViewPool.warm();
 // Structured log lines also land in the admin event log, since Fly keeps only a short stdout tail.
 setEventSink((event) => userStore.recordEvent(event));
 const EVENT_RETENTION_DAYS = readIntegerEnv("ADMIN_EVENT_RETENTION_DAYS", 90);
+// Raw product events; visitors and their active days (what retention needs) are kept regardless.
+const ANALYTICS_RETENTION_DAYS = readIntegerEnv("ANALYTICS_EVENT_RETENTION_DAYS", 400);
 const serverStartedAt = Date.now();
 const adminService = new AdminService(userStore, { rooms: roomManager, presence: socialHub, adminEmails });
 
@@ -162,6 +177,7 @@ async function systemSnapshot(): Promise<Record<string, unknown>> {
       roomTtlSeconds: readIntegerEnv("ROOM_TTL_SECONDS", 7200),
       sessionTtlDays: readIntegerEnv("SESSION_TTL_DAYS", 30),
       eventRetentionDays: EVENT_RETENTION_DAYS,
+      analyticsRetentionDays: ANALYTICS_RETENTION_DAYS,
     },
     features: {
       githubOAuth: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
@@ -177,6 +193,7 @@ async function systemSnapshot(): Promise<Record<string, unknown>> {
 setInterval(() => {
   authService.pruneExpiredSessions();
   userStore.pruneEvents(Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  analyticsService.pruneEvents(Date.now() - ANALYTICS_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }, 60 * 60 * 1000).unref?.();
 
 // The admin console page. It holds no data: /api/admin/* only answers an admin account's session.
@@ -236,6 +253,18 @@ const server = Bun.serve<WebSocketData>({
     }
 
 
+    if (url.pathname === "/api/events" && method === "POST") {
+      if (!isAllowedOrigin(request, origins)) return new Response("Forbidden", { status: 403 });
+      const user = authService.authenticate(readSessionToken(request));
+      return handleAnalyticsEvents(request, analyticsService, {
+        user: user ? { id: user.id, createdAt: user.createdAt } : null,
+        excludedUser: user !== null && analyticsExcludedEmails.has(user.email.toLowerCase()),
+        ip: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
+        country: cloudflareCountry(request),
+      });
+    }
+
     if (url.pathname === "/api/maptap/round" && method === "GET") {
       return createMapTapRoundResponse(url);
     }
@@ -269,10 +298,10 @@ const server = Bun.serve<WebSocketData>({
       return json(await streetViewPool.stats());
     }
 
-    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot });
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot, analytics: analyticsService });
     if (authResponse) return authResponse;
 
-    return serveStatic(url.pathname);
+    return serveStatic(url);
   },
   websocket: {
     open(socket) {

@@ -46,7 +46,9 @@ import type { ShellContext } from "../shell/types";
 import { createDailyStageBar, createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback, type DailyStageProgress } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
 import type { RankedSession } from "./RankedSession";
+import { trackGameComplete } from "../../app/analytics";
 import "../../styles/overland.css";
+import { shareLink } from "../../core/shareLink";
 
 export interface OverlandScreenOptions {
   /** Navigation shell (docs/navigation.md). */
@@ -409,6 +411,8 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
     if (!restored) {
       saveToday();
       daily?.onResult?.(current);
+      // Five-route runs are counted by their results card; Today's route ends here.
+      if (today) trackGameComplete({ game: "overland", mode: "daily" });
     }
     // The daily scores on its own 10-point scale.
     const shownPoints = daily ? scoreDailyOverlandRound(current).points : points;
@@ -463,7 +467,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
       number: overlandDailyNumber(today!.date),
       startName: nameOf(current.route.start),
       endName: nameOf(current.route.end),
-      url: `${typeof window === "undefined" ? "https://locato.quest" : window.location.origin}/?game=overland&daily=1`,
+      url: shareLink({ game: "overland", daily: "1" }),
       away: overlandMissingCountries(graph, current).length,
     });
     const status = el("p", { className: "overland-share-status", attrs: { role: "status" } });
@@ -554,7 +558,7 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
         { label: "Your best", value: formatNumber(Math.max(previousBest, total)), note: total > previousBest ? "New best" : "On this device" },
       ],
       shareTitle: "Locato Overland",
-      shareText: `Locato Overland ${total}/${MAX_POINTS}\n${finished.map((item) => overlandShareLine(item.round)).join("\n")}\nlocato.quest`,
+      shareText: `Locato Overland ${total}/${MAX_POINTS}\n${finished.map((item) => overlandShareLine(item.round)).join("\n")}\n${shareLink({ game: "overland" })}`,
       onTryAgain: () => void playAgain(),
       posting,
       ...(missed.length ? { missed, missedTitle: "Countries you missed" } : {}),

@@ -21,6 +21,7 @@ import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
 import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
+import { trackGameComplete, trackRoute, trackSignIn } from "./analytics";
 import { createAcademyProgressStore } from "./academyProgress";
 import { isLeaderboardMode } from "../core/gameModes";
 import { confirmDialog as shellConfirmDialog } from "../ui/shell/confirmDialog";
@@ -97,6 +98,8 @@ export function createApp(options: AppOptions): App {
       markAuthResolved();
       const userId = state.user?.id ?? null;
       if (userId === authUserId) return;
+      // A sign-in on this page (not the start-up session check): tell analytics now.
+      if (userId !== null && authUserId !== undefined) trackSignIn();
       authUserId = userId;
       for (const listener of [...authListeners]) listener();
     },
@@ -535,6 +538,7 @@ export function createApp(options: AppOptions): App {
       const completionUserId = authControls.getUser()?.id ?? null;
       saveDailyResult(options.storage, result, completionUserId);
       clearDailyProgress(options.storage, progressUserId);
+      trackGameComplete({ game: "daily", mode: "daily" });
       activeDailyScreen = null;
       mountDailyResult(result);
       if (completionUserId) {
@@ -1250,6 +1254,7 @@ export function createApp(options: AppOptions): App {
     // Already playing the daily: re-selecting it resumes in place rather than restarting it.
     if (route.type === "daily-challenge" && navigateOptions?.push !== false && activeDailyScreen !== null && activeScreen === activeDailyScreen) return;
     navigationRun += 1;
+    trackRoute(route);
     if (navigateOptions?.replace) replaceRoute(route);
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {

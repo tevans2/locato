@@ -144,6 +144,8 @@ Admins sign in with their normal Locato account; the console uses the same sessi
 
 **Event log:** every structured server log line (`logEvent` in `server/admin/events.ts`) is also written to the `admin_events` table and pruned after `ADMIN_EVENT_RETENTION_DAYS` (default 90), so history survives Fly's short stdout retention. It only records signed-in activity and server events; guest play isn't tracked.
 
+**Growth analytics:** `src/app/analytics.ts` gives every browser an anonymous visitor id (localStorage) and batches a few events (`visit`, `view`, `game_complete`, `share`, and `sign_in` the moment someone signs in) to `POST /api/events`. `server/analytics/` stores visitors, their active days and the events in SQLite, and **Admin → Growth** reports D1/D7/D30 retention, weekly cohorts, acquisition sources (UTM tags, `?ref=share` on shared results, referrers), a new-visitor funnel and per-game finish/repeat/share rates. Devices linked to the same account count as one person, so a player who switches from phone to laptop still counts as returning. No IPs are stored. List your own accounts in `ANALYTICS_EXCLUDE_EMAILS` to leave every device they sign in on out of the numbers; `localStorage["locato.analytics.optout"] = "1"` does the same for a single device.
+
 | Method | Path | Effect |
 | --- | --- | --- |
 | `GET` | `/api/admin/overview` | Totals, 24h/7d/30d windows (+ prior 30d), 30-day daily series, modes, top players, live counts. |

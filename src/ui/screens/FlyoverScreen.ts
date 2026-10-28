@@ -14,6 +14,7 @@ import { el } from "../dom/createElement";
 import { createFlyoverFlight, flyoverFlagSrc } from "../components/FlyoverFlight";
 import { createResultsStage, createRunList, formatNumber, insertIntoResults, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { shareLink } from "../../core/shareLink";
 
 export interface FlyoverScreenOptions {
   /** Navigation shell (docs/navigation.md). */
@@ -184,7 +185,7 @@ export function createFlyoverScreen(options: FlyoverScreenOptions, services: Fly
     const score = reached.length;
     const fastest = reached.reduce<Reached | null>((best, item) => (!best || item.seconds < best.seconds ? item : best), null);
     const flags = reached.slice(0, 24).map((item) => flagEmoji(item.country.code)).join("");
-    const shareText = `Locato Flyover ✈️ ${score} ${score === 1 ? "country" : "countries"} in ${FLYOVER_RUN_SECONDS}s\n${flags}${reached.length > 24 ? "…" : ""}\nlocato.quest`;
+    const shareText = `Locato Flyover ✈️ ${score} ${score === 1 ? "country" : "countries"} in ${FLYOVER_RUN_SECONDS}s\n${flags}${reached.length > 24 ? "…" : ""}\n${shareLink({ game: "flyover" })}`;
     const runList = createRunList("Your route", reached.map((item) => ({
       label: item.country.name,
       detail: item.country.continent,

@@ -1,6 +1,7 @@
 import type { AdminBans, AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail } from "../../server/admin/AdminService";
 import type { AdminEvent, AdminUserList, AuthUser, LeaderboardEntry, PublicUser } from "../../server/auth/types";
 import type { AdminRoomSummary } from "../../server/rooms/RoomManager";
+export type { GrowthBreakdownRow, GrowthReport, RetentionRate } from "../../server/analytics/AnalyticsService";
 
 export type { AdminBans, AdminDailyEntry, AdminLeaderboardEntry, AdminOverview, AdminRun, AdminUserDetail, AdminEvent, AdminUserList, AdminRoomSummary, LeaderboardEntry, PublicUser };
 
