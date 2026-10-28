@@ -12,6 +12,7 @@ import type { RankedSession } from "./RankedSession";
 import { el } from "../dom/createElement";
 import { createRunList, formatKm, formatNumber, insertIntoResults, shareSquare, shellOrFallback } from "./practiceRun";
 import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt, type PostRankedAttempt } from "./rankedAttempt";
+import { shareLink } from "../../core/shareLink";
 
 
 export interface GeoGuessrScreenOptions {
@@ -280,7 +281,7 @@ export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides
     const bestIndex = results.reduce((top, item, index) => (item.score > (results[top]?.score ?? -1) ? index : top), 0);
     const best = results[bestIndex];
     const ratio = total / GEOGUESSR_MAX_GAME_SCORE;
-    const shareText = `Locato GeoGuessr ${formatNumber(total)}/${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}\n${results.map((item) => shareSquare(item.score / GEOGUESSR_MAX_ROUND_SCORE)).join("")}\nlocato.quest`;
+    const shareText = `Locato GeoGuessr ${formatNumber(total)}/${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}\n${results.map((item) => shareSquare(item.score / GEOGUESSR_MAX_ROUND_SCORE)).join("")}\n${shareLink({ game: "geoguessr" })}`;
     const visited = results.map((item) => ({ code: item.target.countryCode, name: countryName(item.target), flagSrc: `/assets/flags/${item.target.countryCode.toLowerCase()}.svg` }));
     const stats = [
       { label: "Total score", value: formatNumber(total), note: `of ${formatNumber(GEOGUESSR_MAX_GAME_SCORE)}` },

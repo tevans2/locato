@@ -4,6 +4,24 @@ import { formatNumber } from "./format";
 
 type Day = AdminOverview["series"][number];
 
+/** One column: `lower` stacks under `upper`; `extras` show in the tooltip and table. */
+export interface StackedDay {
+  readonly date: string;
+  readonly lower: number;
+  readonly upper: number;
+  readonly extras: readonly (readonly [label: string, value: number])[];
+}
+
+export interface StackedDayChartProps {
+  readonly series: readonly StackedDay[];
+  /** Legend/table names for the lower and upper stacks, e.g. ["Games recorded", "Daily challenges"]. */
+  readonly labels: readonly [string, string];
+  /** Tooltip nouns, e.g. ["games", "dailies"]. */
+  readonly units: readonly [string, string];
+  readonly emptyText: string;
+  readonly ariaLabel: (total: number) => string;
+}
+
 const HEIGHT = 220;
 const PAD = { top: 16, right: 12, bottom: 28, left: 36 };
 const MAX_BAR = 24;
@@ -33,6 +51,18 @@ function shortDate(date: string): string {
 
 // Stacked daily columns: recorded games (bottom) and daily-challenge plays (top), last 30 days.
 export function ActivityChart({ series }: { series: readonly Day[] }) {
+  return (
+    <StackedDayChart
+      series={series.map((d) => ({ date: d.date, lower: d.games, upper: d.dailies, extras: [["Active users", d.activeUsers], ["Signups", d.signups]] }))}
+      labels={["Games recorded", "Daily challenges"]}
+      units={["games", "dailies"]}
+      emptyText="No recorded activity in the last 30 days"
+      ariaLabel={(total) => `Daily activity, last 30 days: ${total} plays in total`}
+    />
+  );
+}
+
+export function StackedDayChart({ series, labels, units, emptyText, ariaLabel }: StackedDayChartProps) {
   const [width, setWidth] = useState(720);
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
@@ -54,21 +84,21 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
     const plotH = HEIGHT - PAD.top - PAD.bottom;
     const band = plotW / Math.max(series.length, 1);
     const barW = Math.min(MAX_BAR, Math.max(3, band * 0.62));
-    const max = niceMax(Math.max(0, ...series.map((d) => d.games + d.dailies)));
+    const max = niceMax(Math.max(0, ...series.map((d) => d.lower + d.upper)));
     const y = (v: number) => PAD.top + plotH - (v / max) * plotH;
     const ticks = [0, max / 4, max / 2, (3 * max) / 4, max].filter((t) => Number.isInteger(t));
     return { plotW, plotH, band, barW, max, y, ticks };
   }, [series, width]);
 
-  const total = series.reduce((sum, d) => sum + d.games + d.dailies, 0);
+  const total = series.reduce((sum, d) => sum + d.lower + d.upper, 0);
   const hovered = hover !== null ? series[hover] : null;
 
   return (
     <div className="adm-chart">
       <div className="adm-chart-toolbar">
         <div className="adm-legend" aria-hidden={asTable}>
-          <span><i className="adm-swatch is-1" /> Games recorded</span>
-          <span><i className="adm-swatch is-2" /> Daily challenges</span>
+          <span><i className="adm-swatch is-1" /> {labels[0]}</span>
+          <span><i className="adm-swatch is-2" /> {labels[1]}</span>
         </div>
         <button type="button" className="adm-link-btn" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
           {asTable ? "Show chart" : "Show table"}
@@ -79,12 +109,12 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
         <div className="adm-table-wrap is-short">
           <table className="adm-table">
             <thead>
-              <tr><th>Day (UTC)</th><th className="num">Games</th><th className="num">Dailies</th><th className="num">Active users</th><th className="num">Signups</th></tr>
+              <tr><th>Day (UTC)</th><th className="num">{labels[0]}</th><th className="num">{labels[1]}</th>{series[0]?.extras.map(([label]) => <th key={label} className="num">{label}</th>)}</tr>
             </thead>
             <tbody>
               {[...series].reverse().map((d) => (
                 <tr key={d.date}>
-                  <td>{d.date}</td><td className="num">{d.games}</td><td className="num">{d.dailies}</td><td className="num">{d.activeUsers}</td><td className="num">{d.signups}</td>
+                  <td>{d.date}</td><td className="num">{d.lower}</td><td className="num">{d.upper}</td>{d.extras.map(([label, value]) => <td key={label} className="num">{value}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -92,8 +122,8 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
         </div>
       ) : (
         <div className="adm-chart-plot" ref={plotRef} onMouseLeave={() => setHover(null)}>
-          {total === 0 && <div className="adm-chart-empty">No recorded activity in the last 30 days</div>}
-          <svg width={width} height={HEIGHT} role="img" aria-label={`Daily activity, last 30 days: ${total} plays in total`}>
+          {total === 0 && <div className="adm-chart-empty">{emptyText}</div>}
+          <svg width={width} height={HEIGHT} role="img" aria-label={ariaLabel(total)}>
             {geometry.ticks.map((tick) => (
               <g key={tick}>
                 <line className="adm-grid" x1={PAD.left} x2={width - PAD.right} y1={geometry.y(tick)} y2={geometry.y(tick)} />
@@ -104,10 +134,10 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
               const cx = PAD.left + geometry.band * (i + 0.5);
               const x = cx - geometry.barW / 2;
               const base = geometry.y(0);
-              const gamesTop = geometry.y(d.games);
-              const dailyTop = geometry.y(d.games + d.dailies);
-              const hasGames = d.games > 0;
-              const hasDailies = d.dailies > 0;
+              const gamesTop = geometry.y(d.lower);
+              const dailyTop = geometry.y(d.lower + d.upper);
+              const hasGames = d.lower > 0;
+              const hasDailies = d.upper > 0;
               // Weekly ticks anchored on today; the first day gets a label only if it isn't crowded.
               const last = series.length - 1;
               const showLabel = (last - i) % 7 === 0 || (i === 0 && (last - i) % 7 >= 3);
@@ -135,7 +165,7 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
                     onFocus={() => setHover(i)}
                     onBlur={() => setHover(null)}
                     tabIndex={0}
-                    aria-label={`${d.date}: ${d.games} games, ${d.dailies} dailies, ${d.activeUsers} active users`}
+                    aria-label={`${d.date}: ${d.lower} ${units[0]}, ${d.upper} ${units[1]}${d.extras.map(([label, value]) => `, ${value} ${label.toLowerCase()}`).join("")}`}
                   />
                 </g>
               );
@@ -147,13 +177,13 @@ export function ActivityChart({ series }: { series: readonly Day[] }) {
               className="adm-tooltip"
               style={{
                 left: Math.min(Math.max(PAD.left + geometry.band * (hover + 0.5), 90), width - 90),
-                top: Math.max(8, geometry.y(hovered.games + hovered.dailies) - 12),
+                top: Math.max(8, geometry.y(hovered.lower + hovered.upper) - 12),
               }}
             >
               <strong>{shortDate(hovered.date)}</strong>
-              <span><i className="adm-swatch is-1" /> {hovered.games} games</span>
-              <span><i className="adm-swatch is-2" /> {hovered.dailies} dailies</span>
-              <span className="adm-tooltip-muted">{hovered.activeUsers} active · {hovered.signups} signups</span>
+              <span><i className="adm-swatch is-1" /> {hovered.lower} {units[0]}</span>
+              <span><i className="adm-swatch is-2" /> {hovered.upper} {units[1]}</span>
+              {hovered.extras.length > 0 && <span className="adm-tooltip-muted">{hovered.extras.map(([label, value]) => `${value} ${label.toLowerCase()}`).join(" · ")}</span>}
             </div>
           )}
         </div>

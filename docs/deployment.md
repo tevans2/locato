@@ -63,6 +63,8 @@ Non-secret config (`NODE_ENV`, room limits, `DATABASE_PATH`) lives in each `[env
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional). |
 
 `ADMIN_EVENT_RETENTION_DAYS` (optional, default `90`) controls how long the admin event log keeps rows.
+`ANALYTICS_EVENT_RETENTION_DAYS` (optional, default `400`) controls how long raw product-analytics events are kept. Visitors and their active days (what retention needs) are never pruned.
+`ANALYTICS_EXCLUDE_EMAILS` (optional, comma-separated) leaves our own accounts out of Admin → Growth: any device that sends events while signed in to one is marked excluded, its earlier (signed-out) data is deleted, and nothing from it is recorded again.
 
 OAuth callback URLs to register with each provider: `${BASE_URL}/auth/github/callback` and `${BASE_URL}/auth/google/callback`.
 

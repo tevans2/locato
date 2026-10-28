@@ -1,6 +1,7 @@
 import { createApp } from "./app/createApp";
 import { indexCountries, rawCountries, validateCountries } from "./core/countries";
 import { initializeTheme } from "./ui/theme";
+import { initAnalytics } from "./app/analytics";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/layout.css";
@@ -23,6 +24,8 @@ import "./styles/geoguessr-play.css";
 const root = document.getElementById("app");
 
 initializeTheme(window.localStorage);
+// Before the app rewrites the URL, so UTM tags and ?ref= are still there to read.
+initAnalytics();
 
 if (!root) {
   throw new Error("Missing #app root element.");
