@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Trash2 } from "lucide-react";
 import type { AdminClient, AdminDailyEntry, AdminLeaderboardEntry, RemovedBoardEntry } from "../api";
 import { boardRemovalNotice, formatBoardValue, formatDateTime, formatDuration, modeName, todayUtc } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
@@ -14,6 +14,14 @@ function shiftDate(date: string, days: number): string {
 }
 
 const FLAG_LABELS: Record<string, string> = { "too-fast": "too fast", backdated: "backdated" };
+// Why a daily result is kept off other players' boards (server/daily/startTickets.ts).
+const HIDDEN_LABELS: Record<string, string> = {
+  "no-start": "no start ticket",
+  "too-fast": "faster than 30s",
+  "time-mismatch": "claimed more time than had passed",
+  "start-reused": "start ticket used by another account",
+  admin: "hidden by an admin",
+};
 
 export function ModerationView({ client, onOpenUser, helpers }: { client: AdminClient; onOpenUser: (id: string) => void; helpers: ActionHelpers }) {
   return (
@@ -29,11 +37,17 @@ function DailyBoard({ client, onOpenUser, helpers }: { client: AdminClient; onOp
   const [date, setDate] = useState(todayUtc());
   const board = useResource(() => client.get<{ entries: AdminDailyEntry[] }>(`/daily?date=${date}`), [client, date]);
   const flagged = board.data?.entries.filter((e) => e.flags.length > 0).length ?? 0;
+  const hiddenCount = board.data?.entries.filter((e) => e.hidden).length ?? 0;
+  const setHidden = async (entry: AdminDailyEntry, hidden: boolean) => {
+    await client.send("PUT", `/daily/${encodeURIComponent(entry.user.id)}/${date}/visibility`, { hidden });
+    helpers.notify(hidden ? "Hidden from other players." : "Now shown on the boards.");
+    board.refresh();
+  };
 
   return (
     <Panel
       title="Daily challenge"
-      subtitle={board.data ? `${board.data.entries.length} result${board.data.entries.length === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged` : ""}` : " "}
+      subtitle={board.data ? `${board.data.entries.length} result${board.data.entries.length === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged` : ""}${hiddenCount ? ` · ${hiddenCount} hidden from other players` : ""}` : " "}
       actions={
         <div className="adm-date-nav">
           <button type="button" className="adm-icon-btn" aria-label="Previous day" onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft size={16} /></button>
@@ -50,15 +64,22 @@ function DailyBoard({ client, onOpenUser, helpers }: { client: AdminClient; onOp
             <thead><tr><th className="num">#</th><th>Player</th><th className="num">Score</th><th className="num">Time</th><th className="num">Hints</th><th>Submitted</th><th>Flags</th><th /></tr></thead>
             <tbody>
               {board.data.entries.map((entry) => (
-                <tr key={entry.user.id} className={entry.flags.length ? "is-flagged" : undefined}>
+                <tr key={entry.user.id} className={entry.flags.length || entry.hidden ? "is-flagged" : undefined}>
                   <td className="num">{entry.rank}</td>
                   <td><button type="button" className="adm-link-btn" onClick={() => onOpenUser(entry.user.id)}>{entry.user.displayName}</button><div className="adm-muted adm-small">{entry.user.email}</div></td>
                   <td className="num">{entry.result.score}</td>
                   <td className="num">{formatDuration(entry.result.timeMs)}</td>
                   <td className="num">{entry.result.hintsUsed}</td>
                   <td>{formatDateTime(entry.result.completedAt)}</td>
-                  <td>{entry.flags.map((flag) => <Badge key={flag} tone="bad">{FLAG_LABELS[flag] ?? flag}</Badge>)}</td>
+                  <td>
+                    {entry.hidden && <Badge tone="warn" title="Its player still sees it; nobody else does">Hidden · {HIDDEN_LABELS[entry.hidden] ?? entry.hidden}</Badge>}{" "}
+                    {entry.flags.map((flag) => <Badge key={flag} tone="bad">{FLAG_LABELS[flag] ?? flag}</Badge>)}
+                  </td>
                   <td className="num">
+                    {entry.hidden
+                      ? <button type="button" className="adm-icon-btn" title="Show on the boards" aria-label={`Show ${entry.user.displayName}'s result on the boards`} onClick={() => void setHidden(entry, false)}><Eye size={14} /></button>
+                      : <button type="button" className="adm-icon-btn" title="Hide from other players" aria-label={`Hide ${entry.user.displayName}'s result from other players`} onClick={() => void setHidden(entry, true)}><EyeOff size={14} /></button>}
+
                     <button type="button" className="adm-icon-btn" aria-label={`Remove ${entry.user.displayName}'s result`} onClick={() => helpers.confirm({
                       title: "Remove daily result?",
                       body: <p>Removes <strong>{entry.user.displayName}</strong>'s {date} result ({entry.result.score}/100 in {formatDuration(entry.result.timeMs)}) from the daily leaderboard.</p>,

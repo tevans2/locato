@@ -1,3 +1,4 @@
+import type { DailyHiddenReason } from "../daily/startTickets";
 import type { RunFlag, RunOutcome, RunTimeline, RunVerdict } from "../../src/core/runAudit";
 
 export interface AuthUser {
@@ -116,6 +117,12 @@ export interface DailyChallengeResult {
 export interface DailyFriendResult {
   readonly user: PublicUser;
   readonly result: DailyChallengeResult;
+}
+
+export interface DailyReview {
+  /** Why it's hidden from other players (see server/daily/startTickets.ts), or null when shown. */
+  readonly hiddenReason: DailyHiddenReason | null;
+  readonly startNonce: string | null;
 }
 
 export interface DailyLeaderboardEntry {
@@ -484,6 +491,14 @@ export interface UserStore {
   listUserBestScores(userId: string): readonly AdminBestScore[];
   deleteBestScore(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;
+  /** Review state for a daily result: whether it's kept off other players' boards, and its start ticket. */
+  setDailyReview(userId: string, date: string, review: DailyReview): void;
+  /** Reviews for one date, by user id. Results without one are shown. */
+  listDailyReviews(date: string): ReadonlyMap<string, DailyReview>;
+  /** Whether another account already submitted a result with this start ticket. */
+  isDailyStartUsed(date: string, startNonce: string, exceptUserId: string): boolean;
+  /** A server secret generated once and kept in the database, so it survives restarts. */
+  getOrCreateSecret(name: string, create: () => string): string;
   // Clears game history, per-category stats, and aggregates; leaderboards, dailies and Academy
   // progress are untouched.
   resetUserStats(userId: string): void;

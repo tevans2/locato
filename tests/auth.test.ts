@@ -255,7 +255,8 @@ describe("auth routes", () => {
     expect(save?.status).toBe(200);
     const fetched = await route(service, jsonRequest("/api/daily/2026-10-01", "GET", undefined, token));
     expect((await fetched!.json()).result).toMatchObject({ rounds, challengeVersion: 2, score: 95 });
-    const leaderboard = await route(service, jsonRequest("/api/daily/leaderboard?date=2026-10-01", "GET"));
+    // Sent without a start ticket, it's hidden from others; its owner still sees it, minus the round details.
+    const leaderboard = await route(service, jsonRequest("/api/daily/leaderboard?date=2026-10-01", "GET", undefined, token));
     expect((await leaderboard!.json()).entries[0].result.rounds).toBeUndefined();
   });
 

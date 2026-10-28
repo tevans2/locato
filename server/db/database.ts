@@ -18,6 +18,7 @@ import type {
   CreateSessionInput,
   CreateUserInput,
   DailyChallengeResult,
+  DailyReview,
   DailyRoundMark,
   FriendRequestLists,
   FullStats,
@@ -219,6 +220,21 @@ function migrate(db: Database): void {
       CHECK (user_low < user_high)
     );
     CREATE INDEX IF NOT EXISTS friendships_user_high ON friendships(user_high);
+
+    -- Daily results kept off other players' boards (server/daily/startTickets.ts) and their start tickets.
+    CREATE TABLE IF NOT EXISTS daily_result_reviews (
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      hidden_reason TEXT,
+      start_nonce TEXT,
+      PRIMARY KEY (user_id, date)
+    );
+    CREATE INDEX IF NOT EXISTS daily_result_reviews_nonce ON daily_result_reviews(date, start_nonce);
+
+    CREATE TABLE IF NOT EXISTS app_secrets (
+      name TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
 
     CREATE TABLE IF NOT EXISTS ip_bans (
       ip TEXT PRIMARY KEY,
@@ -959,7 +975,33 @@ export class SqliteUserStore implements UserStore {
   }
 
   deleteDailyResult(userId: string, date: string): boolean {
+    this.db.query("DELETE FROM daily_result_reviews WHERE user_id = ? AND date = ?").run(userId, date);
     return this.db.query("DELETE FROM daily_challenge_results WHERE user_id = ? AND date = ?").run(userId, date).changes > 0;
+  }
+
+  setDailyReview(userId: string, date: string, review: DailyReview): void {
+    this.db
+      .query(`INSERT INTO daily_result_reviews (user_id, date, hidden_reason, start_nonce) VALUES (?, ?, ?, ?)
+              ON CONFLICT(user_id, date) DO UPDATE SET hidden_reason = excluded.hidden_reason, start_nonce = excluded.start_nonce`)
+      .run(userId, date, review.hiddenReason, review.startNonce);
+  }
+
+  listDailyReviews(date: string): ReadonlyMap<string, DailyReview> {
+    const rows = this.db
+      .query<{ userId: string; hiddenReason: DailyReview["hiddenReason"]; startNonce: string | null }>(
+        "SELECT user_id AS userId, hidden_reason AS hiddenReason, start_nonce AS startNonce FROM daily_result_reviews WHERE date = ?",
+      )
+      .all(date);
+    return new Map(rows.map(({ userId, ...review }) => [userId, review]));
+  }
+
+  isDailyStartUsed(date: string, startNonce: string, exceptUserId: string): boolean {
+    return this.db.query("SELECT 1 FROM daily_result_reviews WHERE date = ? AND start_nonce = ? AND user_id != ? LIMIT 1").get(date, startNonce, exceptUserId) !== null;
+  }
+
+  getOrCreateSecret(name: string, create: () => string): string {
+    this.db.query("INSERT OR IGNORE INTO app_secrets (name, value) VALUES (?, ?)").run(name, create());
+    return this.db.query<{ value: string }>("SELECT value FROM app_secrets WHERE name = ?").get(name)!.value;
   }
 
   resetUserStats(userId: string): void {

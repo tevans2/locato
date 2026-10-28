@@ -365,7 +365,22 @@ export async function fetchDailyChallengeResult(date: string): Promise<DailyChal
   }
 }
 
-export async function saveDailyChallengeResult(result: DailyChallengeResult): Promise<DailyChallengeResult | null> {
+/**
+ * Asks the server to note that today's daily was started; it returns a signed ticket the result is
+ * sent with later, so the boards can tell a real attempt from a made-up one. Null if offline.
+ */
+export async function requestDailyStartTicket(date: string): Promise<string | null> {
+  try {
+    const response = await postJson("/api/daily/start", { date });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { ticket?: unknown };
+    return typeof data.ticket === "string" ? data.ticket : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDailyChallengeResult(result: DailyChallengeResult & { readonly startTicket?: string }): Promise<DailyChallengeResult | null> {
   try {
     const response = await postJson("/api/daily", result);
     if (!response.ok) return null;
