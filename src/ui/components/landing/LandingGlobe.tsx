@@ -15,10 +15,13 @@ export function LandingGlobe({ countryIndex, onOpenCountry }: LandingGlobeProps)
   const globe = useRef<AtlasGlobe | null>(null);
   const [hover, setHover] = useState<AtlasHover | null>(null);
   // "waiting": the drawn globe image only. The interactive one costs ~470 KB (the world map and
-  // three.js), so it loads once the globe is on screen and the browser is idle, or on first touch.
+  // three.js). With a mouse it loads once the globe is on screen and the browser is idle; on
+  // touch screens and with Data Saver on, the first tap on the globe loads it.
   const [status, setStatus] = useState<"waiting" | "loading" | "ready" | "unavailable">("waiting");
   const [wanted, setWanted] = useState(false);
   const saveData = typeof navigator !== "undefined" && (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+  const finePointer = typeof window === "undefined" || typeof window.matchMedia !== "function" || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const autoLoad = finePointer && !saveData;
   const [attempt, setAttempt] = useState(0);
   const [today, setToday] = useState(() => Date.now());
   const featured = getCountryOfTheDay(countryIndex, today);
@@ -39,8 +42,8 @@ export function LandingGlobe({ countryIndex, onOpenCountry }: LandingGlobeProps)
   }, []);
 
   useEffect(() => {
-    // With Data Saver on, only a tap loads it. Without IntersectionObserver (old browsers, tests), load now.
-    if (wanted || saveData) return;
+    // Without IntersectionObserver (old browsers, tests), load now.
+    if (wanted || !autoLoad) return;
     const node = host.current;
     if (!node || typeof IntersectionObserver === "undefined") { setWanted(true); return; }
     let idle: number | null = null;
@@ -58,7 +61,7 @@ export function LandingGlobe({ countryIndex, onOpenCountry }: LandingGlobeProps)
         else window.clearTimeout(idle);
       }
     };
-  }, [wanted, saveData]);
+  }, [wanted, autoLoad]);
 
   useEffect(() => {
     if (!wanted) return;
@@ -125,7 +128,7 @@ export function LandingGlobe({ countryIndex, onOpenCountry }: LandingGlobeProps)
       </> : null}
     </div>
     <div className="atlas-interaction-hint" id="atlas-hint">
-      {status === "waiting" ? <button type="button" className="atlas-load-globe" onClick={() => setWanted(true)}>{saveData ? "Tap to spin the globe" : "Drag to rotate"}</button>
+      {status === "waiting" ? <button type="button" className="atlas-load-globe" onClick={() => setWanted(true)}>{autoLoad ? "Drag to rotate" : "Tap to spin the globe"}</button>
         : status === "loading" ? <span role="status">Loading the world…</span> : status === "unavailable" ? <><span>Explore a country below</span><button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry globe</button></> : <><Mouse size={23} strokeWidth={1.4} /><span><span className="atlas-drag-hint">Drag to rotate</span><span className="atlas-hover-hint">Hover to discover</span></span></>}
     </div>
     <div className={`atlas-keyboard-picker ${status === "unavailable" ? "is-visible" : ""}`}>

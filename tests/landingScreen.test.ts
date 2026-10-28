@@ -48,6 +48,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   // These tests drive the interactive globe; without an observer it loads straight away.
   vi.stubGlobal("IntersectionObserver", undefined);
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("pointer: fine"), media: query, addEventListener() {}, removeEventListener() {} }));
   storage.clear();
   globeMock.load.mockResolvedValue([]);
   globeMock.create.mockImplementation((_host, _features, options: { onHover: (hover: AtlasHover) => void }) => {
@@ -86,6 +87,15 @@ describe("Landing globe and game launcher", () => {
     await mount();
     expect(globeMock.load).not.toHaveBeenCalled();
     await act(async () => document.querySelector(".atlas-globe-stage")!.dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a tap on touch screens, even with the globe on screen", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    expect(document.querySelector(".atlas-load-globe")?.textContent).toBe("Tap to spin the globe");
+    await click(".atlas-load-globe");
     expect(globeMock.load).toHaveBeenCalledTimes(1);
   });
 
