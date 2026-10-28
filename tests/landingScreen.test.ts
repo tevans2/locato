@@ -46,6 +46,8 @@ async function click(selector: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // These tests drive the interactive globe; without an observer it loads straight away.
+  vi.stubGlobal("IntersectionObserver", undefined);
   storage.clear();
   globeMock.load.mockResolvedValue([]);
   globeMock.create.mockImplementation((_host, _features, options: { onHover: (hover: AtlasHover) => void }) => {
@@ -61,6 +63,32 @@ afterEach(async () => {
 });
 
 describe("Landing globe and game launcher", () => {
+  it("holds the interactive globe until it's on screen and the browser is idle, or it's touched", async () => {
+    let onIntersect: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: (entries: { isIntersecting: boolean }[]) => void) { onIntersect = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("requestIdleCallback", (run: () => void) => { run(); return 1; });
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-testid="landing-atlas"] img[src$="atlas-globe.svg"]')).not.toBeNull();
+    await act(async () => onIntersect!([{ isIntersecting: false }]));
+    expect(globeMock.load).not.toHaveBeenCalled();
+    await act(async () => onIntersect!([{ isIntersecting: true }]));
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+    expect(globeMock.create).toHaveBeenCalledTimes(1);
+
+    await act(async () => { screens.splice(0).forEach((screen) => screen.destroy()); });
+    document.body.replaceChildren();
+    vi.clearAllMocks();
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    await act(async () => document.querySelector(".atlas-globe-stage")!.dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a sourced daily fact, opens its profile, and updates an open page at UTC midnight", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(new Date("2026-10-04T23:59:59Z"));
