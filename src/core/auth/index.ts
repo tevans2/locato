@@ -106,8 +106,11 @@ export interface DailyFriendResult {
 
 export interface DailyLeaderboardEntry {
   readonly rank: number;
+  /** For a guest, `id` is `guest:<entry id>` and `username` the name they posted under. */
   readonly user: PublicUser;
   readonly result: DailyChallengeResult;
+  /** Posted without an account, under just a name. */
+  readonly guest?: true;
 }
 
 export interface DailySummary {
@@ -388,6 +391,18 @@ export async function saveDailyChallengeResult(result: DailyChallengeResult & { 
     return data.result ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Posts today's daily without an account, under just a name. */
+export async function postGuestDailyResult(result: DailyChallengeResult & { readonly startTicket?: string }, name: string): Promise<{ readonly entry: { readonly id: string; readonly name: string } } | { readonly error: string }> {
+  try {
+    const response = await postJson("/api/daily/guest", { ...result, name });
+    const data = (await response.json().catch(() => ({}))) as { entry?: { id: string; name: string }; error?: string };
+    if (response.ok && data.entry) return { entry: data.entry };
+    return { error: data.error ?? "Couldn't post your result. Try again." };
+  } catch {
+    return { error: "Couldn't reach Locato. Check your connection and try again." };
   }
 }
 

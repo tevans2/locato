@@ -2,7 +2,9 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
+import { GUEST_DAILY_PREFIX } from "../auth/types";
 import type {
+  GuestDailyResult,
   AdminActivityRows,
   AdminBestScore,
   AdminBestTime,
@@ -230,6 +232,16 @@ function migrate(db: Database): void {
       PRIMARY KEY (user_id, date)
     );
     CREATE INDEX IF NOT EXISTS daily_result_reviews_nonce ON daily_result_reviews(date, start_nonce);
+
+    -- Today's daily posted without an account, under just a name. Reviewed as user_id 'guest:<id>'.
+    CREATE TABLE IF NOT EXISTS daily_guest_results (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      result TEXT NOT NULL,
+      posted_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS daily_guest_results_date ON daily_guest_results(date);
 
     CREATE TABLE IF NOT EXISTS app_secrets (
       name TEXT PRIMARY KEY,
@@ -993,6 +1005,22 @@ export class SqliteUserStore implements UserStore {
       )
       .all(date);
     return new Map(rows.map(({ userId, ...review }) => [userId, review]));
+  }
+
+  listGuestDailyResults(date: string): readonly GuestDailyResult[] {
+    return this.db
+      .query<{ id: string; name: string; result: string; postedAt: number }>("SELECT id, name, result, posted_at AS postedAt FROM daily_guest_results WHERE date = ?")
+      .all(date)
+      .map((row) => ({ ...row, result: JSON.parse(row.result) as GuestDailyResult["result"] }));
+  }
+
+  saveGuestDailyResult(entry: GuestDailyResult): void {
+    this.db.query("INSERT INTO daily_guest_results (id, date, name, result, posted_at) VALUES (?, ?, ?, ?, ?)").run(entry.id, entry.result.date, entry.name, JSON.stringify(entry.result), entry.postedAt);
+  }
+
+  deleteGuestDailyResult(id: string): boolean {
+    this.db.query("DELETE FROM daily_result_reviews WHERE user_id = ?").run(`${GUEST_DAILY_PREFIX}${id}`);
+    return this.db.query("DELETE FROM daily_guest_results WHERE id = ?").run(id).changes > 0;
   }
 
   isDailyStartUsed(date: string, startNonce: string, exceptUserId: string): boolean {

@@ -19,6 +19,27 @@ export interface DailyResultSave {
   readonly rounds?: readonly DailyRoundResult[];
   /** The server's signed note of when this attempt started; sent with the result. */
   readonly startTicket?: string;
+  /** Posted to today's board without an account, under this name. */
+  readonly guestEntry?: { readonly id: string; readonly name: string };
+}
+
+// The name a guest last posted a daily under, offered again next time.
+const GUEST_BOARD_NAME_KEY = "locato:guest-board-name";
+
+export function readGuestBoardName(storage: Storage): string {
+  try {
+    return storage.getItem(GUEST_BOARD_NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function saveGuestBoardName(storage: Storage, name: string): void {
+  try {
+    storage.setItem(GUEST_BOARD_NAME_KEY, name);
+  } catch {
+    // Storage full or blocked: they can type it again.
+  }
 }
 
 function dailySaveScope(userId?: string | null): string {
