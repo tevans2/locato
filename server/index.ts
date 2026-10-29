@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexCountries, rawCountries, validateCountries } from "../src/core/countries";
 import { RoomManager, type MultiplayerConnection } from "./rooms/RoomManager";
@@ -19,6 +19,7 @@ import { SqliteAnalyticsStore } from "./analytics/sqliteStore";
 import { handleAnalyticsEvents } from "./analytics/routes";
 import { clientIp, cloudflareCountry } from "./clientIp";
 import { renderPageMeta } from "./pageMeta";
+import { compressBody, createStaticFiles, etagMatches, NO_CACHE, weakEtag } from "./staticFiles";
 
 interface WebSocketData {
   // Resolved once at upgrade time from the session cookie; immutable for the socket's lifetime.
@@ -32,16 +33,6 @@ const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(SERVER_DIR, "..");
 const DIST_DIR = resolve(PROJECT_ROOT, "dist");
 
-const CONTENT_TYPES: Readonly<Record<string, string>> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
-  ".json": "application/json; charset=utf-8",
-  ".woff2": "font/woff2",
-};
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -80,19 +71,31 @@ function safeStaticPath(pathname: string): string | null {
   }
 }
 
-// The app shell, with link-preview tags for the URL being opened (server/pageMeta.ts).
-async function serveIndex(url: URL): Promise<Response> {
-  const indexPath = safeStaticPath("/index.html");
-  if (!indexPath) return new Response("Not found", { status: 404 });
-  const html = renderPageMeta(await Bun.file(indexPath).text(), url, new URL(baseUrl).origin);
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+const staticFiles = createStaticFiles(DIST_DIR);
+
+// The app shell, with link-preview tags for the URL being opened (server/pageMeta.ts). Browsers
+// revalidate it on every visit (no-cache) so a deploy shows at once; the ETag makes that a 304.
+function serveIndex(request: Request, url: URL): Response {
+  const shell = staticFiles.indexHtml();
+  if (shell === null) return new Response("Not found", { status: 404 });
+  const html = renderPageMeta(shell, url, new URL(baseUrl).origin);
+  const etag = weakEtag(html);
+  const headers = new Headers({ "content-type": "text/html; charset=utf-8", "cache-control": NO_CACHE, etag, vary: "Accept-Encoding" });
+  if (etagMatches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers });
+  const { body, encoding } = compressBody(html, request.headers.get("accept-encoding"));
+  if (encoding) headers.set("content-encoding", encoding);
+  return new Response(body, { headers });
 }
 
-async function serveStatic(url: URL): Promise<Response> {
-  const filePath = url.pathname === "/" || url.pathname === "/index.html" ? null : safeStaticPath(url.pathname);
-  if (!filePath) return serveIndex(url);
-  const ext = extname(filePath);
-  return new Response(Bun.file(filePath), { headers: { "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream" } });
+function serveStatic(request: Request, url: URL): Response {
+  if (url.pathname !== "/" && url.pathname !== "/index.html") {
+    const file = staticFiles.serve(request, url.pathname);
+    if (file) return file;
+    // A bundle that isn't there (an old tab asking for last deploy's hash) must fail as a 404,
+    // not come back as HTML the browser then refuses to run as a script.
+    if (url.pathname.startsWith("/assets/")) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+  }
+  return serveIndex(request, url);
 }
 
 const countryIndex = indexCountries(rawCountries);
@@ -301,7 +304,7 @@ const server = Bun.serve<WebSocketData>({
     const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot, analytics: analyticsService });
     if (authResponse) return authResponse;
 
-    return serveStatic(url);
+    return serveStatic(request, url);
   },
   websocket: {
     open(socket) {

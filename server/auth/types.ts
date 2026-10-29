@@ -1,3 +1,4 @@
+import type { DailyHiddenReason } from "../daily/startTickets";
 import type { RunFlag, RunOutcome, RunTimeline, RunVerdict } from "../../src/core/runAudit";
 
 export interface AuthUser {
@@ -118,11 +119,30 @@ export interface DailyFriendResult {
   readonly result: DailyChallengeResult;
 }
 
+export interface DailyReview {
+  /** Why it's hidden from other players (see server/daily/startTickets.ts), or null when shown. */
+  readonly hiddenReason: DailyHiddenReason | null;
+  readonly startNonce: string | null;
+}
+
 export interface DailyLeaderboardEntry {
   readonly rank: number;
+  /** For a guest, `id` is `guest:<entry id>` and `username` the name they posted under. */
   readonly user: PublicUser;
   readonly result: DailyChallengeResult;
+  /** Posted without an account, under just a name (today's daily only). */
+  readonly guest?: true;
 }
+
+/** A daily result posted without an account. Its review is keyed `guest:<id>` (GUEST_DAILY_PREFIX). */
+export interface GuestDailyResult {
+  readonly id: string;
+  readonly name: string;
+  readonly result: DailyChallengeResult;
+  readonly postedAt: number;
+}
+
+export const GUEST_DAILY_PREFIX = "guest:";
 
 export interface DailySummary {
   readonly history: readonly DailyChallengeResult[];
@@ -484,6 +504,19 @@ export interface UserStore {
   listUserBestScores(userId: string): readonly AdminBestScore[];
   deleteBestScore(userId: string, gameMode: string, variant: string): boolean;
   deleteDailyResult(userId: string, date: string): boolean;
+  /** Review state for a daily result: whether it's kept off other players' boards, and its start ticket. */
+  setDailyReview(userId: string, date: string, review: DailyReview): void;
+  /** Reviews for one date, by user id. Results without one are shown. */
+  listDailyReviews(date: string): ReadonlyMap<string, DailyReview>;
+  /** Guest results (posted with just a name) for one date. */
+  listGuestDailyResults(date: string): readonly GuestDailyResult[];
+  saveGuestDailyResult(entry: GuestDailyResult): void;
+  /** Deletes a guest result and its review. False when there's none. */
+  deleteGuestDailyResult(id: string): boolean;
+  /** Whether another account (or guest) already submitted a result with this start ticket. */
+  isDailyStartUsed(date: string, startNonce: string, exceptUserId: string): boolean;
+  /** A server secret generated once and kept in the database, so it survives restarts. */
+  getOrCreateSecret(name: string, create: () => string): string;
   // Clears game history, per-category stats, and aggregates; leaderboards, dailies and Academy
   // progress are untouched.
   resetUserStats(userId: string): void;

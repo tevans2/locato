@@ -5,6 +5,9 @@ import { indexCountries, rawCountries } from "../src/core/countries";
 import { createLandingScreen } from "../src/ui/screens/LandingScreen";
 import type { ShellContext } from "../src/ui/shell/types";
 import type { AtlasHover } from "../src/ui/components/landing/renderAtlasGlobe";
+import { createDailyResultSave, dailyProgressKey, dailySaveKey } from "../src/storage/dailySave";
+import { getLocalDailyDate } from "../src/core/dailyChallenge";
+import { untilNextDaily } from "../src/ui/screens/LandingScreen";
 
 const globeMock = vi.hoisted(() => ({
   reset: vi.fn(), selectCountry: vi.fn(), destroy: vi.fn(),
@@ -25,7 +28,7 @@ const storage: Storage = {
   key: (index) => [...values.keys()][index] ?? null,
 };
 function shell(): ShellContext {
-  return { openSection: vi.fn(), goHome: vi.fn(), goBack: vi.fn(), openGame: vi.fn(), openGamePicker: vi.fn(), openCountry: vi.fn(), openLeaderboards: vi.fn(), openAccount: vi.fn(), controls: document.createElement("div"), confirmLeave: vi.fn(async () => true), signedIn: () => false };
+  return { openDailyPuzzle: vi.fn(), openSection: vi.fn(), goHome: vi.fn(), goBack: vi.fn(), openGame: vi.fn(), openGamePicker: vi.fn(), openCountry: vi.fn(), openLeaderboards: vi.fn(), openAccount: vi.fn(), controls: document.createElement("div"), confirmLeave: vi.fn(async () => true), signedIn: () => false };
 }
 async function mount() {
   const navigation = shell();
@@ -46,6 +49,9 @@ async function click(selector: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // These tests drive the interactive globe; without an observer it loads straight away.
+  vi.stubGlobal("IntersectionObserver", undefined);
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("pointer: fine"), media: query, addEventListener() {}, removeEventListener() {} }));
   storage.clear();
   globeMock.load.mockResolvedValue([]);
   globeMock.create.mockImplementation((_host, _features, options: { onHover: (hover: AtlasHover) => void }) => {
@@ -61,6 +67,41 @@ afterEach(async () => {
 });
 
 describe("Landing globe and game launcher", () => {
+  it("holds the interactive globe until it's on screen and the browser is idle, or it's touched", async () => {
+    let onIntersect: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: (entries: { isIntersecting: boolean }[]) => void) { onIntersect = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("requestIdleCallback", (run: () => void) => { run(); return 1; });
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-testid="landing-atlas"] img[src$="atlas-globe.svg"]')).not.toBeNull();
+    await act(async () => onIntersect!([{ isIntersecting: false }]));
+    expect(globeMock.load).not.toHaveBeenCalled();
+    await act(async () => onIntersect!([{ isIntersecting: true }]));
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+    expect(globeMock.create).toHaveBeenCalledTimes(1);
+
+    await act(async () => { screens.splice(0).forEach((screen) => screen.destroy()); });
+    document.body.replaceChildren();
+    vi.clearAllMocks();
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    await act(async () => document.querySelector(".atlas-globe-stage")!.dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a tap on touch screens, even with the globe on screen", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    await mount();
+    expect(globeMock.load).not.toHaveBeenCalled();
+    expect(document.querySelector(".atlas-load-globe")?.textContent).toBe("Tap to spin the globe");
+    await click(".atlas-load-globe");
+    expect(globeMock.load).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a sourced daily fact, opens its profile, and updates an open page at UTC midnight", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(new Date("2026-10-04T23:59:59Z"));
@@ -129,5 +170,53 @@ describe("Landing globe and game launcher", () => {
     screens.splice(screens.indexOf(screen), 1);
     await act(async () => resolve([]));
     expect(globeMock.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("Landing daily hero", () => {
+  const today = getLocalDailyDate();
+  const text = () => document.querySelector('[data-testid="landing-daily"]')!.textContent ?? "";
+
+  it("leads the page with today's challenge, ahead of the game library", async () => {
+    const { navigation } = await mount();
+    const hero = document.querySelector('[data-testid="landing-daily"]')!;
+    expect(hero.getAttribute("data-state")).toBe("new");
+    expect(document.querySelector("h1")?.textContent).toBe("Today's geography challenge");
+    expect(hero.compareDocumentPosition(document.querySelector("#games")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelectorAll(".landing-daily-format li")).toHaveLength(7);
+    await click('[data-testid="button-daily-play"]');
+    expect(navigation.openSection).toHaveBeenCalledWith("daily");
+    await click('[data-testid="button-daily-overland"]');
+    expect(navigation.openDailyPuzzle).toHaveBeenCalledWith("overland");
+  });
+
+  it("offers to continue a daily in progress, whichever account it belongs to", async () => {
+    storage.setItem(dailyProgressKey("user-1"), JSON.stringify({ version: 1, date: today, seed: `daily:${today}`, stage: "prompt", roundIndex: 5, score: 40, marks: [], hintsUsed: 0, elapsedMs: 60_000 }));
+    await mount();
+    expect(document.querySelector('[data-testid="landing-daily"]')!.getAttribute("data-state")).toBe("in-progress");
+    expect(document.querySelector('[data-testid="button-daily-play"]')!.textContent).toContain("Continue · round 6 of 10");
+  });
+
+  it("shows today's score grid, a share button and when the next one starts once done", async () => {
+    const marks = ["correct", "correct", "hint", "correct", "miss", "correct", "correct", "correct", "hint", "correct"] as const;
+    storage.setItem(dailySaveKey(today, "user-1"), JSON.stringify(createDailyResultSave({ date: today, seed: `daily:${today}`, score: 82, timeMs: 140_000, hintsUsed: 2, marks: [...marks] })));
+    const { navigation } = await mount();
+    expect(document.querySelector('[data-testid="landing-daily"]')!.getAttribute("data-state")).toBe("done");
+    expect(document.querySelector("h1")?.textContent).toBe("Today's challenge, done.");
+    expect(text()).toContain("82/100");
+    expect(text()).toContain("Next challenge in");
+    expect(document.querySelectorAll(".landing-daily-grid li.is-hint")).toHaveLength(2);
+    expect(document.querySelector('[data-testid="daily-streak"]')?.textContent).toContain("1-day streak");
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await click('[data-testid="button-daily-share"]');
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/Score: 82\/100[\s\S]*view=daily-challenge&ref=share/)));
+    await click('[data-testid="button-daily-result"]');
+    expect(navigation.openSection).toHaveBeenCalledWith("daily");
+  });
+
+  it("counts down to local midnight", () => {
+    expect(untilNextDaily(new Date(2026, 9, 28, 14, 48))).toBe("9h 12m");
+    expect(untilNextDaily(new Date(2026, 9, 28, 23, 59, 30))).toBe("1m");
   });
 });

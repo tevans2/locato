@@ -3,6 +3,8 @@ import type { AcademyProgress } from "../../src/core/academy/types";
 import { LEADERBOARD_MODES, type LeaderboardMetric } from "../../src/core/leaderboards";
 import { isLeaderboardGameMode, leaderboardMetric, leaderboardModeConfig, normalizeLeaderboardVariant } from "../leaderboard/validation";
 import type { AdminRoomSummary, RoomManagerStats } from "../rooms/RoomManager";
+import type { DailyHiddenReason } from "../daily/startTickets";
+import { GUEST_DAILY_PREFIX } from "../auth/types";
 import type {
   AdminBestScore,
   StoredRun,
@@ -174,9 +176,14 @@ export interface AdminRun {
 
 export interface AdminDailyEntry {
   readonly rank: number;
+  /** A guest's `id` is `guest:<entry id>`, with the name they posted under and no email. */
   readonly user: { readonly id: string; readonly displayName: string; readonly email: string };
   readonly result: DailyChallengeResult;
+  /** Posted without an account, under just a name. */
+  readonly guest: boolean;
   readonly flags: readonly ("too-fast" | "backdated")[];
+  /** Why it's kept off other players' boards (its own player still sees it), or null when shown. */
+  readonly hidden: DailyHiddenReason | null;
 }
 
 export type AdminResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly status: number; readonly error: string };
@@ -525,23 +532,41 @@ export class AdminService {
   }
 
   daily(date: string): readonly AdminDailyEntry[] {
+    const reviews = this.store.listDailyReviews(date);
+    const guests = this.store.listGuestDailyResults(date).map((entry) => ({ user: { id: `${GUEST_DAILY_PREFIX}${entry.id}`, displayName: entry.name, email: "" }, result: entry.result, guest: true }));
     return this.store
       .listDailyResultsForDate(date)
       .flatMap((entry) => {
         const user = this.store.findUserById(entry.userId);
-        return user ? [{ user: { id: user.id, displayName: user.displayName, email: user.email }, result: entry.result }] : [];
+        return user ? [{ user: { id: user.id, displayName: user.displayName, email: user.email }, result: entry.result, guest: false }] : [];
       })
+      .concat(guests)
       .sort((a, b) => b.result.score - a.result.score || a.result.timeMs - b.result.timeMs || a.result.hintsUsed - b.result.hintsUsed)
       .map((entry, index) => {
         const flags: ("too-fast" | "backdated")[] = [];
         if (entry.result.timeMs < SUSPICIOUS_DAILY_MS) flags.push("too-fast");
         // Allow a day either side for timezones; anything further was submitted for another day.
         if (Math.abs(Date.parse(`${date}T12:00:00.000Z`) - entry.result.completedAt) > 1.5 * DAY_MS) flags.push("backdated");
-        return { rank: index + 1, ...entry, flags };
+        return { rank: index + 1, ...entry, flags, hidden: reviews.get(entry.user.id)?.hiddenReason ?? null };
       });
   }
 
+  /** Shows a hidden daily result on the boards, or hides one. False when there's no result. */
+  setDailyHidden(userId: string, date: string, hidden: boolean): boolean {
+    const exists = userId.startsWith(GUEST_DAILY_PREFIX)
+      ? this.store.listGuestDailyResults(date).some((entry) => `${GUEST_DAILY_PREFIX}${entry.id}` === userId)
+      : this.store.getDailyResult(userId, date) !== null;
+    if (!exists) return false;
+    const review = this.store.listDailyReviews(date).get(userId);
+    this.store.setDailyReview(userId, date, { hiddenReason: hidden ? "admin" : null, startNonce: review?.startNonce ?? null });
+    return true;
+  }
+
   deleteDailyResult(userId: string, date: string): boolean {
+    if (userId.startsWith(GUEST_DAILY_PREFIX)) {
+      const id = userId.slice(GUEST_DAILY_PREFIX.length);
+      return this.store.listGuestDailyResults(date).some((entry) => entry.id === id) && this.store.deleteGuestDailyResult(id);
+    }
     return this.store.deleteDailyResult(userId, date);
   }
 

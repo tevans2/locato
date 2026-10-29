@@ -1,4 +1,5 @@
-import type {
+import { GUEST_DAILY_PREFIX } from "./types";
+import type { DailyReview, GuestDailyResult,
   AdminActivityRows,
   AdminBestScore,
   AdminBestTime,
@@ -58,6 +59,9 @@ export function createMemoryUserStore(): UserStore {
   const categoryStats = new Map<string, Map<string, CategoryStats>>();
   const gameRecords = new Map<string, GameRecord[]>();
   const dailyResults = new Map<string, DailyChallengeResult>();
+  const dailyReviews = new Map<string, DailyReview>();
+  const guestDailies = new Map<string, GuestDailyResult>();
+  const secrets = new Map<string, string>();
   const bestTimes = new Map<string, { userId: string; gameMode: string; variant: string; timeMs: number; achievedAt: number }>();
   const bestScores = new Map<string, { userId: string; gameMode: string; variant: string; score: number; achievedAt: number }>();
 
@@ -447,7 +451,35 @@ export function createMemoryUserStore(): UserStore {
       dropAttempts(userId, gameMode, variant, "score");
       return bestScores.delete(bestTimeKey(userId, gameMode, variant));
     },
-    deleteDailyResult: (userId, date) => dailyResults.delete(dailyKey(userId, date)),
+    deleteDailyResult: (userId, date) => {
+      dailyReviews.delete(dailyKey(userId, date));
+      return dailyResults.delete(dailyKey(userId, date));
+    },
+    setDailyReview(userId, date, review) {
+      dailyReviews.set(dailyKey(userId, date), { ...review });
+    },
+    listDailyReviews(date) {
+      const suffix = `:${date}`;
+      return new Map([...dailyReviews].filter(([key]) => key.endsWith(suffix)).map(([key, review]) => [key.slice(0, -suffix.length), review]));
+    },
+    listGuestDailyResults: (date) => [...guestDailies.values()].filter((entry) => entry.result.date === date),
+    saveGuestDailyResult(entry) {
+      guestDailies.set(entry.id, entry);
+    },
+    deleteGuestDailyResult(id) {
+      const entry = guestDailies.get(id);
+      if (!entry) return false;
+      dailyReviews.delete(dailyKey(`${GUEST_DAILY_PREFIX}${id}`, entry.result.date));
+      return guestDailies.delete(id);
+    },
+    isDailyStartUsed(date, startNonce, exceptUserId) {
+      return [...dailyReviews].some(([key, review]) => key.endsWith(`:${date}`) && review.startNonce === startNonce && key !== dailyKey(exceptUserId, date));
+    },
+    getOrCreateSecret(name, create) {
+      let value = secrets.get(name);
+      if (value === undefined) secrets.set(name, (value = create()));
+      return value;
+    },
     resetUserStats(userId: string): void {
       stats.delete(userId);
       categoryStats.delete(userId);

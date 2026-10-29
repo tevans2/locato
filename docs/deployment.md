@@ -18,6 +18,8 @@ Prod stays always-on because multiplayer rooms are in-memory — stopping the ma
 
 `Dockerfile` is multi-stage: `node:22-alpine` runs `npm ci && npm run build`, then `oven/bun:1-slim` runs the server. `dist/`, `server/`, and `src/` are copied into the runtime image (the server imports country data from `src/`), and the entrypoint is `bun server/index.ts` on port 3000.
 
+`npm run build` ends with `scripts/compress-dist.mjs`, which writes `.br`/`.gz` copies of every text file in `dist/` and `dist/.static-manifest.json` (content-hash ETags + available encodings). `server/staticFiles.ts` serves the smallest encoding the browser accepts. Hashed Vite bundles (`/assets/name-<hash>.ext`) are cached for a year as `immutable`; other files (flags, shapes, the world map, images) for a day with revalidation; the app shell is `no-cache` with an ETag, so a deploy shows immediately and unchanged pages come back as 304s. A missing `/assets/*` file is a 404, not the app shell. Without the manifest (a bare `vite build`) files are served uncompressed.
+
 ## CI/CD
 
 GitHub Actions deploy on push (both scan full Git history for secrets, then run `npm test` and `npm run build` before deploying):

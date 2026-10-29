@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDailyChallenge, type DailyRoundResult } from "../src/core/dailyChallenge";
 import { indexCountries, rawCountries } from "../src/core/countries";
 import { createDailyIntroScreen } from "../src/ui/screens/DailyIntroScreen";
-import { createDailyResultScreen } from "../src/ui/screens/DailyResultScreen";
-import { createDailyResultSave } from "../src/storage/dailySave";
+import { createDailyResultScreen, dailyPlacement, keepPlayingGames, withGuestEntry } from "../src/ui/screens/DailyResultScreen";
+import { createDailyResultSave, readDailyResult, readGuestBoardName } from "../src/storage/dailySave";
 import { shellOrFallback } from "../src/ui/screens/practiceRun";
 import type { Screen } from "../src/app/router";
 
@@ -78,5 +78,129 @@ describe("daily introduction and review", () => {
     expect(rows).toHaveLength(11);
     expect(rows[10]!.classList.contains("is-you")).toBe(true);
     await vi.waitFor(() => expect(root.querySelector(".daily-result-stats")?.textContent).toContain("Daily streak9"));
+  });
+});
+
+describe("daily results lead on to the full games", () => {
+  const round = (categoryId: string, points: number): DailyRoundResult => ({ categoryId, points, hintsUsed: 0, wrongGuesses: 0, missed: points === 0, ...(categoryId === "map-tap" || categoryId === "overland" ? { targetId: "x" } : { countryCode: "JP" }) });
+
+  it("suggests the games behind today's rounds, the costliest first", () => {
+    const rounds = [round("flags", 10), round("flags", 10), round("capitals", 8), round("capitals", 2), round("shapes", 10), round("shapes", 7),
+      round("pick-country", 10), round("overland", 4), round("map-tap", 9), round("streetview-country", 10)];
+    expect(keepPlayingGames({ rounds })).toEqual([{ game: "capitals", lost: 10 }, { game: "overland", lost: 6 }, { game: "shapes", lost: 3 }]);
+    // A perfect daily still points somewhere: its first games, in the daily's order.
+    expect(keepPlayingGames({ rounds: rounds.map((r) => ({ ...r, points: 10, missed: false })) }).map((g) => g.game)).toEqual(["flags", "capitals", "shapes"]);
+    expect(keepPlayingGames({}).map((g) => g.lost)).toEqual([null, null, null]);
+  });
+
+  it("puts a Keep playing section right under the score that opens those games", () => {
+    const openGame = vi.fn();
+    const openGamePicker = vi.fn();
+    const openDailyPuzzle = vi.fn();
+    const shell = { ...shellOrFallback(undefined, vi.fn()), openGame, openGamePicker, openDailyPuzzle };
+    const today = new Date();
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const rounds = [round("flags", 10), round("flags", 10), round("capitals", 4), round("capitals", 10), round("shapes", 10), round("shapes", 10), round("pick-country", 10), round("overland", 10), round("map-tap", 6), round("streetview-country", 10)];
+    const result = createDailyResultSave({ date, seed: `daily:${date}`, score: 90, timeMs: 120_000, hintsUsed: 0, marks: rounds.map((r) => (r.points === 10 ? "correct" : "hint")), challengeVersion: 2, rounds });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    const root = mount(createDailyResultScreen({ shell, storage: window.localStorage, result, countryIndex: index, onPractice: vi.fn() }));
+    const section = root.querySelector(".daily-keep-playing")!;
+    expect(section.compareDocumentPosition(root.querySelector(".daily-recap")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const cards = [...section.querySelectorAll<HTMLButtonElement>(".daily-keep-card")];
+    expect(cards.map((card) => card.dataset.game)).toEqual(["capitals", "map-tap", "flags"]);
+    expect(cards[0]!.textContent).toContain("You dropped 6 points here today");
+    cards[1]!.click();
+    expect(openGame).toHaveBeenCalledWith("map-tap", "practice");
+    root.querySelector<HTMLButtonElement>('[data-action="all-games"]')!.click();
+    expect(openGamePicker).toHaveBeenCalled();
+    root.querySelector<HTMLButtonElement>('[data-action="daily-mystery"]')!.click();
+    expect(openDailyPuzzle).toHaveBeenCalledWith("mystery");
+    expect(root.querySelector('[data-action="more-games"]')!.textContent).toBe("Play more games");
+  });
+});
+
+describe("guests on the daily board", () => {
+  const today = new Date();
+  const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const board = [90, 85, 70].map((score, n) => ({ rank: n + 1, user: { id: `u${n}`, username: `player${n}`, avatarEmoji: null }, result: { date, seed: `daily:${date}`, score, timeMs: 100_000, hintsUsed: 0, marks: [], shareText: "", completedAt: 0 } }));
+  const guestResult = (extra: { startTicket?: string } = {}) => createDailyResultSave({ date, seed: `daily:${date}`, score: 82, timeMs: 120_000, hintsUsed: 1, marks: Array(10).fill("correct"), ...extra });
+
+  it("places a result by score, then time, then hints", () => {
+    expect(dailyPlacement(board, { score: 82, timeMs: 1, hintsUsed: 0 })).toBe(3);
+    expect(dailyPlacement(board, { score: 85, timeMs: 99_000, hintsUsed: 0 })).toBe(2);
+    expect(dailyPlacement(board, { score: 85, timeMs: 100_000, hintsUsed: 0 })).toBe(2);
+    expect(dailyPlacement(board, { score: 85, timeMs: 101_000, hintsUsed: 0 })).toBe(3);
+    expect(dailyPlacement([], { score: 0, timeMs: 1, hintsUsed: 0 })).toBe(1);
+  });
+
+  it("puts a guest's own entry in place when the board doesn't include it", () => {
+    const placed = withGuestEntry(board, guestResult(), { id: "g1", name: "Sam" });
+    expect(placed.map((entry) => [entry.rank, entry.user.username])).toEqual([[1, "player0"], [2, "player1"], [3, "Sam"], [4, "player2"]]);
+    expect(withGuestEntry(placed, guestResult(), { id: "g1", name: "Sam" })).toBe(placed);
+  });
+
+  it("tells a guest where they'd place and leads with signing in", async () => {
+    const openAccount = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => String(input).includes("/leaderboard") ? new Response(JSON.stringify({ entries: board })) : new Response("{}", { status: 401 })));
+    const root = mount(createDailyResultScreen({ shell: { ...shellOrFallback(undefined, vi.fn()), openAccount }, storage: window.localStorage, result: guestResult(), countryIndex: index, onPractice: vi.fn() }));
+    const claim = root.querySelector<HTMLElement>('[data-testid="daily-claim"]')!;
+    await vi.waitFor(() => expect(claim.hidden).toBe(false));
+    expect(claim.textContent).toContain("Your 82 would place #3 of 4 today.");
+    root.querySelector<HTMLButtonElement>('[data-action="claim-sign-in"]')!.click();
+    expect(openAccount).toHaveBeenCalledOnce();
+    // Without a start ticket there's nothing to check a guest post against: accounts only.
+    expect(root.querySelector('[data-action="post-as-guest"]')).toBeNull();
+  });
+
+  it("posts with just a name, then shows the guest on the board", async () => {
+    let posted: Record<string, unknown> | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      if (String(input) === "/api/daily/guest") {
+        posted = JSON.parse(String(init!.body)) as Record<string, unknown>;
+        return new Response(JSON.stringify({ entry: { id: "g1", name: "Sam" } }));
+      }
+      return String(input).includes("/leaderboard") ? new Response(JSON.stringify({ entries: board })) : new Response("{}", { status: 401 });
+    }));
+    const result = guestResult({ startTicket: "d1.ticket" });
+    const root = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result, countryIndex: index, onPractice: vi.fn() }));
+    const reveal = await vi.waitFor(() => { const button = root.querySelector<HTMLButtonElement>('[data-action="post-as-guest"]'); if (!button) throw new Error("not yet"); return button; });
+    const form = root.querySelector<HTMLFormElement>('[data-testid="daily-guest-form"]')!;
+    expect(form.hidden).toBe(true);
+    reveal.click();
+    expect(form.hidden).toBe(false);
+    form.querySelector("input")!.value = "Sam";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await vi.waitFor(() => expect(root.querySelector(".daily-result-rank")?.textContent).toBe("#3 of 4 today"));
+    expect(posted).toMatchObject({ name: "Sam", score: 82, startTicket: "d1.ticket" });
+    expect(posted).not.toHaveProperty("version");
+    const mine = root.querySelector(".daily-board-row.is-you")!;
+    expect(mine.textContent).toContain("Sam");
+    expect(mine.textContent).toContain("guest");
+    expect(root.querySelector('[data-testid="daily-claim"]')!.textContent).toContain("You're on today's board as Sam.");
+    expect(readDailyResult(window.localStorage, date, null)?.guestEntry).toEqual({ id: "g1", name: "Sam" });
+    expect(readGuestBoardName(window.localStorage)).toBe("Sam");
+  });
+
+  it("shows the server's reason when a name is refused", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => String(input) === "/api/daily/guest"
+      ? new Response(JSON.stringify({ error: "That name belongs to an account. Pick another, or sign in." }), { status: 409 })
+      : String(input).includes("/leaderboard") ? new Response(JSON.stringify({ entries: board })) : new Response("{}", { status: 401 })));
+    const root = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result: guestResult({ startTicket: "d1.ticket" }), countryIndex: index, onPractice: vi.fn() }));
+    (await vi.waitFor(() => { const button = root.querySelector<HTMLButtonElement>('[data-action="post-as-guest"]'); if (!button) throw new Error("not yet"); return button; })).click();
+    const form = root.querySelector<HTMLFormElement>('[data-testid="daily-guest-form"]')!;
+    form.querySelector("input")!.value = "player0";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await vi.waitFor(() => expect(form.querySelector<HTMLElement>(".daily-claim-error")!.hidden).toBe(false));
+    expect(form.textContent).toContain("That name belongs to an account");
+  });
+
+  it("isn't offered to accounts or on an older day's results", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => new Response(JSON.stringify(String(input).includes("/leaderboard") ? { entries: board } : { summary: { history: [], streak: 1, best: null, friendsToday: [] } }))));
+    const account = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result: guestResult({ startTicket: "t" }), countryIndex: index, onPractice: vi.fn(), currentUserId: "u0" }));
+    const older = mount(createDailyResultScreen({ shell: shellOrFallback(undefined, vi.fn()), storage: window.localStorage, result: createDailyResultSave({ date: "2026-10-01", seed: "daily:2026-10-01", score: 50, timeMs: 1, hintsUsed: 0, marks: Array(10).fill("correct") }), countryIndex: index, onPractice: vi.fn() }));
+    await vi.waitFor(() => expect(account.querySelectorAll(".daily-board-row").length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(older.querySelectorAll(".daily-board-row").length).toBeGreaterThan(0));
+    expect(account.querySelector<HTMLElement>('[data-testid="daily-claim"]')!.hidden).toBe(true);
+    expect(older.querySelector<HTMLElement>('[data-testid="daily-claim"]')!.hidden).toBe(true);
   });
 });

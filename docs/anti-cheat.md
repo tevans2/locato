@@ -8,6 +8,13 @@ Its scores are client-reported and its multiplayer route is public. This restore
 Flyover cheating opportunities, including altered physics, autopilot and fabricated in-range
 solo totals. Flyover must not be described as cheat-proof or server-verified.
 Daily also deliberately uses its original local themed challenge, interactive Street View and client scoring. Its future questions and Street View coordinates are public again, and uploaded results are not proof of valid play. Authentication, payload validation and one stored result per account/date remain.
+
+### Daily start tickets (`server/daily/startTickets.ts`)
+
+Pressing Start asks `POST /api/daily/start` for a signed ticket (HMAC with a key generated once and kept in `app_secrets`, so tickets survive deploys). It travels with the in-progress save and the result, including a guest's result synced at sign-in. On `POST /api/daily` the server records a review for each new result. A result is hidden when it has no valid ticket for that date (`no-start`), takes under 30 s or arrives under 30 s after Start (`too-fast`), claims more play than has passed since Start plus 15 s of slack (`time-mismatch`; the client counts active play only, so honest claims are always shorter), or reuses another account's ticket (`start-reused`). A hidden result is saved and stays immutable. Its own player still sees it, at its rank, on the daily board, while other players' boards and friends' summaries leave it out. Admin → Leaderboards → Daily shows the reason and can show or hide any result (`admin`). This doesn't stop someone who reads the public answers and plays at human pace; moderation and bans cover that.
+
+Guests can post today's daily under just a name (`POST /api/daily/guest`, stored in `daily_guest_results` and reviewed as `guest:<id>`). A guest post needs a valid ticket for today (one without a ticket is refused, not hidden), gets the same checks, and can't take an account's username. Each address can post 12 a day. The board marks guest rows. The server can't tell which guest is viewing, so the client puts a guest's own row back in place when it's hidden. When the guest signs in, the uploaded result carries the same ticket, and the server swaps out the guest row for the account's.
+
 Server verification in the other modes does **not** prove that a human supplied the accepted controls or answers.
 
 ## Coverage
@@ -20,7 +27,7 @@ Server verification in the other modes does **not** prove that a human supplied 
 | Map Tap, GeoGuessr | Fixed challenge count; valid pin; private scoring origin; recomputed distance/points |
 | WorldSplit | Fixed rounds; valid line; server population split and points |
 | Flyover | Local 90-second game; authenticated, bounded client score submissions; improvements only |
-| Daily | Original local ten-round game; authenticated, validated client result; one immutable saved result per account/date |
+| Daily | Original local ten-round game; authenticated, validated client result; one immutable saved result per account/date; signed start ticket, and results that fail its checks are kept off other players' boards |
 | Multiplayer | Existing server answer/pin scoring plus strict deadlines; Flyover route order/location/coarse travel-time checks; server-written account results |
 
 Signed-in ranked play outside Flyover and Daily uses the original gameplay screens through `RankedGameScreen` and

@@ -65,6 +65,8 @@ export interface ShellContext {
   readonly openGame: (mode: GameModeId, run?: RunType, variant?: string) => void;
   /** Open the game picker sheet; choosing a game calls `openGame`. `current` is marked "Playing". */
   readonly openGamePicker: (options?: { readonly current?: GameModeId; readonly run?: RunType }) => void;
+  /** Open today's Overland route or today's mystery country (`?game=…&daily=1`). */
+  readonly openDailyPuzzle?: (game: "overland" | "mystery") => void;
   /** Open a country's Atlas profile (`?country=xx`). */
   readonly openCountry: (code: string) => void;
   /** Open Leaderboards, optionally focused on one mode's board (and variant, e.g. a flag set or continent). */

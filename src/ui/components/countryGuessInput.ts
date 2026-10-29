@@ -169,7 +169,10 @@ export function createCountryGuessInput(options: CountryGuessInputOptions): Coun
       addButton.disabled = disabled || busy;
     },
     focus() {
-      input.focus({ preventScroll: true });
+      // A screen built before it's mounted (its first round starts in the constructor) can't take
+      // focus yet; App attaches it in the same task, so try again once that has happened.
+      if (input.isConnected) input.focus({ preventScroll: true });
+      else queueMicrotask(() => { if (input.isConnected && !input.disabled) input.focus({ preventScroll: true }); });
     },
   };
 }

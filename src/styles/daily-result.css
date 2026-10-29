@@ -127,6 +127,30 @@
 #app #daily-result .daily-result-actions { align-items: center; }
 #app #daily-result .daily-next-countdown { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
 
+/* Signed out: where today's result would place, and the way onto the board. */
+#app #daily-result .daily-claim { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--border)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--brand) 7%, var(--surface)); }
+#app #daily-result .daily-claim[hidden] { display: none; }
+#app #daily-result .daily-claim p { margin: 0; }
+#app #daily-result .daily-claim-headline { font-size: 1.05rem; line-height: 1.4; }
+#app #daily-result .daily-claim-headline strong { color: var(--brand); font-variant-numeric: tabular-nums; }
+#app #daily-result .daily-claim-note { color: var(--muted); font-size: .86rem; line-height: 1.5; }
+#app #daily-result .daily-claim-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
+#app #daily-result .daily-claim-link { padding: 4px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: .86rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+#app #daily-result .daily-claim-link:hover { color: var(--text); }
+#app #daily-result .daily-claim-form { display: flex; flex-direction: column; gap: 6px; }
+#app #daily-result .daily-claim-form[hidden] { display: none; }
+#app #daily-result .daily-claim-field { display: flex; gap: 8px; }
+#app #daily-result .daily-claim-input { flex: 1 1 auto; min-width: 0; max-width: 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font: inherit; font-size: .92rem; }
+#app #daily-result .daily-claim-field .shell-btn { flex: 0 0 auto; width: auto; }
+@media (max-width: 520px) {
+  #app #daily-result .daily-claim-input { max-width: none; }
+}
+#app #daily-result .daily-claim-input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+#app #daily-result .daily-claim-error { color: var(--bad); font-size: .84rem; }
+#app #daily-result .daily-claim-error[hidden] { display: none; }
+#app #daily-result .daily-claim-fine { color: var(--muted); font-size: .76rem; }
+#app #daily-result .daily-guest-tag { padding: 0 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .66rem; letter-spacing: .03em; }
+
 #app #daily-result .daily-tiles { display: grid; grid-template-columns: repeat(10, minmax(0, 34px)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 #app #daily-result .daily-tile { display: block; aspect-ratio: 1; border-radius: 7px; background: var(--daily-miss); }
 #app #daily-result .daily-tile.is-correct { background: var(--daily-full); }
@@ -181,3 +205,33 @@
   #app #daily-result .daily-side-panel { padding: 14px; }
 }
 #app #daily-result .daily-avatar { flex: none; width: 1.3em; text-align: center; }
+
+/* ── Keep playing: the full games behind today's rounds, right under the score ──────────── */
+#app #daily-result .daily-keep-playing { display: grid; gap: 14px; width: 100%; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: radial-gradient(120% 160% at 0% 0%, var(--accent-soft), var(--surface) 60%); scroll-margin-top: 88px; }
+#app #daily-result .daily-keep-playing:focus { outline: none; }
+#app #daily-result .daily-keep-playing:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+#app #daily-result .daily-keep-heading h2 { margin: 0; font-size: 1.15rem; }
+#app #daily-result .daily-keep-heading p { margin: 4px 0 0; font-size: .86rem; line-height: 1.5; }
+#app #daily-result .daily-keep-games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+#app #daily-result .daily-keep-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 10px 12px; width: 100%; height: 100%; margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transform: none; transition: border-color 150ms ease, background 150ms ease; }
+#app #daily-result .daily-keep-card:hover { border-color: var(--brand); background: var(--bg-elevated); }
+#app #daily-result .daily-keep-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--accent-soft); color: var(--brand); }
+#app #daily-result .daily-keep-copy { display: grid; align-content: start; gap: 3px; min-width: 0; }
+#app #daily-result .daily-keep-copy strong { font-size: .95rem; }
+#app #daily-result .daily-keep-note { color: var(--brand); font-size: .74rem; font-weight: 700; }
+#app #daily-result .daily-keep-note.is-loss { color: var(--muted); }
+#app #daily-result .daily-keep-description { color: var(--muted); font-size: .78rem; line-height: 1.45; }
+#app #daily-result .daily-keep-cta { grid-column: 2; display: inline-flex; align-items: center; gap: 6px; color: var(--brand); font-size: .8rem; font-weight: 750; }
+#app #daily-result .daily-keep-card:hover .daily-keep-cta svg { transform: translateX(2px); }
+#app #daily-result .daily-keep-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+#app #daily-result .daily-keep-more p { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; color: var(--muted); font-size: .82rem; }
+#app #daily-result .daily-keep-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--brand); font: inherit; font-weight: 700; cursor: pointer; transform: none; }
+#app #daily-result .daily-keep-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 860px) {
+  #app #daily-result .daily-keep-games { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  #app #daily-result .daily-keep-playing { padding: 16px; }
+  #app #daily-result .daily-keep-more p > span:first-child { flex-basis: 100%; }
+  #app #daily-result .daily-keep-more .shell-btn { width: 100%; justify-content: center; }
+}
