@@ -4,9 +4,9 @@ import { getCategory } from "../../core/categories";
 import type { CountryIndex } from "../../core/countries";
 import { findMapTapLocation } from "../../core/maptap/locations";
 import type { ShellContext } from "../shell/types";
-import { fetchDailyLeaderboard, fetchDailySummary, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
+import { fetchDailyLeaderboard, fetchDailySummary, postGuestDailyResult, type DailyLeaderboardEntry, type DailySummary } from "../../core/auth";
 import { recordDailyAchievement, type Achievement } from "../../storage/achievements";
-import type { DailyResultSave } from "../../storage/dailySave";
+import { readGuestBoardName, saveDailyResult, saveGuestBoardName, type DailyResultSave } from "../../storage/dailySave";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createSitePage } from "../shell/SiteHeader";
@@ -61,6 +61,27 @@ export function keepPlayingGames(result: Pick<DailyResultSave, "rounds">): reado
   return [...lost].sort((a, b) => b[1] - a[1]).slice(0, KEEP_PLAYING_COUNT).map(([game, points]) => ({ game, lost: points }));
 }
 
+type BoardResult = Pick<DailyResultSave, "score" | "timeMs" | "hintsUsed">;
+
+/** Where `result` would place among `entries`, by the board's order: score, then time, then hints. */
+export function dailyPlacement(entries: readonly { readonly result: BoardResult }[], result: BoardResult): number {
+  return 1 + entries.filter(({ result: other }) => other.score !== result.score ? other.score > result.score
+    : other.timeMs !== result.timeMs ? other.timeMs < result.timeMs : other.hintsUsed < result.hintsUsed).length;
+}
+
+/**
+ * The board with this guest's own entry in place. A result kept off other players' boards still
+ * shows to its own player, as it does for accounts (the server can't tell who's viewing).
+ */
+export function withGuestEntry(entries: readonly DailyLeaderboardEntry[], result: DailyResultSave, guestEntry: { readonly id: string; readonly name: string }): readonly DailyLeaderboardEntry[] {
+  const id = `guest:${guestEntry.id}`;
+  if (entries.some((entry) => entry.user.id === id)) return entries;
+  const { rounds: _rounds, version: _version, startTicket: _ticket, guestEntry: _entry, ...publicResult } = result;
+  const own: DailyLeaderboardEntry = { rank: 0, user: { id, username: guestEntry.name, avatarEmoji: null }, result: publicResult, guest: true };
+  const at = dailyPlacement(entries, result) - 1;
+  return [...entries.slice(0, at), own, ...entries.slice(at)].map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
 /** "Tuesday 21 October" / "Tue 21 Oct" for a daily's YYYY-MM-DD date. */
 export function formatDailyDate(date: string, style: "long" | "short" = "long"): string {
   const parsed = new Date(`${date}T12:00:00`);
@@ -91,6 +112,11 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   const leaderboardPanel = el("section", { className: "daily-side-panel daily-leaderboard-panel", children: [el("h2", { text: "Today's leaderboard" }), el("p", { className: "muted", text: "Loading today's leaderboard..." })] });
   const retentionPanel = el("div", { className: "daily-retention-panel", children: [el("p", { className: "muted", text: "Loading daily history..." })] });
   const practiceRounds = result.rounds?.filter((round) => round.points < DAILY_POINTS_PER_ROUND) ?? [];
+  // Signed out, today: where this result would place, and the way onto the board (an account first,
+  // or just a name). Filled in once the board loads.
+  const claimPanel = el("section", { className: "daily-claim", attrs: { hidden: "", "aria-live": "polite", "data-testid": "daily-claim" } });
+  let guestEntry = options.currentUserId ? null : result.guestEntry ?? null;
+  let board: readonly DailyLeaderboardEntry[] | null = null;
 
   function roundExplanation(round: DailyRoundResult): string {
     if (round.missed) return "Passed or revealed · 0 points";
@@ -167,8 +193,12 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     return el("article", { children: [el("span", { text: label }), typeof value === "string" ? el("strong", { text: value }) : value] });
   }
 
-  function playerName(user: { readonly avatarEmoji: string | null; readonly username: string }): HTMLElement {
-    return el("span", { className: "daily-friend-name", children: [el("span", { className: "daily-avatar", text: user.avatarEmoji ?? "", attrs: { "aria-hidden": "true" } }), el("span", { text: user.username })] });
+  function playerName(user: { readonly avatarEmoji: string | null; readonly username: string }, guest = false): HTMLElement {
+    return el("span", { className: "daily-friend-name", children: [
+      el("span", { className: "daily-avatar", text: user.avatarEmoji ?? "", attrs: { "aria-hidden": "true" } }),
+      el("span", { text: user.username }),
+      ...(guest ? [el("span", { className: "daily-guest-tag", text: "guest", attrs: { title: "Posted without an account" } })] : []),
+    ] });
   }
 
   function leaderboardRow(entry: DailyLeaderboardEntry, mine: boolean): HTMLElement {
@@ -176,7 +206,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       className: `daily-history-row daily-board-row${mine ? " is-you" : ""}`,
       children: [
         el("span", { className: "daily-board-rank", text: `#${entry.rank}` }),
-        playerName(entry.user),
+        playerName(entry.user, entry.guest === true),
         ...(mine ? [el("span", { className: "daily-you-pill", text: "You" })] : []),
         el("strong", { text: `${entry.result.score}` }),
         el("span", { className: "daily-board-time", text: formatDailyTime(entry.result.timeMs) }),
@@ -189,13 +219,17 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
     return entries.length >= 100 ? "100+" : String(entries.length);
   }
 
-  function renderLeaderboard(entries: readonly DailyLeaderboardEntry[] | null): void {
+  function renderLeaderboard(loaded: readonly DailyLeaderboardEntry[] | null): void {
+    board = loaded;
+    const entries = loaded && guestEntry ? withGuestEntry(loaded, result, guestEntry) : loaded;
+    renderClaim();
     const heading = el("div", { className: "daily-side-heading", children: [el("h2", { text: isToday ? "Today's leaderboard" : "Leaderboard" }), ...(entries?.length ? [el("span", { className: "muted", text: `${playerCount(entries)} player${entries.length === 1 ? "" : "s"}` })] : [])] });
     if (!entries) {
       leaderboardPanel.replaceChildren(heading, el("p", { className: "muted", text: "Leaderboard is unavailable right now." }));
       return;
     }
-    const mine = options.currentUserId ? entries.find((entry) => entry.user.id === options.currentUserId) : undefined;
+    const myId = options.currentUserId ?? (guestEntry ? `guest:${guestEntry.id}` : null);
+    const mine = myId ? entries.find((entry) => entry.user.id === myId) : undefined;
     if (mine) {
       rankBadge.hidden = false;
       rankBadge.replaceChildren(el("strong", { text: `#${mine.rank}` }), el("span", { text: ` of ${playerCount(entries)} today` }));
@@ -207,6 +241,90 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
       heading,
       el("ol", { className: "daily-history-list daily-leaderboard-list", children: rows.length > 0 ? rows : [el("li", { className: "daily-history-row", text: "No completed results yet." })] }),
     );
+  }
+
+  /** "would place #4 of 38 today" for a result not on the board yet. */
+  function wouldPlace(entries: readonly DailyLeaderboardEntry[]): HTMLElement {
+    const rank = dailyPlacement(entries, result);
+    if (entries.length === 0) return el("p", { className: "daily-claim-headline", children: [el("span", { text: "Nobody's on today's board yet. Your " }), el("strong", { text: String(result.score) }), el("span", { text: " would put you " }), el("strong", { text: "first" }), el("span", { text: "." })] });
+    const outside = entries.length >= 100 && rank > entries.length;
+    return el("p", { className: "daily-claim-headline", children: [
+      el("span", { text: "Your " }), el("strong", { text: String(result.score) }),
+      ...(outside ? [el("span", { text: " would place outside today's top 100." })]
+        : [el("span", { text: " would place " }), el("strong", { text: `#${rank}` }), el("span", { text: ` of ${entries.length >= 100 ? "100+" : entries.length + 1} today.` })]),
+    ] });
+  }
+
+  function renderClaim(): void {
+    // Accounts post automatically; an older day's board is closed.
+    if (options.currentUserId || !isToday || !board) {
+      claimPanel.hidden = true;
+      return;
+    }
+    claimPanel.hidden = false;
+    const signIn = el("button", { className: "shell-btn shell-btn-primary", attrs: { type: "button", "data-action": "claim-sign-in" }, on: { click: () => options.shell.openAccount() }, children: [el("span", { text: guestEntry ? "Sign in" : "Sign in to claim it" })] });
+    if (guestEntry) {
+      claimPanel.replaceChildren(
+        el("p", { className: "daily-claim-headline", children: [el("span", { text: "You're on today's board as " }), el("strong", { text: guestEntry.name }), el("span", { text: "." })] }),
+        el("p", { className: "daily-claim-note", text: "Make an account to keep your streak, see your history on any device and play friends. Today's result comes with you." }),
+        el("div", { className: "daily-claim-actions", children: [signIn] }),
+      );
+      return;
+    }
+    const children: HTMLElement[] = [
+      wouldPlace(board),
+      el("p", { className: "daily-claim-note", text: "Sign in to post it, keep your streak on every device and compare with friends." }),
+    ];
+    // A guest result needs its start ticket so the server has something to check it against.
+    if (!result.startTicket) {
+      claimPanel.replaceChildren(...children, el("div", { className: "daily-claim-actions", children: [signIn] }));
+      return;
+    }
+    const nameInput = el("input", { className: "daily-claim-input", attrs: {
+      type: "text", name: "leaderboard-name", placeholder: "Leaderboard name", "aria-label": "Leaderboard name", autocomplete: "nickname",
+      minlength: "3", maxlength: "20", pattern: "[A-Za-z0-9_\\-]+", required: "", spellcheck: "false", value: readGuestBoardName(options.storage),
+    } }) as HTMLInputElement;
+    const postButton = el("button", { className: "shell-btn shell-btn-quiet", attrs: { type: "submit" }, children: [el("span", { text: "Post" })] }) as HTMLButtonElement;
+    const error = el("p", { className: "daily-claim-error", attrs: { hidden: "", role: "alert" } });
+    const form = el("form", { className: "daily-claim-form", attrs: { hidden: "", "data-testid": "daily-guest-form" }, children: [
+      el("div", { className: "daily-claim-field", children: [nameInput, postButton] }),
+      error,
+      el("p", { className: "daily-claim-fine", text: "Today only, from this device. Sign in later and it moves to your account." }),
+    ] }) as HTMLFormElement;
+    const reveal = el("button", { className: "daily-claim-link", attrs: { type: "button", "data-action": "post-as-guest", "aria-expanded": "false" }, text: "Or post with just a name" });
+    reveal.addEventListener("click", () => {
+      form.hidden = false;
+      reveal.hidden = true;
+      reveal.setAttribute("aria-expanded", "true");
+      nameInput.focus();
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = nameInput.value.trim();
+      postButton.disabled = true;
+      error.hidden = true;
+      void postGuestDailyResult(dailyPayload(), name).then((posted) => {
+        if (destroyed) return;
+        postButton.disabled = false;
+        if ("error" in posted) {
+          error.textContent = posted.error;
+          error.hidden = false;
+          return;
+        }
+        guestEntry = posted.entry;
+        saveGuestBoardName(options.storage, posted.entry.name);
+        saveDailyResult(options.storage, { ...result, guestEntry: posted.entry }, null);
+        void fetchDailyLeaderboard(result.date).then((entries) => {
+          if (!destroyed) renderLeaderboard(entries ?? board);
+        });
+      });
+    });
+    claimPanel.replaceChildren(...children, el("div", { className: "daily-claim-actions", children: [signIn, reveal] }), form);
+  }
+
+  function dailyPayload() {
+    const { version: _version, guestEntry: _entry, ...payload } = result;
+    return payload;
   }
 
   function renderSummary(summary: DailySummary | null): void {
@@ -290,6 +408,7 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
               ],
             }),
             el("div", { className: "daily-result-actions", children: [shareButton, homeButton, ...(isToday ? [nextDaily] : [])] }),
+            claimPanel,
             ...(achievementResult.unlocked.length > 0 ? [el("section", { className: "achievement-panel", children: [
               el("div", { className: "achievement-panel-title", children: [el("span", { className: "eyebrow", text: "Unlocked" }), el("strong", { text: `${achievementResult.unlocked.length} achievement${achievementResult.unlocked.length === 1 ? "" : "s"}` })] }),
               el("div", { className: "achievement-list", children: achievementResult.unlocked.map((achievement: Achievement) => el("article", { className: "achievement-chip", children: [el("strong", { text: achievement.title }), el("span", { text: achievement.description })] })) }),
@@ -312,11 +431,16 @@ export function createDailyResultScreen(options: DailyResultScreenOptions): Scre
   void fetchDailyLeaderboard(result.date).then((entries) => {
     if (!destroyed) renderLeaderboard(entries);
   });
+  // Signed in from here: the daily page reloads as the account, which now holds this result.
+  const offAuth = !options.currentUserId && isToday ? options.shell.onAuthChange?.(() => {
+    if (!destroyed && options.shell.signedIn()) options.shell.openSection("daily");
+  }) : undefined;
 
   return {
     element,
     destroy: () => {
       destroyed = true;
+      offAuth?.();
       if (countdownTimer !== null) window.clearInterval(countdownTimer);
       page.destroy();
     },

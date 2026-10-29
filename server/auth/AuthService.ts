@@ -18,6 +18,7 @@ import { RankedGames, type RankedGamesOptions } from "../ranked/RankedGames";
 import { assessDailyResult, createStartTicket, isCurrentDailyDate, readStartTicket } from "../daily/startTickets";
 import { randomBytes } from "node:crypto";
 import { RATING_START, ratingChanges } from "../../src/core/multiplayer/ratings";
+import { GUEST_DAILY_PREFIX } from "./types";
 import type {
   AuthUser,
   IpBan,
@@ -326,14 +327,50 @@ export class AuthService {
    * its start ticket; one that fails stays visible to its own player but off everyone else's boards.
    */
   saveDailyResult(userId: string, result: DailyChallengeResult, startTicket?: unknown): DailyChallengeResult {
+    const ticket = readStartTicket(this.dailyTicketSecret(), startTicket);
+    // Posted as a guest, then signed in: the account's result takes over from the guest one.
+    if (ticket) this.dropGuestDaily(result.date, ticket.nonce);
     const existing = this.store.getDailyResult(userId, result.date);
     if (existing) return existing;
     const saved = this.store.saveDailyResult(userId, result, false);
-    const ticket = readStartTicket(this.dailyTicketSecret(), startTicket);
     const reused = ticket !== null && this.store.isDailyStartUsed(result.date, ticket.nonce, userId);
     const hiddenReason = assessDailyResult(saved, ticket, this.clock(), reused);
     this.store.setDailyReview(userId, result.date, { hiddenReason, startNonce: ticket?.nonce ?? null });
     return saved;
+  }
+
+  private dropGuestDaily(date: string, startNonce: string): void {
+    for (const [key, review] of this.store.listDailyReviews(date)) {
+      if (key.startsWith(GUEST_DAILY_PREFIX) && review.startNonce === startNonce) this.store.deleteGuestDailyResult(key.slice(GUEST_DAILY_PREFIX.length));
+    }
+  }
+
+  /**
+   * Posts today's daily without an account, under just a name. It needs the start ticket from the
+   * attempt (so there's something to check it against) and is reviewed like an account's result.
+   * Posting the same attempt again returns the entry it already made.
+   */
+  postGuestDaily(nameInput: unknown, result: DailyChallengeResult, startTicket: unknown): { readonly entry: { readonly id: string; readonly name: string } } | { readonly status: number; readonly error: string } {
+    const name = normalizeUsername(nameInput);
+    if (!name) return { status: 400, error: `Names are ${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters using letters, numbers, _ or -.` };
+    const now = this.clock();
+    if (!isCurrentDailyDate(result.date, now)) return { status: 400, error: "Only today's daily can be posted without an account." };
+    const ticket = readStartTicket(this.dailyTicketSecret(), startTicket);
+    if (!ticket || ticket.date !== result.date) return { status: 400, error: "This result can't be checked, so it needs an account. Sign in to post it." };
+    const reviews = this.store.listDailyReviews(result.date);
+    const previous = [...reviews].find(([key, review]) => key.startsWith(GUEST_DAILY_PREFIX) && review.startNonce === ticket.nonce);
+    if (previous) {
+      const existing = this.store.listGuestDailyResults(result.date).find((entry) => `${GUEST_DAILY_PREFIX}${entry.id}` === previous[0]);
+      if (existing) return { entry: { id: existing.id, name: existing.name } };
+    }
+    // A guest name can't pass for an account on the board.
+    if (this.store.findUserByUsername(name)) return { status: 409, error: "That name belongs to an account. Pick another, or sign in." };
+    const id = randomBytes(9).toString("base64url");
+    const { rounds: _rounds, ...publicResult } = result;
+    const reused = this.store.isDailyStartUsed(result.date, ticket.nonce, `${GUEST_DAILY_PREFIX}${id}`);
+    this.store.saveGuestDailyResult({ id, name, result: publicResult, postedAt: now });
+    this.store.setDailyReview(`${GUEST_DAILY_PREFIX}${id}`, result.date, { hiddenReason: assessDailyResult(result, ticket, now, reused), startNonce: ticket.nonce });
+    return { entry: { id, name } };
   }
 
   /** Results on `date` that other players can see; `viewerId` always sees their own. */
@@ -371,10 +408,14 @@ export class AuthService {
   }
 
   getDailyLeaderboard(date: string, limit = 100, viewerId: string | null = null): readonly DailyLeaderboardEntry[] {
-    return this.visibleDailyResults(date, this.store.listDailyResultsForDate(date), viewerId)
-      .map((entry) => {
-        const user = this.store.findUserById(entry.userId);
+    const guests = new Map(this.store.listGuestDailyResults(date).map((entry) => [`${GUEST_DAILY_PREFIX}${entry.id}`, entry]));
+    const entries = [...this.store.listDailyResultsForDate(date), ...[...guests].map(([userId, entry]) => ({ userId, result: entry.result }))];
+    return this.visibleDailyResults(date, entries, viewerId)
+      .map((entry): Omit<DailyLeaderboardEntry, "rank"> | null => {
         const { rounds: _rounds, ...publicResult } = entry.result;
+        const guest = guests.get(entry.userId);
+        if (guest) return { user: { id: entry.userId, username: guest.name, avatarEmoji: null }, result: publicResult, guest: true };
+        const user = this.store.findUserById(entry.userId);
         return user ? { user: this.toPublicUser(user), result: publicResult } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)

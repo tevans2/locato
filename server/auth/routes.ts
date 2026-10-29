@@ -100,13 +100,11 @@ function isDurationMs(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 86_400_000;
 }
 
-// Start tickets are cheap and stateless, but nobody needs more than a handful an hour.
-const dailyStartLimiter = (() => {
-  const LIMIT = 60;
+function windowLimiter(limit: number, windowMs: number) {
   const counts = new Map<string, { window: number; count: number }>();
   return {
     take(key: string, now: number): boolean {
-      const window = Math.floor(now / 3_600_000);
+      const window = Math.floor(now / windowMs);
       const entry = counts.get(key);
       if (!entry || entry.window !== window) {
         if (counts.size > 20_000) counts.clear();
@@ -114,10 +112,15 @@ const dailyStartLimiter = (() => {
         return true;
       }
       entry.count += 1;
-      return entry.count <= LIMIT;
+      return entry.count <= limit;
     },
   };
-})();
+}
+
+// Start tickets are cheap and stateless, but nobody needs more than a handful an hour.
+const dailyStartLimiter = windowLimiter(60, 3_600_000);
+// One daily a day per player; a household or classroom shares an address, so allow a few.
+const guestDailyLimiter = windowLimiter(12, 86_400_000);
 
 function isDailyDate(v: unknown): v is string {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -305,6 +308,18 @@ export async function handleAuthRequest(request: Request, url: URL, service: Aut
     if (!body || !isDailyDate(body.date)) return json({ error: "Invalid daily challenge date." }, 400);
     const started = service.startDaily(body.date);
     return "error" in started ? json({ error: started.error }, 400) : json(started);
+  }
+
+  // Today's daily without an account: a name instead of a sign-in (accounts are still the main path).
+  if (pathname === "/api/daily/guest" && method === "POST") {
+    if (!guestDailyLimiter.take(ip(request), Date.now())) return json({ error: "Too many results from your network today. Sign in to post." }, 429);
+    const body = await readJsonBody(request);
+    const result = body ? parseDailyResult(body) : null;
+    if (!body || !result) return json({ error: "Invalid daily challenge result." }, 400);
+    const posted = service.postGuestDaily(body.name, result, body.startTicket);
+    if ("error" in posted) return json({ error: posted.error }, posted.status);
+    log("info", "daily.guest-recorded", { ip: ip(request), entryId: posted.entry.id, date: result.date, score: result.score });
+    return json(posted);
   }
 
   const dailyMatch = pathname.match(/^\/api\/daily\/(\d{4}-\d{2}-\d{2})$/);

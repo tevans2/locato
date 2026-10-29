@@ -281,7 +281,7 @@ export function createApp(options: AppOptions): App {
   }
 
   function dailyLocalResultToAccount(result: DailyResultSave): DailyChallengeResult & { readonly startTicket?: string } {
-    const { version: _version, ...payload } = result;
+    const { version: _version, guestEntry: _guestEntry, ...payload } = result;
     return payload;
   }
 

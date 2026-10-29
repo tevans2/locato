@@ -66,7 +66,9 @@ function DailyBoard({ client, onOpenUser, helpers }: { client: AdminClient; onOp
               {board.data.entries.map((entry) => (
                 <tr key={entry.user.id} className={entry.flags.length || entry.hidden ? "is-flagged" : undefined}>
                   <td className="num">{entry.rank}</td>
-                  <td><button type="button" className="adm-link-btn" onClick={() => onOpenUser(entry.user.id)}>{entry.user.displayName}</button><div className="adm-muted adm-small">{entry.user.email}</div></td>
+                  <td>{entry.guest
+                    ? <>{entry.user.displayName} <Badge tone="neutral" title="Posted with just a name, no account">Guest</Badge></>
+                    : <><button type="button" className="adm-link-btn" onClick={() => onOpenUser(entry.user.id)}>{entry.user.displayName}</button><div className="adm-muted adm-small">{entry.user.email}</div></>}</td>
                   <td className="num">{entry.result.score}</td>
                   <td className="num">{formatDuration(entry.result.timeMs)}</td>
                   <td className="num">{entry.result.hintsUsed}</td>
