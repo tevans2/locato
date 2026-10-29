@@ -57,22 +57,26 @@ describe("game engine", () => {
     expect(state.streak).toBe(streakState.streak);
   });
 
-  it("returns a country fact before the direct name-shape hint", () => {
+  it("returns a region hint before the border and name-shape hints", () => {
     const { countryIndex, engine } = createFixtureGame();
     const current = getCurrentCountry(countryIndex, engine.getState());
 
     const firstHint = engine.dispatch({ type: "REQUEST_HINT", now: 1060 })[0];
     const secondHint = engine.dispatch({ type: "REQUEST_HINT", now: 1070 })[0];
+    const thirdHint = engine.dispatch({ type: "REQUEST_HINT", now: 1080 })[0];
 
     expect(firstHint?.type).toBe("HINT_REVEALED");
     expect(secondHint?.type).toBe("HINT_REVEALED");
-    if (firstHint?.type !== "HINT_REVEALED" || secondHint?.type !== "HINT_REVEALED") return;
-    expect(firstHint.hint.title).toBe("Country note");
-    expect(secondHint.hint.title).toBe("Name shape");
+    expect(thirdHint?.type).toBe("HINT_REVEALED");
+    if (firstHint?.type !== "HINT_REVEALED" || secondHint?.type !== "HINT_REVEALED" || thirdHint?.type !== "HINT_REVEALED") return;
+    expect(firstHint.hint.title).toBe("Where in the world");
+    expect(secondHint.hint.title).toBe("Land borders");
+    expect(thirdHint.hint.title).toBe("Name shape");
     expect(firstHint.hint.message).not.toContain(current!.name);
-    expect(secondHint.hint.message).toContain(`Starts with “${current!.name.charAt(0).toUpperCase()}”`);
-    expect(secondHint.hint.message).toContain(`${current!.name.replace(/[^A-Za-z]/g, "").length} letters`);
-    expect(engine.getState().hintLevel).toBe(2);
+    expect(secondHint.hint.message).not.toContain(current!.name);
+    expect(thirdHint.hint.message).toContain(`Starts with “${current!.name.charAt(0).toUpperCase()}”`);
+    expect(thirdHint.hint.message).toContain(`${current!.name.replace(/[^A-Za-z]/g, "").length} letters`);
+    expect(engine.getState().hintLevel).toBe(3);
   });
 
   it("accepts punctuation-heavy abbreviations and close misspellings on submit", () => {
