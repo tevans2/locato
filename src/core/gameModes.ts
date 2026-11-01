@@ -47,7 +47,7 @@ export const worldMapGameModeOptions: readonly GameModeOption[] = [
   },
   {
     id: "click-country",
-    label: "Click on the country",
+    label: "Click the country",
     description: "A random country name appears; click the matching country on the map.",
     group: "World map games",
   },

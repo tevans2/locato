@@ -23,6 +23,8 @@ export interface FocusBarOptions {
   readonly closeLabel: string;
   /** Optional small title beside ✕ (hidden on phones by default styling). */
   readonly title?: string;
+  /** "h1" when the title is the page's heading (a lesson); otherwise it's a plain label. */
+  readonly titleTag?: "h1" | "p";
   /** 0..1 for the built-in bar, or your own element (e.g. placement's step dots). Omit for none. */
   readonly progress?: number | HTMLElement;
   /** Accessible name of the built-in progress bar. Default "Progress". */
@@ -106,7 +108,7 @@ export function createFocusBar(options: FocusBarOptions): FocusBarHandle {
 
   const element = el("header", {
     className: classes.root,
-    children: [close, ...(options.title ? [el("p", { className: classes.title, text: options.title })] : []), progressWrap],
+    children: [close, ...(options.title ? [el(options.titleTag ?? "p", { className: classes.title, text: options.title })] : []), progressWrap],
   });
   return { element, close, progressWrap, setProgress, setProgressElement, setTrailing };
 }

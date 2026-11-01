@@ -7,7 +7,7 @@ import type { ShellContext } from "../src/ui/shell/types";
 import type { AtlasHover } from "../src/ui/components/landing/renderAtlasGlobe";
 import { createDailyResultSave, dailyProgressKey, dailySaveKey } from "../src/storage/dailySave";
 import { getLocalDailyDate } from "../src/core/dailyChallenge";
-import { untilNextDaily } from "../src/ui/screens/LandingScreen";
+import { mergeAccountDaily, untilNextDaily } from "../src/ui/screens/LandingScreen";
 
 const globeMock = vi.hoisted(() => ({
   reset: vi.fn(), selectCountry: vi.fn(), destroy: vi.fn(),
@@ -218,5 +218,22 @@ describe("Landing daily hero", () => {
   it("counts down to local midnight", () => {
     expect(untilNextDaily(new Date(2026, 9, 28, 14, 48))).toBe("9h 12m");
     expect(untilNextDaily(new Date(2026, 9, 28, 23, 59, 30))).toBe("1m");
+  });
+});
+
+describe("mergeAccountDaily", () => {
+  const local = { done: false, roundsPlayed: 3, streak: 2, result: null };
+  const today = { date: "2026-10-30", seed: "s", score: 74, timeMs: 90_000, hintsUsed: 0, marks: ["correct", "miss"] as const, shareText: "", completedAt: 1 };
+
+  it("marks today done from the account when this device never played it", () => {
+    const merged = mergeAccountDaily(local, { history: [today], streak: 7, best: null, friendsToday: [] }, "2026-10-30");
+    expect(merged).toMatchObject({ done: true, roundsPlayed: 0, streak: 7 });
+    expect(merged.result?.score).toBe(74);
+    expect(merged.result?.shareText).toContain("74");
+  });
+
+  it("keeps the device's progress when the account hasn't finished today", () => {
+    expect(mergeAccountDaily(local, { history: [], streak: 1, best: null, friendsToday: [] }, "2026-10-30")).toEqual({ ...local, streak: 2 });
+    expect(mergeAccountDaily(local, null, "2026-10-30")).toBe(local);
   });
 });

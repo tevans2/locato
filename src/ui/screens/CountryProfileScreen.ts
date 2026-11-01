@@ -174,7 +174,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function createCountryProfileScreen(options: CountryProfileScreenOptions): Screen {
-  const previousTitle = document.title;
   const profile = getCountryProfile(options.code);
   const ordered = sortedProfiles();
   const cleanups: (() => void)[] = [];
@@ -737,7 +736,6 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
       for (const search of searches) search.destroy();
       locator?.destroy();
       siteHeader?.destroy();
-      document.title = previousTitle;
     },
   };
 }

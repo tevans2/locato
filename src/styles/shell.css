@@ -10,9 +10,12 @@
 :root {
   --shell-gutter: clamp(16px, 4vw, 48px);
   --shell-max: 1320px;
-  --shell-content-max: 1180px;
+  /* One column for every site page, aligned with the header logo (pages used to sit 70px further in). */
+  --shell-content-max: var(--shell-max);
   --shell-bar-h: 68px;
   --shell-tabbar-h: 62px;
+  /* Height of the sticky site header: the bar, plus the tab row where tabs sit on top (phones). */
+  --shell-header-h: var(--shell-bar-h);
   --shell-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --shell-glass: color-mix(in srgb, var(--bg) 84%, transparent);
   --shell-tile-clues: var(--accent-soft);
@@ -377,7 +380,7 @@
     bottom: 0;
     z-index: 90;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 5px max(6px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
@@ -409,7 +412,7 @@
   #app .shell-tab-icon .shell-icon { width: 21px; height: 21px; }
 
   #app .shell-tab-label {
-    font-size: 0.66rem;
+    font-size: .75rem;
     font-weight: 700;
     letter-spacing: 0.01em;
     line-height: 1;
@@ -428,6 +431,24 @@
   #app .shell-heading-title { font-size: clamp(1.9rem, 8.4vw, 2.4rem); }
   #app .shell-heading-sub { font-size: 0.92rem; }
   #app .shell-page-main { padding-bottom: 40px; }
+
+  /* iPhone browsers keep their own toolbar at the bottom, which overlaps or shoves a fixed bottom
+     bar, so there the tabs become a compact second row of the sticky header (main.ts sets the class;
+     a home-screen install has no toolbar and keeps the bottom bar). */
+  :root.has-top-tabs { --shell-tabbar-h: 0px; --shell-header-h: calc(var(--shell-bar-h) + 46px); }
+  :root.has-top-tabs #app.app-shell:has(.shell-tabbar) { padding-bottom: env(safe-area-inset-bottom); }
+  :root.has-top-tabs #app .shell-tabbar {
+    position: static;
+    height: 46px;
+    padding: 0 max(6px, env(safe-area-inset-right)) 2px max(6px, env(safe-area-inset-left));
+    border-top: 1px solid var(--border);
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  :root.has-top-tabs #app .shell-tab { min-height: 44px; gap: 2px; }
+  :root.has-top-tabs #app .shell-tab-icon { width: 38px; height: 22px; }
+  :root.has-top-tabs #app .shell-tab-icon .shell-icon { width: 18px; height: 18px; }
 }
 
 /* ---------- GameBar ---------- */
@@ -489,7 +510,7 @@
 
 #app .shell-switcher-group {
   color: var(--muted);
-  font-size: 0.62rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   line-height: 1;
@@ -680,7 +701,7 @@
 #app .shell-menu-heading {
   padding: 8px 10px 4px;
   color: var(--subtle);
-  font-size: 0.62rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -694,7 +715,7 @@
   #app .shell-switcher-icon { width: 34px; height: 34px; border-radius: 9px; }
   #app .shell-switcher-icon .shell-icon { width: 17px; height: 17px; }
   #app .shell-switcher-name { font-size: 0.95rem; }
-  #app .shell-run-pill { height: 32px; padding: 0 10px; font-size: 0.72rem; }
+  #app .shell-run-pill { height: 32px; padding: 0 10px; font-size: .75rem; }
   #app .shell-run-option { padding: 0 7px; }
   /* Mid-run the clock says "timed" on its own. */
   #app .shell-run-option.is-timed.is-active:has(.shell-run-clock:not(:empty)) .shell-icon { display: none; }
@@ -860,7 +881,7 @@
 
 #shell-layer .shell-picker-group-head h3 {
   color: var(--brand);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -934,7 +955,7 @@
   border-radius: 999px;
   background: var(--brand);
   color: var(--on-brand);
-  font-size: 0.6rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1071,7 +1092,7 @@
 
 #app .shell-results-kicker {
   color: var(--brand);
-  font-size: 0.7rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1111,7 +1132,7 @@
 
 #app .shell-results-stat dt {
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1138,7 +1159,7 @@
 #app .shell-results-missed h3 {
   margin-bottom: 10px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1252,3 +1273,44 @@
 #app .shell-heading-link:hover { border-color: var(--brand); background: var(--accent-soft); }
 #app .shell-heading-link .shell-icon { color: var(--brand); transition: transform 180ms var(--shell-ease); }
 #app .shell-heading-link:hover .shell-icon { transform: translateX(2px); }
+
+/* ---------- Touch targets ---------- */
+
+/* On touch screens every compact control gets an invisible hit area of at least 44px, so the bars
+   keep their density but taps still land. */
+@media (pointer: coarse) {
+  :is(#app, #shell-layer) :is(.shell-icon-btn, .shell-controls .auth-trigger, .shell-gamebar-back, .shell-run-option, .shell-chip, .shell-back, .shell-heading-link),
+  .world-map-control-button { position: relative; }
+
+  :is(#app, #shell-layer) :is(.shell-icon-btn, .shell-controls .auth-trigger, .shell-gamebar-back, .shell-run-option, .shell-chip, .shell-back, .shell-heading-link)::after,
+  .world-map-control-button::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  .world-map-control-button { min-width: 40px; min-height: 40px; }
+}
+
+/* Phones: the game's name gets two lines instead of an ellipsis ("Name …"); the group label
+   (MAP / CLUES) gives up its row for it. */
+@media (max-width: 700px) {
+  #app .shell-switcher-group { display: none; }
+  #app .shell-switcher-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    font-size: 0.9rem;
+    line-height: 1.12;
+  }
+}
+@media (max-width: 420px) {
+  /* Narrow phones: the name matters more than the mode's tile icon beside it. */
+  #app .shell-gamebar .shell-switcher-icon { display: none; }
+}

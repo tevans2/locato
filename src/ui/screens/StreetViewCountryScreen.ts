@@ -268,7 +268,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const submitButton = el("button", { className: "primary-action", text: "Guess", attrs: { type: "submit" } });
   const nextRoundButton = el("button", { className: "primary-action", text: "Next round", attrs: { type: "button" } });
   const fullscreenButton = el("button", { className: "ghost-action streetview-fullscreen-action", text: "Fullscreen", attrs: { type: "button", "aria-pressed": "false" } });
-  const revealButton = el("button", { className: "ghost-action", text: "Reveal", attrs: { type: "button" } });
+  const revealButton = el("button", { className: "ghost-action", text: "Reveal answer", attrs: { type: "button" } });
   const feedback = createFeedbackView();
   const loadingOverlay = el("div", {
     className: "streetview-loader",
@@ -312,7 +312,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const answerPanel = el("aside", {
     className: "answer-panel streetview-panel",
     children: [
-      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? `${options.dailyChallenge?.practice ? "Daily practice" : "Daily challenge"} · Street View` : "Street View country" }), el("h2", { text: "Guess the country" })] }),
+      el("div", { className: "panel-title", children: [el("span", { className: "eyebrow", text: isDailyChallenge ? `${options.dailyChallenge?.practice ? "Daily practice" : "Daily challenge"} · Street View` : "Street View country" }), el("h1", { text: "Guess the country" })] }),
       el("p", {
         className: "streetview-rules",
         text: isDailyChallenge
@@ -325,7 +325,9 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       statsPanel,
       feedback.element,
       roundResult,
-      el("div", { className: "actions", children: [fullscreenButton, nextRoundButton, revealButton] }),
+      el("div", { className: "actions", children: [fullscreenButton, nextRoundButton] }),
+      // Revealing ends the round, so it's a quiet link rather than a peer of Fullscreen.
+      el("div", { className: "solo-quiet-actions", children: [revealButton] }),
     ],
   });
   const layout = el("div", {
@@ -899,7 +901,7 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   bindKeyboardAwareInput(element, input, controller.signal);
 
   render();
-  if (!apiKey) showFeedback(feedback, "Street View is unavailable right now. Try another game or use Reveal to continue.", "neutral");
+  if (!apiKey) showFeedback(feedback, "Street View is unavailable right now. Try another game or use Reveal answer to continue.", "neutral");
   warmRoundCache();
   queueMicrotask(() => input.focus());
 

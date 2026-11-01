@@ -2,6 +2,7 @@ import { createApp } from "./app/createApp";
 import { indexCountries, rawCountries, validateCountries } from "./core/countries";
 import { initializeTheme } from "./ui/theme";
 import { initAnalytics } from "./app/analytics";
+import { isAppleTouchDevice } from "./ui/dom/mobileKeyboard";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/layout.css";
@@ -24,6 +25,10 @@ import "./styles/geoguessr-play.css";
 const root = document.getElementById("app");
 
 initializeTheme(window.localStorage);
+// iPhone browsers put their toolbar at the bottom, so phone tabs go in the header there (shell.css).
+// Not in a home-screen install, which has no browser toolbar.
+const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+document.documentElement.classList.toggle("has-top-tabs", isAppleTouchDevice() && !standalone);
 // Before the app rewrites the URL, so UTM tags and ?ref= are still there to read.
 initAnalytics();
 

@@ -58,7 +58,7 @@ it.each(["flags", "flag-colors", "shapes", "codes", "capitals", "capital-recall"
   for (let index = 0; index < 2; index++) {
     ui.advance();
     ui.$<HTMLInputElement>("#guess-input").value = ui.answer().answer!;
-    ui.button("Enter").click(); ui.button("Enter").click(); // A double Enter must not answer the next clue.
+    ui.button("Guess").click(); ui.button("Guess").click(); // A double Enter must not answer the next clue.
     await vi.waitFor(() => expect(ui.state().index).toBe(index + 1));
   }
   await ui.posted();
@@ -81,7 +81,7 @@ it("keeps Hint and Pass working without exposing the upcoming answer", async () 
   expect(ui.state().index).toBe(0);
   expect(ui.state().hints).toBe(0);
   for (let i = 0; i < 2; i++) {
-    ui.advance(); ui.$<HTMLInputElement>("#guess-input").value = ui.answer().answer!; ui.button("Enter").click();
+    ui.advance(); ui.$<HTMLInputElement>("#guess-input").value = ui.answer().answer!; ui.button("Guess").click();
     await vi.waitFor(() => expect(ui.state().index).toBe(i + 1));
   }
   await ui.posted();

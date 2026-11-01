@@ -245,7 +245,7 @@ export function createAcademyScreen(options: AcademyScreenOptions): Screen {
           children: [
             el("div", {
               className: `academy-stat${streak > 0 ? " is-lit" : ""}`,
-              children: [hubIcon("flame"), el("dt", { text: "Day streak" }), el("dd", { text: String(streak) })],
+              children: [hubIcon("flame"), el("dt", { text: "Learning streak" }), el("dd", { text: String(streak) })],
             }),
             el("div", {
               className: "academy-stat",

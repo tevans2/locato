@@ -7,14 +7,16 @@
   --border: rgba(25, 35, 31, 0.14);
   --border-strong: rgba(25, 35, 31, 0.3);
   --text: #253e30;
-  --muted: #687264;
-  --subtle: #8a948e;
+  --muted: #5f695b;
+  --subtle: #646d67;
   --accent: #bbcf91;
+  /* --accent is a fill colour; this is the same hue dark enough to read as text (4.5:1+). */
+  --accent-text: #4f6b2c;
   --accent-soft: #e7edda;
   --earth: #3b7567;
   --route: #b9734d;
   --good: #5f9728;
-  --bad: #c94f35;
+  --bad: #b8462e;
   --sea: #c9e0df;
   --land: #f7f5eb;
   --radius-sm: 8px;
@@ -77,8 +79,9 @@
   --border-strong: rgba(226, 234, 225, 0.28);
   --text: #efefdd;
   --muted: #adb9a6;
-  --subtle: #748078;
+  --subtle: #94a097;
   --accent: #b9d18f;
+  --accent-text: #b9d18f;
   --accent-soft: #2c3e2b;
   /* Dark map palette: preserves the previous always-dark renderer values. */
   --map-ocean-top: #121a10;

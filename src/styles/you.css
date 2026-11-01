@@ -141,7 +141,7 @@
 #app .you-achievement-copy { min-width: 0; display: grid; gap: 4px; }
 #app .you-achievement-copy strong { font-size: 0.95rem; font-weight: 780; }
 #app .you-achievement-copy > span { color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
-#app .you-achievement-copy > .you-achievement-state { margin-top: 2px; color: var(--brand); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+#app .you-achievement-copy > .you-achievement-state { margin-top: 2px; color: var(--brand); font-size: .75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 #app .you-achievement.is-locked .you-achievement-copy strong { color: var(--muted); }
 #app .you-achievement.is-locked .you-achievement-state { color: var(--subtle); }
 
@@ -151,3 +151,19 @@
   #app .you-achievements-summary { grid-template-columns: minmax(0, 1fr); }
   #app .you-achievement-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
+
+#app .you-device-stats { display: grid; gap: 12px; margin-bottom: 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+#app .you-device-stats h2 { margin: 0; font-family: var(--font-editorial); font-size: 1.3rem; font-weight: 500; }
+#app .you-device-stats dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
+#app .you-device-stats dl > div { padding: 12px 14px; border-radius: 10px; background: var(--surface-soft); }
+#app .you-device-stats dt { color: var(--muted); font-size: .75rem; font-weight: 700; }
+#app .you-device-stats dd { margin: 4px 0 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Account (avatar, sign out) sits beside the title: the header avatar opens these pages now. */
+#app .you-page .you-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 16px; }
+#app .you-page .you-heading > .shell-heading-sub { grid-column: 1 / -1; }
+#app .you-page .you-account-btn { min-height: 40px; padding: 0 16px; border: 1px solid var(--border-strong); background: var(--surface); }
+#app .you-page .you-account-btn[hidden] { display: none; }
+#app .you-page .you-account-btn[hidden] ~ .shell-heading-sub, #app .you-page .you-heading:has(.you-account-btn[hidden]) > .shell-heading-title { grid-column: 1 / -1; }
+/* The header avatar marks the You section the way the nav marks the others. */
+#app .shell-site-header[data-section="you"] .auth-trigger.is-authenticated { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }

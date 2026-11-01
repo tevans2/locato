@@ -4,7 +4,9 @@ import { getCategory } from "../../core/categories";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
 import { createSitePage } from "../shell/SiteHeader";
-import { ACHIEVEMENTS, getUnlockedAchievements } from "../../storage/achievements";
+import { ACHIEVEMENTS, getAchievementState, getUnlockedAchievements } from "../../storage/achievements";
+import { readAcademyProgress } from "../../storage/academySave";
+import { academyLevel } from "../../core/academy/mastery";
 import { createYouHeading, createYouTabs, type YouTab } from "../components/youTabs";
 import "../../styles/you.css";
 
@@ -204,6 +206,27 @@ export function signInPrompt(shell: ShellContext, title: string, copy: string): 
   });
 }
 
+/**
+ * A guest's Stats page: what this browser already knows (dailies, streak, achievements, Academy),
+ * so the page has something to show and signing in has something to keep. Null when there's nothing yet.
+ */
+export function buildDeviceSummary(storage: Storage | undefined): HTMLElement | null {
+  if (!storage) return null;
+  const state = getAchievementState(storage);
+  const mastered = academyLevel(readAcademyProgress(storage)).mastered;
+  const items: readonly [string, string][] = [
+    ["Dailies played", String(state.dailyDates.length)],
+    ["Best daily streak", String(state.bestDailyStreak)],
+    ["Achievements", `${state.unlockedIds.length}/${ACHIEVEMENTS.length}`],
+    ["Countries mastered", String(mastered)],
+  ];
+  if (state.dailyDates.length === 0 && state.unlockedIds.length === 0 && mastered === 0) return null;
+  return el("section", { className: "you-device-stats", attrs: { "aria-labelledby": "you-device-stats-title" }, children: [
+    el("h2", { text: "On this device", attrs: { id: "you-device-stats-title" } }),
+    el("dl", { children: items.map(([label, value]) => el("div", { children: [el("dt", { text: label }), el("dd", { text: value })] })) }),
+  ] });
+}
+
 /** Every achievement: unlocked ones first, locked ones dimmed with how to earn them. */
 export function buildAchievements(storage: Storage | undefined): HTMLElement {
   const unlocked = new Set(storage ? getUnlockedAchievements(storage).map((a) => a.id) : []);
@@ -260,7 +283,7 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
   let tab: Exclude<YouTab, "friends"> = options.initialTab ?? "stats";
   let destroyed = false;
 
-  const heading = createYouHeading(TAB_COPY[tab].title, TAB_COPY[tab].subtitle);
+  const heading = createYouHeading(TAB_COPY[tab].title, TAB_COPY[tab].subtitle, shell);
   const content = el("div", { className: "stats-content you-panel", attrs: { id: "stats-panel" } });
   const achievementsPanel = el("div", { className: "you-panel", attrs: { id: "achievements-panel" } });
 
@@ -290,7 +313,10 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
   function loadStats(): void {
     const request = ++statsRequest;
     if (!shell.signedIn()) {
-      content.replaceChildren(signInPrompt(shell, "Sign in to see your stats", "Accuracy, best streaks, world-map times and multiplayer wins are saved to your account."));
+      const device = buildDeviceSummary(options.storage);
+      content.replaceChildren(...(device ? [device] : []), signInPrompt(shell, device ? "Keep these with an account" : "Sign in to see your stats", device
+        ? "Sign in to save this device's progress, and add accuracy, best times and multiplayer wins from every device."
+        : "Accuracy, best streaks, world-map times and multiplayer wins are saved to your account."));
       return;
     }
     content.replaceChildren(el("p", { className: "stats-loading", text: "Loading stats…" }));
@@ -312,6 +338,7 @@ export function createStatsScreen(options: StatsScreenOptions): Screen {
     destroy: () => {
       destroyed = true;
       unsubscribeAuth?.();
+      heading.destroy();
       page.destroy();
     },
   };

@@ -26,6 +26,7 @@ export interface GeoStreetView {
 export function createGeoStreetView(signal: AbortSignal): GeoStreetView {
   const element = document.createElement("div");
   element.className = "geo-panorama";
+  element.setAttribute("role", "region");
   element.setAttribute("aria-label", "Explore the mystery location in Street View");
   let panorama: Panorama | null = null;
   let startingPano = "";

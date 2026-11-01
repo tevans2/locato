@@ -79,7 +79,11 @@ export function createProfileLocator(options: ProfileLocatorOptions): ProfileLoc
     if (!country) continue;
     if (country.code === profile.code) path.classList.add("is-cp-self");
     else if (neighbourSet.has(country.code)) path.classList.add("is-cp-neighbour");
-    path.setAttribute("aria-label", country.name);
+    // A hover tooltip, not aria-label (prohibited on a role-less path); the svg's own label
+    // describes the map for screen readers, and the page lists the neighbours as links.
+    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.textContent = country.name;
+    path.replaceChildren(title);
   }
   const selfPath = selfCountry ? view.pathByCountryId.get(selfCountry.id) : undefined;
   // Draw the country above its neighbours so its full outline stroke shows.

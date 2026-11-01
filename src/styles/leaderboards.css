@@ -76,7 +76,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -129,7 +129,7 @@
 
 #leaderboards .lb-field-label {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -222,7 +222,7 @@
 
 #leaderboards .lb-modes-label {
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -329,7 +329,7 @@
 
 #leaderboards .lb-eyebrow {
   color: var(--brand);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -408,7 +408,7 @@
 
 #leaderboards .lb-variants-label {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -580,7 +580,7 @@
 #leaderboards .lb-board-columns {
   padding: 4px 14px 4px 6px;
   color: var(--subtle);
-  font-size: 0.66rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -623,7 +623,7 @@
   border-radius: 999px;
   background: var(--brand);
   color: var(--on-brand);
-  font-size: 0.64rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -741,7 +741,7 @@
   #leaderboards .lb-modes::-webkit-scrollbar { display: none; }
   #leaderboards .lb-modes-group { flex: none; display: flex; align-items: center; gap: 6px; }
   #leaderboards .lb-modes-group + .lb-modes-group { padding: 0 0 0 14px; border-top: 0; border-left: 1px solid var(--border); }
-  #leaderboards .lb-modes-label { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.58rem; letter-spacing: 0.12em; }
+  #leaderboards .lb-modes-label { font-size: .75rem; letter-spacing: 0.08em; }
   #leaderboards .lb-modes-list { flex-wrap: nowrap; }
 
   #leaderboards .lb-board-head { grid-template-columns: minmax(0, 1fr); }
@@ -753,9 +753,9 @@
 
   #leaderboards .lb-card { padding: 14px; border-radius: 16px; }
 
-  /* Leaderboards: the call to action sits just above the TabBar, always in reach. */
-  #leaderboards .lb-lb { gap: 12px; padding-bottom: 76px; animation-name: lb-fade-in; }
-  #leaderboards .lb-board { --lb-board-pad: 16px; --lb-pin-bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 80px); border-radius: 22px; }
+  /* The call to action stays in the board's head, in flow, so it never covers the podium. */
+  #leaderboards .lb-lb { gap: 12px; animation-name: lb-fade-in; }
+  #leaderboards .lb-board { --lb-board-pad: 16px; --lb-pin-bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 10px); border-radius: 22px; }
   #leaderboards .lb-board-head { gap: 12px; padding-top: 20px; border-radius: 22px 22px 0 0; }
   #leaderboards .lb-board-intro { gap: 12px; }
   #leaderboards .lb-board-icon { width: 44px; height: 44px; border-radius: 13px; margin-top: 2px; }
@@ -764,16 +764,7 @@
   #leaderboards .lb-attempt { font-size: 0.92rem; }
   #leaderboards .lb-practise { justify-self: start; }
 
-  #leaderboards .lb-cta .lb-play {
-    position: fixed;
-    left: var(--shell-gutter);
-    right: var(--shell-gutter);
-    bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 10px);
-    z-index: 85;
-    width: auto;
-    min-height: 54px;
-    box-shadow: 0 12px 30px color-mix(in srgb, var(--brand) 38%, transparent), 0 0 0 5px color-mix(in srgb, var(--bg) 70%, transparent);
-  }
+  #leaderboards .lb-cta .lb-play { min-height: 52px; }
 
   #leaderboards .lb-variants { display: grid; gap: 8px; }
   #leaderboards .lb-segments { width: max-content; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }

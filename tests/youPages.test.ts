@@ -54,10 +54,21 @@ describe("Stats page", () => {
   it("is a You site page with Stats · Friends · Achievements tabs", () => {
     const ui = mountStats();
     expect(ui.root.dataset.shell).toBe("site");
-    expect(ui.root.querySelector('.shell-nav-link[aria-current="page"]')?.textContent).toBe("You");
+    expect(ui.root.querySelector<HTMLElement>(".shell-site-header")?.dataset.section).toBe("you");
+    expect(ui.root.querySelector(".shell-nav-link[aria-current]")).toBeNull();
     expect([...ui.root.querySelectorAll(".you-tab")].map((b) => b.textContent)).toEqual(["Stats", "Friends", "Achievements"]);
     expect(ui.tab("stats").getAttribute("aria-current")).toBe("page");
     expect(ui.root.querySelector("h1")?.textContent).toBe("Stats");
+  });
+
+  it("has an Account button for the popup (avatar, sign out) only when signed in", () => {
+    const guest = mountStats();
+    expect(guest.root.querySelector<HTMLButtonElement>(".you-account-btn")!.hidden).toBe(true);
+    const member = mountStats({ shell: makeShell(true) });
+    const account = member.root.querySelector<HTMLButtonElement>(".you-account-btn")!;
+    expect(account.hidden).toBe(false);
+    account.click();
+    expect(member.shell.openAccount).toHaveBeenCalled();
   });
 
   it("asks guests to sign in", () => {
