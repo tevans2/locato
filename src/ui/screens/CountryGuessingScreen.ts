@@ -614,8 +614,16 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     recordGuess(clickedCountry);
   }
 
-  function giveUpNameAllRun(): void {
+  /** Ending or wiping a run with countries already found asks first (docs/navigation.md: never lose progress silently). */
+  async function confirmLosingProgress(title: string, message: string, confirmLabel: string): Promise<boolean> {
+    if (!shell || roundEnded() || progressOfRun() === 0) return true;
+    return shell.confirmLeave(message, { title, confirmLabel, cancelLabel: "Keep playing", tone: "danger" });
+  }
+
+  async function giveUpNameAllRun(): Promise<void> {
     if (playMode !== "name-all" || roundEnded()) return;
+    if (!(await confirmLosingProgress("Give up this run?", "The round ends here and the countries you missed are shown on the map.", "Give up"))) return;
+    if (roundEnded()) return;
 
     captureReviewForCurrentRun("the given-up run", true);
     endAuditedRun("given-up");
@@ -779,9 +787,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const atlas = createAtlasView(countryIndex.countries);
   const feedback = createFeedbackView();
   const input = el("input", {
-    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
+    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "Type a country…" },
   });
-  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
+  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Guess", attrs: { type: "submit" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
   if (timed) resetButton.textContent = "Restart run";
   // Timed runs: the live clock sits in the GameBar pill.
@@ -794,7 +802,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const lastCountryName = el("strong", { className: "stat-value", text: "None" });
   const timerLast = el("strong", { className: "stat-value", text: "—" });
   const timerBest = el("strong", { className: "stat-value", text: "—" });
-  const panelHeading = el("h2", { text: "Name every country" });
+  const panelHeading = el("h1", { text: "Name every country" });
   const targetCountryName = el("strong", { className: "country-click-target-name", text: "—" });
   const clickPrompt = el("div", {
     className: "country-click-prompt",
@@ -862,7 +870,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   const showMissingButton = el("button", { className: "ghost-action", text: "Show missing", attrs: { type: "button", "aria-pressed": "false" } });
   const mapSurfaceButton = el("button", { className: "ghost-action", text: "3D globe", attrs: { type: "button", "aria-pressed": "false" } });
   const fullscreenButton = el("button", { className: "ghost-action map-fullscreen-action", text: "Fullscreen", attrs: { type: "button", "aria-pressed": "false" } });
-  const giveUpButton = el("button", { className: "ghost-action", text: "Give up", attrs: { type: "button" } });
+  const giveUpButton = el("button", { className: "ghost-action is-danger", text: "Give up", attrs: { type: "button" } });
   const checkPuzzleButton = el("button", { className: "primary-action puzzle-check-button", text: "Check accuracy", attrs: { type: "button" } });
   const mobileExtrasToggle = el("button", { className: "mobile-extras-toggle", text: "Details", attrs: { type: "button", "aria-expanded": "false" } });
   const mobileExtrasPanel = el("div", { className: "mobile-extras-panel" });
@@ -973,7 +981,7 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
     },
     { signal: controller.signal },
   );
-  giveUpButton.addEventListener("click", giveUpNameAllRun, { signal: controller.signal });
+  giveUpButton.addEventListener("click", () => void giveUpNameAllRun(), { signal: controller.signal });
   checkPuzzleButton.addEventListener("click", handlePuzzleCheck, { signal: controller.signal });
 
   puzzleContinentSelect.addEventListener(
@@ -1005,7 +1013,8 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   );
   resetButton.addEventListener(
     "click",
-    () => {
+    async () => {
+      if (!(await confirmLosingProgress("Restart this run?", "You'll start again from zero, and the countries you've found so far are cleared.", "Restart"))) return;
       dismissKeyboardIfTouchInput(input);
       resetGame(
         timed
@@ -1039,7 +1048,9 @@ export function createCountryGuessingScreen(options: CountryGuessingScreenOption
   mobileExtrasPanel.replaceChildren(
     detailStatsPanel,
     achievementPanel,
-    el("div", { className: "actions", children: [showMissingButton, mapSurfaceButton, fullscreenButton, giveUpButton, checkPuzzleButton, resetButton, atlas.element] }),
+    // Map tools first; run-level actions (Progress, Restart, Give up) are quiet links below them.
+    el("div", { className: "actions", children: [checkPuzzleButton, showMissingButton, mapSurfaceButton, fullscreenButton] }),
+    el("div", { className: "solo-quiet-actions", children: [atlas.element, resetButton, giveUpButton] }),
   );
 
   const progressOfRun = (): number => (playMode === "puzzle" ? puzzlePlacedCount : guessedCountryIds.size);

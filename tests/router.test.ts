@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRouteUrl, routeFromLocation, type AppRoute } from "../src/app/router";
+import { buildRouteUrl, HOME_TITLE, routeFromLocation, routeTitle, type AppRoute } from "../src/app/router";
 import { gameModeOptions, isPromptGameModeId, isWorldMapGameModeId } from "../src/core/gameModes";
 
 const parse = (url: string) => routeFromLocation(new URL(url, "https://locato.test"));
@@ -126,5 +126,16 @@ describe("shareable game routes", () => {
     const flagColours: AppRoute = { type: "solo-game", categoryIds: ["flag-colors"], continueSaved: false, run: "timed" };
     expect(buildRouteUrl(flagColours, { pathname: "/" })).toBe("/?game=flag-colors&run=timed");
     expect(parse("/?game=flag-colors&run=timed")).toEqual(flagColours);
+  });
+});
+
+describe("route titles", () => {
+  it("names every page in the tab title", () => {
+    expect(routeTitle({ type: "landing" })).toBe(HOME_TITLE);
+    expect(routeTitle({ type: "solo-game", categoryIds: ["capitals"] })).toBe("Capitals · Locato");
+    expect(routeTitle({ type: "country-guessing", mode: "name-all", run: "timed" })).toBe("Name all countries · Timed · Locato");
+    expect(routeTitle({ type: "mystery", daily: true })).toBe("Today's mystery · Locato");
+    expect(routeTitle({ type: "multiplayer", joinCode: "abcd" })).toBe("Room ABCD · Multiplayer · Locato");
+    expect(routeTitle({ type: "leaderboards" })).toBe("Leaderboards · Locato");
   });
 });

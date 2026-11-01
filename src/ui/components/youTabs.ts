@@ -1,4 +1,5 @@
 import { el } from "../dom/createElement";
+import type { ShellContext } from "../shell/types";
 
 /** The You section's sub-pages (docs/navigation.md → "You"): Stats · Friends · Achievements. */
 export type YouTab = "stats" | "friends" | "achievements";
@@ -37,15 +38,23 @@ export function createYouTabs(current: YouTab, onSelect: (tab: YouTab) => void):
   return { element: el("nav", { className: "you-tabs", attrs: { "aria-label": "You" }, children: buttons }), setCurrent };
 }
 
-/** Title band shared by the You pages (same look as the shell heading). */
-export function createYouHeading(title: string, subtitle: string): { readonly element: HTMLElement; readonly setTitle: (title: string, subtitle: string) => void } {
+/**
+ * Title band shared by the You pages (same look as the shell heading). Signed in, it carries an
+ * Account button for the popup (avatar, sign out): the header avatar now opens these pages instead.
+ */
+export function createYouHeading(title: string, subtitle: string, shell?: Pick<ShellContext, "openAccount" | "signedIn" | "onAuthChange">): { readonly element: HTMLElement; readonly setTitle: (title: string, subtitle: string) => void; readonly destroy: () => void } {
   const h1 = el("h1", { className: "shell-heading-title", text: title });
   const sub = el("p", { className: "shell-heading-sub", text: subtitle });
+  const account = el("button", { className: "shell-btn you-account-btn", text: "Account", attrs: { type: "button" }, on: { click: () => shell?.openAccount() } });
+  const syncAccount = (): void => { account.hidden = !shell?.signedIn(); };
+  syncAccount();
+  const unsubscribe = shell?.onAuthChange?.(syncAccount);
   return {
-    element: el("div", { className: "shell-heading you-heading", children: [h1, sub] }),
+    element: el("div", { className: "shell-heading you-heading", children: [h1, account, sub] }),
     setTitle: (nextTitle, nextSubtitle) => {
       h1.textContent = nextTitle;
       sub.textContent = nextSubtitle;
     },
+    destroy: () => unsubscribe?.(),
   };
 }

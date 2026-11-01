@@ -14,7 +14,7 @@ export interface SiteSectionInfo {
   readonly id: SiteSection;
   /** Sentence-case label used in the header, tab bar and ⋯ menu. */
   readonly label: string;
-  /** The phone TabBar's narrower label, when `label` won't fit a sixth of the screen. */
+  /** The phone TabBar's narrower label, when `label` won't fit a fifth of the screen. */
   readonly tabLabel?: string;
   readonly icon: ShellIconName;
 }
@@ -27,6 +27,9 @@ export const SITE_SECTIONS: readonly SiteSectionInfo[] = [
   { id: "leaderboards", label: "Leaderboards", tabLabel: "Boards", icon: "trophy" },
   { id: "you", label: "You", icon: "user-round" },
 ];
+
+/** The header and tab bar list every section but You, which the account avatar opens instead. */
+export const NAV_SECTIONS: readonly SiteSectionInfo[] = SITE_SECTIONS.filter((section) => section.id !== "you");
 
 export interface ConfirmOptions {
   /** Optional bold heading above the message. */

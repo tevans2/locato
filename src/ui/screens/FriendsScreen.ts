@@ -73,7 +73,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const outgoingSection = el("section", { className: "friend-section", children: [el("h2", { text: "Sent" }), outgoingList] });
   const friendsSection = el("section", { className: "friend-section", children: [el("h2", { text: "Friends" }), friendsList] });
 
-  const heading = createYouHeading("Friends", "Add friends by username, see who's online and compare stats.");
+  const heading = createYouHeading("Friends", "Add friends by username, see who's online and compare stats.", options.shell);
   const tabs = createYouTabs("friends", (tab) => {
     if (tab !== "friends") options.onOpenTab(tab);
   });
@@ -100,7 +100,11 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
   const element = page.element;
 
   function personRow(user: PublicUser, online: boolean | null, actions: readonly HTMLElement[], onProfile?: () => void): HTMLElement {
-    const dot = online === null ? [] : [el("span", { className: `friend-status${online ? " is-online" : ""}`, attrs: { title: online ? "Online" : "Offline" } })];
+    // The dot is backed by a word, so "online" isn't told by colour alone.
+    const dot = online === null ? [] : [el("span", { className: `friend-status-wrap${online ? " is-online" : ""}`, children: [
+      el("span", { className: `friend-status${online ? " is-online" : ""}`, attrs: { "aria-hidden": "true" } }),
+      el("span", { className: "friend-status-text", text: online ? "Online" : "Offline" }),
+    ] })];
     const nameNode = onProfile
       ? el("button", { className: "friend-name friend-profile-link", text: user.username, attrs: { type: "button" }, on: { click: onProfile } })
       : el("span", { className: "friend-name", text: user.username });
@@ -177,7 +181,8 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
         : data.friends.map((f) => {
             const actions: HTMLElement[] = [actionButton("Stats", "secondary-action", () => openProfile(f.user))];
             if (options.onInviteToGame && f.online) actions.push(actionButton("Invite", "primary-action", () => options.onInviteToGame?.(f.user)));
-            actions.push(actionButton("Remove", "ghost-action", () => void act(() => removeFriend(f.user.id))));
+            actions.push(actionButton("Remove", "ghost-action friend-remove", () => void options.shell.confirmLeave(`${f.user.username} will be removed from your friends. You can send a new request later.`, { title: `Remove ${f.user.username}?`, confirmLabel: "Remove", cancelLabel: "Keep", tone: "danger" })
+              .then((remove) => { if (remove) void act(() => removeFriend(f.user.id)); })));
             return personRow(f.user, f.online, actions, () => openProfile(f.user));
           })),
     );
@@ -259,6 +264,7 @@ export function createFriendsScreen(options: FriendsScreenOptions): Screen {
       if (searchTimer) clearTimeout(searchTimer);
       unsubscribe?.();
       unsubscribeAuth?.();
+      heading.destroy();
       page.destroy();
     },
   };

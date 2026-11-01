@@ -5,7 +5,6 @@ import {
   Binoculars,
   CalendarDays,
   Compass,
-  Check,
   Crown,
   Eye,
   Flag,
@@ -32,13 +31,14 @@ import { readAcademyProgress } from "../../storage/academySave";
 import { getAchievementState } from "../../storage/achievements";
 import { readDailyOnDevice, type DailyResultSave } from "../../storage/dailySave";
 import { academyLevel } from "../../core/academy/mastery";
-import { DAILY_COUNTRY_COUNT, DAILY_FORMAT, DAILY_MAX_SCORE, getLocalDailyDate, type DailyRoundMark } from "../../core/dailyChallenge";
+import { createDailyShareText, formatDailyDate, DAILY_COUNTRY_COUNT, DAILY_FORMAT, DAILY_MAX_SCORE, getLocalDailyDate, type DailyRoundMark } from "../../core/dailyChallenge";
+import { fetchDailySummary, type DailySummary } from "../../core/auth";
 import { overlandDailyNumber } from "../../core/overland/routes";
 import { mysteryDailyNumber } from "../../core/mystery/round";
 import { shareLink } from "../../core/shareLink";
 import { shareResult } from "../shell/ResultsCard";
 import { dailyThemeForDate } from "../../core/dailyThemes";
-import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type GameModeCatalogueEntry, type GameModeGroup, type GameModeId } from "../../core/gameModes";
+import { GAME_MODE_GROUPS, gameModeCatalogueEntry, isPromptGameModeId, type GameModeGroup, type GameModeId } from "../../core/gameModes";
 import type { Screen } from "../../app/router";
 import type { CountryIndex } from "../../core/countries";
 import { LandingGlobe } from "../components/landing/LandingGlobe";
@@ -117,6 +117,18 @@ function dayNumber(key: string): number | null {
   return match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / DAY_MS : null;
 }
 
+/**
+ * Folds the account's daily summary into this device's status, so a daily finished on another
+ * device (or before this browser's storage was cleared) still shows as done, with its streak.
+ */
+export function mergeAccountDaily(local: DailyStatus, summary: DailySummary | null, date: string): DailyStatus {
+  if (!summary) return local;
+  const today = summary.history.find((entry) => entry.date === date) ?? null;
+  const result = local.result ?? (today ? { version: 2 as const, ...today, shareText: createDailyShareText(today.date, today.score, today.timeMs, today.marks) } : null);
+  const done = local.done || today !== null;
+  return { done, roundsPlayed: done ? 0 : local.roundsPlayed, streak: Math.max(local.streak, summary.streak), result };
+}
+
 /** Today's daily from local storage: done, in progress, and the running streak. */
 export function readDailyStatus(storage: Storage | undefined, now = new Date()): DailyStatus {
   if (!storage) return { done: false, roundsPlayed: 0, streak: 0, result: null };
@@ -156,10 +168,19 @@ function LandingDaily({ shell, storage, now }: LandingScreenOptions) {
     return () => window.clearInterval(timer);
   }, [now]);
   const date = getLocalDailyDate(clock);
+  const [signedIn, setSignedIn] = useState(() => shell.signedIn());
+  const [account, setAccount] = useState<{ readonly date: string; readonly summary: DailySummary } | null>(null);
+  useEffect(() => shell.onAuthChange?.(() => setSignedIn(shell.signedIn())), [shell]);
+  useEffect(() => {
+    if (!signedIn) { setAccount(null); return; }
+    let live = true;
+    void fetchDailySummary(date).then((summary) => { if (live && summary) setAccount({ date, summary }); });
+    return () => { live = false; };
+  }, [signedIn, date]);
   const theme = dailyThemeForDate(date);
-  const daily = readDailyStatus(storage, clock);
+  const daily = mergeAccountDaily(readDailyStatus(storage, clock), account?.date === date ? account.summary : null, date);
   const state = daily.done ? "done" : daily.roundsPlayed > 0 ? "in-progress" : "new";
-  const dateLabel = clock.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const dateLabel = formatDailyDate(date, "short");
   const result = daily.result;
   const open = () => shell.openSection("daily");
   const share = () => {
@@ -175,7 +196,7 @@ function LandingDaily({ shell, storage, now }: LandingScreenOptions) {
     <div className="landing-daily-main">
       <p className="landing-daily-kicker"><CalendarDays size={15} strokeWidth={1.8} aria-hidden="true" /> Daily challenge <span aria-hidden="true">·</span> <time dateTime={date}>{dateLabel}</time></p>
       <h1 id="landing-daily-title">{state === "done" ? "Today's challenge, done." : "Today's geography challenge"}</h1>
-      <p className="landing-daily-theme"><strong>{theme.title}.</strong> {state === "done" ? "A new one starts at midnight. Same puzzle for everyone, so compare with friends." : `${theme.description} Ten rounds, the same for everyone today. Free, no sign-up.`}</p>
+      <p className="landing-daily-theme"><strong>{theme.title}.</strong> {state === "done" ? "A new one starts at midnight. Same puzzle for everyone, so compare with friends." : `${theme.description} Ten rounds, the same for everyone today.${signedIn ? "" : " Free, no sign-up."}`}</p>
       <div className="landing-daily-actions">
         {state === "done"
           ? <>
@@ -213,7 +234,6 @@ function LandingDaily({ shell, storage, now }: LandingScreenOptions) {
 
 function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOptions) {
   const [group, setGroup] = useState<GameModeGroup>(GAME_MODE_GROUPS[0]!);
-  const [mode, setMode] = useState<GameModeCatalogueEntry>(GAME_MODE_GROUPS[0]!.modes[0]!);
   const allModes = GAME_MODE_GROUPS.flatMap((item) => item.modes);
   const latest = latestResume(storage);
   const play = (id: GameModeId) => shell.openGame(id, "practice");
@@ -228,13 +248,13 @@ function LandingGamePicker({ shell, storage, countryIndex }: LandingScreenOption
         <span>{allModes.length} games</span>
       </header>
       <div className="mode-picker-tabs" role="group" aria-label="Game groups">
-        {GAME_MODE_GROUPS.map((item) => <button type="button" key={item.id} aria-pressed={group.id === item.id} onClick={() => { setGroup(item); setMode(item.modes[0]!); }}>
+        {GAME_MODE_GROUPS.map((item) => <button type="button" key={item.id} aria-pressed={group.id === item.id} onClick={() => setGroup(item)}>
           {item.label}<span>{item.modes.length}</span>
         </button>)}
       </div>
       <div className="mode-picker-options" role="group" aria-label={`${group.label} games`}>
-        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} aria-pressed={mode.id === item.id} onClick={() => { setMode(item); play(item.id); }}>
-          <Icon size={19} strokeWidth={1.5} /><span className="mode-picker-option-label">{item.label}{saved ? <small className="mode-picker-saved" aria-label={`, saved run ${saved}`}>{saved}</small> : null}</span><span className="mode-picker-indicator" aria-hidden="true">{mode.id === item.id ? <Check size={12} /> : null}</span>
+        {group.modes.map((item) => { const Icon = MODE_ICONS[item.id]; const saved = modeResumeProgress(storage, item.id); return <button type="button" className="mode-picker-option" key={item.id} data-testid={`picker-mode-${item.id}`} onClick={() => play(item.id)}>
+          <Icon size={19} strokeWidth={1.5} /><span className="mode-picker-option-label">{item.label}{saved ? <small className="mode-picker-saved" aria-label={`, saved run ${saved}`}>{saved}</small> : null}</span><ArrowRight className="mode-picker-go" size={15} aria-hidden="true" />
         </button>; })}
       </div>
       {latest ? <div className="mode-picker-shortcuts">

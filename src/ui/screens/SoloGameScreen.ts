@@ -114,6 +114,16 @@ function countryForGuess(index: CountryIndex, answer: string): Country | null {
 }
 
 
+/** The answer panel asks the question the prompt poses, per category (mixed runs change it per round). */
+const PANEL_TITLES: Readonly<Record<string, string>> = {
+  flags: "Whose flag is this?",
+  "flag-colors": "Whose flag is hiding?",
+  shapes: "Which country is this?",
+  codes: "Which country has this code?",
+  capitals: "Whose capital is this?",
+  "capital-recall": "Name the capital",
+};
+
 export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const controller = new AbortController();
   const { countryIndex, engine } = options;
@@ -139,10 +149,11 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   const atlas = createAtlasView(countries);
   const views: SoloViews = { stats, prompt, feedback, atlas };
   const input = el("input", {
-    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "e.g. Brazil, Japan, ZA..." },
+    attrs: { id: "guess-input", name: "guess", type: "text", autocomplete: "off", autocapitalize: "words", autocorrect: "off", spellcheck: "false", inputmode: "text", enterkeyhint: "done", placeholder: "Type a country…" },
   });
   const guessLabel = el("label", { text: "Your guess", attrs: { for: "guess-input" } });
-  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Enter", attrs: { type: "submit", "aria-label": "Enter guess" } });
+  const panelHeading = el("h1", { text: "Name the country" });
+  const submitButton = el("button", { className: "primary-action guess-submit-action", text: "Guess", attrs: { type: "submit" } });
   const hintButton = el("button", { className: "secondary-action hint-action", text: "Hint", attrs: { type: "button", "aria-label": "Get a hint" } });
   const skipButton = el("button", { className: "secondary-action", text: "Pass", attrs: { type: "button", "aria-label": "Reveal this answer" } });
   const resetButton = el("button", { className: "ghost-action", text: "Restart", attrs: { type: "button" } });
@@ -299,7 +310,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
       if (event.type === "GUESS_WRONG") {
         revealAnswerArmed = false;
-        showFeedback(views.feedback, isDailyChallenge ? `Not quite. This round is now worth up to ${scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses)} points. Try again.` : "Not quite. Streak reset, prompt still live.", "bad");
+        showFeedback(views.feedback, isDailyChallenge ? `Not quite. This round is now worth up to ${scoreDailyRound(dailyRoundHintsUsed, false, dailyRoundWrongGuesses)} points. Try again.` : "Not quite — try again. Your streak starts over.", "bad");
         continue;
       }
 
@@ -309,7 +320,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
         const skipped = countryIndex.byId[event.previousCountryId];
         missedCountryIds.add(event.previousCountryId);
         // Daily passes reveal the answer separately; elsewhere, name what was skipped so the miss teaches something.
-        showFeedback(views.feedback, skipped && !isDailyChallenge ? `Skipped — that was ${answerLabelFor(skipped)}. It can return later.` : "Skipped. Streak reset — this prompt can return later.", "neutral");
+        showFeedback(views.feedback, skipped && !isDailyChallenge ? `Skipped — that was ${answerLabelFor(skipped)}. It can return later.` : "Skipped. It can come back later in the run.", "neutral");
         if (skipped) offerCountryProfile(skipped);
         continue;
       }
@@ -514,6 +525,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
 
   function render(persist = true): void {
     const state = engine.getState();
+    panelHeading.textContent = PANEL_TITLES[state.currentCategoryId ?? options.selectedGameMode] ?? "Name the country";
     const current = getCurrentCountry(countryIndex, state);
     const displayRound = state.roundNumber + (options.dailyChallenge?.roundOffset ?? 0);
     const category = state.currentCategoryId ? getCategory(state.currentCategoryId) : undefined;
@@ -522,9 +534,7 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
     if (dailyMap) dailyMap.element.classList.toggle("is-click-country-mode", content?.kind === "map-click" && state.status === "playing");
     freePlayToggle.hidden = capitalRecallMap === null || timed;
     guessLabel.textContent = isCapitalRecallMode ? "Capital" : "Your guess";
-    input.placeholder = isCapitalRecallMode
-      ? "e.g. Tokyo, Abuja, Brasília..."
-      : "e.g. Brazil, Japan, ZA...";
+    input.placeholder = isCapitalRecallMode ? "Type a capital…" : "Type a country…";
     if (freePlayEnabled) {
       updateFreePlayStatsView(stats, {
         found: freePlayGuessedCountryIds.size,
@@ -834,7 +844,9 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
   mobileExtrasPanel.replaceChildren(
     ...(timerPanel ? [timerPanel] : []),
     achievementPanel,
-    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton, ...(isDailyChallenge ? [] : [resetButton]), atlas.element] }),
+    el("div", { className: "actions solo-action-grid", children: [hintButton, skipButton] }),
+    // Run-level tools are quiet links, apart from the answer tools; the daily has neither.
+    ...(isDailyChallenge ? [] : [el("div", { className: "solo-quiet-actions", children: [atlas.element, resetButton] })]),
   );
 
   /** A timed run is "in progress" from the first answer until it completes. */
@@ -894,14 +906,15 @@ export function createSoloGameScreen(options: SoloGameScreenOptions): Screen {
           el("aside", {
             className: "answer-panel",
             children: [
-              el("div", { className: "panel-title has-freeplay-toggle", children: [el("h2", { text: "Name the place" }), freePlayToggle] }),
+              el("div", { className: "panel-title has-freeplay-toggle", children: [panelHeading, freePlayToggle] }),
               form,
               feedback.element,
               stats.element,
-              ...(flagPoolSelector ? [flagPoolSelector.element] : []),
               hintPopover,
               mobileExtrasToggle,
               mobileExtrasPanel,
+              // A run setting, not a play control: it sits under the tools.
+              ...(flagPoolSelector ? [flagPoolSelector.element] : []),
             ],
           }),
         ],

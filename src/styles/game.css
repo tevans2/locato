@@ -63,7 +63,7 @@
 }
 
 .category-dropdown[open] .category-dropdown-summary::after {
-  color: var(--accent);
+  color: var(--accent-text);
   transform: rotate(180deg);
 }
 
@@ -153,7 +153,7 @@
   font-size: clamp(3rem, 12vw, 7rem);
   font-weight: 800;
   letter-spacing: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   text-align: center;
   line-height: 1;
 }
@@ -345,7 +345,7 @@
   border-radius: 999px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.78);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 720;
   pointer-events: none;
   backdrop-filter: blur(10px);
@@ -371,7 +371,7 @@
 .capital-map-current-prefix,
 .capital-map-progress {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: .75rem;
   font-weight: 760;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -434,7 +434,7 @@
 .capital-map-recent-chip span {
   flex: none;
   color: #49771f;
-  font-size: 0.7rem;
+  font-size: .75rem;
   font-weight: 840;
   letter-spacing: 0.04em;
 }
@@ -495,7 +495,7 @@
 
 :root[data-theme="dark"] .capital-map-progress {
   border-color: rgba(184, 227, 109, 0.24);
-  color: var(--accent);
+  color: var(--accent-text);
   background: rgba(6, 10, 8, 0.74);
 }
 
@@ -506,7 +506,7 @@
 }
 
 :root[data-theme="dark"] .capital-map-recent-chip span {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .stats-panel {
@@ -534,7 +534,7 @@
 .stat-label, .progress-copy {
   display: block;
   color: var(--muted);
-  font-size: 0.73rem;
+  font-size: .75rem;
   font-weight: 620;
 }
 
@@ -664,7 +664,7 @@
 .complete-card {
   font-size: 1.55rem;
   font-weight: 760;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .daily-result-screen {
@@ -817,7 +817,7 @@
 }
 
 .achievement-chip strong {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.88rem;
 }
 
@@ -972,7 +972,7 @@
 }
 
 .hint-action {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: rgba(184, 227, 109, 0.38);
   background: rgba(184, 227, 109, 0.1);
 }
@@ -1032,7 +1032,7 @@
 }
 
 .hint-popover-title {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.82rem;
 }
 
@@ -1125,8 +1125,8 @@
 }
 
 .world-map-control-button {
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 38px;
+  min-height: 38px;
   padding: 6px 9px;
   border: 1px solid rgba(217, 217, 214, 0.14);
   border-radius: var(--radius-sm);
@@ -1338,7 +1338,7 @@
 
 .map-review-country small {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
 }
 
 .country-guess-screen [hidden] {
@@ -1736,7 +1736,7 @@
 
 .game-mode-group-label {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 780;
   letter-spacing: 0.06em;
   padding: 2px 4px 1px;
@@ -1767,7 +1767,7 @@
 .category-dropdown-selected-description {
   min-width: 0;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: .75rem;
   font-weight: 620;
   line-height: 1.2;
   overflow: hidden;
@@ -2045,7 +2045,7 @@
 .streetview-result {
   display: block;
   min-height: 1.4em;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 @media (max-width: 900px) {
@@ -2309,7 +2309,7 @@
 }
 
 .streetview-country-screen.is-streetview-fullscreen .streetview-stats .stat-label {
-  font-size: 0.66rem;
+  font-size: .75rem;
 }
 
 .streetview-country-screen.is-streetview-fullscreen .streetview-stats .stat-value {
@@ -2408,12 +2408,15 @@
 }
 
 .maptap-setup-heading .eyebrow {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .maptap-setup-heading h1 {
   margin: 0;
-  font-size: clamp(1.45rem, 2.3vw, 2rem);
+  font-family: var(--font-editorial);
+  font-weight: 480;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
   line-height: 1.02;
 }
 
@@ -2489,7 +2492,7 @@
 .maptap-category-copy small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: .75rem;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2501,7 +2504,7 @@
   border-radius: 999px;
   background: rgba(232, 226, 211, 0.08);
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 750;
   text-align: center;
 }
@@ -2580,7 +2583,7 @@
 }
 
 .maptap-sidebar .panel-title .eyebrow {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .maptap-sidebar .panel-title strong {
@@ -3001,7 +3004,7 @@
 }
 
 .maptap-mp-result-score {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3016,7 +3019,7 @@
 
 .maptap-mp-scoreboard .eyebrow {
   color: var(--subtle);
-  font-size: 0.72rem;
+  font-size: .75rem;
   letter-spacing: 0.06em;
 }
 
@@ -3121,7 +3124,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 .round-kicker,
 .country-click-target-label {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .flag-slot {
@@ -3158,7 +3161,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 .prompt-text,
 .complete-card,
 .room-code {
-  color: var(--accent);
+  color: var(--accent-text);
   text-shadow: 0 0 26px rgba(134, 200, 63, 0.16);
 }
 
@@ -3404,7 +3407,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
 
 .flag-pool-label {
   color: var(--muted);
-  font-size: .64rem;
+  font-size: .75rem;
   font-weight: 760;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -3429,7 +3432,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: .7rem;
+  font-size: .75rem;
   font-weight: 720;
   line-height: 1.15;
   cursor: pointer;
@@ -3463,7 +3466,7 @@ body:not(:has(.landing-screen-shell)) .game-header .game-mode-dropdown .category
   .flag-pool-option {
     min-height: 32px;
     padding-inline: 4px;
-    font-size: .66rem;
+    font-size: .75rem;
 
   }
 }

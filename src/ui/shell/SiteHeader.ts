@@ -1,7 +1,7 @@
 import { buildRouteUrl, type AppRoute } from "../../app/router";
 import { el } from "../dom/createElement";
 import { shellIcon } from "./icons";
-import { markShellScreen, SITE_SECTIONS, type ShellContext, type SiteSection } from "./types";
+import { markShellScreen, NAV_SECTIONS, SITE_SECTIONS, type ShellContext, type SiteSection } from "./types";
 import "../../styles/shell.css";
 
 /** Where each section link points, so links are real URLs (middle-click, copy link). */
@@ -107,13 +107,13 @@ export interface TabBarHandle {
 }
 
 /**
- * The phone navigation: six sections with icons, fixed to the bottom with safe-area padding.
+ * The phone navigation: five sections with icons (You is the account avatar), fixed to the bottom with safe-area padding.
  * Hidden above 700px. While one is on the page, App's root reserves room for it so content
  * is never covered (see `#app:has(.shell-tabbar)` in shell.css).
  */
 export function createTabBar(ctx: ShellContext, section: SiteSection, guard: Pick<SiteHeaderOptions, "leaveGuard" | "onLeave"> = {}): TabBarHandle {
   const check = createLeaveCheck(ctx, guard);
-  const links = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-tab", true, check));
+  const links = NAV_SECTIONS.map((item) => sectionLink(ctx, item, "shell-tab", true, check));
   const element = el("nav", { className: "shell-tabbar", attrs: { "aria-label": "Sections" }, children: links });
   markCurrent(links, section);
   return { element, setSection: (next) => markCurrent(links, next) };
@@ -149,7 +149,7 @@ export function createBackLink(back: ShellBackLink, className = "shell-back"): H
 export function createSiteHeader(ctx: ShellContext, options: SiteHeaderOptions): SiteHeaderHandle {
   const guard = { ...(options.leaveGuard ? { leaveGuard: options.leaveGuard } : {}), ...(options.onLeave ? { onLeave: options.onLeave } : {}) };
   const check = createLeaveCheck(ctx, guard);
-  const navLinks = SITE_SECTIONS.map((item) => sectionLink(ctx, item, "shell-nav-link", false, check));
+  const navLinks = NAV_SECTIONS.map((item) => sectionLink(ctx, item, "shell-nav-link", false, check));
   const tabBar = createTabBar(ctx, options.section, guard);
   const element = el("header", {
     className: "shell-site-header",

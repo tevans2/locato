@@ -6,7 +6,7 @@ export interface FeedbackView {
 }
 
 export function createFeedbackView(): FeedbackView {
-  return { element: el("p", { className: "feedback", attrs: { "aria-live": "polite" }, text: "Choose a mode and start guessing." }) };
+  return { element: el("p", { className: "feedback", attrs: { "aria-live": "polite" }, text: "Make your first guess." }) };
 }
 
 export function hideFeedback(view: FeedbackView): void {

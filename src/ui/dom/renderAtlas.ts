@@ -55,7 +55,8 @@ export function createAtlasView(countries: readonly Country[]): AtlasView {
     progressRows.push(row);
   }
 
-  const openButton = el("button", { className: "atlas-open", text: "Atlas", attrs: { type: "button", "aria-expanded": "false" } });
+  // "Progress", not "Atlas": the Atlas is the Learn section; this drawer is just this run's tally.
+  const openButton = el("button", { className: "atlas-open", text: "Progress", attrs: { type: "button", "aria-expanded": "false" } });
   const closeButton = el("button", { className: "atlas-close", text: "Close", attrs: { type: "button" } });
   const revealedList = el("div", { className: "atlas-revealed-list" });
   const overlay = el("div", { className: "atlas-overlay", attrs: { "aria-hidden": "true" } });
@@ -63,7 +64,7 @@ export function createAtlasView(countries: readonly Country[]): AtlasView {
     className: "atlas-drawer",
     attrs: { "aria-label": "Atlas progress", tabindex: "-1" },
     children: [
-      el("header", { className: "atlas-header", children: [el("div", { children: [el("p", { className: "eyebrow", text: "Progress" }), el("h2", { text: "Atlas" })] }), closeButton] }),
+      el("header", { className: "atlas-header", children: [el("div", { children: [el("p", { className: "eyebrow", text: "This run" }), el("h2", { text: "Progress" })] }), closeButton] }),
       el("section", { className: "atlas-section", children: [el("h3", { text: "Continents" }), el("div", { className: "atlas-progress", children: progressRows })] }),
       el("section", { className: "atlas-section", children: [el("h3", { text: "Revealed" }), revealedList] }),
     ],

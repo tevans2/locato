@@ -20,7 +20,7 @@ import { createSocialClient, resolveSocialUrl } from "../core/social/SocialClien
 import type { SocialServerMessage } from "../core/social/socialProtocol";
 import { createLandingScreen } from "../ui/screens/LandingScreen";
 import { el } from "../ui/dom/createElement";
-import { buildRouteUrl, routeFromLocation, type AppRoute, type Screen } from "./router";
+import { buildRouteUrl, routeFromLocation, routeTitle, type AppRoute, type Screen } from "./router";
 import { trackGameComplete, trackRoute, trackSignIn } from "./analytics";
 import { createAcademyProgressStore } from "./academyProgress";
 import { isLeaderboardMode } from "../core/gameModes";
@@ -104,7 +104,6 @@ export function createApp(options: AppOptions): App {
       for (const listener of [...authListeners]) listener();
     },
     onViewStats: () => navigate({ type: "stats" }),
-    onViewFriends: () => navigate({ type: "friends" }),
   });
   // Navigation shell (docs/navigation.md): one context handed to every screen as `shell`.
   // The account trigger lives in `shell.controls`, which SiteHeader places on its right (GameBar
@@ -245,11 +244,34 @@ export function createApp(options: AppOptions): App {
     if (stats) authControls.refreshStats(stats);
   }
 
+  // Focus only follows navigations the player made (a cold load's loading → screen swap isn't one).
+  let playerHasInteracted = false;
+  const markInteracted = (): void => { playerHasInteracted = true; };
+  window.addEventListener("pointerdown", markInteracted, { capture: true, once: true });
+  window.addEventListener("keydown", markInteracted, { capture: true, once: true });
+
   function mount(screen: Screen): void {
     activeScreen?.destroy();
     activeScreen = screen;
     options.root.replaceChildren(screen.element, authControls.panel);
     options.root.scrollTop = 0;
+    if (playerHasInteracted) focusNewScreen(screen);
+  }
+
+  /**
+   * After an in-app navigation, focus would otherwise fall back to <body> with the old screen
+   * gone: move it to the new screen's heading so keyboard and screen-reader users start there.
+   * Screens that focus something themselves (a game's answer field) keep that.
+   */
+  function focusNewScreen(screen: Screen): void {
+    requestAnimationFrame(() => {
+      if (activeScreen !== screen) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && screen.element.contains(active)) return;
+      const target = screen.element.querySelector<HTMLElement>("h1") ?? screen.element;
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    });
   }
 
   // The You tab the next Stats screen opens on (Friends → "Achievements" lands there).
@@ -1269,6 +1291,7 @@ export function createApp(options: AppOptions): App {
     if (route.type === "daily-challenge" && navigateOptions?.push !== false && activeDailyScreen !== null && activeScreen === activeDailyScreen) return;
     navigationRun += 1;
     trackRoute(route);
+    document.title = routeTitle(route);
     if (navigateOptions?.replace) replaceRoute(route);
     else if (navigateOptions?.push !== false) pushRoute(route);
     if (route.type === "landing") {

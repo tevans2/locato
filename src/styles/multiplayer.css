@@ -136,7 +136,7 @@
 
 .multiplayer-flag-slot .complete-card {
   width: min(34rem, 92%);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: clamp(1.15rem, 2.4vw, 1.8rem);
   line-height: 1.18;
   text-align: center;
@@ -172,7 +172,7 @@
 .multiplayer-map-target span {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 760;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -310,7 +310,7 @@
 }
 
 .score-value {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 800;
 }
 
@@ -394,7 +394,7 @@
 }
 
 .multiplayer-chat-header .eyebrow {
-  font-size: 0.7rem;
+  font-size: .75rem;
 }
 
 .multiplayer-chat-list {
@@ -427,8 +427,8 @@
 .multiplayer-chat-author {
   display: block;
   margin-bottom: 2px;
-  color: var(--accent);
-  font-size: 0.72rem;
+  color: var(--accent-text);
+  font-size: .75rem;
   font-weight: 760;
 }
 
@@ -468,7 +468,7 @@
   place-items: center;
   border: 1px solid rgba(184, 227, 109, 0.32);
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--accent-text);
   background:
     linear-gradient(135deg, rgba(184, 227, 109, 0.18), rgba(255, 255, 255, 0.035)),
     rgba(10, 14, 10, 0.94);
@@ -511,7 +511,7 @@
   padding-inline: 4px;
   color: #11160e;
   background: var(--accent);
-  font-size: 0.66rem;
+  font-size: .75rem;
   font-weight: 850;
   line-height: 1;
 }
@@ -624,7 +624,7 @@
 
 .round-reveal.is-taken { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 10%, var(--bg-elevated)); }
 .round-reveal.is-yours { border-color: var(--good); }
-.round-reveal-label { color: var(--muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.round-reveal-label { color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .round-reveal-answer { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
 .round-reveal-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text); font-size: 0.92rem; font-weight: 650; }
 .round-reveal.is-missed .round-reveal-line { color: var(--muted); }
@@ -662,3 +662,47 @@
 @media (prefers-reduced-motion: reduce) {
   .round-reveal { animation: none; }
 }
+
+/* ---------- Phones, keyboard up (mobileKeyboard.ts) ---------- */
+@media (max-width: 700px) {
+  /* Quiz race: the prompt gets the room left above the answer box, the page can scroll it back to
+     the top of what's visible (stepping down by --viewport-top when iOS has panned the page), and
+     the sticky site header, TabBar and chat button step aside so nothing covers it. */
+  .multiplayer-game-layout.is-mobile-typing {
+    padding-top: var(--viewport-top, 0px);
+    padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
+  }
+  .multiplayer-game-layout.is-mobile-typing .multiplayer-flag-slot,
+  .multiplayer-game-layout.is-mobile-typing .multiplayer-map-prompt {
+    height: clamp(110px, calc(var(--viewport-height, 62svh) - 175px), 260px);
+    min-height: 0;
+  }
+  .multiplayer-game-layout.is-mobile-typing .multiplayer-flag-slot .flag-image { max-height: calc(100% - 16px); }
+  .multiplayer-game-layout.is-mobile-typing .multiplayer-answer-panel > h2,
+  .multiplayer-game-layout.is-mobile-typing .multiplayer-answer-form > label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  #app:has(.multiplayer-game-layout.is-mobile-typing) .shell-site-header,
+  #app:has(.multiplayer-game-layout.is-mobile-typing) .multiplayer-chat-dock { display: none; }
+
+  /* Room chat: docked just above the keyboard, sized to what's visible, TabBar out of the way. */
+  #multiplayer .multiplayer-chat-dock.is-mobile-typing,
+  #multiplayer[data-view] .multiplayer-chat-dock.is-mobile-typing {
+    bottom: calc(var(--keyboard-offset, 0px) + 8px);
+  }
+  .multiplayer-chat-dock.is-mobile-typing .multiplayer-chat-panel {
+    max-height: min(320px, calc(var(--viewport-height, 60svh) - 70px));
+  }
+  #app:has(.multiplayer-chat-dock.is-mobile-typing) .shell-tabbar { display: none; }
+}
+
+/* The chat button stays a round button (the phone-wide `button { width: 100% }` stretched it
+   across the dock whenever the panel was open). */
+:root .multiplayer-chat-dock .multiplayer-chat-toggle { width: auto; }
+
+/* Between rounds the answer box is read-only (it keeps the phone keyboard up). */
+.multiplayer-answer-form input[readonly] { opacity: 0.6; }

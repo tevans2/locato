@@ -194,7 +194,7 @@
 
 .friend-profile-link:hover,
 .friend-profile-link:focus-visible {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: underline;
   outline: none;
 }
@@ -319,3 +319,10 @@
     grid-template-columns: 1fr auto auto;
   }
 }
+
+/* Names are links to a profile, not fields: no box. */
+#app .friend-row .friend-profile-link { min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 1rem; font-weight: 650; }
+.friend-status-wrap { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--muted); font-size: .75rem; font-weight: 700; }
+.friend-status-wrap.is-online { color: var(--text); }
+#app .friend-row .friend-remove { border-color: transparent; background: transparent; color: var(--bad); }
+#app .friend-row .friend-remove:hover { border-color: var(--bad); background: transparent; color: var(--bad); }

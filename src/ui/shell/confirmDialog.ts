@@ -14,9 +14,12 @@ export function confirmDialog(message: string, options: ConfirmOptions = {}): Pr
   dialogCount += 1;
   const id = `shell-confirm-${dialogCount}`;
   return new Promise<boolean>((resolve) => {
-    const cancel = el("button", { className: "shell-btn shell-btn-quiet", text: options.cancelLabel ?? "Stay", attrs: { type: "button", "data-action": "cancel" } });
+    // The safe choice carries the weight: a danger confirm is red beside a quiet cancel; otherwise
+    // staying is the filled button and leaving the quiet one.
+    const danger = options.tone === "danger";
+    const cancel = el("button", { className: `shell-btn ${danger ? "shell-btn-quiet" : "shell-btn-primary"}`, text: options.cancelLabel ?? "Stay", attrs: { type: "button", "data-action": "cancel" } });
     const confirm = el("button", {
-      className: `shell-btn ${options.tone === "danger" ? "shell-btn-danger" : "shell-btn-primary"}`,
+      className: `shell-btn ${danger ? "shell-btn-danger" : "shell-btn-quiet"}`,
       text: options.confirmLabel ?? "Leave",
       attrs: { type: "button", "data-action": "confirm" },
     });

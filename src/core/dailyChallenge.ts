@@ -208,3 +208,10 @@ Score: ${score}/${DAILY_MAX_SCORE}
 Time: ${formatDailyTime(timeMs)}
 ${grid}`;
 }
+
+/** "Tuesday 21 October" / "Tue 21 Oct" for a daily's YYYY-MM-DD date. */
+export function formatDailyDate(date: string, style: "long" | "short" = "long"): string {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("en-GB", style === "long" ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
+}

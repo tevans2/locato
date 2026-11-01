@@ -13,7 +13,7 @@ shell components (`src/ui/shell/`) and every screen build against.
 | **Learn** | `?view=academy…`, `?view=atlas`, `?country=xx` | Academy, lessons, placement, and the Atlas: an index of every country (the old flag gallery) plus each country's profile. |
 | **Multiplayer** | `?view=multiplayer[&create=1[&invite=]]`, `?room=CODE` | Live games with friends: open a room, share the link, play. |
 | **Leaderboards** | `?view=leaderboards[&mode=&variant=]`, timed game routes | Every mode's global board and its ranked attempt. The phone TabBar labels it **Boards**. |
-| **You** | `?view=stats`, `?view=friends` | Stats, achievements, friends, account. |
+| **You** | `?view=stats`, `?view=friends` | Stats, achievements, friends, account. Not in the header or TabBar: the signed-in account avatar opens it (guests: the sign-in popup links to it); the page's **Account** button opens the popup (avatar, sign out). |
 
 Old links keep working: `?view=leaderboard` and `?view=compete&tab=leaderboards` (or any
 `?view=compete&mode=`) open Leaderboards, plain `?view=compete` opens Multiplayer, and `?view=flags`
@@ -47,7 +47,7 @@ links, browser Back and the in-room Leave button ask first, and closing the tab 
 ### Leaderboards
 
 - **Leaderboards** (`?view=leaderboards[&mode=&variant=]`): the board is the page.
-  A mode picker across the top covers **all 15 modes** (grouped Clues / Map / Street View; a
+  A mode picker across the top covers **all 17 modes** (grouped Clues / Map / Street View; a
   sideways chip scroller on phones), variant pills appear only for modes that have them (flag set
   for Flags, continent for Puzzle), then the board: a podium for the top 3, ranked rows below,
   your row highlighted (and pinned to the bottom while you scroll when you rank below the rows
@@ -90,10 +90,11 @@ How you switch:
 ## Layouts
 
 1. **Site page** — landing, Academy hub, Atlas and profiles, Multiplayer, Leaderboards, Stats,
-   Friends, daily result. `SiteHeader`: logo (always Home) · the six section links with the current
-   one marked · sound, theme and account on the right. On phones the section links move to a
-   bottom `TabBar`.
-2. **Game screen** — all 15 modes and a multiplayer game. `GameBar`: ← back · the game's name as a
+   Friends, daily result. `SiteHeader`: logo (always Home) · the section links except You, with the current
+   one marked · sound, theme and account on the right (the account avatar is the way into You). On
+   phones the section links move to a bottom `TabBar`; on iPhone browsers, whose own toolbar sits at
+   the bottom, it becomes a second row of the header instead.
+2. **Game screen** — all 17 modes and a multiplayer game. `GameBar`: ← back · the game's name as a
    switcher (opens the game picker; switching never silently discards a run) · the run type
    (a Practice | Timed switch with the clock, or a Best badge on single-run modes) · a `⋯` menu with sound, theme, how to play, and the section
    links. The page-to-page links live in that menu, not across the bar.

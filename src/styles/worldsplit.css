@@ -121,7 +121,7 @@
 }
 
 .worldsplit-map-hint strong { font-size: .86rem; }
-.worldsplit-map-hint span { color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.worldsplit-map-hint span { color: var(--muted); font-size: .75rem; line-height: 1.4; }
 .worldsplit-map-hint.is-hidden { opacity: 0; transform: translate(-50%, -45%); }
 
 .worldsplit-map-label {
@@ -132,7 +132,7 @@
   padding: 6px 8px;
   color: var(--muted);
   background: color-mix(in srgb, var(--surface) 84%, transparent);
-  font-size: .62rem;
+  font-size: .75rem;
   pointer-events: none;
 }
 
@@ -185,7 +185,7 @@
 
 .worldsplit-progress-label {
   color: var(--muted);
-  font-size: .7rem;
+  font-size: .75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -222,9 +222,9 @@
 
 .worldsplit-side-card.is-a { border-top: 4px solid var(--worldsplit-a); }
 .worldsplit-side-card.is-b { border-top: 4px solid var(--worldsplit-b); }
-.worldsplit-side-name { color: var(--muted); font-size: .65rem; font-weight: 760; text-transform: uppercase; }
+.worldsplit-side-name { color: var(--muted); font-size: .75rem; font-weight: 760; text-transform: uppercase; }
 .worldsplit-side-value { font-size: clamp(1.45rem, 2.7vw, 2.15rem); line-height: 1; letter-spacing: -.045em; }
-.worldsplit-side-population { min-height: 28px; color: var(--muted); font-size: .63rem; line-height: 1.35; }
+.worldsplit-side-population { min-height: 28px; color: var(--muted); font-size: .75rem; line-height: 1.35; }
 
 .worldsplit-result-callout {
   margin-top: 10px;
@@ -236,7 +236,7 @@
 .worldsplit-result-callout strong,
 .worldsplit-result-callout span { display: block; }
 .worldsplit-result-callout strong { margin-bottom: 5px; font-size: .88rem; }
-.worldsplit-result-callout span { color: var(--muted); font-size: .68rem; line-height: 1.45; }
+.worldsplit-result-callout span { color: var(--muted); font-size: .75rem; line-height: 1.45; }
 
 .worldsplit-adjustments {
   display: grid;
@@ -246,15 +246,18 @@
 
 .worldsplit-adjust-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 52px 1fr 1fr;
+  align-items: center;
   gap: 7px;
 }
+
+.worldsplit-adjust-label { color: var(--muted); font-size: .75rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 
 .worldsplit-adjust-button,
 .worldsplit-reset-line {
   min-height: 36px;
   padding: 0 10px;
-  font-size: .7rem;
+  font-size: .75rem;
   font-weight: 700;
 }
 
@@ -281,7 +284,7 @@
 .worldsplit-data-note {
   margin: 16px 0 0;
   color: var(--subtle);
-  font-size: .6rem;
+  font-size: .75rem;
   line-height: 1.45;
 }
 
@@ -319,6 +322,9 @@
   .worldsplit-panel-title h1 { font-size: 2rem; }
   .worldsplit-map-label { display: none; }
   .worldsplit-map-hint { width: min(250px, calc(100% - 24px)); }
+  /* Phones: Lock / Next sit straight under the map, not below the side cards and fine-tuning. */
+  .worldsplit-panel { display: flex; flex-direction: column; }
+  .worldsplit-panel-actions { order: -1; margin: 0 0 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

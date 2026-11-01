@@ -319,7 +319,7 @@ export function createWorldMapView(features: readonly WorldCountryFeature[], cou
 
   const zoomInButton = createButton("+", "Zoom in");
   const zoomOutButton = createButton("−", "Zoom out");
-  const resetViewButton = options.recenter ? createButton(options.recenter.text, options.recenter.label) : createButton("Reset", "Reset map zoom and position");
+  const resetViewButton = options.recenter ? createButton(options.recenter.text, options.recenter.label) : createButton("Recentre", "Recentre the map");
   const controls = document.createElement("div");
   controls.className = "world-map-controls";
   controls.append(zoomInButton, zoomOutButton, resetViewButton);

@@ -300,6 +300,18 @@ describe("multiplayer screen", () => {
     screen.destroy();
     expect(server.sent.at(-1)).toEqual({ type: "LEAVE_ROOM" });
   });
+
+  it("doesn't claim a win in a room of one", async () => {
+    window.localStorage.setItem("locato.mp.name", "Ana");
+    const { server, screen } = mountScreen({ initialJoinCode: "K7QMR" });
+    await flush();
+    server.emit({ type: "SESSION_ASSIGNED", playerId: "p1", roomCode: "K7QMR", sessionToken: "t1" });
+    server.emit({ type: "ROOM_SNAPSHOT", room: room({ status: "complete" }) });
+    server.emit({ type: "GAME_COMPLETED", results: [{ playerId: "p1", name: "Ana", rank: 1, score: 0, correctAnswers: 0, wrongAnswers: 0 }] });
+    expect(screen.element.querySelector(".mp-results-title")?.textContent).toBe("Game over");
+    expect(screen.element.querySelector(".mp-results-head .mp-muted")?.textContent).toMatch(/^Solo game\./);
+    screen.destroy();
+  });
 });
 
 describe("ratings", () => {

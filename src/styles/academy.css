@@ -26,7 +26,7 @@
   --acad-m-mastered: #cbe78f;
   --acad-line: #7f938a;
   --acad-line-group: #f4f1d8;
-  --acad-ink: #f08a65;
+  --acad-ink: #f79c7c;
   --acad-ink-soft: rgba(240, 138, 101, 0.14);
   --acad-paper: #1f2c23;
   --acad-paper-edge: #2b3b2f;
@@ -60,7 +60,7 @@
 
 #academy .academy-kicker {
   color: var(--brand);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   line-height: 1.2;
@@ -229,7 +229,7 @@
 
 #academy .academy-chip:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 #academy .academy-chip-name { overflow: hidden; font-size: 0.8rem; font-weight: 800; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-#academy .academy-chip-meta { color: var(--muted); font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+#academy .academy-chip-meta { color: var(--muted); font-size: .75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 #academy .academy-chip-bar {
   position: relative;
@@ -419,7 +419,7 @@
 
 #academy .academy-map-caption-text { display: grid; min-width: 0; }
 #academy .academy-map-caption-name { font-size: 0.92rem; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#academy .academy-map-caption-meta { color: var(--muted); font-size: 0.74rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#academy .academy-map-caption-meta { color: var(--muted); font-size: .75rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #academy .academy-map-legend {
   position: absolute;
@@ -437,7 +437,7 @@
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: blur(8px);
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: .75rem;
   font-weight: 700;
   pointer-events: none;
 }
@@ -559,7 +559,7 @@
 
 #academy .academy-stat .academy-icon { grid-area: icon; width: 24px; height: 24px; color: var(--muted); }
 #academy .academy-stat.is-lit .academy-icon { color: var(--acad-ink); }
-#academy .academy-stat dt { grid-area: label; color: var(--muted); font-size: 0.7rem; font-weight: 700; }
+#academy .academy-stat dt { grid-area: label; color: var(--muted); font-size: .75rem; font-weight: 700; }
 #academy .academy-stat dd { grid-area: value; margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
 #academy .academy-stat dd small { color: var(--subtle); font-size: 0.78rem; font-weight: 700; }
 
@@ -756,14 +756,14 @@
   gap: 10px;
   padding: 0 10px 0 4px;
   color: var(--subtle);
-  font-size: 0.66rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 #academy .academy-skill-legend { display: flex; gap: 4px; margin-right: 24px; }
-#academy .academy-skill-legend span { width: 40px; text-align: center; font-size: 0.62rem; letter-spacing: 0.02em; text-transform: none; }
+#academy .academy-skill-legend span { width: 40px; text-align: center; font-size: .75rem; letter-spacing: 0.02em; text-transform: none; }
 
 #academy .academy-country-list { display: grid; gap: 4px; margin: -8px 0 0; padding: 0; list-style: none; }
 
@@ -794,7 +794,7 @@
 
 #academy .academy-country-text { grid-area: text; display: grid; min-width: 0; }
 #academy .academy-country-text strong { font-size: 0.9rem; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#academy .academy-country-text span { color: var(--muted); font-size: 0.74rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#academy .academy-country-text span { color: var(--muted); font-size: .75rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #academy .academy-mastery-chip {
   grid-area: chip;
@@ -803,7 +803,7 @@
   border-radius: 999px;
   background: var(--surface-soft);
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: .75rem;
   font-weight: 800;
 }
 
@@ -856,8 +856,8 @@
 #academy .academy-ring.is-full .academy-ring-fill { stroke: var(--acad-m-mastered); }
 #academy .academy-ring[style*="--ring-pct: 0;"] .academy-ring-fill,
 #academy .academy-ring[style$="--ring-pct: 0"] .academy-ring-fill { stroke: transparent; }
-#academy .academy-ring-sm.is-full .academy-ring-value { font-size: 0.6rem; }
-#academy .academy-ring-value { font-size: 0.7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+#academy .academy-ring-sm.is-full .academy-ring-value { font-size: .75rem; }
+#academy .academy-ring-value { font-size: .75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 #academy .academy-ring-lg .academy-ring-value { font-size: 1.05rem; }
 
 #academy .academy-flag-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
@@ -871,14 +871,14 @@
   box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-#academy .academy-flag-more { margin-left: 6px; color: var(--muted); font-size: 0.72rem; font-weight: 800; }
+#academy .academy-flag-more { margin-left: 6px; color: var(--muted); font-size: .75rem; font-weight: 800; }
 
 #academy .academy-difficulty {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1042,7 +1042,7 @@
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--brand);
-  font-size: 0.64rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1234,7 +1234,7 @@
     border-radius: 0;
     background: none;
     backdrop-filter: none;
-    font-size: 0.7rem;
+    font-size: .75rem;
     gap: 4px 12px;
   }
   #academy .academy-panel-title { font-size: 1.5rem; }

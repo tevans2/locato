@@ -169,7 +169,7 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
 
   const mapHint = el("div", {
     className: "worldsplit-map-hint",
-    children: [el("strong", { text: "Draw across the map" }), el("span", { text: "Click and drag. The line extends forever." })],
+    children: [el("strong", { text: "Draw across the map" }), el("span", { text: `${window.matchMedia?.("(pointer: coarse)").matches ? "Drag a finger across it" : "Click and drag"}. The line extends forever.` })],
   });
   const mapShell = el("div", {
     className: "worldsplit-map-shell",
@@ -204,14 +204,15 @@ export function createWorldSplitScreen(options: WorldSplitScreenOptions, service
 
   const rotateLeftButton = el("button", { className: "worldsplit-adjust-button", text: "↺ 5°", attrs: { type: "button", "aria-label": "Rotate line five degrees anticlockwise" } });
   const rotateRightButton = el("button", { className: "worldsplit-adjust-button", text: "5° ↻", attrs: { type: "button", "aria-label": "Rotate line five degrees clockwise" } });
-  const shiftBackButton = el("button", { className: "worldsplit-adjust-button", text: "Toward B", attrs: { type: "button", "aria-label": "Shift line toward side B" } });
-  const shiftForwardButton = el("button", { className: "worldsplit-adjust-button", text: "Toward A", attrs: { type: "button", "aria-label": "Shift line toward side A" } });
+  const shiftBackButton = el("button", { className: "worldsplit-adjust-button", text: "← Side B", attrs: { type: "button", "aria-label": "Shift line toward side B" } });
+  const shiftForwardButton = el("button", { className: "worldsplit-adjust-button", text: "Side A →", attrs: { type: "button", "aria-label": "Shift line toward side A" } });
   const resetLineButton = el("button", { className: "worldsplit-reset-line", text: "Clear line", attrs: { type: "button" } });
   const adjustControls = el("div", {
     className: "worldsplit-adjustments",
     children: [
-      el("div", { className: "worldsplit-adjust-row", children: [rotateLeftButton, rotateRightButton] }),
-      el("div", { className: "worldsplit-adjust-row", children: [shiftBackButton, shiftForwardButton] }),
+      // Labelled rows: the arrows alone didn't say what they adjust.
+      el("div", { className: "worldsplit-adjust-row", children: [el("span", { className: "worldsplit-adjust-label", text: "Rotate" }), rotateLeftButton, rotateRightButton] }),
+      el("div", { className: "worldsplit-adjust-row", children: [el("span", { className: "worldsplit-adjust-label", text: "Slide" }), shiftBackButton, shiftForwardButton] }),
       resetLineButton,
     ],
   });

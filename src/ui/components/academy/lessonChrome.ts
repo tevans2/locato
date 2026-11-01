@@ -27,6 +27,7 @@ export function createLessonTopBar(options: { readonly title: string; readonly e
     closeLabel: options.exitLabel ?? "Leave lesson",
     closeIcon: icon("close"),
     title: options.title,
+    titleTag: "h1",
     progress: 0,
     progressLabel: "Lesson progress",
     trailing: streak,

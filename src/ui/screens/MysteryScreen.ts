@@ -42,6 +42,7 @@ import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt
 import type { RankedSession } from "./RankedSession";
 import { trackGameComplete } from "../../app/analytics";
 import "../../styles/mystery.css";
+import { bindKeyboardAwareInput } from "../dom/mobileKeyboard";
 import { shareLink } from "../../core/shareLink";
 
 export interface MysteryScreenOptions {
@@ -665,6 +666,8 @@ export function createMysteryScreen(options: MysteryScreenOptions, services: Mys
   const layout = el("main", { className: "mystery-layout", children: [mapShell, panel] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen mystery-screen gb-screen" });
+  // Phones: keep the map and the field in view while the keyboard is up (mobileKeyboard.ts).
+  bindKeyboardAwareInput(element, guessInput.input, signal);
   const bar = createBestBar(element, shell, {
     gameMode: "mystery",
     storage: options.storage,

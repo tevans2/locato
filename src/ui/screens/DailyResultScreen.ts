@@ -1,4 +1,4 @@
-import { DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, formatDailyTime, getLocalDailyDate, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
+import { DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, formatDailyDate, formatDailyTime, getLocalDailyDate, type DailyRoundMark, type DailyRoundResult } from "../../core/dailyChallenge";
 import { dailyThemeForDate } from "../../core/dailyThemes";
 import { getCategory } from "../../core/categories";
 import type { CountryIndex } from "../../core/countries";
@@ -82,12 +82,7 @@ export function withGuestEntry(entries: readonly DailyLeaderboardEntry[], result
   return [...entries.slice(0, at), own, ...entries.slice(at)].map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
-/** "Tuesday 21 October" / "Tue 21 Oct" for a daily's YYYY-MM-DD date. */
-export function formatDailyDate(date: string, style: "long" | "short" = "long"): string {
-  const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleDateString("en-GB", style === "long" ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
-}
+export { formatDailyDate } from "../../core/dailyChallenge";
 
 /** "7h 12m" until the next local midnight, when a new daily opens. */
 export function formatUntilNextDaily(now: Date): string {

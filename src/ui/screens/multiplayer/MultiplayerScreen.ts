@@ -30,6 +30,7 @@ import { createMultiplayerResults } from "./MultiplayerResults";
 import { roomKindInfo } from "./roomModes";
 import { trackGameComplete } from "../../../app/analytics";
 import "../../../styles/multiplayer-hub.css";
+import { bindKeyboardAwareInput } from "../../dom/mobileKeyboard";
 
 export interface MultiplayerScreenOptions {
   readonly shell: ShellContext;
@@ -211,6 +212,8 @@ export function createMultiplayerScreen(options: MultiplayerScreenOptions): Scre
     children: [el("div", { className: "multiplayer-chat-header", children: [el("span", { className: "eyebrow", text: "Room chat" })] }), chatList, chatForm],
   });
   const chatDock = el("div", { className: "multiplayer-chat-dock", attrs: { hidden: "" }, children: [chatPanel, chatToggle] });
+  // Phones: the chat docks just above the keyboard, and Send doesn't drop it (mobileKeyboard.ts).
+  bindKeyboardAwareInput(chatDock, chatInput, signal);
   chatToggle.addEventListener("click", () => {
     chatOpen = !chatOpen;
     render(session.state());

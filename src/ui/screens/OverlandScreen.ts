@@ -48,6 +48,7 @@ import { createBestBar, createRankedResults, readSingleBest, submitRankedAttempt
 import type { RankedSession } from "./RankedSession";
 import { trackGameComplete } from "../../app/analytics";
 import "../../styles/overland.css";
+import { bindKeyboardAwareInput } from "../dom/mobileKeyboard";
 import { shareLink } from "../../core/shareLink";
 
 export interface OverlandScreenOptions {
@@ -708,6 +709,8 @@ export function createOverlandScreen(options: OverlandScreenOptions, services: O
   const layout = el("main", { className: "overland-layout", children: [mapShell, panel] });
   const resultsStage = createResultsStage(layout);
   const element = el("section", { className: "game-screen overland-screen gb-screen" });
+  // Phones: keep the map and the field in view while the keyboard is up (mobileKeyboard.ts).
+  bindKeyboardAwareInput(element, guessInput.input, signal);
   const bar = daily
     ? createDailyStageBar(element, {
         stage: "Overland",
