@@ -112,7 +112,7 @@
   border-radius: 8px;
   color: var(--muted);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
-  font-size: .66rem;
+  font-size: .75rem;
   font-weight: 700;
   list-style: none;
   pointer-events: none;
@@ -152,7 +152,7 @@
 
 .overland-eyebrow {
   color: var(--brand);
-  font-size: .62rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -163,7 +163,7 @@
   border: 0;
   color: var(--muted);
   background: transparent;
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -201,7 +201,7 @@
 
 .overland-progress { display: grid; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--border); }
 .overland-progress > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.overland-progress-label { color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.overland-progress-label { color: var(--muted); font-size: .75rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .overland-running-score { font-size: .82rem; font-variant-numeric: tabular-nums; }
 .overland-progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .overland-progress-dot { height: 4px; border-radius: 99px; background: var(--surface-soft); }
@@ -214,7 +214,7 @@
 /* ---------- Guess box ---------- */
 
 .overland-guess-form { position: relative; display: grid; gap: 7px; margin-top: 16px; }
-.overland-input-label { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.overland-input-label { color: var(--muted); font-size: .75rem; font-weight: 700; }
 .overland-input-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 
 #app .overland-input {
@@ -276,7 +276,7 @@
 /* ---------- Guesses ---------- */
 
 .overland-meter { display: grid; gap: 7px; margin-top: 12px; }
-.overland-meter-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.overland-meter-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .75rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .overland-meter-label { color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
 .overland-meter-pips { display: flex; gap: 4px; }
 .overland-pip { flex: 1 1 0; height: 8px; border-radius: 99px; background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--border); }
@@ -306,10 +306,10 @@
 .overland-guess.is-route { border-left-color: var(--ov-route); }
 .overland-guess.is-close { border-left-color: var(--ov-close); }
 .overland-guess.is-detour { border-left-color: var(--ov-detour); }
-.overland-guess-index { color: var(--subtle); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.overland-guess-index { color: var(--subtle); font-size: .75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .overland-guess-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .overland-guess-name { overflow: hidden; font-size: .88rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.overland-guess-verdict { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .7rem; font-weight: 750; white-space: nowrap; }
+.overland-guess-verdict { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .75rem; font-weight: 750; white-space: nowrap; }
 
 @keyframes overland-guess-in {
   from { opacity: 0; transform: translateY(-4px); }
@@ -341,8 +341,8 @@
 #app .overland-hint:hover:not(:disabled) { border-style: solid; background: var(--surface-soft); }
 #app .overland-hint:disabled { color: var(--subtle); cursor: not-allowed; }
 #app .overland-hint .shell-icon { color: var(--ov-close); }
-.overland-hint-cost { color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
-.overland-hint-note { min-height: 0; margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+.overland-hint-cost { color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.overland-hint-note { min-height: 0; margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.5; }
 .overland-hint-note:empty { display: none; }
 
 .overland-initial {
@@ -374,7 +374,7 @@
 .overland-outcome-title { font-family: var(--font-editorial); font-size: 1.35rem; font-weight: 480; letter-spacing: -.02em; }
 .overland-outcome-points { flex: none; font-size: .86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .overland-outcome-detail { margin: 4px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.5; }
-.overland-chain-label { margin: 13px 0 6px; color: var(--muted); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.overland-chain-label { margin: 13px 0 6px; color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .overland-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .overland-chain-arrow { color: var(--subtle); font-size: .8rem; }
 
@@ -398,7 +398,7 @@
 .overland-all { margin-top: 10px; }
 .overland-all-routes { display: grid; gap: 8px; margin-top: 8px; }
 .overland-all-routes[hidden] { display: none; }
-.overland-note { margin: 12px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.overland-note { margin: 12px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--muted); font-size: .75rem; line-height: 1.5; }
 #app .overland-next { width: 100%; min-height: 46px; margin-top: 16px; }
 
 /* ---------- Today's route ---------- */
@@ -415,7 +415,7 @@
 }
 
 .overland-today-stats div { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
-.overland-today-stats dt { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.overland-today-stats dt { color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .overland-today-stats dd { margin: 3px 0 0; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .overland-share-preview {
   margin: 0;
@@ -435,7 +435,7 @@
 .overland-today-next { margin: 0; color: var(--muted); font-size: .76rem; }
 #app .overland-share { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; }
 #app .overland-play-run { justify-self: center; }
-.overland-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .74rem; text-align: center; }
+.overland-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .75rem; text-align: center; }
 
 /* ---------- How to play (in the shell layer) ---------- */
 
@@ -471,7 +471,7 @@
   .overland-layout { gap: 10px; }
   .overland-panel { padding: 18px 16px; }
   .overland-route { font-size: 1.5rem; }
-  .overland-legend { left: 8px; bottom: 8px; gap: 4px 9px; padding: 6px 8px; font-size: .6rem; }
+  .overland-legend { left: 8px; bottom: 8px; gap: 4px 9px; padding: 6px 8px; font-size: .75rem; }
   #shell-layer .overland-howto-legend li { grid-template-columns: auto minmax(0, 1fr); }
   #shell-layer .overland-howto-legend li > span:last-child { grid-column: 2; }
 }
@@ -479,4 +479,16 @@
 @media (prefers-reduced-motion: reduce) {
   .overland-screen .overland-map .world-map-country,
   .overland-guess { transition: none; animation: none; }
+}
+
+/* Phones, keyboard up: the map takes exactly the room left above the field (so iOS never has to
+   push the page up), the panel header steps aside, and suggestions open upward over the map
+   instead of under the keyboard. */
+@media (max-width: 700px) {
+  .overland-screen.is-mobile-typing :is(.overland-title-row, .overland-route-detail, .overland-progress) { display: none; }
+  .overland-screen.is-mobile-typing .overland-map-shell,
+  .overland-screen.is-mobile-typing .overland-map-shell > .world-map-panel { height: clamp(130px, calc(var(--viewport-height, 62svh) - 185px), 420px); }
+  .overland-screen.is-mobile-typing .overland-panel { padding-top: 12px; }
+  .overland-screen.is-mobile-typing .overland-route { font-size: 1.1rem; }
+  .overland-screen.is-mobile-typing .overland-suggestions { top: auto; bottom: calc(100% + 4px); max-height: min(220px, 34svh); overflow-y: auto; }
 }

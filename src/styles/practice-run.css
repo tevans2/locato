@@ -48,7 +48,7 @@
 #app .gb-run-list-title {
   margin: 0 0 8px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -91,7 +91,7 @@
   flex: none;
   width: 2ch;
   color: var(--subtle);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
@@ -113,7 +113,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-#app .gb-run-copy small { overflow: hidden; color: var(--muted); font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
+#app .gb-run-copy small { overflow: hidden; color: var(--muted); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
 
 #app .gb-run-value {
   flex: none;
@@ -136,7 +136,7 @@
 .maptap-run-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .maptap-run-label {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -193,7 +193,8 @@
   --border-strong: rgba(255, 255, 255, 0.28);
   --text: #eef1e8;
   --muted: #a7b3ad;
-  --subtle: #7f8c86;
+  --subtle: #95a29c;
+  --accent-text: #d8ec99;
   --brand: #d8ec99;
   --brand-hover: #e9f7be;
   --on-brand: #15241b;
@@ -275,3 +276,12 @@
   #app .geoguessr-screen[data-phase="complete"] .geo-map-legend { top: calc(25dvh + 127px); }
 }
 .geoguessr-screen[data-phase="unconfigured"] .geo-loading-actions { display: none; }
+
+/* Street View, typing on a phone: room to scroll the view back to the top of what's visible, and
+   a step down by --viewport-top when iOS has panned the page up (see mobileKeyboard.ts). */
+@media (max-width: 700px) {
+  #app > :is(.streetview-country-screen, .mystery-screen, .overland-screen).gb-screen[data-shell].is-mobile-typing:not(.is-streetview-fullscreen) {
+    padding-top: var(--viewport-top, 0px);
+    padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
+  }
+}

@@ -386,7 +386,7 @@ export function createPuzzleMapView(
 
   const zoomInButton = createButton("+", "Zoom in");
   const zoomOutButton = createButton("−", "Zoom out");
-  const resetViewButton = createButton("Reset", "Reset puzzle board zoom and position");
+  const resetViewButton = createButton("Recentre", "Recentre the puzzle board");
   const controls = document.createElement("div");
   controls.className = "world-map-controls puzzle-board-controls";
   controls.append(zoomInButton, zoomOutButton, resetViewButton);

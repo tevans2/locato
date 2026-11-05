@@ -10,7 +10,7 @@
 #app #daily-result .daily-result-kicker {
   margin: 0;
   color: var(--brand);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -52,7 +52,7 @@
 #app .daily-intro-panel .daily-result-kicker {
   margin: 0;
   color: var(--brand);
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -74,7 +74,7 @@
 #app .daily-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 10px; }
 #app .daily-format article { display: flex; flex-direction: column; gap: 9px; border: 1px solid var(--border); border-radius: 14px; padding: 18px; background: var(--surface); }
 #app .daily-format article svg { color: var(--brand); margin-bottom: 6px; }
-#app .daily-format article span { color: var(--muted); font-size: .73rem; }
+#app .daily-format article span { color: var(--muted); font-size: .75rem; }
 #app .daily-format article strong { font-size: .92rem; }
 #app .daily-intro-balance { margin: 0; font-size: .86rem; line-height: 1.7; color: var(--muted); }
 #app .daily-scoring { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
@@ -82,6 +82,13 @@
 #app .daily-scoring p { margin: 0; font-size: .86rem; line-height: 1.7; }
 #app .daily-scoring p + p { margin-top: 10px; }
 #app .daily-resume-note { margin: 0; font-size: .86rem; color: var(--brand); }
+#app .daily-intro-lead, #app .daily-intro-side { display: flex; flex-direction: column; align-items: flex-start; gap: 22px; min-width: 0; }
+#app .daily-intro-side { width: 100%; gap: 14px; }
+@media (min-width: 1000px) {
+  #app .daily-intro-panel.is-split { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; gap: clamp(32px, 5vw, 72px); width: 100%; }
+  #app .daily-intro-panel.is-split .daily-intro-side { padding-top: 34px; }
+  #app .daily-intro-panel.is-split .daily-format { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 #app .daily-start-button { min-height: 48px; }
 #app .daily-result-theme { margin: 0; font-family: var(--font-editorial); font-size: 1.8rem; font-weight: 430; }
 #app .daily-recap { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; width: 100%; padding: 24px 0; }
@@ -92,7 +99,7 @@
 #app .daily-recap-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
 #app .daily-recap-number { color: var(--muted); font-size: .8rem; }
 #app .daily-recap-answer { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-#app .daily-recap-mode { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+#app .daily-recap-mode { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 #app .daily-recap-answer strong { font-size: .94rem; overflow-wrap: anywhere; }
 #app .daily-recap-reason { font-size: .78rem; color: var(--muted); line-height: 1.5; }
 #app .daily-recap-points { color: var(--brand); font-size: .9rem; }
@@ -149,7 +156,7 @@
 #app #daily-result .daily-claim-error { color: var(--bad); font-size: .84rem; }
 #app #daily-result .daily-claim-error[hidden] { display: none; }
 #app #daily-result .daily-claim-fine { color: var(--muted); font-size: .76rem; }
-#app #daily-result .daily-guest-tag { padding: 0 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .66rem; letter-spacing: .03em; }
+#app #daily-result .daily-guest-tag { padding: 0 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .75rem; letter-spacing: .03em; }
 
 #app #daily-result .daily-tiles { display: grid; grid-template-columns: repeat(10, minmax(0, 34px)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 #app #daily-result .daily-tile { display: block; aspect-ratio: 1; border-radius: 7px; background: var(--daily-miss); }
@@ -166,7 +173,7 @@
 
 #app #daily-result .daily-recap { padding-top: 8px; }
 #app #daily-result .daily-recap-heading { flex-wrap: wrap; }
-#app #daily-result .daily-legend { gap: 6px 14px; font-size: .74rem; }
+#app #daily-result .daily-legend { gap: 6px 14px; font-size: .75rem; }
 #app #daily-result .daily-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 #app #daily-result .daily-legend .daily-tile { width: 10px; border-radius: 3px; }
 #app #daily-result .daily-recap-row { position: relative; padding-left: 14px; }
@@ -193,7 +200,7 @@
 #app #daily-result .daily-board-time { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 #app #daily-result .daily-board-row:not(.is-you) { grid-template-columns: 2.6em minmax(0, 1fr) auto auto; }
 #app #daily-result .daily-friend-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#app #daily-result .daily-you-pill { padding: 2px 8px; border-radius: 999px; background: var(--brand); color: var(--bg); font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+#app #daily-result .daily-you-pill { padding: 2px 8px; border-radius: 999px; background: var(--brand); color: var(--bg); font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 #app #daily-result .daily-board-gap { padding: 0 10px; color: var(--muted); line-height: 1; }
 #app #daily-result .daily-empty-row { color: var(--muted); grid-template-columns: 1fr; }
 #app #daily-result .daily-history-bar { width: 72px; height: 6px; border-radius: 6px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
@@ -210,7 +217,7 @@
 #app #daily-result .daily-keep-playing { display: grid; gap: 14px; width: 100%; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: radial-gradient(120% 160% at 0% 0%, var(--accent-soft), var(--surface) 60%); scroll-margin-top: 88px; }
 #app #daily-result .daily-keep-playing:focus { outline: none; }
 #app #daily-result .daily-keep-playing:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-#app #daily-result .daily-keep-heading h2 { margin: 0; font-size: 1.15rem; }
+#app #daily-result .daily-keep-heading h2 { margin: 0; font-family: var(--font-editorial); font-size: 1.45rem; font-weight: 480; letter-spacing: -0.02em; }
 #app #daily-result .daily-keep-heading p { margin: 4px 0 0; font-size: .86rem; line-height: 1.5; }
 #app #daily-result .daily-keep-games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
 #app #daily-result .daily-keep-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 10px 12px; width: 100%; height: 100%; margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transform: none; transition: border-color 150ms ease, background 150ms ease; }
@@ -218,7 +225,7 @@
 #app #daily-result .daily-keep-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--accent-soft); color: var(--brand); }
 #app #daily-result .daily-keep-copy { display: grid; align-content: start; gap: 3px; min-width: 0; }
 #app #daily-result .daily-keep-copy strong { font-size: .95rem; }
-#app #daily-result .daily-keep-note { color: var(--brand); font-size: .74rem; font-weight: 700; }
+#app #daily-result .daily-keep-note { color: var(--brand); font-size: .75rem; font-weight: 700; }
 #app #daily-result .daily-keep-note.is-loss { color: var(--muted); }
 #app #daily-result .daily-keep-description { color: var(--muted); font-size: .78rem; line-height: 1.45; }
 #app #daily-result .daily-keep-cta { grid-column: 2; display: inline-flex; align-items: center; gap: 6px; color: var(--brand); font-size: .8rem; font-weight: 750; }
@@ -235,3 +242,12 @@
   #app #daily-result .daily-keep-more p > span:first-child { flex-basis: 100%; }
   #app #daily-result .daily-keep-more .shell-btn { width: 100%; justify-content: center; }
 }
+
+/* Each tile carries a mark as well as a colour (✓ full, ½ with help, ✕ missed), so the grid reads
+   without telling red from green. */
+#app #daily-result .daily-tile { display: grid; place-items: center; color: rgba(255, 255, 255, 0.94); font-size: .75rem; font-weight: 900; line-height: 1; }
+#app #daily-result .daily-tile::before { content: "✕"; }
+#app #daily-result .daily-tile.is-correct::before { content: "✓"; }
+#app #daily-result .daily-tile.is-hint { color: #2b2006; }
+#app #daily-result .daily-tile.is-hint::before { content: "½"; }
+:root[data-theme="dark"] #app #daily-result .daily-tile:not(.is-hint) { color: #10170f; }

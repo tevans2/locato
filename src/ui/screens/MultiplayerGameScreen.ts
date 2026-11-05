@@ -7,6 +7,7 @@ import { promptImageClass } from "../dom/renderPrompt";
 import { createWorldMapView, setWorldMapTargetCountry } from "../dom/renderWorldMap";
 import { createFlagColorRevealView } from "../dom/renderFlagColorReveal";
 import { playTick } from "../dom/sfx";
+import { bindKeyboardAwareInput, reopenKeyboard } from "../dom/mobileKeyboard";
 
 export interface MultiplayerGameViewState {
   readonly room: PublicRoomState;
@@ -223,7 +224,8 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   answerForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const answer = answerInput.value.trim();
-    if (!answer) return;
+    // Read-only between rounds (see update): the box keeps focus, but there's nothing to answer.
+    if (!answer || answerInput.readOnly) return;
     if (activeFlagColorPromptSrc) {
       const guessedCountry = countryForGuess(options.countryIndex, answer);
       if (guessedCountry) flagColorReveal.addGuess(guessedCountry.flagSrc);
@@ -256,6 +258,11 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
   });
 
   skipButton.addEventListener("click", () => options.onSkip());
+
+  // Phones: keep the prompt and the answer box in view with the keyboard up, and let one tap on
+  // Submit answer (mobileKeyboard.ts).
+  const keyboard = new AbortController();
+  bindKeyboardAwareInput(element, answerInput, keyboard.signal);
 
   return {
     element,
@@ -292,7 +299,12 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       skipButton.hidden = !state.canSubmit || skipRequired === 0;
       skipButton.disabled = !state.canSubmit || localSkipVoted;
       skipButton.textContent = localSkipVoted ? `Skip voted ${skipCount}/${skipRequired}` : `Skip ${skipCount}/${skipRequired}`;
-      answerInput.disabled = !state.canSubmit;
+      // Between rounds the box goes read-only rather than disabled: disabling blurs it, which drops
+      // a phone keyboard every round (and iOS won't reopen it from the next round's focus()).
+      answerInput.disabled = state.room.status === "complete";
+      answerInput.readOnly = !state.canSubmit;
+      answerInput.setAttribute("aria-disabled", String(!state.canSubmit));
+      answerInput.placeholder = state.canSubmit ? "Type the country name" : state.room.status === "complete" ? "Game over" : "Next round coming…";
       submitButton.disabled = !state.canSubmit;
       answerForm.hidden = isMapClickRound;
       mapView.element.classList.toggle("is-disabled", !state.canSubmit);
@@ -301,8 +313,10 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       // ROUND_STARTED/GAME_STARTED frame arrives while status is still round-result/lobby
       // (canSubmit false), and the playing snapshot follows separately. Keying focus off
       // canSubmit handles that split, and once-per-round avoids stealing the caret mid-type.
+      // A phone keyboard went down during the break (the box was read-only) while the box stayed
+      // selected: reopenKeyboard brings it back where the browser allows it.
       if (state.canSubmit && !isMapClickRound && roundKey !== null && roundKey !== focusedRoundKey) {
-        answerInput.focus();
+        reopenKeyboard(answerInput);
         focusedRoundKey = roundKey;
       }
 
@@ -414,6 +428,9 @@ export function createMultiplayerGameView(options: MultiplayerGameViewOptions): 
       const bumpWinner = state.roundResult?.results.find((result) => result.correct);
       if (bumpWinner) scoreList.querySelector(`[data-player-id="${bumpWinner.playerId}"]`)?.classList.add("score-bump");
     },
-    destroy: stopTimerLoop,
+    destroy: () => {
+      stopTimerLoop();
+      keyboard.abort();
+    },
   };
 }

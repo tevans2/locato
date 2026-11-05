@@ -67,7 +67,7 @@ describe("SiteHeader and TabBar", () => {
     const nav = header.element.querySelector(".shell-site-nav")!;
     const current = [...nav.querySelectorAll("a[aria-current]")];
     expect(current.map((link) => link.textContent)).toEqual(["Learn"]);
-    expect([...nav.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Leaderboards", "You"]);
+    expect([...nav.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Leaderboards"]);
     expect(nav.querySelector<HTMLAnchorElement>('a[data-section="multiplayer"]')!.getAttribute("href")).toBe("/?view=multiplayer");
     expect(nav.querySelector<HTMLAnchorElement>('a[data-section="leaderboards"]')!.getAttribute("href")).toBe("/?view=leaderboards");
 
@@ -75,8 +75,12 @@ describe("SiteHeader and TabBar", () => {
     header.element.querySelector<HTMLButtonElement>(".shell-brand")!.click();
     expect(ctx.calls).toEqual(["section:daily", "home"]);
 
+    header.setSection("leaderboards");
+    expect(nav.querySelector('a[aria-current="page"]')!.getAttribute("data-section")).toBe("leaderboards");
+    // You has no nav link (the account avatar opens it): nothing is marked, the header carries the section.
     header.setSection("you");
-    expect(nav.querySelector('a[aria-current="page"]')!.getAttribute("data-section")).toBe("you");
+    expect(nav.querySelector('a[aria-current="page"]')).toBeNull();
+    expect(header.element.dataset.section).toBe("you");
   });
 
   it("moves the shared controls cluster into the header and releases it on destroy", () => {
@@ -98,12 +102,12 @@ describe("SiteHeader and TabBar", () => {
     expect(createSiteHeader(makeContext(), { section: "play" }).heading).toBeNull();
   });
 
-  it("builds a tab bar with six labelled tabs and the current one marked", () => {
+  it("builds a tab bar with five labelled tabs and the current one marked", () => {
     const ctx = makeContext();
     const tabs = createTabBar(ctx, "leaderboards");
     expect(tabs.element.getAttribute("aria-label")).toBe("Sections");
-    // "Leaderboards" is too wide for a sixth of a phone; its tab says "Boards" and keeps the full name for screen readers.
-    expect([...tabs.element.querySelectorAll(".shell-tab-label")].map((label) => label.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Boards", "You"]);
+    // "Leaderboards" is too wide for a fifth of a phone; its tab says "Boards" and keeps the full name for screen readers.
+    expect([...tabs.element.querySelectorAll(".shell-tab-label")].map((label) => label.textContent)).toEqual(["Play", "Daily", "Learn", "Multiplayer", "Boards"]);
     expect(tabs.element.querySelector('[aria-current="page"]')!.getAttribute("data-section")).toBe("leaderboards");
     expect(tabs.element.querySelector('[data-section="leaderboards"]')!.getAttribute("aria-label")).toBe("Leaderboards");
     tabs.element.querySelector<HTMLAnchorElement>('[data-section="play"]')!.click();

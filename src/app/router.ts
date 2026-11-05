@@ -1,5 +1,5 @@
 import { isFlagPool, type FlagPool } from "../core/flagPools";
-import { isPromptGameModeId, isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
+import { gameModeCatalogueEntry, isPromptGameModeId, isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 
 export type AppRoute =
   | { readonly type: "landing" }
@@ -154,4 +154,32 @@ export function buildRouteUrl(route: AppRoute, location: Pick<Location, "pathnam
   }
   const search = params.toString();
   return `${location.pathname}${search ? `?${search}` : ""}`;
+}
+
+export const HOME_TITLE = "Locato — A daily geography challenge";
+
+/**
+ * The tab title for a route, so history, tabs and screen readers say where you are. Screens with
+ * a more specific name (a country's profile) refine it once they know it.
+ */
+export function routeTitle(route: AppRoute): string {
+  const game = (id: GameModeId) => `${gameModeCatalogueEntry(id).label}${"run" in route && route.run === "timed" ? " · Timed" : ""} · Locato`;
+  switch (route.type) {
+    case "landing": return HOME_TITLE;
+    case "solo-game": return game(route.categoryIds?.find(isPromptGameModeId) ?? "flags");
+    case "country-guessing": return game(route.mode ?? "name-all");
+    case "map-tap": case "streetview-country": case "geoguessr": case "worldsplit": case "flyover": return game(route.type);
+    case "overland": case "mystery": return route.daily ? `Today's ${route.type === "overland" ? "route" : "mystery"} · Locato` : game(route.type);
+    case "daily-challenge": return "Daily challenge · Locato";
+    case "daily-practice": return "Daily practice · Locato";
+    case "multiplayer": return route.joinCode ? `Room ${route.joinCode.toUpperCase()} · Multiplayer · Locato` : "Multiplayer · Locato";
+    case "stats": return "Stats · Locato";
+    case "friends": return "Friends · Locato";
+    case "leaderboards": return route.mode ? `${gameModeCatalogueEntry(route.mode).label} leaderboard · Locato` : "Leaderboards · Locato";
+    case "academy": return "Academy · Locato";
+    case "academy-lesson": return "Lesson · Academy · Locato";
+    case "academy-placement": return "Placement · Academy · Locato";
+    case "atlas": case "flag-gallery": return "Atlas · Locato";
+    case "country-profile": return "Country · Locato";
+  }
 }

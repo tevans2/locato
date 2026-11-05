@@ -122,3 +122,6 @@ p { line-height: 1.5; }
     rgba(18, 25, 18, 0.88);
 }
 .muted { color: var(--muted); }
+
+/* Headings take focus programmatically after a navigation (App.focusNewScreen); no ring for that. */
+h1[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }

@@ -69,7 +69,6 @@ export function filterAtlas(profiles: readonly CountryProfile[], entries: Return
 
 export function createAtlasScreen(options: AtlasScreenOptions): Screen {
   const { shell } = options;
-  const previousTitle = document.title;
   document.title = "Atlas · Locato";
   const profiles = allCountryProfiles();
   const entries = buildSearchEntries(profiles, options.countryIndex);
@@ -86,7 +85,7 @@ export function createAtlasScreen(options: AtlasScreenOptions): Screen {
       autocomplete: "off",
       autocapitalize: "off",
       spellcheck: "false",
-      placeholder: "Search by country, capital or code",
+      placeholder: "Country, capital or code",
       "aria-controls": "atlas-grid",
       "aria-describedby": "atlas-count",
     },
@@ -121,7 +120,7 @@ export function createAtlasScreen(options: AtlasScreenOptions): Screen {
 
   const sortSelect = el("select", {
     className: "atlas-sort-select",
-    attrs: { id: "atlas-sort" },
+    attrs: { id: "atlas-sort", "aria-label": "Sort countries" },
     children: (Object.keys(SORT_LABELS) as AtlasSort[]).map((key) => el("option", { text: SORT_LABELS[key], attrs: { value: key } })),
   });
   sortSelect.value = state.sort;
@@ -254,7 +253,6 @@ export function createAtlasScreen(options: AtlasScreenOptions): Screen {
       controller.abort();
       unsubscribe?.();
       page.destroy();
-      document.title = previousTitle;
     },
   };
 }

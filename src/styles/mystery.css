@@ -68,7 +68,7 @@
   border-radius: 8px;
   color: var(--muted);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
-  font-size: .66rem;
+  font-size: .75rem;
   font-weight: 700;
   list-style: none;
   pointer-events: none;
@@ -97,7 +97,7 @@
 .mystery-panel-title { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .mystery-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .mystery-title-links { display: flex; align-items: center; gap: 14px; }
-.mystery-eyebrow { color: var(--brand); font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.mystery-eyebrow { color: var(--brand); font-size: .75rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .mystery-title { margin: 10px 0 8px; font-family: var(--font-editorial); font-size: clamp(1.55rem, 2.6vw, 2.1rem); font-weight: 460; line-height: 1.1; letter-spacing: -.035em; }
 .mystery-detail { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
 
@@ -107,7 +107,7 @@
   border: 0;
   color: var(--muted);
   background: transparent;
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -121,7 +121,7 @@
 .mystery-progress { display: grid; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--border); }
 .mystery-progress[hidden] { display: none; }
 .mystery-progress > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.mystery-progress-label { color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.mystery-progress-label { color: var(--muted); font-size: .75rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .mystery-running-score { font-size: .82rem; font-variant-numeric: tabular-nums; }
 .mystery-progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .mystery-progress-dot { height: 4px; border-radius: 99px; background: var(--surface-soft); }
@@ -134,7 +134,7 @@
 /* ---------- Guess box ---------- */
 
 .mystery-guess-form { position: relative; display: grid; gap: 7px; margin-top: 16px; }
-.mystery-input-label { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.mystery-input-label { color: var(--muted); font-size: .75rem; font-weight: 700; }
 .mystery-input-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 
 #app .mystery-input {
@@ -181,7 +181,7 @@
 .mystery-feedback[data-tone="warm"] { color: color-mix(in srgb, var(--my-warm) 70%, var(--text)); }
 
 .mystery-meter { display: grid; gap: 7px; margin-top: 12px; }
-.mystery-meter-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.mystery-meter-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .75rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .mystery-meter-label { color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
 .mystery-meter-pips { display: flex; gap: 4px; }
 .mystery-pip { flex: 1 1 0; height: 8px; border-radius: 99px; background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--border); }
@@ -216,7 +216,7 @@
 #app .mystery-hint:hover:not(:disabled) { border-style: solid; background: var(--surface-soft); }
 #app .mystery-hint:disabled { color: var(--subtle); cursor: not-allowed; }
 #app .mystery-hint .shell-icon { color: var(--my-mild); }
-.mystery-hint-cost { color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+.mystery-hint-cost { color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 .mystery-hint-notes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .mystery-hint-notes:empty { display: none; }
 .mystery-hint-notes li { padding: 6px 10px; border-left: 3px solid var(--my-mild); background: var(--bg-elevated); font-size: .78rem; font-weight: 650; }
@@ -243,16 +243,16 @@
 .mystery-guess.is-mild { border-left-color: var(--my-mild); }
 .mystery-guess.is-found { border-left-color: var(--my-found); }
 .mystery-guess-main { display: grid; grid-template-columns: 16px auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; }
-.mystery-guess-index { color: var(--subtle); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mystery-guess-index { color: var(--subtle); font-size: .75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .mystery-guess-flag { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .mystery-guess-name { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; white-space: nowrap; }
 .mystery-guess-distance,
 .mystery-guess-proximity { font-size: .78rem; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mystery-guess-proximity { min-width: 3.2ch; color: var(--muted); text-align: right; }
-.mystery-guess-direction { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: .7rem; font-weight: 800; }
+.mystery-guess-direction { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: .75rem; font-weight: 800; }
 .mystery-arrow { display: inline-flex; color: var(--text); transition: transform 300ms ease; }
 .mystery-guess-clues { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 24px; }
-.mystery-chip { padding: 2px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: .68rem; font-weight: 750; white-space: nowrap; }
+.mystery-chip { padding: 2px 8px; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: .75rem; font-weight: 750; white-space: nowrap; }
 .mystery-chip.is-yes { border-color: color-mix(in srgb, var(--my-found) 60%, var(--border)); color: color-mix(in srgb, var(--my-found) 70%, var(--text)); }
 .mystery-chip.is-no { border-style: dashed; }
 
@@ -279,9 +279,9 @@
 .mystery-answer { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
 .mystery-answer-flag { width: 54px; height: 36px; flex: none; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px var(--border-strong); }
 .mystery-answer > div { display: grid; gap: 2px; min-width: 0; }
-.mystery-answer-kicker { color: var(--muted); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.mystery-answer-kicker { color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .mystery-answer-name { font-size: 1.15rem; }
-.mystery-answer-facts { color: var(--muted); font-size: .74rem; line-height: 1.45; }
+.mystery-answer-facts { color: var(--muted); font-size: .75rem; line-height: 1.45; }
 #app .mystery-next { width: 100%; min-height: 46px; margin-top: 16px; }
 
 /* ---------- Today's mystery ---------- */
@@ -289,7 +289,7 @@
 .mystery-today-summary { display: grid; gap: 10px; margin-top: 16px; }
 .mystery-today-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
 .mystery-today-stats div { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
-.mystery-today-stats dt { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.mystery-today-stats dt { color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .mystery-today-stats dd { margin: 3px 0 0; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .mystery-share-preview {
@@ -311,7 +311,7 @@
 .mystery-today-next { margin: 0; color: var(--muted); font-size: .76rem; }
 #app .mystery-share { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; }
 #app .mystery-play-run { justify-self: center; }
-.mystery-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .74rem; text-align: center; }
+.mystery-share-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .75rem; text-align: center; }
 
 /* ---------- How to play (in the shell layer) ---------- */
 
@@ -337,7 +337,7 @@
 @media (max-width: 700px) {
   .mystery-layout { gap: 10px; }
   .mystery-panel { padding: 18px 16px; }
-  .mystery-legend { left: 8px; bottom: 8px; gap: 4px 9px; padding: 6px 8px; font-size: .6rem; }
+  .mystery-legend { left: 8px; bottom: 8px; gap: 4px 9px; padding: 6px 8px; font-size: .75rem; }
   .mystery-guess-main { grid-template-columns: 16px auto minmax(0, 1fr) auto auto; }
   .mystery-guess-proximity { display: none; }
   .mystery-guess-clues { padding-left: 0; }
@@ -346,4 +346,15 @@
 @media (prefers-reduced-motion: reduce) {
   .mystery-guess,
   .mystery-arrow { animation: none; transition: none; }
+}
+
+/* Phones, keyboard up: the map takes exactly the room left above the field (so iOS never has to
+   push the page up), the panel header steps aside, and suggestions open upward over the map
+   instead of under the keyboard. */
+@media (max-width: 700px) {
+  .mystery-screen.is-mobile-typing :is(.mystery-panel-title, .mystery-progress) { display: none; }
+  .mystery-screen.is-mobile-typing .mystery-map-shell,
+  .mystery-screen.is-mobile-typing .mystery-map-shell > .world-map-panel { height: clamp(130px, calc(var(--viewport-height, 62svh) - 150px), 420px); }
+  .mystery-screen.is-mobile-typing .mystery-panel { padding-top: 12px; }
+  .mystery-screen.is-mobile-typing .mystery-suggestions { top: auto; bottom: calc(100% + 4px); max-height: min(220px, 34svh); overflow-y: auto; }
 }

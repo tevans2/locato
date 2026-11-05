@@ -100,7 +100,7 @@
 
 #multiplayer .mp-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 #multiplayer .mp-card-title { font-size: 1.04rem; font-weight: 800; letter-spacing: -0.01em; }
-#multiplayer .mp-subtitle { margin: 18px 0 8px; color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+#multiplayer .mp-subtitle { margin: 18px 0 8px; color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 #multiplayer .mp-muted { color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
 #multiplayer .mp-small { font-size: 0.8rem; }
 
@@ -109,7 +109,7 @@
   align-items: center;
   gap: 8px;
   color: var(--mp-live);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -165,7 +165,7 @@
   text-underline-offset: 4px;
 }
 
-#multiplayer .mp-field-label { color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+#multiplayer .mp-field-label { color: var(--muted); font-size: .75rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 #multiplayer .mp-field-hint { color: var(--muted); font-size: 0.8rem; }
 #multiplayer .mp-field-hint.is-error,
 #multiplayer .mp-field-error { color: var(--bad); font-size: 0.82rem; font-weight: 700; }
@@ -226,7 +226,7 @@
   border-radius: 999px;
   background: var(--mp-you);
   color: var(--text);
-  font-size: 0.68rem;
+  font-size: .75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -301,7 +301,7 @@
 }
 
 #multiplayer .mp-start-head { display: grid; gap: 8px; }
-#multiplayer .mp-start-title { font-size: clamp(1.5rem, 2.6vw, 1.9rem); font-weight: 800; letter-spacing: -0.025em; }
+#multiplayer .mp-start-title { font-family: var(--font-editorial); font-size: clamp(1.6rem, 2.8vw, 2rem); font-weight: 480; letter-spacing: -0.03em; }
 
 #multiplayer .mp-name-field { display: grid; gap: 6px; max-width: 360px; }
 
@@ -486,7 +486,7 @@
   border-radius: 999px;
   background: var(--surface-soft);
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
   font-weight: 800;
 }
 
@@ -532,7 +532,7 @@
 #multiplayer .mp-chip-picker { display: grid; gap: 10px; }
 #multiplayer .mp-chip-group { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 10px; }
 #multiplayer .mp-chip-group:only-child { grid-template-columns: minmax(0, 1fr); }
-#multiplayer .mp-chip-group-label { padding-top: 9px; color: var(--subtle); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+#multiplayer .mp-chip-group-label { padding-top: 9px; color: var(--subtle); font-size: .75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 #multiplayer .mp-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 
 #multiplayer .mp-chip {
@@ -641,16 +641,17 @@
   min-height: 54px;
   gap: 10px;
   padding: 0 28px;
-  border: 1px solid var(--mp-live);
+  /* The app's one primary style; the live orange stays for "live" badges, not actions. */
+  border: 1px solid var(--brand);
   border-radius: 14px;
-  background: var(--mp-live);
-  color: var(--mp-live-ink);
+  background: var(--brand);
+  color: var(--on-brand);
   font-size: 1.05rem;
   font-weight: 800;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--mp-live) 26%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
-#multiplayer .mp-start-game:hover { border-color: var(--mp-live-hover); background: var(--mp-live-hover); }
+#multiplayer .mp-start-game:hover { border-color: var(--brand-hover); background: var(--brand-hover); }
 #multiplayer .mp-start-note { max-width: 44ch; color: var(--muted); font-size: 0.86rem; line-height: 1.4; }
 #multiplayer .mp-waiting { display: inline-flex; align-items: center; gap: 10px; font-weight: 750; }
 #multiplayer .mp-leave { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -727,7 +728,7 @@
 }
 
 #multiplayer .mp-game {
-  height: calc(100dvh - var(--shell-bar-h) - 30px);
+  height: calc(100dvh - var(--shell-header-h) - 30px);
   min-height: 460px;
   display: flex;
   flex-direction: column;
@@ -770,8 +771,8 @@
 @media (max-width: 1000px) {
   #multiplayer .mp-home { grid-template-columns: minmax(0, 1fr); }
   #multiplayer .mp-home-side { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+  /* Stacked, who's in the room comes before the settings, so the host sees friends arrive. */
   #multiplayer .mp-lobby-grid { grid-template-columns: minmax(0, 1fr); }
-  #multiplayer .mp-settings-card { order: -1; }
 }
 
 @media (max-width: 900px) {
@@ -788,10 +789,13 @@
   #multiplayer .mp-settings-grid { grid-template-columns: minmax(0, 1fr); }
 
   /* The one button stays in reach, just above the TabBar. */
+  /* Docked flush on the TabBar, so nothing shows through a gap beneath it. */
   #multiplayer .mp-lobby .mp-action-bar {
     position: sticky;
-    bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 8px);
+    bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom));
     z-index: 5;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
     box-shadow: 0 -8px 24px color-mix(in srgb, var(--text) 10%, transparent);
   }
 
@@ -825,7 +829,8 @@
 /* Room chat: clear of the phone TabBar, and of the lobby's sticky Start bar. */
 @media (max-width: 700px) {
   #multiplayer .multiplayer-chat-dock { bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 12px); }
-  #multiplayer[data-view="lobby"] .multiplayer-chat-dock { bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 156px); }
+  /* Lobby: the chat button sits at the right, just above the Start bar, clear of the settings. */
+  #multiplayer[data-view="lobby"] .multiplayer-chat-dock { left: auto; right: 12px; justify-items: end; bottom: calc(var(--shell-tabbar-h) + env(safe-area-inset-bottom) + 124px); }
 }
 
 /* ---------- Ratings ---------- */
@@ -873,4 +878,15 @@
 @media (max-width: 700px) {
   #multiplayer .mp-standing.has-rating { grid-template-columns: 30px 34px minmax(0, 1fr) auto; }
   #multiplayer .mp-standing.has-rating .mp-standing-rating { grid-column: 3 / -1; }
+}
+
+/* Results on phones: Play again full width, then Change game and Leave room side by side (they
+   used to wrap into a ragged three-way layout, squeezing Play again until its label overflowed). */
+@media (max-width: 700px) {
+  #multiplayer .mp-results .mp-action-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #multiplayer .mp-results .mp-action-main { display: contents; }
+  #multiplayer .mp-results .mp-start-game { grid-column: 1 / -1; width: 100%; min-height: 52px; padding: 0 16px; white-space: nowrap; }
+  #multiplayer .mp-results .mp-waiting { grid-column: 1 / -1; }
+  #multiplayer .mp-results .mp-action-bar .shell-btn-quiet { width: 100%; min-height: 48px; padding: 0 12px; white-space: nowrap; }
+  #multiplayer .mp-results .mp-action-bar:has(.mp-waiting:not([hidden])) .mp-leave { grid-column: 1 / -1; }
 }

@@ -40,9 +40,9 @@ describe("SiteHeader leave guard", () => {
     other.element.dataset.leaveConfirm = "Leave room ABCD?";
     document.body.append(other.element);
     other.element.querySelector<HTMLButtonElement>(".shell-brand")!.click();
-    other.element.querySelector<HTMLAnchorElement>('.shell-tab[data-section="you"]')!.click();
+    other.element.querySelector<HTMLAnchorElement>('.shell-tab[data-section="daily"]')!.click();
     await flush();
-    expect(leave.calls).toEqual(["home", "section:you"]);
+    expect(leave.calls).toEqual(["home", "section:daily"]);
   });
 
   it("navigates straight away without a pending question", () => {

@@ -193,6 +193,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   // Answers are saved as they're given, but the place in the lesson isn't: ask before leaving
   // mid-lesson. data-leave-confirm lets app-level exits (Home, invites) ask the same question.
   const LEAVE_MESSAGE = "Leave this lesson? Your answers so far are saved.";
+  const LEAVE_DETAIL = "Your answers so far are saved, but you'll start this lesson from the top next time.";
   const midLesson = (): boolean => phase !== "complete" && session.attempts.length > 0;
   const syncLeaveGuard = (): void => {
     if (midLesson()) root.dataset.leaveConfirm = LEAVE_MESSAGE;
@@ -203,7 +204,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       exit();
       return;
     }
-    void confirmDialog(LEAVE_MESSAGE, { confirmLabel: "Leave", cancelLabel: "Stay" }).then((leave) => {
+    void confirmDialog(LEAVE_DETAIL, { title: "Leave this lesson?", confirmLabel: "Leave", cancelLabel: "Keep learning" }).then((leave) => {
       if (leave && !abort.signal.aborted) exit();
     });
   };
@@ -213,7 +214,12 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
   const stage = el("main", { className: "lx-stage", children: [stageInner] });
   const footerInner = el("div", { className: "lx-footer-inner" });
   const footer = el("footer", { className: "lx-footer", children: [footerInner] });
-  const tray = createFeedbackTray({ onContinue: () => advance(), onOpenCountry: options.onOpenCountry });
+  // Mid-lesson, a country's profile opens in a new tab so the lesson (and your place in it) stays put.
+  const openCountry = (code: string): void => {
+    if (!midLesson()) { options.onOpenCountry(code); return; }
+    window.open(`${window.location.pathname}?country=${encodeURIComponent(code.toLowerCase())}`, "_blank", "noopener");
+  };
+  const tray = createFeedbackTray({ onContinue: () => advance(), onOpenCountry: openCountry });
 
   function layoutPlayer(): void {
     root.replaceChildren(top.element, stage, footer, tray.element, announcer);
@@ -232,7 +238,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       retry: current.retry,
       promoted: current.promoted === true,
       onAnswer: (answer) => handleAnswer(current, answer),
-      onOpenCountry: options.onOpenCountry,
+      onOpenCountry: openCountry,
       announce,
     };
     const step = current.step;
@@ -441,7 +447,7 @@ export function createLessonScreen(options: LessonScreenOptions): Screen {
       primary,
       review: missed.length > 0 ? { label: `Review mistakes (${missed.length})`, run: startPractice } : null,
       back: { label: "Back to Academy", run: exit },
-      onOpenCountry: options.onOpenCountry,
+      onOpenCountry: openCountry,
       countryIndex,
       random,
     });

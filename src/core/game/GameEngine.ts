@@ -1,85 +1,20 @@
-import { COUNTRY_FACTS } from "../countries/facts";
-import { normalizeAnswerVariants, type Country, type CountryId, type CountryIndex } from "../countries";
+import { normalizeAnswerVariants, type CountryId, type CountryIndex } from "../countries";
 import { buildPromptSlots, getCategory } from "../categories";
 import { createFameRampQueue } from "./fameRamp";
+import { createHint, isIslandPool, TOTAL_HINTS } from "./hints";
 import { createRoundQueue, takeNextCountry } from "./roundQueue";
 import type { CreateGameEngineInput, GameCommand, GameEngine, GameEvent, GameState, Hint } from "./types";
+
+// Hint ladders live in ./hints — mode-aware, so they never repeat what the prompt already shows.
+export { createHint, TOTAL_HINTS } from "./hints";
 
 // Single "infinite" mode policy (the only mode now): endless run, hints on, skips on, no timer.
 const STREAK_SCORE_CAP = 10;
 const CORRECT_BASE_POINTS = 100;
 const STREAK_BONUS_POINTS = 10;
 
-// Number of distinct hints before the hint button flips to "Reveal answer".
-export const TOTAL_HINTS = 3;
-
 function correctGuessPoints(streak: number): number {
   return CORRECT_BASE_POINTS + Math.min(streak, STREAK_SCORE_CAP) * STREAK_BONUS_POINTS;
-}
-
-function countNameLetters(name: string): number {
-  return name.replace(/[^A-Za-z]/g, "").length;
-}
-
-function countNameWords(name: string): number {
-  return name.split(/\s+/).filter(Boolean).length;
-}
-
-function createCapitalHint(country: Country, level: number): Hint {
-  const hintLevel = Math.min(level, TOTAL_HINTS - 1);
-  if (hintLevel === 0) {
-    return {
-      title: "Capital clue",
-      message: `${country.continent}. ${country.capitalAliases.length > 0 ? "Alternate capital spellings are accepted." : "The official capital name is expected."}`,
-      level: hintLevel,
-    };
-  }
-
-  if (hintLevel === 1) {
-    const letterCount = countNameLetters(country.capital);
-    const wordCount = countNameWords(country.capital);
-    return {
-      title: "Capital shape",
-      message: `Starts with “${country.capital.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
-      level: hintLevel,
-    };
-  }
-
-  return {
-    title: "Capital trace",
-    message: country.capitalAliases.length > 0 ? `Also accepted: ${country.capitalAliases[0]}.` : `One letter inside it is “${country.capital.charAt(Math.max(0, Math.floor(country.capital.length / 2))).toUpperCase()}”.`,
-    level: hintLevel,
-  };
-}
-
-export function createHint(country: Country, level: number, categoryId: string): Hint {
-  if (categoryId === "capital-recall") return createCapitalHint(country, level);
-
-  const hintLevel = Math.min(level, TOTAL_HINTS - 1);
-  if (hintLevel === 0) {
-    return {
-      title: "Country note",
-      message: COUNTRY_FACTS[country.code] ?? `It has a distinct geographic profile in ${country.geographyLabel ?? country.continent}.`,
-      level: hintLevel,
-    };
-  }
-
-  if (hintLevel === 1) {
-    const letterCount = countNameLetters(country.name);
-    const wordCount = countNameWords(country.name);
-    return {
-      title: "Name shape",
-      message: `${country.geographyLabel ?? country.continent}. Starts with “${country.name.charAt(0).toUpperCase()}”; ${letterCount} letters${wordCount > 1 ? ` across ${wordCount} words` : ""}.`,
-      level: hintLevel,
-    };
-  }
-
-  const codeLetter = country.code.charAt(1) || country.code.charAt(0);
-  return {
-    title: "Index trace",
-    message: `One ISO-code letter is “${codeLetter}”. ${country.aliases.length > 0 ? "An alternate accepted name exists." : "No alternate-name shortcut is registered."}`,
-    level: hintLevel,
-  };
 }
 
 // Seeded category-per-country assignment shared by createInitialState and matching. One slot per
@@ -216,7 +151,9 @@ export function createGameEngine(input: CreateGameEngineInput): GameEngine {
       if (!currentCountry || !category) return events;
 
       if (command.type === "REQUEST_HINT") {
-        const hint = createHint(currentCountry, state.hintLevel, category.id);
+        const hint = createHint(currentCountry, state.hintLevel, category.id, {
+          islandPool: isIslandPool(state.poolCountryIds, countryIndex),
+        });
         state = {
           ...state,
           hintLevel: state.hintLevel + 1,

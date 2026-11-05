@@ -1,4 +1,4 @@
-import { DAILY_FORMAT, DAILY_FORMAT_WITHOUT_OVERLAND, DAILY_HINT_PENALTY, DAILY_WRONG_GUESS_PENALTY, type DailyChallenge } from "../../core/dailyChallenge";
+import { DAILY_FORMAT, formatDailyDate, DAILY_FORMAT_WITHOUT_OVERLAND, DAILY_HINT_PENALTY, DAILY_WRONG_GUESS_PENALTY, type DailyChallenge } from "../../core/dailyChallenge";
 import type { Screen } from "../../app/router";
 import type { ShellContext } from "../shell/types";
 import { el } from "../dom/createElement";
@@ -20,27 +20,32 @@ export function createDailyIntroScreen(options: {
   ];
   return createSitePage(options.shell, {
     section: "daily", id: "daily-intro", className: "daily-intro-screen",
-    content: [el("section", { className: "daily-intro-panel", children: [
-      el("p", { className: "daily-result-kicker", text: `Daily challenge · ${challenge.date}` }),
-      el("h1", { className: "daily-theme-title", text: challenge.theme?.title ?? "Today's world tour" }),
-      el("p", { className: "daily-intro-description", text: challenge.theme?.description ?? "Ten geography questions, the same for everyone today." }),
-      el("div", { className: "daily-intro-meta", children: [
-        el("span", { text: "10 rounds" }), el("span", { text: "100 points" }), el("span", { text: "One scored attempt today" }),
+    // Desktop: the pitch and start button on the left, today's round order and scoring beside it.
+    content: [el("section", { className: "daily-intro-panel is-split", children: [
+      el("div", { className: "daily-intro-lead", children: [
+        el("p", { className: "daily-result-kicker", text: `Daily challenge · ${formatDailyDate(challenge.date)}` }),
+        el("h1", { className: "daily-theme-title", text: challenge.theme?.title ?? "Today's world tour" }),
+        el("p", { className: "daily-intro-description", text: challenge.theme?.description ?? "Ten geography questions, the same for everyone today." }),
+        el("div", { className: "daily-intro-meta", children: [
+          el("span", { text: "10 rounds" }), el("span", { text: "100 points" }), el("span", { text: "One scored attempt today" }),
+        ] }),
+        ...(roundsPlayed > 0 ? [el("p", { className: "daily-resume-note", text: `${roundsPlayed} of 10 rounds completed. Continue where you left off.` })] : []),
+        el("button", { className: "shell-btn shell-btn-primary daily-start-button", attrs: { type: "button", "data-action": "start-daily" }, children: [
+          el("span", { text: roundsPlayed > 0 ? "Resume today's challenge" : "Start today's challenge" }), shellIcon("arrow-right", 18, 2),
+        ], on: { click: options.onStart } }),
+        el("p", { className: "daily-intro-balance", text: challenge.themeScoped
+          ? "Start with familiar flags, then build through country questions and two final rounds. All ten rounds follow today's theme."
+          : "Your saved challenge continues with its original questions and order." }),
       ] }),
-      ...(roundsPlayed > 0 ? [el("p", { className: "daily-resume-note", text: `${roundsPlayed} of 10 rounds completed. Continue where you left off.` })] : []),
-      el("button", { className: "shell-btn shell-btn-primary daily-start-button", attrs: { type: "button", "data-action": "start-daily" }, children: [
-        el("span", { text: roundsPlayed > 0 ? "Resume today's challenge" : "Start today's challenge" }), shellIcon("arrow-right", 18, 2),
-      ], on: { click: options.onStart } }),
-      el("section", { className: "daily-format", attrs: { "aria-label": "Today's round order" }, children: format.map((stage) => el("article", { children: [
-        shellIcon(stage.icon, 21, 1.7), el("span", { text: `Round${stage.rounds.includes("–") ? "s" : ""} ${stage.rounds}` }), el("strong", { text: stage.label }),
-      ] })) }),
-      el("p", { className: "daily-intro-balance", text: challenge.themeScoped
-        ? "Start with familiar flags, then build through country questions and two final rounds. All ten rounds follow today's theme."
-        : "Your saved challenge continues with its original questions and order." }),
-      el("section", { className: "daily-scoring", children: [
-        el("h2", { text: "How scoring works" }),
-        el("p", { text: `Each round is worth 10 points. A hint costs ${DAILY_HINT_PENALTY} points and a wrong guess costs ${DAILY_WRONG_GUESS_PENALTY} points. Passing or revealing an answer earns 0. Map Tap awards points for how close you pin the location.${challenge.overlandRoute ? ` In Overland, every guess beyond the shortest route's length counts as a wrong guess.` : ""}` }),
-        el("p", { className: "muted", text: "Score comes first on the leaderboard; time breaks ties. Your progress saves as you play." }),
+      el("div", { className: "daily-intro-side", children: [
+        el("section", { className: "daily-format", attrs: { "aria-label": "Today's round order" }, children: format.map((stage) => el("article", { children: [
+          shellIcon(stage.icon, 21, 1.7), el("span", { text: `Round${stage.rounds.includes("–") ? "s" : ""} ${stage.rounds}` }), el("strong", { text: stage.label }),
+        ] })) }),
+        el("section", { className: "daily-scoring", children: [
+          el("h2", { text: "How scoring works" }),
+          el("p", { text: `Each round is worth 10 points. A hint costs ${DAILY_HINT_PENALTY} points and a wrong guess costs ${DAILY_WRONG_GUESS_PENALTY} points. Passing or revealing an answer earns 0. Map Tap awards points for how close you pin the location.${challenge.overlandRoute ? ` In Overland, every guess beyond the shortest route's length counts as a wrong guess.` : ""}` }),
+          el("p", { className: "muted", text: "Score comes first on the leaderboard; time breaks ties. Your progress saves as you play." }),
+        ] }),
       ] }),
     ] })],
   });

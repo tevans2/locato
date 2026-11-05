@@ -63,7 +63,7 @@ function card(box: CardProgress["box"]): CardProgress {
 }
 
 describe("Country profile screen", () => {
-  it("renders the key facts for a known country and manages the document title", () => {
+  it("renders the key facts for a known country and sets the document title", () => {
     document.title = "Locato";
     const ui = mount("JP");
     expect(document.title).toBe("Japan · Locato");
@@ -87,7 +87,8 @@ describe("Country profile screen", () => {
     expect(ui.root.querySelector(".world-map-country.is-cp-self")).not.toBeNull();
     ui.screen.destroy();
     screens.length = 0;
-    expect(document.title).toBe("Locato");
+    // The app sets the next route's title; unmounting no longer restores an older one over it.
+    expect(document.title).toBe("Japan · Locato");
   });
 
   it("shows a friendly not-found state with a working search picker", () => {

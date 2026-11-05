@@ -16,12 +16,12 @@ function svgIcon(svgMarkup: string): HTMLElement {
 
 export interface AuthPanelOptions {
   readonly onAuthChange: (state: AuthState) => void;
+  /** The You page. Signed in, the avatar opens it; guests reach it from the sign-in popup. */
   readonly onViewStats?: () => void;
-  readonly onViewFriends?: () => void;
 }
 
 export interface AuthControls {
-  // Fixed top-right button: "Sign in" for guests, avatar/profile icon for signed-in users.
+  // Top-right button: "Sign in" (opens the popup) for guests, the avatar (opens the You page) when signed in.
   readonly trigger: HTMLElement;
   // Fixed popup attached next to the trigger. It is kept outside screens so navigation cannot reset it.
   readonly panel: HTMLElement;
@@ -86,17 +86,25 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     ],
   });
 
+  const viewStatsButton = el("button", { className: "ghost-action auth-view-stats", text: "Your progress on this device →", attrs: { type: "button" } });
+
+  // Visible labels: placeholders vanish as soon as you type.
+  const field = (label: string, input: HTMLInputElement, hint?: HTMLElement): HTMLElement =>
+    el("label", { className: "auth-field", children: [el("span", { className: "auth-field-label", text: label }), input, ...(hint ? [hint] : [])] });
+  const passwordHint = el("span", { className: "auth-field-hint", text: "At least 8 characters.", attrs: { hidden: "" } });
+  const displayNameField = field("Username", displayNameInput);
   const signInForm = el("form", {
     className: "auth-form",
     children: [
       el("div", { className: "auth-mode-tabs", attrs: { role: "tablist", "aria-label": "Account action" }, children: [loginTab, registerTab] }),
-      displayNameInput,
-      emailInput,
-      passwordInput,
+      displayNameField,
+      field("Email", emailInput),
+      field("Password", passwordInput, passwordHint),
       feedbackEl,
       submitButton,
       el("div", { className: "auth-divider", children: [el("span", { text: "or" })] }),
       oauthSection,
+      viewStatsButton,
     ],
   });
 
@@ -107,8 +115,6 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
   const gamesValue = el("strong", { text: "0" });
   const correctValue = el("strong", { text: "0" });
   const streakValue = el("strong", { text: "0" });
-  const friendsButton = el("button", { className: "secondary-action auth-view-friends", text: "Friends →", attrs: { type: "button" } });
-  const viewStatsButton = el("button", { className: "secondary-action auth-view-stats", text: "View full stats →", attrs: { type: "button" } });
   const signOutButton = el("button", { className: "ghost-action auth-sign-out", text: "Sign out", attrs: { type: "button" } });
 
   const avatarPicker = el("div", { className: "avatar-picker", attrs: { role: "group", "aria-label": "Choose avatar", hidden: "true" } });
@@ -135,8 +141,6 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
           el("span", { children: [streakValue, el("small", { text: "best streak" })] }),
         ],
       }),
-      friendsButton,
-      viewStatsButton,
       signOutButton,
     ],
   });
@@ -184,7 +188,8 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     registerTab.classList.toggle("is-active", registering);
     loginTab.setAttribute("aria-selected", String(!registering));
     registerTab.setAttribute("aria-selected", String(registering));
-    displayNameInput.hidden = !registering;
+    displayNameField.hidden = !registering;
+    passwordHint.hidden = !registering;
     submitButton.textContent = registering ? "Create account" : "Sign in";
     passwordInput.setAttribute("autocomplete", registering ? "new-password" : "current-password");
     panelTitle.textContent = registering ? "Create account" : "Sign in";
@@ -227,7 +232,9 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
       triggerLabel.hidden = true;
       triggerLabel.textContent = "";
       trigger.title = user.displayName;
-      trigger.setAttribute("aria-label", `Account: ${user.displayName}`);
+      trigger.setAttribute("aria-label", `Your profile: ${user.displayName}`);
+      trigger.removeAttribute("aria-haspopup");
+      trigger.removeAttribute("aria-expanded");
     } else {
       triggerAvatar.hidden = true;
       triggerInitial.hidden = true;
@@ -237,6 +244,8 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
       triggerLabel.textContent = "Sign in";
       trigger.title = "Sign in";
       trigger.setAttribute("aria-label", "Sign in");
+      trigger.setAttribute("aria-haspopup", "dialog");
+      trigger.setAttribute("aria-expanded", String(isOpen));
     }
   }
 
@@ -281,7 +290,7 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
   function openPanel(): void {
     isOpen = true;
     panel.hidden = false;
-    trigger.setAttribute("aria-expanded", "true");
+    if (!currentState.user) trigger.setAttribute("aria-expanded", "true");
     if (currentState.user) signOutButton.focus();
     else emailInput.focus();
   }
@@ -291,11 +300,17 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     isOpen = false;
     panel.hidden = true;
     avatarPicker.hidden = true;
-    trigger.setAttribute("aria-expanded", "false");
+    if (!currentState.user) trigger.setAttribute("aria-expanded", "false");
     if (restoreFocus && trigger.isConnected) trigger.focus();
   }
 
-  trigger.addEventListener("click", () => (isOpen ? closePanel() : openPanel()), { signal: controller.signal });
+  trigger.addEventListener("click", () => {
+    if (currentState.user && options.onViewStats) {
+      closePanel();
+      options.onViewStats();
+    } else if (isOpen) closePanel();
+    else openPanel();
+  }, { signal: controller.signal });
   closeButton.addEventListener("click", closePanel, { signal: controller.signal });
   loginTab.addEventListener("click", () => setMode("login"), { signal: controller.signal });
   registerTab.addEventListener("click", () => setMode("register"), { signal: controller.signal });
@@ -390,15 +405,6 @@ export function createAuthControls(options: AuthPanelOptions): AuthControls {
     () => {
       closePanel();
       options.onViewStats?.();
-    },
-    { signal: controller.signal },
-  );
-
-  friendsButton.addEventListener(
-    "click",
-    () => {
-      closePanel();
-      options.onViewFriends?.();
     },
     { signal: controller.signal },
   );

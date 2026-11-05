@@ -161,6 +161,12 @@
   min-height: 44px;
 }
 
+.auth-field { display: grid; gap: 5px; }
+.auth-field[hidden] { display: none; }
+.auth-field-label { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.auth-field-hint { color: var(--muted); font-size: .75rem; }
+.auth-field-hint[hidden] { display: none; }
+
 .auth-submit,
 .auth-oauth-btn,
 .auth-sign-out {
@@ -325,7 +331,7 @@
 
 .auth-stat-grid small {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: .75rem;
 }
 
 @media (max-width: 700px) {
@@ -360,3 +366,7 @@
     width: auto;
   }
 }
+
+/* The app-wide button rules (phone full-width buttons, panel button boxes) outrank `all: unset`
+   above; keep the avatar a plain round target beside the name. */
+:root .auth-panel .auth-account-avatar-wrap { width: auto; min-width: 0; min-height: 0; flex: none; padding: 0; border: 0; background: none; box-shadow: none; }

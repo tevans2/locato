@@ -76,8 +76,10 @@ export function createMultiplayerResults(options: MultiplayerResultsOptions): Mu
       const mine = results.find((result) => result.playerId === localPlayerId);
       const tied = winner && results[1] && results[1].score === winner.score && room.kind !== "flyover";
       kicker.replaceChildren(el("span", { text: `${roomKindInfo(room.kind).label} · game over` }));
-      headline.textContent = !winner ? "Game over" : tied ? "It's a tie!" : winner.playerId === localPlayerId ? "You won!" : `${winner.name} wins`;
-      const placing = !mine ? "" : tied && mine.score === winner?.score ? "You tied for first." : mine.rank === 1 ? "You finished first." : `You finished #${mine.rank} of ${results.length}.`;
+      // Alone in the room there's no one to beat: "You won! You finished first." read oddly.
+      const solo = results.length === 1 && mine !== undefined;
+      headline.textContent = !winner || solo ? "Game over" : tied ? "It's a tie!" : winner.playerId === localPlayerId ? "You won!" : `${winner.name} wins`;
+      const placing = !mine ? "" : solo ? "Solo game." : tied && mine.score === winner?.score ? "You tied for first." : mine.rank === 1 ? "You finished first." : `You finished #${mine.rank} of ${results.length}.`;
       subline.textContent = mine
         ? `${placing} ${describeRoom(room).join(" · ")}`
         : `You watched this one, so you're in the next game. ${describeRoom(room).join(" · ")}`;

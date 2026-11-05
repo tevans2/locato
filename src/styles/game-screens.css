@@ -56,6 +56,14 @@
     min-height: 100dvh;
     padding: 0 max(12px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
+  /* Typing (keyboard up) on a prompt screen: the page needs room below to scroll the prompt back
+     to the top of what's visible, and steps down by --viewport-top when iOS has panned it up with
+     nothing left to scroll. Without this the shell's padding above wins, the page can't scroll,
+     and the flag gets pushed off the top. */
+  #app > .game-screen[data-shell]:is(.solo-game-screen, .daily-game-screen):not(.is-map-fullscreen).is-mobile-typing {
+    padding-top: var(--viewport-top, 0px);
+    padding-bottom: max(40vh, calc(var(--keyboard-offset, 0px) + 12px));
+  }
   .game-screen[data-shell] > .shell-gamebar,
   .game-screen[data-shell] > .shell-focusbar { margin-bottom: 8px; }
 
@@ -72,7 +80,7 @@
     padding: 6px 8px;
     gap: 0;
   }
-  .game-screen[data-shell] .answer-panel > .stats-panel .stat-label { font-size: 0.6rem; }
+  .game-screen[data-shell] .answer-panel > .stats-panel .stat-label { font-size: .75rem; }
   .game-screen[data-shell] .answer-panel > .stats-panel .stat-value { font-size: 0.98rem; }
   .game-screen[data-shell] .answer-panel > .stats-panel .progress-card { display: none; }
 
@@ -86,7 +94,7 @@
 @media (max-width: 700px) {
   .country-guess-screen[data-shell].is-mobile-typing.is-timed-run > .shell-gamebar {
     position: fixed;
-    top: 0;
+    top: var(--viewport-top, 0px);
     right: max(12px, env(safe-area-inset-right));
     left: max(12px, env(safe-area-inset-left));
     z-index: 125;
@@ -96,8 +104,8 @@
     background: var(--bg);
   }
   .country-guess-screen[data-shell].is-mobile-typing.is-timed-run :is(.world-map-panel, .world-globe-panel) {
-    top: calc(max(4px, env(safe-area-inset-top)) + 58px);
-    height: clamp(200px, calc(100svh - max(var(--keyboard-offset, 0px), 38vh) - 144px), 380px);
-    min-height: 200px;
+    top: calc(var(--viewport-top, 0px) + max(4px, env(safe-area-inset-top)) + 58px);
+    height: clamp(130px, calc(var(--viewport-height, 62svh) - 150px), 380px);
+    min-height: 130px;
   }
 }

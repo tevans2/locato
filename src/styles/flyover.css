@@ -127,7 +127,7 @@
 
 .flyover-target-label {
   color: var(--muted);
-  font-size: .7rem;
+  font-size: .75rem;
   font-weight: 750;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -368,7 +368,7 @@
 
 @media (max-width: 700px) {
   .multiplayer-flyover-view .flyover-hud-bottom { padding-left: 62px; }
-  .flyover-standings { min-width: 0; padding: 5px 7px; font-size: .74rem; }
+  .flyover-standings { min-width: 0; padding: 5px 7px; font-size: .75rem; }
   .flyover-standing-name { max-width: 6em; }
 }
 

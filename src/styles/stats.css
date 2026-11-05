@@ -72,7 +72,7 @@
   line-height: 1;
 }
 
-.stats-hero-card.is-highlight .stats-hero-value { color: var(--accent); }
+.stats-hero-card.is-highlight .stats-hero-value { color: var(--accent-text); }
 
 .stats-hero-label {
   font-size: 0.78rem;
@@ -231,7 +231,7 @@
   }
 
   .stats-hero-label {
-    font-size: 0.72rem;
+    font-size: .75rem;
   }
 
   .stats-mode-grid {

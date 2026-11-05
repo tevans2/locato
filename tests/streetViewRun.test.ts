@@ -84,7 +84,7 @@ describe("Street View country run", () => {
     // Round 5: reveal.
     await ui.ready();
     codes.push(ui.currentCode());
-    ui.$<HTMLButtonElement>(".streetview-panel .actions .ghost-action:last-child")!.click();
+    ui.$<HTMLButtonElement>(".streetview-panel .solo-quiet-actions .ghost-action")!.click();
     expect(next.textContent).toBe("See results");
     next.click();
 
@@ -155,7 +155,7 @@ describe("Street View country run", () => {
     document.body.append(screen.element);
     const input = screen.element.querySelector<HTMLInputElement>("#streetview-guess-input")!;
     await vi.waitFor(() => expect(input.disabled).toBe(false));
-    screen.element.querySelector<HTMLButtonElement>(".streetview-panel .actions .ghost-action:last-child")!.click();
+    screen.element.querySelector<HTMLButtonElement>(".streetview-panel .solo-quiet-actions .ghost-action")!.click();
     expect(onComplete).not.toHaveBeenCalled();
     const next = screen.element.querySelector<HTMLButtonElement>(".streetview-panel .actions .primary-action")!;
     expect(next.textContent).toBe("Continue daily challenge");
@@ -196,7 +196,7 @@ describe("Street View country scoring (single-run: every run counts)", () => {
     await ui.ready();
     expect(ui.$(".streetview-points")?.textContent).toBe("6");
     // Country 4: revealed (0). Country 5: first guess (3).
-    ui.$<HTMLButtonElement>(".streetview-panel .actions .ghost-action:last-child")!.click();
+    ui.$<HTMLButtonElement>(".streetview-panel .solo-quiet-actions .ghost-action")!.click();
     ui.$<HTMLButtonElement>(".streetview-panel .actions .primary-action")!.click();
     await ui.ready();
     ui.guess(countryIndex.byCode.get(ui.currentCode())!.name);

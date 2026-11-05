@@ -407,6 +407,8 @@ export function createTypeStep(input: TypeInput, ctx: StepContext): StepView {
 
   const check = primaryButton("Check", "lx-check");
   check.disabled = true;
+  // Outside the form (it's in the footer), but tapping it mustn't drop the keyboard first.
+  check.dataset.keepsKeyboard = "";
   const dontKnow = secondaryButton(ctx.skipLabel ?? "I don't know", "lx-dont-know");
   let answered = false;
 

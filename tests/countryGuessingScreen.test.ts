@@ -77,7 +77,7 @@ describe("CountryGuessingScreen practice vs timed", () => {
     const select = root.querySelector<HTMLSelectElement>("#name-all-continent")!;
     select.value = "Asia";
     select.dispatchEvent(new Event("change"));
-    expect(root.querySelector(".panel-title h2")?.textContent).toBe("Name every country in Asia");
+    expect(root.querySelector(".panel-title h1")?.textContent).toBe("Name every country in Asia");
     type("Brazil");
     expect(root.querySelector(".feedback")?.textContent).toContain("Brazil isn't in Asia.");
     type("Japan");
@@ -90,7 +90,7 @@ describe("CountryGuessingScreen practice vs timed", () => {
     const { root } = setup({ run: "timed", nameAllContinent: "Africa" });
     expect(root.querySelector("#name-all-continent")).toBeNull();
     expect(root.querySelector(".name-all-prompt .puzzle-continent-locked")?.textContent).toBe("Africa");
-    expect(root.querySelector(".panel-title h2")?.textContent).toBe("Name every country in Africa");
+    expect(root.querySelector(".panel-title h1")?.textContent).toBe("Name every country in Africa");
   });
 
   it("timed shows the clock in the GameBar", () => {
@@ -115,10 +115,12 @@ describe("CountryGuessingScreen practice vs timed", () => {
     expect(root.dataset.phase).toBeUndefined();
   });
 
-  it("give up shows the missed list and can go back to review on the map", () => {
+  it("give up asks first, then shows the missed list and can go back to review on the map", async () => {
     const { root, shell, type } = setup();
     type("Japan");
     [...root.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Give up")!.click();
+    await vi.waitFor(() => expect(root.querySelector(".shell-results")).not.toBeNull());
+    expect(shell.confirmLeave).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ confirmLabel: "Give up", tone: "danger" }));
     const card = root.querySelector(".shell-results")!;
     expect(card.querySelector(".shell-results-title")?.textContent).toBe("Round over");
     const chips = [...card.querySelectorAll<HTMLElement>("[data-country]")].map((chip) => chip.dataset.country);
