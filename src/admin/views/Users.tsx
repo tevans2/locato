@@ -5,6 +5,7 @@ import { boardRemovalNotice, formatBoardValue, formatDate, formatDateTime, forma
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource, type ConfirmRequest } from "../ui";
 import { EventRow } from "./Events";
 import { RunsTable } from "./Runs";
+import { IpCountryTag } from "../ipCountry";
 
 const PAGE = 50;
 
@@ -314,7 +315,7 @@ function UserDrawer({ client, currentAdminId, id, onClose, onChanged, helpers }:
                     <tbody>
                       {d.ips.map((row) => (
                         <tr key={row.ip}>
-                          <td><code>{row.ip}</code> {row.banned && <Badge tone="bad">banned</Badge>}</td>
+                          <td><code>{row.ip}</code> <IpCountryTag ip={row.ip} /> {row.banned && <Badge tone="bad">banned</Badge>}</td>
                           <td>{formatRelative(row.lastSeenAt)}</td>
                           <td className="num">{row.events}</td>
                           <td className="num">

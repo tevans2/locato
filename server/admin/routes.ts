@@ -74,6 +74,8 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
     });
   }
 
+  if (pathname === "/api/admin/ip-countries" && method === "GET") return json({ countries: service.ipCountries(url.searchParams.get("ips")) });
+
   // --- Users ---
   if (pathname === "/api/admin/users" && method === "GET") {
     return json(service.listUsers({ q: url.searchParams.get("q") ?? undefined, limit: intParam(url, "limit"), offset: intParam(url, "offset") }));

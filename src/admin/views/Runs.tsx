@@ -2,6 +2,7 @@ import type { AdminClient, AdminRun } from "../api";
 import { formatDateTime, formatDuration, modeName } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
 import { RUN_FLAG_LABELS } from "../../core/runAudit";
+import { IpCountryTag } from "../ipCountry";
 
 const CURVE_W = 168;
 const CURVE_H = 40;
@@ -59,7 +60,7 @@ export function RunsTable({ runs, showPlayer = false, onOpenUser }: { runs: read
             const lasted = run.finishedAt !== null ? run.finishedAt - run.startedAt : null;
             return (
               <tr key={run.id} className={run.verdict === "reject" ? "is-flagged" : undefined}>
-                <td>{formatDateTime(run.startedAt)}<div className="adm-muted adm-small" title={run.userAgent ?? undefined}>{run.ip ?? "—"}</div></td>
+                <td>{formatDateTime(run.startedAt)}<div className="adm-muted adm-small" title={run.userAgent ?? undefined}>{run.ip ?? "—"} <IpCountryTag ip={run.ip} /></div></td>
                 {showPlayer && (
                   <td>{onOpenUser ? <button type="button" className="adm-link-btn" onClick={() => onOpenUser(run.userId)}>{run.displayName ?? run.userId}</button> : run.displayName}</td>
                 )}
