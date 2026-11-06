@@ -52,6 +52,7 @@ export function createMemoryUserStore(): UserStore {
   const userBans = new Map<string, UserBan>();
   const attempts: { userId: string; gameMode: string; variant: string; metric: "time" | "score"; value: number; achievedAt: number; removedAt: number | null }[] = [];
   const ipBans = new Map<string, IpBan>();
+  const ipCountries = new Map<string, string>();
   const usersByEmail = new Map<string, StoredUser>();
   const usersByOAuth = new Map<string, StoredUser>();
   const sessions = new Map<string, Session>();
@@ -360,6 +361,9 @@ export function createMemoryUserStore(): UserStore {
     listIpBans: (now) => [...ipBans.values()].filter((ban) => ban.expiresAt === null || ban.expiresAt > now).sort((a, b) => b.createdAt - a.createdAt),
     saveIpBan(ban) { ipBans.set(ban.ip, ban); },
     deleteIpBan: (ip) => ipBans.delete(ip),
+    recordIpCountry(ip, country) { ipCountries.set(ip, country); },
+    // No analytics here, so only Cloudflare's countries.
+    findIpCountries: (ips) => ips.flatMap((ip) => { const country = ipCountries.get(ip); return country ? [{ ip, country, source: "cloudflare" as const }] : []; }),
     isAdmin: (userId) => adminIds.has(userId),
     setAdmin(userId, admin) {
       if (!usersById.has(userId)) return;

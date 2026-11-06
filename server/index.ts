@@ -16,6 +16,7 @@ import { createSeededRandom, shuffle } from "../src/core/game";
 import { serveGameAsset } from "./ranked/GameAssets";
 import { AnalyticsService } from "./analytics/AnalyticsService";
 import { SqliteAnalyticsStore } from "./analytics/sqliteStore";
+import { createIpCountryRecorder } from "./admin/ipCountryRecorder";
 import { handleAnalyticsEvents } from "./analytics/routes";
 import { clientIp, cloudflareCountry } from "./clientIp";
 import { renderPageMeta } from "./pageMeta";
@@ -121,6 +122,7 @@ const databasePath = process.env.DATABASE_PATH ?? resolve(PROJECT_ROOT, ".data/l
 const database = openDatabase(databasePath);
 const userStore = new SqliteUserStore(database);
 const analyticsService = new AnalyticsService(new SqliteAnalyticsStore(database));
+const recordIpCountry = createIpCountryRecorder(userStore);
 // Ranked verification is mandatory. Optional legacy telemetry cannot authorize results.
 const enforceRunAudit = process.env.RUN_AUDIT_ENFORCE === "1";
 const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs: SESSION_TTL_MS, enforceRunAudit,
@@ -232,6 +234,7 @@ const server = Bun.serve<WebSocketData>({
     // Banned addresses: before the sockets and API routes below (handleAuthRequest checks again).
     const ipBlocked = ipBanResponse(request, url, authService);
     if (ipBlocked) return ipBlocked;
+    recordIpCountry(request);
     if (/^\/api\/game-assets\/[a-f0-9]{48}$/.test(url.pathname) && method === "GET") {
       try { return await serveGameAsset(url); } catch { return json({ error: "Game artwork unavailable." }, 503); }
     }

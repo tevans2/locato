@@ -281,6 +281,17 @@ export interface BannedUser extends UserBan {
 }
 
 /** Requests from this address get a 403 on sign-in, sign-up, the API and multiplayer. */
+/**
+ * Where an address is. "cloudflare": Cloudflare's country header on a request from it.
+ * "account": a guess for addresses seen before that was recorded, from the analytics country of
+ * the account(s) that used it.
+ */
+export interface IpCountry {
+  readonly ip: string;
+  readonly country: string;
+  readonly source: "cloudflare" | "account";
+}
+
 export interface IpBan {
   readonly ip: string;
   readonly reason: string | null;
@@ -488,6 +499,10 @@ export interface UserStore {
   listIpBans(now: number): readonly IpBan[];
   saveIpBan(ban: IpBan): void;
   deleteIpBan(ip: string): boolean;
+  /** Remember Cloudflare's country for an address (latest wins). */
+  recordIpCountry(ip: string, country: string, now: number): void;
+  /** Countries for these addresses: Cloudflare's when recorded, else a guess from their accounts. */
+  findIpCountries(ips: readonly string[]): readonly IpCountry[];
   deleteUser(id: string): boolean;
   deleteUserSessions(userId: string): number;
   updateDisplayName(userId: string, displayName: string): void;
