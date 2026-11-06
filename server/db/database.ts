@@ -48,6 +48,7 @@ import type {
   BannedUser,
   RemovedBest,
   IpBan,
+  IpCountry,
   UserBan,
   PlayerRating,
   RatingLeaderboardEntry,
@@ -254,6 +255,13 @@ function migrate(db: Database): void {
       created_at INTEGER NOT NULL,
       expires_at INTEGER,
       created_by TEXT
+    );
+
+    -- Cloudflare's country for each client address, so the admin console can label IPs.
+    CREATE TABLE IF NOT EXISTS ip_countries (
+      ip TEXT PRIMARY KEY,
+      country TEXT NOT NULL,
+      seen_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS admin_events (
@@ -1081,6 +1089,40 @@ export class SqliteUserStore implements UserStore {
 
   listUserRuns(userId: string, limit: number): readonly StoredRun[] {
     return this.db.query<RunRow>(`${RUN_SELECT} WHERE user_id = ? ORDER BY started_at DESC LIMIT ?`).all(userId, limit).map(toStoredRun);
+  }
+
+  recordIpCountry(ip: string, country: string, now: number): void {
+    this.db
+      .query("INSERT INTO ip_countries (ip, country, seen_at) VALUES (?, ?, ?) ON CONFLICT(ip) DO UPDATE SET country = excluded.country, seen_at = excluded.seen_at")
+      .run(ip, country, now);
+  }
+
+  findIpCountries(ips: readonly string[]): readonly IpCountry[] {
+    if (ips.length === 0) return [];
+    const marks = ips.map(() => "?").join(", ");
+    const found = new Map<string, IpCountry>();
+    for (const row of this.db.query<{ ip: string; country: string }>(`SELECT ip, country FROM ip_countries WHERE ip IN (${marks})`).all(...ips)) {
+      found.set(row.ip, { ip: row.ip, country: row.country, source: "cloudflare" });
+    }
+    const rest = ips.filter((ip) => !found.has(ip));
+    if (rest.length > 0) {
+      // Older addresses: the analytics country of the accounts that used them, the most-logged first.
+      // analytics_visitors belongs to the analytics store; without it there's nothing to guess from.
+      try {
+        const rows = this.db
+          .query<{ ip: string; country: string }>(
+            `SELECT e.ip AS ip, v.country AS country, COUNT(*) AS n FROM admin_events e
+             JOIN analytics_visitors v ON v.user_id = e.user_id
+             WHERE e.ip IN (${rest.map(() => "?").join(", ")}) AND v.country IS NOT NULL
+             GROUP BY e.ip, v.country ORDER BY n DESC`,
+          )
+          .all(...rest);
+        for (const row of rows) if (!found.has(row.ip)) found.set(row.ip, { ip: row.ip, country: row.country, source: "account" });
+      } catch {
+        // No analytics table: leave them unlabelled.
+      }
+    }
+    return [...found.values()];
   }
 
   listFlaggedRuns(limit: number): readonly StoredRun[] {

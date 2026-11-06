@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import type { AdminClient, AdminEvent } from "../api";
 import { formatClock, formatDate } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel } from "../ui";
+import { IpCountryTag } from "../ipCountry";
 
 const PAGE = 100;
 const ACTION_PRESETS = ["", "admin.", "register", "login", "oauth", "daily", "leaderboard", "game", "friend", "streetview"];
@@ -29,13 +30,14 @@ export function EventRow({ event, compact = false, onOpenUser, onFilterIp }: { e
         </time>
         <span className="adm-event-action">{event.action}</span>
         {event.level === "warn" && <Badge tone="warn">warn</Badge>}
+        {!compact && event.ip && <IpCountryTag ip={event.ip} />}
         {!compact && <span className="adm-event-summary">{summary}</span>}
       </button>
       {open && (
         <div className="adm-event-detail">
           <dl>
             {event.ip && (
-              <div><dt>IP</dt><dd>{onFilterIp ? <button type="button" className="adm-link-btn" onClick={() => onFilterIp(event.ip!)}>{event.ip}</button> : event.ip}</dd></div>
+              <div><dt>IP</dt><dd>{onFilterIp ? <button type="button" className="adm-link-btn" onClick={() => onFilterIp(event.ip!)}>{event.ip}</button> : event.ip} <IpCountryTag ip={event.ip} /></dd></div>
             )}
             {event.userId && (
               <div><dt>User</dt><dd>{onOpenUser ? <button type="button" className="adm-link-btn" onClick={() => onOpenUser(event.userId!)}>{event.userId}</button> : event.userId}</dd></div>

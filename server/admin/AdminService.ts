@@ -18,6 +18,7 @@ import type {
   AuthUser,
   BannedUser,
   IpBan,
+  IpCountry,
   RemovedBest,
   UserBan,
   CategoryStats,
@@ -467,6 +468,13 @@ export class AdminService {
 
   unbanIp(ip: string): boolean {
     return this.store.deleteIpBan(ip);
+  }
+
+  /** Countries for a comma-separated list of addresses (at most 200; anything that isn't an IP is skipped). */
+  ipCountries(list: unknown): readonly IpCountry[] {
+    if (typeof list !== "string") return [];
+    const ips = [...new Set(list.split(",").map((ip) => ip.trim()).filter((ip) => ip.length <= 45 && IP_PATTERN.test(ip)))].slice(0, 200);
+    return this.store.findIpCountries(ips);
   }
 
   private userIps(userId: string, now: number): readonly AdminUserIp[] {

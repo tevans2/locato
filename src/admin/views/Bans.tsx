@@ -3,6 +3,7 @@ import type { AdminBans, AdminClient } from "../api";
 import { formatDateTime } from "../format";
 import { Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
 import { IP_BAN_LENGTHS, toggleBan, type ActionHelpers } from "./Users";
+import { IpCountryTag } from "../ipCountry";
 
 function failed(helpers: ActionHelpers, err: unknown): void {
   helpers.notify(err instanceof Error ? err.message : String(err), "bad");
@@ -74,7 +75,7 @@ export function BansView({ client, onOpenUser, helpers }: { client: AdminClient;
               <tbody>
                 {data.ips.map((ban) => (
                   <tr key={ban.ip}>
-                    <td><code>{ban.ip}</code></td>
+                    <td><code>{ban.ip}</code> <IpCountryTag ip={ban.ip} /></td>
                     <td>{formatDateTime(ban.createdAt)}</td>
                     <td>{ban.expiresAt === null ? "Until lifted" : formatDateTime(ban.expiresAt)}</td>
                     <td>{ban.reason ?? <span className="adm-muted">—</span>}</td>
