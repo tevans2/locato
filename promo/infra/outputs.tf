@@ -10,8 +10,3 @@ output "media_bucket" {
 output "private_bucket" {
   value = cloudflare_r2_bucket.private.name
 }
-
-output "ci_token" {
-  value     = var.create_ci_token ? cloudflare_api_token.ci[0].value : null
-  sensitive = true
-}

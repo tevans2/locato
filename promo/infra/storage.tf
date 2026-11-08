@@ -35,5 +35,8 @@ resource "cloudflare_d1_database" "promo" {
   primary_location_hint = var.d1_location
   lifecycle {
     prevent_destroy = true
+    # reported by Cloudflare (size, table count, version), not settings. Terraform warns this is "redundant", but without
+    # it the provider (v5.28) plans a no-op update on every run.
+    ignore_changes = [file_size, num_tables, version]
   }
 }

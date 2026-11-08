@@ -25,9 +25,3 @@ variable "d1_location" {
   default     = "weur"
   description = "Where D1 keeps its primary copy (weur is the closest region to South Africa)."
 }
-
-variable "create_ci_token" {
-  type        = bool
-  default     = false
-  description = "Create a narrow deploy token (Worker + D1 + the promo route) for GitHub Actions."
-}

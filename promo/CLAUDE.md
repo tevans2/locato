@@ -31,3 +31,4 @@ from the game's Docker image. Full guide: `VIDEOS.md`. Posting: `social/profile-
 - `npm run content [-- list|validate|pull|push|schema]` · `npm run voices [-- create|add|import|from-spec|missing|apply|ls|rm]`
 - `npm run stage -- videos/<week>-*.json` (queue for posting) · `npm run queue` · `npm run publish -- videos/x.json` (post now)
 - `npm run worker:dev` (local service) · `npm run worker:migrate` · `npm run worker:deploy` · infra: `infra/README.md`
+- Deploys: the promo service deploys from `main` via `.github/workflows/promo-deploy.yml`; the game's deploys ignore `promo/**`. Terraform is manual.

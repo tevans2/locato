@@ -9,7 +9,7 @@ which gets a short-lived token from the game and calls the promo service directl
 | D1 `locato-promo` | Records: videos and their posts, content, voices and clips, music, runs, audit | Terraform (`storage.tf`) + schema `../worker/migrations/*.sql` |
 | R2 `locato-social` (public, `media.locato.quest`) | Rendered videos (Buffer fetches them) and voice clips | Terraform (adopted as is; its custom domain stays in the dashboard) |
 | R2 `locato-promo-private` | Licensed music, backups, Terraform state | Terraform (created by `./bootstrap`, then adopted) |
-| Deploy token (optional) | Narrow token for GitHub Actions: the Worker, D1 and its route | Terraform (`tokens.tf`, `create_ci_token = true`) |
+| Deploy token | Narrow token for GitHub Actions: the Worker, D1 and its route | Made in the dashboard (see *Automatic deploys*) |
 | Secrets | `BUFFER_API_KEY`, `PROMO_SERVICE_TOKEN`, `PROMO_ADMIN_SECRET` | `./secrets` (Worker secrets, never in Terraform state) |
 
 ## One-time setup
@@ -27,7 +27,6 @@ Cloudflare dashboard → My Profile → API Tokens → Create Token → **Custom
 | Zone (`locato.quest`) | Zone | Read |
 | Zone (`locato.quest`) | Workers Routes | Edit |
 | Zone (`locato.quest`) | DNS | Edit |
-| User | API Tokens | Edit *(only if you want Terraform to create the deploy token)* |
 
 Put it in `promo/.env` as `CLOUDFLARE_API_TOKEN` (replacing the old one), with `CLOUDFLARE_ACCOUNT_ID`.
 Terraform keeps its state in R2 and uses this same token for that (an R2-capable token doubles as S3 credentials).
@@ -37,7 +36,7 @@ Terraform keeps its state in R2 and uses this same token for that (an R2-capable
 ```bash
 cd promo/infra
 ./bootstrap          # private bucket, zone id, terraform init, then a plan: check it adopts locato-social without changes
-./tf apply           # D1 database (+ the deploy token if create_ci_token = true)
+./tf apply           # D1 database
 ./sync-wrangler      # copies the D1 id into worker/wrangler.jsonc
 ```
 
@@ -61,6 +60,33 @@ Then open the admin → **Promo**. From the Mac: `npm run queue`, `npm run voice
 
 After this, the old R2 S3 keys (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) aren't used by anything: delete them from `.env`
 and revoke them in the dashboard.
+
+## Automatic deploys (GitHub Actions)
+
+- `.github/workflows/promo-deploy.yml`: on pushes to `main` that touch the promo service (`promo/worker`, `promo/src/content`,
+  `promo/content`, the posting code, or promo's dependencies) it typechecks, applies D1 migrations, deploys the Worker and
+  checks `/health`. You can also run it by hand (Actions → Deploy promo service → Run workflow).
+- The game's two deploy workflows ignore `promo/**`, so promo-only merges don't restart the game.
+- Infrastructure (this folder) stays manual: `./tf plan`, then `./tf apply`.
+
+It needs two repository secrets. Create a **narrow deploy token** (Cloudflare → Manage account → Account API Tokens →
+Create → Custom), no expiry or a long one:
+
+| Scope | Permission | Access |
+|---|---|---|
+| Account | Workers Scripts | Edit |
+| Account | D1 | Edit |
+| Account | Account Settings | Read |
+| Zone (`locato.quest`) | Workers Routes | Edit |
+
+Then, from the repo root (paste the token when asked; the account id is in `promo/.env`):
+
+```bash
+gh secret set PROMO_CLOUDFLARE_DEPLOY_TOKEN
+gh secret set CLOUDFLARE_ACCOUNT_ID
+```
+
+It can't touch buckets, DNS or tokens. Your setup token is only needed for `./tf` and can expire.
 
 ## Day to day
 
