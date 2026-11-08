@@ -1,0 +1,103 @@
+{
+  "template": "daily",
+  "seed": "demo4",
+  "createdAt": "2026-11-07T14:01:28.775Z",
+  "props": {
+    "variant": "daily",
+    "title": "Warm up for today's Daily",
+    "badge": "Across Africa",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "ET",
+        "country": "Ethiopia",
+        "answer": "Ethiopia",
+        "note": "Africa"
+      },
+      {
+        "type": "capital",
+        "code": "EG",
+        "country": "Egypt",
+        "answer": "Cairo",
+        "note": "Africa"
+      },
+      {
+        "type": "shape",
+        "code": "AO",
+        "country": "Angola",
+        "answer": "Angola",
+        "note": "Africa"
+      },
+      {
+        "type": "flag",
+        "code": "MZ",
+        "country": "Mozambique",
+        "answer": "Mozambique",
+        "note": "Africa"
+      },
+      {
+        "type": "capital",
+        "code": "RW",
+        "country": "Rwanda",
+        "answer": "Kigali",
+        "note": "Africa"
+      }
+    ],
+    "secondsPerRound": 3,
+    "outro": {
+      "question": "Ready for the real one?",
+      "cta": "Today's Daily: Across Africa"
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-daily/e0f5c140d5.wav",
+        "duration": 2.323,
+        "text": "Warm up for today's Daily: Across Africa!"
+      },
+      "outro": {
+        "src": "locato/voice/sample-daily/359282d79e.wav",
+        "duration": 1.903,
+        "text": "Ready for the real one? Comment your score!"
+      },
+      "cta": {
+        "src": "locato/voice/sample-daily/18fabd4bb7.wav",
+        "duration": 2.931,
+        "text": "Play today's Daily for free at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-daily/518d013370.wav",
+          "duration": 1.009,
+          "text": "That's Ethiopia!"
+        },
+        {
+          "src": "locato/voice/sample-daily/ed4fbb04c0.wav",
+          "duration": 1.038,
+          "text": "That's Cairo!"
+        },
+        {
+          "src": "locato/voice/sample-daily/d733b27163.wav",
+          "duration": 0.737,
+          "text": "That's Angola!"
+        },
+        {
+          "src": "locato/voice/sample-daily/e194bc00d0.wav",
+          "duration": 0.975,
+          "text": "That's Mozambique!"
+        },
+        {
+          "src": "locato/voice/sample-daily/95d6ac11e5.wav",
+          "duration": 0.807,
+          "text": "That's Kigali!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "template": "speedrun",
+  "seed": "1794060089522",
+  "createdAt": "2026-11-07T14:01:30.941Z",
+  "props": {
+    "title": "Every flag in Europe",
+    "badge": "Speedrun",
+    "clip": {
+      "src": "locato/clips/sample-a.mp4",
+      "width": 1080,
+      "height": 1920,
+      "duration": 8,
+      "muted": true
+    },
+    "timer": {
+      "start": 0.5,
+      "stop": 7.5,
+      "label": "TIME"
+    },
+    "callouts": [
+      {
+        "at": 2,
+        "text": "No hints used"
+      }
+    ],
+    "zooms": [
+      {
+        "start": 3,
+        "end": 6.5,
+        "x": 0.5,
+        "y": 0.35,
+        "scale": 1.4
+      }
+    ],
+    "outro": {
+      "question": "Can you beat it?",
+      "cta": "Try a timed run. Free, in your browser."
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-speedrun/bd61b6e6ca.wav",
+        "duration": 0.836,
+        "text": "Every flag in Europe."
+      },
+      "outro": {
+        "src": "locato/voice/sample-speedrun/58c50880b8.wav",
+        "duration": 1.669,
+        "text": "Can you beat it? Comment your best time!"
+      },
+      "cta": {
+        "src": "locato/voice/sample-speedrun/69259d2b17.wav",
+        "duration": 2.709,
+        "text": "Think you can beat it? Play it free at locato.quest!"
+      }
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

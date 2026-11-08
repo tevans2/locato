@@ -1,0 +1,176 @@
+{
+  "template": "quiz",
+  "seed": "sample-spot",
+  "createdAt": "2026-11-07T18:08:43.357Z",
+  "link": "https://locato.quest/?ref=samplespot",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Spot the country",
+    "rounds": [
+      {
+        "type": "spot",
+        "code": "TR",
+        "country": "Turkiye",
+        "answer": "Turkiye",
+        "note": "Asia",
+        "view": [
+          1535.7,
+          321.6,
+          2008.7,
+          699.9
+        ],
+        "c": [
+          1771,
+          510.4
+        ],
+        "seconds": 2.5
+      },
+      {
+        "type": "spot",
+        "code": "BR",
+        "country": "Brazil",
+        "answer": "Brazil",
+        "note": "South America",
+        "view": [
+          286.2,
+          421.7,
+          1799.8,
+          1632.5
+        ],
+        "c": [
+          1056,
+          993.2
+        ],
+        "seconds": 3
+      },
+      {
+        "type": "spot",
+        "code": "BO",
+        "country": "Bolivia",
+        "answer": "Bolivia",
+        "note": "South America",
+        "view": [
+          714.8,
+          841.9,
+          1226.8,
+          1251.5
+        ],
+        "c": [
+          963.1,
+          1050.5
+        ],
+        "seconds": 3.5
+      },
+      {
+        "type": "spot",
+        "code": "TG",
+        "country": "Togo",
+        "answer": "Togo",
+        "note": "Africa",
+        "view": [
+          1373.7,
+          701.5,
+          1633.7,
+          909.5
+        ],
+        "c": [
+          1504.7,
+          806.3
+        ],
+        "seconds": 4
+      },
+      {
+        "type": "spot",
+        "code": "VA",
+        "country": "Holy See",
+        "answer": "Holy See",
+        "note": "Europe",
+        "view": [
+          1461.8,
+          378.1,
+          1721.8,
+          586.1
+        ],
+        "c": [
+          1591.7,
+          482.2
+        ],
+        "seconds": 4.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "spot",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-spot/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-spot/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-spot/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-spot/7f530bd5be.wav",
+          "duration": 1.407,
+          "text": "That's Turkiye!"
+        },
+        {
+          "src": "locato/voice/sample-spot/222d1f7cd5.wav",
+          "duration": 1.071,
+          "text": "That's Brazil!"
+        },
+        {
+          "src": "locato/voice/sample-spot/6c582e73b7.wav",
+          "duration": 0.968,
+          "text": "That's Bolivia!"
+        },
+        {
+          "src": "locato/voice/sample-spot/103eac9394.wav",
+          "duration": 0.833,
+          "text": "That's Togo!"
+        },
+        {
+          "src": "locato/voice/sample-spot/dc52d29d45.wav",
+          "duration": 1.062,
+          "text": "That's Holy See!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

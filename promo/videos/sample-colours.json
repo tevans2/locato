@@ -1,0 +1,159 @@
+{
+  "template": "quiz",
+  "seed": "sample-colours",
+  "createdAt": "2026-11-07T18:03:01.307Z",
+  "link": "https://locato.quest/?ref=samplecolours",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Flag colours",
+    "rounds": [
+      {
+        "type": "colours",
+        "code": "MA",
+        "country": "Morocco",
+        "answer": "Morocco",
+        "note": "Africa",
+        "stages": [
+          "locato/colours/ma/0.svg",
+          "locato/colours/ma/1.svg",
+          "locato/flags/ma.svg"
+        ],
+        "seconds": 3
+      },
+      {
+        "type": "colours",
+        "code": "PT",
+        "country": "Portugal",
+        "answer": "Portugal",
+        "note": "Europe",
+        "stages": [
+          "locato/colours/pt/0.svg",
+          "locato/colours/pt/1.svg",
+          "locato/colours/pt/2.svg",
+          "locato/colours/pt/3.svg",
+          "locato/flags/pt.svg"
+        ],
+        "seconds": 3.5
+      },
+      {
+        "type": "colours",
+        "code": "UG",
+        "country": "Uganda",
+        "answer": "Uganda",
+        "note": "Africa",
+        "stages": [
+          "locato/colours/ug/0.svg",
+          "locato/colours/ug/1.svg",
+          "locato/colours/ug/2.svg",
+          "locato/colours/ug/3.svg",
+          "locato/flags/ug.svg"
+        ],
+        "seconds": 4
+      },
+      {
+        "type": "colours",
+        "code": "CF",
+        "country": "Central African Republic",
+        "answer": "Central African Republic",
+        "note": "Africa",
+        "stages": [
+          "locato/colours/cf/0.svg",
+          "locato/colours/cf/1.svg",
+          "locato/colours/cf/2.svg",
+          "locato/colours/cf/3.svg",
+          "locato/flags/cf.svg"
+        ],
+        "seconds": 4.5
+      },
+      {
+        "type": "colours",
+        "code": "BT",
+        "country": "Bhutan",
+        "answer": "Bhutan",
+        "note": "Asia",
+        "stages": [
+          "locato/colours/bt/0.svg",
+          "locato/colours/bt/1.svg",
+          "locato/colours/bt/2.svg",
+          "locato/colours/bt/3.svg",
+          "locato/flags/bt.svg"
+        ],
+        "seconds": 5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "colours",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        3,
+        3.5,
+        4,
+        4.5,
+        5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-colours/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-colours/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-colours/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-colours/bf85ada3cf.wav",
+          "duration": 0.701,
+          "text": "That's Morocco!"
+        },
+        {
+          "src": "locato/voice/sample-colours/c424b3d842.wav",
+          "duration": 1.168,
+          "text": "That's Portugal!"
+        },
+        {
+          "src": "locato/voice/sample-colours/59fb123c74.wav",
+          "duration": 0.778,
+          "text": "That's Uganda!"
+        },
+        {
+          "src": "locato/voice/sample-colours/75958edba1.wav",
+          "duration": 1.759,
+          "text": "That's Central African Republic!"
+        },
+        {
+          "src": "locato/voice/sample-colours/90232dc04f.wav",
+          "duration": 0.719,
+          "text": "That's Bhutan!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

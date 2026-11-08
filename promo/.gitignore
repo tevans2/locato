@@ -1,0 +1,34 @@
+# ---- never commit (this repo is public) ----
+.env
+.claude/settings.local.json
+# Mixkit's licence allows use inside videos, not sharing the audio files
+public/locato/music/
+# Research report and strategy notes: kept private by default
+public/locato/research/
+
+# ---- generated or regenerable ----
+node_modules/
+.cache/
+out/
+dist/
+.locks/
+.wrangler/
+.wrangler-local/
+.dev.vars
+tools/voice/.venv/
+tools/voice/.jobs-*.json
+# copied from the game by `npm run locato:sync`
+public/locato/data.json
+public/locato/flags/
+public/locato/shapes/
+public/locato/map/
+public/locato/logo.svg
+# made per video (voiceover, flag-colour stages)
+public/locato/voice/
+public/locato/colours/
+
+# ---- large media, kept locally ----
+public/locato/clips/
+
+.DS_Store
+public/locato/voice-cache/

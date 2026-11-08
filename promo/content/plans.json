@@ -1,0 +1,15 @@
+[
+  {
+    "id": "default",
+    "name": "Research mix: 14 a week",
+    "days": [
+      [{"recipe": {"format": "quiz", "modes": ["flag"], "copy": {"hook": "a"}}}, {"recipe": {"format": "quiz", "modes": ["which"], "copy": {"hook": "b"}}}],
+      [{"recipe": {"format": "quiz", "modes": ["shape"], "copy": {"hook": "d"}}}, {"recipe": {"format": "quiz", "modes": ["flag"], "rules": {"mode": "one-life"}}}],
+      [{"recipe": {"format": "quiz", "modes": ["spot"], "copy": {"hook": "a"}}}, {"recipe": {"format": "lookalikes", "skill": "flag"}}],
+      [{"recipe": {"format": "quiz", "modes": "mix", "copy": {"hook": "b"}}}, {"recipe": {"format": "quiz", "modes": ["route"], "count": 3, "copy": {"hook": "d"}}}],
+      [{"recipe": {"format": "daily"}}, {"recipe": {"format": "quiz", "modes": ["colours"], "copy": {"hook": "a"}}}],
+      [{"recipe": {"format": "quiz", "modes": ["capital"], "copy": {"hook": "b"}}}, {"recipe": {"format": "quiz", "modes": ["shape"], "rules": {"mode": "one-life"}}}],
+      [{"recipe": {"format": "quiz", "modes": ["which"], "copy": {"hook": "d"}}}, {"recipe": {"format": "quiz", "modes": ["split"], "count": 3, "copy": {"hook": "a"}}}]
+    ]
+  }
+]

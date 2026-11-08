@@ -1,0 +1,171 @@
+{
+  "template": "quiz",
+  "seed": "sample-pin",
+  "createdAt": "2026-11-07T18:16:12.136Z",
+  "link": "https://locato.quest/?ref=samplepin",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "MapTap",
+    "rounds": [
+      {
+        "type": "pin",
+        "place": "Cairo",
+        "code": "EG",
+        "answer": "In Egypt",
+        "note": "City",
+        "say": "It's in Egypt!",
+        "view": [
+          1296.6,
+          237.2,
+          2196.6,
+          957.2
+        ],
+        "x": 1746.6,
+        "y": 597.2,
+        "seconds": 2.5
+      },
+      {
+        "type": "pin",
+        "place": "Sydney",
+        "code": "AU",
+        "answer": "In Australia",
+        "note": "City",
+        "say": "It's in Australia!",
+        "view": [
+          2241.5,
+          857.6,
+          3141.5,
+          1577.6
+        ],
+        "x": 2691.5,
+        "y": 1217.6,
+        "seconds": 3
+      },
+      {
+        "type": "pin",
+        "place": "Stonehenge",
+        "code": "GB",
+        "answer": "In United Kingdom",
+        "note": "Landmark",
+        "say": "It's in United Kingdom!",
+        "view": [
+          1033.4,
+          34.2,
+          1933.4,
+          754.2
+        ],
+        "x": 1483.4,
+        "y": 394.2,
+        "seconds": 3.5
+      },
+      {
+        "type": "pin",
+        "place": "Samarkand",
+        "code": "UZ",
+        "answer": "In Uzbekistan",
+        "note": "City",
+        "say": "It's in Uzbekistan!",
+        "view": [
+          1563.9,
+          143.8,
+          2463.9,
+          863.8
+        ],
+        "x": 2013.9,
+        "y": 503.8,
+        "seconds": 4
+      },
+      {
+        "type": "pin",
+        "place": "Mount Elbrus",
+        "code": "RU",
+        "answer": "In Russia",
+        "note": "Mountain",
+        "say": "It's in Russia!",
+        "view": [
+          1369,
+          108.3,
+          2269,
+          828.3
+        ],
+        "x": 1819,
+        "y": 468.3,
+        "seconds": 4.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "pin",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-pin/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-pin/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-pin/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-pin/31936828cc.wav",
+          "duration": 2.23,
+          "text": "It's in Egypt!"
+        },
+        {
+          "src": "locato/voice/sample-pin/d26067d1d2.wav",
+          "duration": 1.272,
+          "text": "It's in Australia!"
+        },
+        {
+          "src": "locato/voice/sample-pin/c889a76475.wav",
+          "duration": 1.302,
+          "text": "It's in United Kingdom!"
+        },
+        {
+          "src": "locato/voice/sample-pin/b7185ec728.wav",
+          "duration": 1.065,
+          "text": "It's in Uzbekistan!"
+        },
+        {
+          "src": "locato/voice/sample-pin/2e925b8532.wav",
+          "duration": 1.249,
+          "text": "It's in Russia!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

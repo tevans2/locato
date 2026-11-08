@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    # promo/ deploys on its own (promo-deploy.yml): promo-only changes don't redeploy the game.
+    # The token code the game shares with the promo service still triggers a deploy (its contract test runs here).
+    paths:
+      - "**"
+      - "!promo/**"
+      - "promo/worker/src/auth.ts"
   workflow_dispatch:
 
 concurrency:

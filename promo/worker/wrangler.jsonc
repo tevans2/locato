@@ -1,0 +1,29 @@
+{
+  // The promo service: API (promo.locato.quest) + a timer that keeps Buffer topped up and records what was posted.
+  // Separate from the game: its own records (D1), files (R2) and deploys. Infra: ../infra (Terraform).
+  //   deploy: npm run worker:deploy      schema: npm run worker:migrate      logs: npx wrangler tail --config worker/wrangler.jsonc
+  "name": "locato-promo",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{"pattern": "promo.locato.quest", "custom_domain": true}],
+  // every 4 hours; no Buffer requests when nothing is waiting or due for a check
+  "triggers": {"crons": ["15 */4 * * *"]},
+  "d1_databases": [
+    // database_id is filled in from Terraform by infra/sync-wrangler
+    {"binding": "DB", "database_name": "locato-promo", "database_id": "644da58a-e718-4495-b318-3437ef46a14f", "migrations_dir": "migrations"}
+  ],
+  "r2_buckets": [
+    {"binding": "MEDIA", "bucket_name": "locato-social"},          // public: videos for Buffer, voice clips
+    {"binding": "PRIVATE", "bucket_name": "locato-promo-private"}  // private: licensed music, backups
+  ],
+  "vars": {
+    "TIMEZONE": "Africa/Johannesburg",
+    "TIMES": "13:00,19:00",
+    "MEDIA_URL": "https://media.locato.quest",
+    // origins allowed to call the API from a browser (the game's admin)
+    "ADMIN_ORIGINS": "https://locato.quest,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+  },
+  "observability": {"enabled": true}
+  // secrets (infra/secrets): BUFFER_API_KEY, PROMO_SERVICE_TOKEN, PROMO_ADMIN_SECRET
+}

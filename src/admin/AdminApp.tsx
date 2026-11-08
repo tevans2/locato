@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Ban, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, TrendingUp, Users } from "lucide-react";
+import { Activity, Ban, Clapperboard, Gauge, LayoutDashboard, ListTree, LogOut, Mail, Moon, Radio, ShieldCheck, Sun, TrendingUp, Users } from "lucide-react";
 import { checkSession, createClient, signIn, signOut as endSession, type AdminSessionState } from "./api";
 import { ConfirmDialog, Toasts, type ConfirmRequest, type Toast } from "./ui";
 import { OverviewView } from "./views/Overview";
@@ -10,9 +10,10 @@ import { BansView } from "./views/Bans";
 import { LiveView } from "./views/Live";
 import { EventsView } from "./views/Events";
 import { SystemView } from "./views/System";
+import { PromoView } from "./views/Promo";
 import { currentTheme, toggleTheme } from "../ui/theme";
 
-type ViewId = "overview" | "growth" | "users" | "moderation" | "bans" | "live" | "events" | "system";
+type ViewId = "overview" | "growth" | "users" | "moderation" | "bans" | "live" | "events" | "promo" | "system";
 
 const NAV: readonly { id: ViewId; label: string; icon: typeof Users; description: string }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, description: "Activity and health at a glance" },
@@ -22,6 +23,7 @@ const NAV: readonly { id: ViewId; label: string; icon: typeof Users; description
   { id: "bans", label: "Bans", icon: Ban, description: "Banned accounts and IP addresses" },
   { id: "live", label: "Live", icon: Radio, description: "Open multiplayer rooms and who's online" },
   { id: "events", label: "Event log", icon: ListTree, description: "Sign-ins, submissions, admin actions and warnings" },
+  { id: "promo", label: "Promo", icon: Clapperboard, description: "Promo videos: queue, posted results, content, voices and music (the separate promo service)" },
   { id: "system", label: "System", icon: Gauge, description: "Server, database and configuration" },
 ];
 
@@ -187,6 +189,7 @@ export function AdminApp() {
         {route.view === "bans" && <BansView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "live" && <LiveView client={client} onOpenUser={openUser} helpers={helpers} />}
         {route.view === "events" && <EventsView client={client} onOpenUser={openUser} />}
+        {route.view === "promo" && <PromoView client={client} helpers={helpers} />}
         {route.view === "system" && <SystemView client={client} />}
       </main>
 

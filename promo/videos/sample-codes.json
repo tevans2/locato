@@ -1,0 +1,126 @@
+{
+  "template": "quiz",
+  "seed": "sample-codes",
+  "createdAt": "2026-11-07T17:57:46.075Z",
+  "link": "https://locato.quest/?ref=samplecodes",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Country codes",
+    "rounds": [
+      {
+        "type": "code",
+        "code": "NG",
+        "country": "Nigeria",
+        "answer": "Nigeria",
+        "note": "Africa",
+        "seconds": 1.5
+      },
+      {
+        "type": "code",
+        "code": "PL",
+        "country": "Poland",
+        "answer": "Poland",
+        "note": "Europe",
+        "seconds": 2
+      },
+      {
+        "type": "code",
+        "code": "FJ",
+        "country": "Fiji",
+        "answer": "Fiji",
+        "note": "Oceania",
+        "seconds": 2.5
+      },
+      {
+        "type": "code",
+        "code": "CG",
+        "country": "Congo",
+        "answer": "Congo",
+        "note": "Africa",
+        "seconds": 3
+      },
+      {
+        "type": "code",
+        "code": "TL",
+        "country": "Timor-Leste",
+        "answer": "Timor-Leste",
+        "note": "Asia",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "codes",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-codes/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-codes/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-codes/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-codes/a8f6d6e247.wav",
+          "duration": 0.959,
+          "text": "That's Nigeria!"
+        },
+        {
+          "src": "locato/voice/sample-codes/716b441b0d.wav",
+          "duration": 1.039,
+          "text": "That's Poland!"
+        },
+        {
+          "src": "locato/voice/sample-codes/01370d8f1e.wav",
+          "duration": 0.941,
+          "text": "That's Fiji!"
+        },
+        {
+          "src": "locato/voice/sample-codes/9e6fd07371.wav",
+          "duration": 1.067,
+          "text": "That's Congo!"
+        },
+        {
+          "src": "locato/voice/sample-codes/0964c1d503.wav",
+          "duration": 1.338,
+          "text": "That's Timor-Leste!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}
