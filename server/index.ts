@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { promoConfigFromEnv } from "./admin/promoToken";
+import { adminContentSecurityPolicy, promoConfigFromEnv } from "./admin/promoToken";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexCountries, rawCountries, validateCountries } from "../src/core/countries";
@@ -214,7 +214,7 @@ function serveAdminPage(): Response {
       "x-robots-tag": "noindex, nofollow",
       "x-frame-options": "DENY",
       "referrer-policy": "no-referrer",
-      "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      "content-security-policy": adminContentSecurityPolicy(promoConfig),
     },
   });
 }
