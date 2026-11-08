@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "loadtest": "node loadtest/run.mjs",
+    "loadtest:check": "node --test loadtest/checks.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/compress-dist.mjs",
     "preview": "vite preview",
@@ -41,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
+    "k6": "^0.0.0",
     "lucide-react": "^1.21.0",
     "maplibre-gl": "^5.24.0",
     "pngjs": "^7.0.0",
