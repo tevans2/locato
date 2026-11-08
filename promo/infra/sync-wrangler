@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Copy the D1 database id from Terraform into worker/wrangler.jsonc.
+set -euo pipefail
+cd "$(dirname "$0")"
+ID=$(./tf output -raw d1_database_id)
+python3 - "$ID" <<'PY'
+import re, sys
+p = '../worker/wrangler.jsonc'
+s = open(p).read()
+s2 = re.sub(r'("database_id":\s*")[^"]*(")', lambda m: m.group(1) + sys.argv[1] + m.group(2), s)
+open(p, 'w').write(s2)
+print('✓ worker/wrangler.jsonc database_id =', sys.argv[1])
+PY

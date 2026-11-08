@@ -1,0 +1,67 @@
+{
+  "template": "versus",
+  "seed": "1794060091143",
+  "createdAt": "2026-11-07T14:01:32.730Z",
+  "props": {
+    "title": "Alex vs Sam",
+    "badge": "1v1 race",
+    "top": {
+      "name": "Alex",
+      "emoji": "🌋",
+      "result": "14 flags",
+      "clip": {
+        "src": "locato/clips/sample-a.mp4",
+        "width": 1080,
+        "height": 1920,
+        "duration": 8,
+        "muted": true
+      }
+    },
+    "bottom": {
+      "name": "Sam",
+      "emoji": "🗼",
+      "result": "11 flags",
+      "clip": {
+        "src": "locato/clips/sample-b.mp4",
+        "width": 1080,
+        "height": 1920,
+        "duration": 7,
+        "muted": true
+      }
+    },
+    "winner": "top",
+    "outro": {
+      "question": "Who would you beat?",
+      "cta": "Race your friends live. No download."
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-versus/52d141546b.wav",
+        "duration": 1.282,
+        "text": "Alex vs Sam."
+      },
+      "outro": {
+        "src": "locato/voice/sample-versus/c9c612b6da.wav",
+        "duration": 1.743,
+        "text": "Who would you beat? Tag who you'd race!"
+      },
+      "cta": {
+        "src": "locato/voice/sample-versus/c6df014b21.wav",
+        "duration": 1.692,
+        "text": "Play it free at locato.quest!"
+      },
+      "result": {
+        "src": "locato/voice/sample-versus/7ba685dca2.wav",
+        "duration": 0.989,
+        "text": "Alex wins!"
+      }
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

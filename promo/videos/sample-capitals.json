@@ -1,0 +1,126 @@
+{
+  "template": "quiz",
+  "seed": "sample-capitals",
+  "createdAt": "2026-11-07T17:49:12.433Z",
+  "link": "https://locato.quest/?ref=samplecapitals",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Capitals",
+    "rounds": [
+      {
+        "type": "capital",
+        "code": "RU",
+        "country": "Russia",
+        "answer": "Moscow",
+        "note": "Capital of Russia",
+        "seconds": 1.5
+      },
+      {
+        "type": "capital",
+        "code": "AU",
+        "country": "Australia",
+        "answer": "Canberra",
+        "note": "Capital of Australia",
+        "seconds": 2
+      },
+      {
+        "type": "capital",
+        "code": "VN",
+        "country": "Vietnam",
+        "answer": "Hanoi",
+        "note": "Capital of Vietnam",
+        "seconds": 2.5
+      },
+      {
+        "type": "capital",
+        "code": "VU",
+        "country": "Vanuatu",
+        "answer": "Port Vila",
+        "note": "Capital of Vanuatu",
+        "seconds": 3
+      },
+      {
+        "type": "capital",
+        "code": "DJ",
+        "country": "Djibouti",
+        "answer": "Djibouti",
+        "note": "Capital of Djibouti",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "capitals",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-capitals/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-capitals/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-capitals/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-capitals/5f07e25e78.wav",
+          "duration": 0.849,
+          "text": "That's Moscow!"
+        },
+        {
+          "src": "locato/voice/sample-capitals/c346b50c9a.wav",
+          "duration": 1.058,
+          "text": "That's Canberra!"
+        },
+        {
+          "src": "locato/voice/sample-capitals/66029bfd88.wav",
+          "duration": 0.673,
+          "text": "That's Hanoi!"
+        },
+        {
+          "src": "locato/voice/sample-capitals/59fa7056f7.wav",
+          "duration": 1.005,
+          "text": "That's Port Vila!"
+        },
+        {
+          "src": "locato/voice/sample-capitals/3b8b60a3e6.wav",
+          "duration": 1.188,
+          "text": "That's Djibouti!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

@@ -1,0 +1,307 @@
+{
+  "template": "quiz",
+  "seed": "sample-route-v2",
+  "createdAt": "2026-11-07T19:29:39.628Z",
+  "link": "https://locato.quest/?ref=sampleroute",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Overland",
+    "rounds": [
+      {
+        "type": "route",
+        "from": {
+          "code": "LU",
+          "name": "Luxembourg",
+          "c": [
+            1541.2,
+            407.4
+          ]
+        },
+        "to": {
+          "code": "IT",
+          "name": "Italy",
+          "c": [
+            1589.2,
+            466.9
+          ]
+        },
+        "path": [
+          {
+            "code": "FR",
+            "name": "France"
+          }
+        ],
+        "view": [
+          1400.3,
+          343.6,
+          1700.3,
+          571.6
+        ],
+        "answer": "1 country",
+        "note": "France",
+        "say": "Just 1: France!",
+        "seconds": 4
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "AT",
+          "name": "Austria",
+          "c": [
+            1601.5,
+            427.9
+          ]
+        },
+        "to": {
+          "code": "MK",
+          "name": "North Macedonia",
+          "c": [
+            1662.7,
+            485.1
+          ]
+        },
+        "path": [
+          {
+            "code": "HU",
+            "name": "Hungary"
+          },
+          {
+            "code": "RS",
+            "name": "Serbia"
+          }
+        ],
+        "view": [
+          1470.1,
+          339.4,
+          1770.1,
+          567.4
+        ],
+        "answer": "2 countries",
+        "note": "Hungary → Serbia",
+        "say": "Just 2: Hungary, Serbia!",
+        "seconds": 4
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "NL",
+          "name": "Netherlands",
+          "c": [
+            1537.4,
+            384
+          ]
+        },
+        "to": {
+          "code": "HU",
+          "name": "Hungary",
+          "c": [
+            1641,
+            431.9
+          ]
+        },
+        "path": [
+          {
+            "code": "DE",
+            "name": "Germany"
+          },
+          {
+            "code": "AT",
+            "name": "Austria"
+          }
+        ],
+        "view": [
+          1444,
+          288.6,
+          1744,
+          516.5
+        ],
+        "answer": "2 countries",
+        "note": "Germany → Austria",
+        "say": "Just 2: Germany, Austria!",
+        "seconds": 4
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "GR",
+          "name": "Greece",
+          "c": [
+            1671.2,
+            505.7
+          ]
+        },
+        "to": {
+          "code": "YE",
+          "name": "Yemen",
+          "c": [
+            1889.3,
+            734.5
+          ]
+        },
+        "path": [
+          {
+            "code": "TR",
+            "name": "Turkiye"
+          },
+          {
+            "code": "IQ",
+            "name": "Iraq"
+          },
+          {
+            "code": "SA",
+            "name": "Saudi Arabia"
+          }
+        ],
+        "view": [
+          1565.8,
+          444.8,
+          2036.6,
+          802.6
+        ],
+        "answer": "3 countries",
+        "note": "Turkiye → Iraq → Saudi Arabia",
+        "say": "Just 3: Turkiye, Iraq, Saudi Arabia!",
+        "seconds": 4
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "MN",
+          "name": "Mongolia",
+          "c": [
+            2265.5,
+            435.6
+          ]
+        },
+        "to": {
+          "code": "ES",
+          "name": "Spain",
+          "c": [
+            1469.2,
+            496.9
+          ]
+        },
+        "path": [
+          {
+            "code": "RU",
+            "name": "Russia"
+          },
+          {
+            "code": "PL",
+            "name": "Poland"
+          },
+          {
+            "code": "DE",
+            "name": "Germany"
+          },
+          {
+            "code": "FR",
+            "name": "France"
+          }
+        ],
+        "view": [
+          1267.1,
+          -251.4,
+          2860.4,
+          959.6
+        ],
+        "answer": "4 countries",
+        "note": "Russia → Poland → Germany → France",
+        "say": "Just 4: Russia, Poland, Germany, France!",
+        "seconds": 4,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "route",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-route/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-route/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-route/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-route/a795f1174d.wav",
+          "duration": 1.169,
+          "text": "Just 1: France!"
+        },
+        {
+          "src": "locato/voice/sample-route/feee24da8f.wav",
+          "duration": 2.084,
+          "text": "Just 2: Hungary, Serbia!"
+        },
+        {
+          "src": "locato/voice/sample-route/29ac079818.wav",
+          "duration": 1.891,
+          "text": "Just 2: Germany, Austria!"
+        },
+        {
+          "src": "locato/voice/sample-route/6a28d9d982.wav",
+          "duration": 2.112,
+          "text": "Just 3: Turkiye, Iraq, Saudi Arabia!"
+        },
+        {
+          "src": "locato/voice/sample-route/d5ae3a2be9.wav",
+          "duration": 2.651,
+          "text": "Just 4: Russia, Poland, Germany, France!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  },
+  "published": {
+    "instagram": {
+      "postId": "6af07437562f2e6de9bccc2b",
+      "dueAt": "2026-11-08T13:37:36.822Z",
+      "status": "scheduled"
+    },
+    "tiktok": {
+      "postId": "6af074389214322f6854b894",
+      "dueAt": "2026-11-08T13:37:36.822Z",
+      "status": "scheduled"
+    },
+    "youtube": {
+      "postId": "6af07439229bf05dafb22663",
+      "dueAt": "2026-11-08T13:37:36.822Z",
+      "status": "scheduled"
+    }
+  },
+  "mediaUrl": "https://media.locato.quest/videos/sample-route.mp4?v=12052438"
+}

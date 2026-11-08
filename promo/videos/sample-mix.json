@@ -1,0 +1,193 @@
+{
+  "template": "quiz",
+  "seed": "sample-mix-v2",
+  "createdAt": "2026-11-07T19:31:45.692Z",
+  "link": "https://locato.quest/?ref=samplemix",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Every mode",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "CL",
+        "country": "Chile",
+        "answer": "Chile",
+        "note": "South America",
+        "seconds": 1.5
+      },
+      {
+        "type": "shape",
+        "code": "BE",
+        "country": "Belgium",
+        "answer": "Belgium",
+        "note": "Europe",
+        "seconds": 2
+      },
+      {
+        "type": "capital",
+        "code": "NA",
+        "country": "Namibia",
+        "answer": "Windhoek",
+        "note": "Capital of Namibia",
+        "seconds": 2.5
+      },
+      {
+        "type": "spot",
+        "code": "MW",
+        "country": "Malawi",
+        "answer": "Malawi",
+        "note": "Africa",
+        "view": [
+          1622.7,
+          897.2,
+          1938.4,
+          1137.2
+        ],
+        "c": [
+          1780.9,
+          1016.7
+        ],
+        "seconds": 4
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "BG",
+          "name": "Bulgaria",
+          "c": [
+            1688.6,
+            473.9
+          ]
+        },
+        "to": {
+          "code": "SD",
+          "name": "Sudan",
+          "c": [
+            1743.8,
+            734.1
+          ]
+        },
+        "path": [
+          {
+            "code": "TR",
+            "name": "Turkiye"
+          },
+          {
+            "code": "SY",
+            "name": "Syria"
+          },
+          {
+            "code": "IL",
+            "name": "Israel"
+          },
+          {
+            "code": "EG",
+            "name": "Egypt"
+          }
+        ],
+        "view": [
+          1472.2,
+          416.5,
+          2040,
+          848
+        ],
+        "answer": "4 countries",
+        "note": "Turkiye → Syria → Israel → Egypt",
+        "say": "Just 4: Turkiye, Syria, Israel, Egypt!",
+        "seconds": 4,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "mix",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        4,
+        4
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-mix/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-mix/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-mix/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-mix/16221d4f3d.wav",
+          "duration": 1.046,
+          "text": "That's Chile!"
+        },
+        {
+          "src": "locato/voice/sample-mix/fed49a2a1a.wav",
+          "duration": 1.136,
+          "text": "That's Belgium!"
+        },
+        {
+          "src": "locato/voice/sample-mix/0404b4d178.wav",
+          "duration": 0.965,
+          "text": "That's Windhoek!"
+        },
+        {
+          "src": "locato/voice/sample-mix/a5d268b2c1.wav",
+          "duration": 1.05,
+          "text": "That's Malawi!"
+        },
+        {
+          "src": "locato/voice/sample-mix/d1179e3bdc.wav",
+          "duration": 2.48,
+          "text": "Just 4: Turkiye, Syria, Israel, Egypt!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  },
+  "published": {
+    "instagram": {
+      "postId": "6af03880562f2e6de9a8bab4",
+      "dueAt": "2026-11-08T08:53:20.677Z",
+      "status": "sending"
+    },
+    "tiktok": {
+      "postId": "6af0388b004e4879a7a683d6",
+      "dueAt": "2026-11-08T08:53:31.844Z",
+      "status": "sending"
+    },
+    "youtube": {
+      "postId": "6af03896004e4879a7a68522",
+      "dueAt": "2026-11-08T08:53:42.920Z",
+      "status": "sent"
+    }
+  },
+  "mediaUrl": "https://media.locato.quest/videos/sample-mix.mp4?v=7789403"
+}

@@ -120,6 +120,9 @@ server/
   leaderboard/    Leaderboard mode/variant validation
   rooms/          Server-authoritative multiplayer Room + RoomManager
   protocol/       Raw WebSocket message parsing
+
+promo/            Promo videos (Remotion templates, posting via R2 + Buffer).
+                  Its own package, not part of the game build. See promo/CLAUDE.md
 ```
 
 ## HTTP API

@@ -1,0 +1,33 @@
+[
+  {"id": "hook.can-you-get", "slot": "hook", "alias": "a", "text": "Can you get {n}/{n}?", "default": true, "suits": {"format": ["quiz"], "rules": ["score"]}, "note": "Research hook A"},
+  {"id": "hook.only-nerds", "slot": "hook", "alias": "b", "text": "Only geography nerds get #{n}", "suits": {"format": ["quiz"], "rules": ["score"]}, "note": "Research hook B"},
+  {"id": "hook.miss-one", "slot": "hook", "alias": "c", "text": "Miss one and you're out", "default": true, "suits": {"format": ["quiz"], "rules": ["one-life"]}, "note": "Research hook C"},
+  {"id": "hook.starts-easy", "slot": "hook", "alias": "d", "text": "This starts easy. It doesn't stay easy.", "suits": {"format": ["quiz"]}, "note": "Research hook D"},
+  {"id": "hook.beat-my-score", "slot": "hook", "alias": "e", "text": "Beat my score: {score}/{n}", "needs": ["score"], "suits": {"format": ["quiz"], "rules": ["score"]}, "note": "Research hook E: only with a score you really got"},
+  {"id": "hook.none", "slot": "hook", "alias": "f", "text": "", "note": "No hook line (research hook F)"},
+  {"id": "hook.daily-warmup", "slot": "hook", "text": "Warm up for today's Daily", "say": "Warm up for today's Daily: {theme}!", "default": true, "suits": {"format": ["daily"]}},
+  {"id": "hook.lookalikes-flag", "slot": "hook", "text": "Can you tell these flags apart?", "default": true, "suits": {"format": ["lookalikes"], "skill": ["flag"]}},
+  {"id": "hook.lookalikes-shape", "slot": "hook", "text": "Can you tell these shapes apart?", "default": true, "suits": {"format": ["lookalikes"], "skill": ["shape"]}},
+
+  {"id": "answer.thats", "slot": "answer", "text": "That's {answer}!", "default": true, "note": "Country modes. A host-like line gives the voice context; bare names come out garbled more often"},
+  {"id": "answer.pin", "slot": "answer", "text": "It's in {country}!", "note": "MapTap"},
+  {"id": "answer.route", "slot": "answer", "text": "Just {k}: {names}!", "note": "Overland"},
+  {"id": "answer.split", "slot": "answer", "text": "The {side} side, with {pct} percent!", "note": "Worldsplit"},
+
+  {"id": "question.score", "slot": "question", "text": "What did you score?", "default": true, "suits": {"format": ["quiz"], "rules": ["score"]}},
+  {"id": "question.one-life", "slot": "question", "text": "Where did you get eliminated?", "default": true, "suits": {"format": ["quiz"], "rules": ["one-life"]}},
+  {"id": "question.daily", "slot": "question", "text": "Ready for the real one?", "default": true, "suits": {"format": ["daily"]}},
+  {"id": "question.how-many", "slot": "question", "text": "How many did you get?", "default": true, "suits": {"format": ["lookalikes"]}},
+
+  {"id": "note.score", "slot": "note", "text": "Comment your score 👇", "say": "Comment your score!", "default": true, "suits": {"rules": ["score"]}},
+  {"id": "note.round", "slot": "note", "text": "Comment your round 👇", "say": "Comment your round!", "default": true, "suits": {"rules": ["one-life"]}},
+
+  {"id": "cta.prove-it", "slot": "cta", "text": "Got {n}/{n}? Prove it in the full game.", "say": "Got {n} out of {n}? Prove it at locato.quest!", "default": true, "suits": {"format": ["quiz"], "rules": ["score"]}},
+  {"id": "cta.made-it", "slot": "cta", "text": "Made it to the end? Prove it in the full game.", "say": "Made it to the end? Prove it at locato.quest!", "default": true, "suits": {"format": ["quiz"], "rules": ["one-life"]}},
+  {"id": "cta.daily", "slot": "cta", "text": "Today's Daily: {theme}", "say": "Play today's Daily for free at locato.quest!", "default": true, "suits": {"format": ["daily"]}},
+  {"id": "cta.academy", "slot": "cta", "text": "Train your eye in the free Academy", "say": "Play it free at locato.quest!", "default": true, "suits": {"format": ["lookalikes"]}},
+
+  {"id": "caption.legend", "slot": "caption", "text": "{n}/{n} = geography legend 🌍 {tags}", "default": true, "suits": {"format": ["quiz"], "rules": ["score"]}},
+  {"id": "caption.how-far", "slot": "caption", "text": "How far did you get? 💀 {tags}", "default": true, "suits": {"format": ["quiz"], "rules": ["one-life"]}},
+  {"id": "caption.generic", "slot": "caption", "text": "Can you beat it? 🌍 #geography #quiz #locato", "default": true, "suits": {"format": ["daily", "lookalikes"]}}
+]

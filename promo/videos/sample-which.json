@@ -1,0 +1,149 @@
+{
+  "template": "quiz",
+  "seed": "sample-which",
+  "createdAt": "2026-11-07T18:06:16.144Z",
+  "link": "https://locato.quest/?ref=samplewhich",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Which one is it?",
+    "rounds": [
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "SK",
+        "country": "Slovakia",
+        "answer": "Slovakia",
+        "options": [
+          "Russia",
+          "Slovakia",
+          "Slovenia"
+        ],
+        "seconds": 1.5
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "NL",
+        "country": "Netherlands",
+        "answer": "Netherlands",
+        "options": [
+          "Luxembourg",
+          "Netherlands"
+        ],
+        "seconds": 2
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "JO",
+        "country": "Jordan",
+        "answer": "Jordan",
+        "options": [
+          "Jordan",
+          "Palestine",
+          "Sudan"
+        ],
+        "seconds": 2.5
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "IT",
+        "country": "Italy",
+        "answer": "Italy",
+        "options": [
+          "Italy",
+          "Mexico"
+        ],
+        "seconds": 3
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "ID",
+        "country": "Indonesia",
+        "answer": "Indonesia",
+        "options": [
+          "Indonesia",
+          "Monaco",
+          "Poland"
+        ],
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "which",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-which/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-which/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-which/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-which/8319c99327.wav",
+          "duration": 1.259,
+          "text": "That's Slovakia!"
+        },
+        {
+          "src": "locato/voice/sample-which/a62747d85d.wav",
+          "duration": 1.162,
+          "text": "That's Netherlands!"
+        },
+        {
+          "src": "locato/voice/sample-which/dcf0280362.wav",
+          "duration": 0.906,
+          "text": "That's Jordan!"
+        },
+        {
+          "src": "locato/voice/sample-which/eeec106b4b.wav",
+          "duration": 0.966,
+          "text": "That's Italy!"
+        },
+        {
+          "src": "locato/voice/sample-which/7e2d50f6c0.wav",
+          "duration": 1.054,
+          "text": "That's Indonesia!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

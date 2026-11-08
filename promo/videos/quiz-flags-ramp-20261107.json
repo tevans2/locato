@@ -1,0 +1,111 @@
+{
+  "template": "quiz",
+  "seed": "1794064083643",
+  "createdAt": "2026-11-07T15:08:03.651Z",
+  "props": {
+    "title": "Name these 6 flags",
+    "badge": "Easy → Hard",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "MX",
+        "country": "Mexico",
+        "answer": "Mexico",
+        "note": "North America"
+      },
+      {
+        "type": "flag",
+        "code": "IQ",
+        "country": "Iraq",
+        "answer": "Iraq",
+        "note": "Asia"
+      },
+      {
+        "type": "flag",
+        "code": "HN",
+        "country": "Honduras",
+        "answer": "Honduras",
+        "note": "North America"
+      },
+      {
+        "type": "flag",
+        "code": "LB",
+        "country": "Lebanon",
+        "answer": "Lebanon",
+        "note": "Asia"
+      },
+      {
+        "type": "flag",
+        "code": "GM",
+        "country": "Gambia",
+        "answer": "Gambia",
+        "note": "Africa"
+      },
+      {
+        "type": "flag",
+        "code": "LS",
+        "country": "Lesotho",
+        "answer": "Lesotho",
+        "note": "Africa"
+      }
+    ],
+    "secondsPerRound": 3,
+    "outro": {
+      "question": "How many did you get out of 6?"
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/quiz-flags-ramp-20261107/cb76ad27bb.wav",
+        "duration": 1.588,
+        "text": "Can you name these 6 flags?"
+      },
+      "outro": {
+        "src": "locato/voice/quiz-flags-ramp-20261107/1f5d75c239.wav",
+        "duration": 2.78,
+        "text": "How many did you get out of 6? Comment your score!"
+      },
+      "cta": {
+        "src": "locato/voice/quiz-flags-ramp-20261107/addb658be8.wav",
+        "duration": 2.107,
+        "text": "Play free at locato.quest."
+      },
+      "answers": [
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/533e23abc5.wav",
+          "duration": 0.822,
+          "text": "Mexico!"
+        },
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/2abf5da070.wav",
+          "duration": 0.593,
+          "text": "Iraq!"
+        },
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/e757471867.wav",
+          "duration": 0.887,
+          "text": "Honduras!"
+        },
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/154a6fd4de.wav",
+          "duration": 0.747,
+          "text": "Lebanon!"
+        },
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/3f501db74a.wav",
+          "duration": 0.699,
+          "text": "Gambia!"
+        },
+        {
+          "src": "locato/voice/quiz-flags-ramp-20261107/cb38fcbf5e.wav",
+          "duration": 0.95,
+          "text": "Lesotho!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "kokoro-82m",
+    "voice": "am_michael",
+    "speed": 1.08
+  }
+}

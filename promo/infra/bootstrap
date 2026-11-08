@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# One-time setup: the private bucket (Terraform keeps its state there, so it must exist first), the zone id,
+# backend.hcl + terraform.tfvars (both gitignored), then terraform init and a plan. Safe to re-run.
+set -euo pipefail
+cd "$(dirname "$0")"
+if [ -f ../.env ]; then set -a; . ../.env; set +a; fi
+: "${CLOUDFLARE_API_TOKEN:?Put the bootstrap token in promo/.env as CLOUDFLARE_API_TOKEN (see infra/README.md)}"
+: "${CLOUDFLARE_ACCOUNT_ID:?Set CLOUDFLARE_ACCOUNT_ID in promo/.env}"
+API=https://api.cloudflare.com/client/v4
+H=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+BUCKET=locato-promo-private
+if curl -sf "${H[@]}" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET" >/dev/null; then
+  echo "· bucket $BUCKET exists"
+else
+  curl -sf "${H[@]}" -X POST "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets" -d "{\"name\":\"$BUCKET\"}" >/dev/null && echo "✓ created private bucket $BUCKET"
+fi
+ZONE=$(curl -sf "${H[@]}" "$API/zones?name=locato.quest" | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; print(r[0]["id"] if r else "")')
+[ -n "$ZONE" ] || { echo "Can't see the locato.quest zone: the token needs Zone Read on it" >&2; exit 1; }
+printf 'account_id = "%s"\nzone_id    = "%s"\n' "$CLOUDFLARE_ACCOUNT_ID" "$ZONE" > terraform.tfvars
+printf 'endpoints = { s3 = "https://%s.r2.cloudflarestorage.com" }\n' "$CLOUDFLARE_ACCOUNT_ID" > backend.hcl
+./tf init -input=false -backend-config=backend.hcl
+./tf plan
+echo
+echo "Looks right? Then: ./tf apply && ./sync-wrangler && ./secrets   (see README.md)"

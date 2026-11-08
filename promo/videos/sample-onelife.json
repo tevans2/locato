@@ -1,0 +1,144 @@
+{
+  "template": "quiz",
+  "seed": "sample-onelife",
+  "createdAt": "2026-11-07T18:34:55.339Z",
+  "link": "https://locato.quest/?ref=sampleonelife",
+  "props": {
+    "mode": "one-life",
+    "title": "Miss one and you're out",
+    "badge": "Flags",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "AE",
+        "country": "United Arab Emirates",
+        "answer": "United Arab Emirates",
+        "note": "Asia",
+        "seconds": 1.5
+      },
+      {
+        "type": "flag",
+        "code": "CH",
+        "country": "Switzerland",
+        "answer": "Switzerland",
+        "note": "Europe",
+        "seconds": 2
+      },
+      {
+        "type": "flag",
+        "code": "QA",
+        "country": "Qatar",
+        "answer": "Qatar",
+        "note": "Asia",
+        "seconds": 2.5
+      },
+      {
+        "type": "flag",
+        "code": "MV",
+        "country": "Maldives",
+        "answer": "Maldives",
+        "note": "Asia",
+        "seconds": 3
+      },
+      {
+        "type": "flag",
+        "code": "SL",
+        "country": "Sierra Leone",
+        "answer": "Sierra Leone",
+        "note": "Africa",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "Where did you get eliminated?",
+      "note": "Comment your round 👇",
+      "cta": "Made it to the end? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "flags",
+      "mode": "one-life",
+      "hook": "c",
+      "hookText": "Miss one and you're out",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-onelife/0b773d23f6.wav",
+        "duration": 1.298,
+        "text": "Miss one and you're out."
+      },
+      "outro": {
+        "src": "locato/voice/sample-onelife/48b541d053.wav",
+        "duration": 2.063,
+        "text": "Where did you get eliminated? Comment your round"
+      },
+      "cta": {
+        "src": "locato/voice/sample-onelife/8669a6e156.wav",
+        "duration": 2.441,
+        "text": "Made it to the end? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-onelife/01c35d9d9d.wav",
+          "duration": 1.811,
+          "text": "That's United Arab Emirates!"
+        },
+        {
+          "src": "locato/voice/sample-onelife/3fbeb3fc29.wav",
+          "duration": 1.055,
+          "text": "That's Switzerland!"
+        },
+        {
+          "src": "locato/voice/sample-onelife/c7f5ac3f1b.wav",
+          "duration": 0.927,
+          "text": "That's Qatar!"
+        },
+        {
+          "src": "locato/voice/sample-onelife/4c94b501e2.wav",
+          "duration": 1.125,
+          "text": "That's Maldives!"
+        },
+        {
+          "src": "locato/voice/sample-onelife/5f1a8eb668.wav",
+          "duration": 1.197,
+          "text": "That's Sierra Leone!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  },
+  "published": {
+    "instagram": {
+      "postId": "6af07434004e4879a7bb024b",
+      "dueAt": "2026-11-08T13:22:36.822Z",
+      "status": "scheduled"
+    },
+    "tiktok": {
+      "postId": "6af07435229bf05dafb224c1",
+      "dueAt": "2026-11-08T13:22:36.822Z",
+      "status": "scheduled"
+    },
+    "youtube": {
+      "postId": "6af07436562f2e6de9bccbd8",
+      "dueAt": "2026-11-08T13:22:36.822Z",
+      "status": "scheduled"
+    }
+  },
+  "mediaUrl": "https://media.locato.quest/videos/sample-onelife.mp4?v=6547290"
+}

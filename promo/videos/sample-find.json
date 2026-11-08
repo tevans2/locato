@@ -1,0 +1,176 @@
+{
+  "template": "quiz",
+  "seed": "sample-find",
+  "createdAt": "2026-11-07T18:13:21.836Z",
+  "link": "https://locato.quest/?ref=samplefind",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Click the country",
+    "rounds": [
+      {
+        "type": "find",
+        "code": "CA",
+        "country": "Canada",
+        "answer": "Canada",
+        "note": "North America",
+        "view": [
+          -453.4,
+          -923.4,
+          2921,
+          1776.1
+        ],
+        "c": [
+          792.7,
+          338.6
+        ],
+        "seconds": 2.5
+      },
+      {
+        "type": "find",
+        "code": "UA",
+        "country": "Ukraine",
+        "answer": "Ukraine",
+        "note": "Europe",
+        "view": [
+          1307.3,
+          179.1,
+          2100.5,
+          813.6
+        ],
+        "c": [
+          1726.9,
+          413.3
+        ],
+        "seconds": 3
+      },
+      {
+        "type": "find",
+        "code": "SN",
+        "country": "Senegal",
+        "answer": "Senegal",
+        "note": "Africa",
+        "view": [
+          1033.6,
+          568.4,
+          1673.6,
+          1080.4
+        ],
+        "c": [
+          1376.8,
+          749.7
+        ],
+        "seconds": 3.5
+      },
+      {
+        "type": "find",
+        "code": "BI",
+        "country": "Burundi",
+        "answer": "Burundi",
+        "note": "Africa",
+        "view": [
+          1435.7,
+          694.8,
+          2075.7,
+          1206.8
+        ],
+        "c": [
+          1746.3,
+          921.3
+        ],
+        "seconds": 4
+      },
+      {
+        "type": "find",
+        "code": "SB",
+        "country": "Solomon Islands",
+        "answer": "Solomon Islands",
+        "note": "Oceania",
+        "view": [
+          2533.7,
+          670.4,
+          3173.7,
+          1182.5
+        ],
+        "c": [
+          2830,
+          981.9
+        ],
+        "seconds": 4.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "find",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-find/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-find/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-find/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-find/50091977a4.wav",
+          "duration": 1.254,
+          "text": "That's Canada!"
+        },
+        {
+          "src": "locato/voice/sample-find/84bb910145.wav",
+          "duration": 0.971,
+          "text": "That's Ukraine!"
+        },
+        {
+          "src": "locato/voice/sample-find/f97443d1ec.wav",
+          "duration": 0.711,
+          "text": "That's Senegal!"
+        },
+        {
+          "src": "locato/voice/sample-find/019a4e9110.wav",
+          "duration": 0.69,
+          "text": "That's Burundi!"
+        },
+        {
+          "src": "locato/voice/sample-find/e8baee3f9c.wav",
+          "duration": 1.589,
+          "text": "That's Solomon Islands!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

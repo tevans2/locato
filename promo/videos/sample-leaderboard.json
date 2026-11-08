@@ -1,0 +1,63 @@
+{
+  "template": "leaderboard",
+  "seed": "1794060088941",
+  "createdAt": "2026-11-07T14:01:29.343Z",
+  "props": {
+    "title": "Top 3: Flags",
+    "badge": "Leaderboard",
+    "metric": "time",
+    "entries": [
+      {
+        "rank": 1,
+        "name": "tateevans",
+        "emoji": "🌋",
+        "value": 269308
+      },
+      {
+        "rank": 2,
+        "name": "kyliandabancourt",
+        "emoji": "🗼",
+        "value": 273485
+      },
+      {
+        "rank": 3,
+        "name": "Player 3",
+        "emoji": "🐨",
+        "value": 1351647
+      }
+    ],
+    "outro": {
+      "question": "Could you make the podium?",
+      "cta": "Try a ranked run. Free, in your browser."
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-leaderboard/64a9327e37.wav",
+        "duration": 1.419,
+        "text": "The top 3 on the Flags leaderboard."
+      },
+      "outro": {
+        "src": "locato/voice/sample-leaderboard/ca1ff273a9.wav",
+        "duration": 2.337,
+        "text": "Could you make the podium? Comment your best time!"
+      },
+      "cta": {
+        "src": "locato/voice/sample-leaderboard/c6df014b21.wav",
+        "duration": 1.692,
+        "text": "Play it free at locato.quest!"
+      },
+      "result": {
+        "src": "locato/voice/sample-leaderboard/6e78bc3ae4.wav",
+        "duration": 1.632,
+        "text": "tateevans takes first place!"
+      }
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

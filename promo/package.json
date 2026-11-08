@@ -1,0 +1,59 @@
+{
+  "name": "locato-promo",
+  "version": "1.0.0",
+  "description": "Template-driven explainer videos",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.541",
+    "@remotion/google-fonts": "4.0.541",
+    "@remotion/media": "4.0.541",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.541",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261108.1",
+    "@remotion/bundler": "^4.0.541",
+    "@remotion/eslint-config-flat": "4.0.541",
+    "@remotion/renderer": "^4.0.541",
+    "@types/d3-geo": "^3.1.1",
+    "@types/react": "19.3.0",
+    "@types/web": "0.0.166",
+    "d3-geo": "^3.1.1",
+    "eslint": "10.12.0",
+    "kokoro-js": "^1.2.1",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3",
+    "wrangler": "^4.158.0"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "studio": "remotion studio",
+    "locato:sync": "bun tools/locato/sync.ts",
+    "new": "bun tools/locato/new.ts",
+    "render": "node tools/render.mjs",
+    "check": "node tools/render.mjs --check --guides",
+    "new:week": "bun tools/locato/week.ts",
+    "voice": "node tools/voice/voice.mjs",
+    "publish": "bun tools/locato/queue.ts publish",
+    "stage": "bun tools/locato/queue.ts stage",
+    "queue": "bun tools/locato/queue.ts",
+    "worker:deploy": "set -a && . ./.env && set +a && wrangler deploy --config worker/wrangler.jsonc",
+    "content": "bun tools/locato/content.ts",
+    "voices": "bun tools/locato/voices.ts",
+    "worker:migrate": "set -a && . ./.env && set +a && wrangler d1 migrations apply locato-promo --remote --config worker/wrangler.jsonc",
+    "worker:dev": "wrangler d1 migrations apply locato-promo --local --config worker/wrangler.jsonc --persist-to .wrangler-local && wrangler dev --config worker/wrangler.jsonc --local --persist-to .wrangler-local --port 8787"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}
