@@ -1,0 +1,126 @@
+{
+  "template": "quiz",
+  "seed": "sample-capital-of",
+  "createdAt": "2026-11-07T17:53:10.216Z",
+  "link": "https://locato.quest/?ref=samplecapitalof",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Capitals",
+    "rounds": [
+      {
+        "type": "capital-of",
+        "code": "IN",
+        "country": "India",
+        "answer": "India",
+        "note": "New Delhi",
+        "seconds": 1.5
+      },
+      {
+        "type": "capital-of",
+        "code": "CU",
+        "country": "Cuba",
+        "answer": "Cuba",
+        "note": "Havana",
+        "seconds": 2
+      },
+      {
+        "type": "capital-of",
+        "code": "MR",
+        "country": "Mauritania",
+        "answer": "Mauritania",
+        "note": "Nouakchott",
+        "seconds": 2.5
+      },
+      {
+        "type": "capital-of",
+        "code": "LC",
+        "country": "Saint Lucia",
+        "answer": "Saint Lucia",
+        "note": "Castries",
+        "seconds": 3
+      },
+      {
+        "type": "capital-of",
+        "code": "SS",
+        "country": "South Sudan",
+        "answer": "South Sudan",
+        "note": "Juba",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "capital-of",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-capital-of/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-capital-of/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-capital-of/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-capital-of/172d119a9d.wav",
+          "duration": 0.815,
+          "text": "That's India!"
+        },
+        {
+          "src": "locato/voice/sample-capital-of/7739188ffa.wav",
+          "duration": 1.256,
+          "text": "That's Cuba!"
+        },
+        {
+          "src": "locato/voice/sample-capital-of/73ba2b6dab.wav",
+          "duration": 1,
+          "text": "That's Mauritania!"
+        },
+        {
+          "src": "locato/voice/sample-capital-of/71c17b3e76.wav",
+          "duration": 1.113,
+          "text": "That's Saint Lucia!"
+        },
+        {
+          "src": "locato/voice/sample-capital-of/4e3be52c3b.wav",
+          "duration": 1.173,
+          "text": "That's South Sudan!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

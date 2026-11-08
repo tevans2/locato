@@ -3,6 +3,7 @@ import type { AdminService } from "./AdminService";
 import type { AnalyticsService } from "../analytics/AnalyticsService";
 import type { AuthUser } from "../auth/types";
 import { clientIp } from "../clientIp";
+import { mintPromoToken, type PromoConfig } from "./promoToken";
 
 export interface AdminRouteContext {
   readonly service: AdminService;
@@ -10,6 +11,8 @@ export interface AdminRouteContext {
   readonly system?: () => Promise<Record<string, unknown>> | Record<string, unknown>;
   // First-party visitor analytics (retention, sources, games) behind the Growth view.
   readonly analytics?: AnalyticsService;
+  // The promo service (separate Worker): the admin gets short-lived tokens to call it from the browser.
+  readonly promo?: PromoConfig | null;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -57,6 +60,12 @@ export async function handleAdminRoutes(request: Request, url: URL, context: Adm
   if (pathname === "/api/admin/growth" && method === "GET") {
     if (!context.analytics) return json({ error: "Analytics is not configured." }, 404);
     return json(context.analytics.report(intParam(url, "days")));
+  }
+
+  if (pathname === "/api/admin/promo-token" && method === "POST") {
+    if (!context.promo) return json({ error: "The promo service isn't configured (set PROMO_API_URL and PROMO_ADMIN_SECRET)." }, 404);
+    const minted = mintPromoToken(context.promo.secret, actor);
+    return json({ token: minted.token, expiresAt: minted.expiresAt, apiUrl: context.promo.apiUrl });
   }
 
   if (pathname === "/api/admin/system" && method === "GET") return json(context.system ? await context.system() : {});

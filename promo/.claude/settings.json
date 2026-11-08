@@ -1,0 +1,22 @@
+{
+  "enabledPlugins": {
+    "remotion@remotion": true
+  },
+  "extraKnownMarketplaces": {
+    "remotion": {
+      "source": {
+        "source": "github",
+        "repo": "remotion-dev/claude-code-plugin"
+      }
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(node tools/render.mjs *)",
+      "Bash(python3 tools/remotion/contact.py *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run lint)",
+      "Bash(ffprobe *)"
+    ]
+  }
+}

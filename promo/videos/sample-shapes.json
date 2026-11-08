@@ -1,0 +1,126 @@
+{
+  "template": "quiz",
+  "seed": "sample-shapes",
+  "createdAt": "2026-11-07T17:46:34.029Z",
+  "link": "https://locato.quest/?ref=sampleshapes",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Country outlines",
+    "rounds": [
+      {
+        "type": "shape",
+        "code": "KE",
+        "country": "Kenya",
+        "answer": "Kenya",
+        "note": "Africa",
+        "seconds": 1.5
+      },
+      {
+        "type": "shape",
+        "code": "CO",
+        "country": "Colombia",
+        "answer": "Colombia",
+        "note": "South America",
+        "seconds": 2
+      },
+      {
+        "type": "shape",
+        "code": "BS",
+        "country": "Bahamas",
+        "answer": "Bahamas",
+        "note": "North America",
+        "seconds": 2.5
+      },
+      {
+        "type": "shape",
+        "code": "KI",
+        "country": "Kiribati",
+        "answer": "Kiribati",
+        "note": "Oceania",
+        "seconds": 3
+      },
+      {
+        "type": "shape",
+        "code": "SZ",
+        "country": "Eswatini",
+        "answer": "Eswatini",
+        "note": "Africa",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "shapes",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-shapes/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-shapes/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-shapes/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-shapes/339e2f69a6.wav",
+          "duration": 1.07,
+          "text": "That's Kenya!"
+        },
+        {
+          "src": "locato/voice/sample-shapes/e0c7ded204.wav",
+          "duration": 1.053,
+          "text": "That's Colombia!"
+        },
+        {
+          "src": "locato/voice/sample-shapes/f7991b1042.wav",
+          "duration": 0.927,
+          "text": "That's Bahamas!"
+        },
+        {
+          "src": "locato/voice/sample-shapes/3b6353f117.wav",
+          "duration": 0.8,
+          "text": "That's Kiribati!"
+        },
+        {
+          "src": "locato/voice/sample-shapes/967d413d7e.wav",
+          "duration": 1.211,
+          "text": "That's Eswatini!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}

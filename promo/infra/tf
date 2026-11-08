@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# terraform, with the R2 state credentials derived from CLOUDFLARE_API_TOKEN (in promo/.env).
+# An API token with R2 access doubles as S3 credentials: key id = the token's id, secret = SHA-256 of the token.
+#   ./tf plan     ./tf apply     ./tf output
+set -euo pipefail
+cd "$(dirname "$0")"
+if [ -f ../.env ]; then set -a; . ../.env; set +a; fi
+: "${CLOUDFLARE_API_TOKEN:?Put the bootstrap token in promo/.env as CLOUDFLARE_API_TOKEN (see infra/README.md)}"
+: "${CLOUDFLARE_ACCOUNT_ID:?Set CLOUDFLARE_ACCOUNT_ID in promo/.env}"
+verify() { curl -sf "$1" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["result"]["id"])' 2>/dev/null; }
+id=$(verify https://api.cloudflare.com/client/v4/user/tokens/verify || verify "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify" || true)
+[ -n "$id" ] || { echo "CLOUDFLARE_API_TOKEN isn't valid" >&2; exit 1; }
+export AWS_ACCESS_KEY_ID="$id"
+export AWS_SECRET_ACCESS_KEY="$(printf %s "$CLOUDFLARE_API_TOKEN" | shasum -a 256 | cut -d' ' -f1)"
+export TF_VAR_account_id="$CLOUDFLARE_ACCOUNT_ID"
+exec terraform "$@"

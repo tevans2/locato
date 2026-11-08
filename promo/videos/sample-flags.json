@@ -1,0 +1,144 @@
+{
+  "template": "quiz",
+  "seed": "sample-flags",
+  "createdAt": "2026-11-07T17:42:59.195Z",
+  "link": "https://locato.quest/?ref=sampleflags",
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Flags",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "GB",
+        "country": "United Kingdom",
+        "answer": "United Kingdom",
+        "note": "Europe",
+        "seconds": 1.5
+      },
+      {
+        "type": "flag",
+        "code": "TH",
+        "country": "Thailand",
+        "answer": "Thailand",
+        "note": "Asia",
+        "seconds": 2
+      },
+      {
+        "type": "flag",
+        "code": "SY",
+        "country": "Syria",
+        "answer": "Syria",
+        "note": "Asia",
+        "seconds": 2.5
+      },
+      {
+        "type": "flag",
+        "code": "DM",
+        "country": "Dominica",
+        "answer": "Dominica",
+        "note": "North America",
+        "seconds": 3
+      },
+      {
+        "type": "flag",
+        "code": "GW",
+        "country": "Guinea-Bissau",
+        "answer": "Guinea-Bissau",
+        "note": "Africa",
+        "seconds": 3.5,
+        "boss": true
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "flags",
+      "mode": "score",
+      "hook": "a",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-flags/fa9cc3dd16.wav",
+        "duration": 1.327,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-flags/bbe55bb390.wav",
+        "duration": 1.852,
+        "text": "What did you score? Comment your score"
+      },
+      "cta": {
+        "src": "locato/voice/sample-flags/b55c6c5b0f.wav",
+        "duration": 2.818,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-flags/e8e8f44bf9.wav",
+          "duration": 1.248,
+          "text": "That's United Kingdom!"
+        },
+        {
+          "src": "locato/voice/sample-flags/5f7956392a.wav",
+          "duration": 1.138,
+          "text": "That's Thailand!"
+        },
+        {
+          "src": "locato/voice/sample-flags/43fbd522d2.wav",
+          "duration": 0.86,
+          "text": "That's Syria!"
+        },
+        {
+          "src": "locato/voice/sample-flags/006825e08f.wav",
+          "duration": 0.816,
+          "text": "That's Dominica!"
+        },
+        {
+          "src": "locato/voice/sample-flags/5a141984f4.wav",
+          "duration": 1.027,
+          "text": "That's Guinea-Bissau!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  },
+  "published": {
+    "instagram": {
+      "postId": "6af0741951492b796e3c31b9",
+      "dueAt": "2026-11-08T13:07:37.996Z",
+      "status": "sending"
+    },
+    "tiktok": {
+      "postId": "6af074259214322f6854b1c2",
+      "dueAt": "2026-11-08T13:07:49.088Z",
+      "status": "sending"
+    },
+    "youtube": {
+      "postId": "6af0743051492b796e3c37bb",
+      "dueAt": "2026-11-08T13:08:00.063Z",
+      "status": "sent"
+    }
+  },
+  "mediaUrl": "https://media.locato.quest/videos/sample-flags.mp4?v=6408822"
+}

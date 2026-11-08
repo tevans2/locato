@@ -1,4 +1,5 @@
 import { existsSync, statSync } from "node:fs";
+import { promoConfigFromEnv } from "./admin/promoToken";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { indexCountries, rawCountries, validateCountries } from "../src/core/countries";
@@ -133,6 +134,7 @@ const authService = new AuthService(userStore, bunPasswordHasher, { sessionTtlMs
   },
 });
 const cookieOptions = { secure: process.env.NODE_ENV === "production" };
+const promoConfig = promoConfigFromEnv();
 const baseUrl = process.env.BASE_URL ?? `http://localhost:${readIntegerEnv("PORT", DEFAULT_PORT)}`;
 // Our own accounts, comma-separated: devices signed in to them are left out of Growth analytics.
 const analyticsExcludedEmails = new Set((process.env.ANALYTICS_EXCLUDE_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
@@ -304,7 +306,7 @@ const server = Bun.serve<WebSocketData>({
       return json(await streetViewPool.stats());
     }
 
-    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot, analytics: analyticsService });
+    const authResponse = await handleAuthRequest(request, url, authService, cookieOptions, baseUrl, socialHub, { service: adminService, system: systemSnapshot, analytics: analyticsService, promo: promoConfig });
     if (authResponse) return authResponse;
 
     return serveStatic(request, url);

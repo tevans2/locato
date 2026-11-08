@@ -11,3 +11,6 @@ coverage
 .env.*
 !.env.example
 output
+
+# promo videos have their own package and are not part of the game image
+promo

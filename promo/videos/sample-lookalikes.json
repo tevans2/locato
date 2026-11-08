@@ -1,0 +1,103 @@
+{
+  "template": "lookalikes",
+  "seed": "demo3",
+  "createdAt": "2026-11-07T14:01:28.554Z",
+  "props": {
+    "title": "Can you tell these flags apart?",
+    "badge": "Look-alikes",
+    "sets": [
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "AT",
+            "name": "Austria"
+          },
+          {
+            "code": "LV",
+            "name": "Latvia"
+          }
+        ],
+        "tip": "Austria is bright red with an equal white stripe; Latvia is a darker carmine with a thinner white stripe."
+      },
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "CI",
+            "name": "Cote d'Ivoire"
+          },
+          {
+            "code": "IE",
+            "name": "Ireland"
+          }
+        ],
+        "tip": "Ireland runs green-white-orange from the flagpole; Côte d'Ivoire runs orange-white-green."
+      },
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "MY",
+            "name": "Malaysia"
+          },
+          {
+            "code": "US",
+            "name": "United States"
+          },
+          {
+            "code": "LR",
+            "name": "Liberia"
+          }
+        ],
+        "tip": "The US has 50 stars; Liberia has a single white star; Malaysia has a yellow crescent and star."
+      }
+    ],
+    "secondsPerSet": 4,
+    "outro": {
+      "question": "How many did you get?",
+      "cta": "Train your eye in the free Academy"
+    },
+    "voice": {
+      "hook": {
+        "src": "locato/voice/sample-lookalikes/1bb856dee4.wav",
+        "duration": 1.455,
+        "text": "Can you tell these flags apart?"
+      },
+      "outro": {
+        "src": "locato/voice/sample-lookalikes/4bfbb0aa8e.wav",
+        "duration": 1.869,
+        "text": "How many did you get? Comment your score!"
+      },
+      "cta": {
+        "src": "locato/voice/sample-lookalikes/c6df014b21.wav",
+        "duration": 1.692,
+        "text": "Play it free at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "locato/voice/sample-lookalikes/6be9eb412d.wav",
+          "duration": 1.557,
+          "text": "Austria. Latvia."
+        },
+        {
+          "src": "locato/voice/sample-lookalikes/cd646bd181.wav",
+          "duration": 2.99,
+          "text": "Cote d'Ivoire. Ireland."
+        },
+        {
+          "src": "locato/voice/sample-lookalikes/16b288ae34.wav",
+          "duration": 2.284,
+          "text": "Malaysia. United States. Liberia."
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "default",
+    "intensity": "lively",
+    "exaggeration": 0.9,
+    "cfg": 0.35
+  }
+}
