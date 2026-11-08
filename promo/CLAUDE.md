@@ -29,6 +29,7 @@ from the game's Docker image. Full guide: `VIDEOS.md`. Posting: `social/profile-
 ## Common commands
 - `npm run new -- quiz --kind flags [--from continent:asia --exclude FR --pick chad --print]` · `npm run new:week` · `npm run render -- videos/<name>.json`
 - `npm run content [-- list|validate|pull|push|schema]` · `npm run voices [-- create|add|import|from-spec|missing|apply|ls|rm]`
-- `npm run stage -- videos/<week>-*.json` (queue for posting) · `npm run queue` · `npm run publish -- videos/x.json` (post now)
+- `npm run stage -- videos/<week>-*.json` (queue for posting) · `npm run stage -- --video x.mp4 --caption "…"` (a hand-made video) · `npm run queue` · `npm run publish -- …` (post now)
+- Posts for every video (rendered or uploaded, from the Mac or the admin) are built by `src/content/posts.ts`: change captions/metadata there.
 - `npm run worker:dev` (local service) · `npm run worker:migrate` · `npm run worker:deploy` · infra: `infra/README.md`
 - Deploys: the promo service deploys from `main` via `.github/workflows/promo-deploy.yml`; the game's deploys ignore `promo/**`. Terraform is manual.

@@ -228,6 +228,7 @@ Buffer topped up and records what went out.
 npm run stage -- videos/2026-11-16-*.json      # upload + queue (13:00 and 19:00 Johannesburg by default)
 npm run queue                                  # status; --hold / --release / --remove <name>; --run; --done
 npm run publish -- videos/x.json               # stage with a start of "now", then post straight away
+npm run stage -- --video ~/Desktop/clip.mp4 --caption "…"   # any finished mp4 you made yourself (or Promo → Queue → Upload a video)
 ```
 
 Also in the admin: Promo → Queue, Posted (with visitors per video from its ?ref= link), Runs.
