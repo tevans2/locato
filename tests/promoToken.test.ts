@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mintPromoToken, promoConfigFromEnv } from "../server/admin/promoToken";
+import { adminContentSecurityPolicy, mintPromoToken, promoConfigFromEnv } from "../server/admin/promoToken";
 // The promo service's own check: the token format is a contract between the two, so test them together.
 // promo/ is not in the game's Docker image, so tsconfig.json excludes this file from the build's typecheck; vitest runs it in CI.
 import { authenticate } from "../promo/worker/src/auth";
@@ -30,6 +30,17 @@ describe("promo admin tokens", () => {
   it("need both settings to be configured", () => {
     expect(promoConfigFromEnv({})).toBeNull();
     expect(promoConfigFromEnv({ PROMO_API_URL: "https://promo.locato.quest/" })).toBeNull();
-    expect(promoConfigFromEnv({ PROMO_API_URL: "https://promo.locato.quest/", PROMO_ADMIN_SECRET: "s" })).toEqual({ apiUrl: "https://promo.locato.quest", secret: "s" });
+    expect(promoConfigFromEnv({ PROMO_API_URL: "https://promo.locato.quest/", PROMO_ADMIN_SECRET: "s" })).toEqual({ apiUrl: "https://promo.locato.quest", secret: "s", mediaUrl: "https://media.locato.quest" });
+  });
+
+  it("let the admin page reach the promo service only when it's configured", () => {
+    const strict = adminContentSecurityPolicy(null);
+    expect(strict).toContain("connect-src 'self';");
+    expect(strict).not.toContain("media-src");
+    const promo = adminContentSecurityPolicy(promoConfigFromEnv({ PROMO_API_URL: "https://promo.locato.quest/", PROMO_ADMIN_SECRET: "s" }));
+    expect(promo).toContain("connect-src 'self' https://promo.locato.quest;");
+    expect(promo).toContain("media-src 'self' blob: https://media.locato.quest;");
+    expect(promo).toContain("script-src 'self';");
+    expect(promo).toContain("frame-ancestors 'none'");
   });
 });

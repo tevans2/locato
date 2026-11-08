@@ -7,6 +7,8 @@ import { createHmac } from "node:crypto";
 export interface PromoConfig {
   readonly apiUrl: string;
   readonly secret: string;
+  /** Where the promo service's public files live (voice clips the Promo tab plays). */
+  readonly mediaUrl: string;
 }
 
 export const PROMO_TOKEN_TTL_SECONDS = 15 * 60;
@@ -15,7 +17,37 @@ export const PROMO_TOKEN_TTL_SECONDS = 15 * 60;
 export function promoConfigFromEnv(env: Record<string, string | undefined> = process.env): PromoConfig | null {
   const apiUrl = env.PROMO_API_URL?.trim().replace(/\/$/, "");
   const secret = env.PROMO_ADMIN_SECRET?.trim();
-  return apiUrl && secret ? { apiUrl, secret } : null;
+  const mediaUrl = env.PROMO_MEDIA_URL?.trim().replace(/\/$/, "") || "https://media.locato.quest";
+  return apiUrl && secret ? { apiUrl, secret, mediaUrl } : null;
+}
+
+const originOf = (url: string) => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The admin page's Content-Security-Policy. Strict by default; with the promo service configured, the Promo tab may also
+ * call its API (connect-src) and play its voice clips plus local previews (media-src).
+ */
+export function adminContentSecurityPolicy(promo: PromoConfig | null): string {
+  const api = promo ? originOf(promo.apiUrl) : null;
+  const media = promo ? originOf(promo.mediaUrl) : null;
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    `connect-src 'self'${api ? ` ${api}` : ""}`,
+    ...(promo ? [`media-src 'self' blob:${media ? ` ${media}` : ""}`] : []),
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join("; ");
 }
 
 export function mintPromoToken(secret: string, admin: { readonly id: string; readonly displayName: string }, now = Date.now(), ttlSeconds = PROMO_TOKEN_TTL_SECONDS): { token: string; expiresAt: number } {
