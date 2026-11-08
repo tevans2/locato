@@ -51,7 +51,9 @@
     "content": "bun tools/locato/content.ts",
     "voices": "bun tools/locato/voices.ts",
     "worker:migrate": "set -a && . ./.env && set +a && wrangler d1 migrations apply locato-promo --remote --config worker/wrangler.jsonc",
-    "worker:dev": "wrangler d1 migrations apply locato-promo --local --config worker/wrangler.jsonc --persist-to .wrangler-local && wrangler dev --config worker/wrangler.jsonc --local --persist-to .wrangler-local --port 8787"
+    "worker:dev": "wrangler d1 migrations apply locato-promo --local --config worker/wrangler.jsonc --persist-to .wrangler-local && wrangler dev --config worker/wrangler.jsonc --local --persist-to .wrangler-local --port 8787",
+    "voices:build": "bun tools/locato/voicebuild.ts",
+    "voices:review": "bun tools/voice/review.ts"
   },
   "allowScripts": {
     "esbuild": false

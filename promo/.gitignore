@@ -32,3 +32,8 @@ public/locato/clips/
 
 .DS_Store
 public/locato/voice-cache/
+
+# voice reference clips: only the ones a library voice is built from
+tools/voice/refs/*.wav
+!tools/voice/refs/bm_george.wav
+!tools/voice/refs/am_michael.wav

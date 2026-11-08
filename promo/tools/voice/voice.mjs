@@ -7,10 +7,20 @@
 //          chatterbox clones from a short Kokoro sample. --intensity sets chatterbox's exaggeration.
 // Chatterbox lines are checked with local Whisper and regenerated if a word comes out wrong.
 // Writes clips to public/locato/voice/<spec>/ and the timings into the spec's props.voice.
+// --library <voice> (or PROMO_VOICE_LIBRARY=<voice> in .env; "--library none" to skip): lines the voice library already
+//   has are used as they are; missing ones are made with that voice's own settings and uploaded, so the library grows.
+// Names are said using content/pronunciations.json (shared by every voice).
 import {createHash} from 'node:crypto';
+import dns from 'node:dns';
+import net from 'node:net';
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {basename, join, resolve} from 'node:path';
+
+// prefer IPv4: on networks without working IPv6, Node's fetch can fail with EHOSTUNREACH instead of falling back
+dns.setDefaultResultOrder('ipv4first');
+// and give each connection attempt time on a slow link (Node's default is 250 ms per address, then it gives up)
+net.setDefaultAutoSelectFamilyAttemptTimeout(3000);
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PY = join(ROOT, 'tools/voice/.venv/bin/python');
@@ -26,25 +36,45 @@ if (!files.length) {
 }
 
 const INTENSITY = {calm: {exaggeration: 0.5, cfg: 0.5}, lively: {exaggeration: 0.9, cfg: 0.35}, hype: {exaggeration: 1.3, cfg: 0.3}};
-const engine = flag('engine', existsSync(PY) ? 'chatterbox' : 'kokoro');
-const intensity = flag('intensity', 'lively');
+let engine = flag('engine', existsSync(PY) ? 'chatterbox' : 'kokoro');
+let intensity = flag('intensity', 'lively');
 if (!INTENSITY[intensity]) throw new Error(`--intensity must be one of ${Object.keys(INTENSITY).join(', ')}`);
-const voiceName = flag('voice', engine === 'kokoro' ? 'af_heart' : 'default');
+let voiceName = flag('voice', engine === 'kokoro' ? 'af_heart' : 'default');
 const speed = Number(flag('speed', '1.08'));
 
-// Names the models tend to get wrong, respelled the way they're said.
-const SAY = {
-  "Cote d'Ivoire": 'Coat dee-vwahr',
-  "Côte d'Ivoire": 'Coat dee-vwahr',
-  Niger: 'Nee-zhair',
-  Qatar: 'Kuh-tar',
-  Lesotho: 'Leh-soo-too',
-  Djibouti: 'Jih-boo-tee',
-  Eswatini: 'Eh-swah-tee-nee',
-  Ljubljana: 'Lyoob-lyah-nah',
-  'locato.quest': 'locato dot quest',
+// How to say names the models get wrong (content/pronunciations.json, shared by every voice; see src/content/speech.ts).
+const DICT = JSON.parse(readFileSync(join(ROOT, 'content/pronunciations.json'), 'utf8')).words;
+const DICT_NAMES = Object.keys(DICT).sort((a, b) => b.length - a.length);
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const speakable = (s) =>
+  DICT_NAMES.reduce((t, name) => t.replace(new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, 'gu'), DICT[name]), s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\bvs\.?(?=\s)/g, 'versus').replace(/(\d+)\s*\/\s*(\d+)/g, '$1 out of $2').replace(/#(\d+)/g, 'number $1').replace(/(\d+):(\d\d)\.(\d)/g, '$1 minutes $2 point $3 seconds');
+
+// ---- the voice library (the promo service) ------------------------------------------------------------------------
+// clipKey must match src/content/voice.ts: same line (case/spacing/curly quotes aside) = same key.
+const normLine = (t) => t.trim().replace(/\s+/g, ' ').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').toLowerCase();
+const hash53 = (str, seed = 0) => {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
 };
-const speakable = (s) => Object.entries(SAY).reduce((t, [a, b]) => t.replaceAll(a, b), s).replace(/\bvs\.?(?=\s)/g, 'versus').replace(/(\d+)\s*\/\s*(\d+)/g, '$1 out of $2').replace(/#(\d+)/g, 'number $1').replace(/(\d+):(\d\d)\.(\d)/g, '$1 minutes $2 point $3 seconds');
+const clipKey = (text) => hash53(normLine(text));
+const API = (process.env.PROMO_API_URL ?? 'https://promo.locato.quest').replace(/\/$/, '');
+async function api(path, init = {}) {
+  const r = await fetch(`${API}${path}`, {...init, headers: {authorization: `Bearer ${process.env.PROMO_SERVICE_TOKEN}`, ...init.headers}});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`promo service ${path}: ${data.error ?? r.status}`);
+  return data;
+}
+const libraryId = flag('library', process.env.PROMO_VOICE_LIBRARY);
+const library = libraryId && libraryId !== 'none' ? await api(`/voices/${libraryId}`) : null;
 
 const hookFrom = (title) => {
   const t = title.trim();
@@ -194,8 +224,14 @@ async function transcribe(file) {
 }
 
 // ---- main ----------------------------------------------------------------------------------------
+if (library) {
+  // a library voice decides how missing lines sound, so they match the rest
+  const ls = library.voice.settings ?? {};
+  if (library.voice.engine === 'chatterbox') (engine = 'chatterbox'), (voiceName = ls.voice ?? 'default'), (intensity = ls.intensity ?? intensity);
+  if (ls.exaggeration) INTENSITY[intensity] = {exaggeration: ls.exaggeration, cfg: ls.cfg ?? INTENSITY[intensity].cfg};
+}
 const settings = engine === 'kokoro' ? {engine: 'kokoro-82m', voice: voiceName, speed} : {engine: 'chatterbox', voice: voiceName, intensity, ...INTENSITY[intensity]};
-console.log(`Voice: ${engine} · ${voiceName}${engine === 'kokoro' ? ` · speed ${speed}` : ` · ${intensity}`}`);
+console.log(`Voice: ${library ? `library "${libraryId}" (${Object.keys(library.clips).length} lines) · ` : ''}${engine} · ${voiceName}${engine === 'kokoro' ? ` · speed ${speed}` : ` · ${intensity}`}`);
 const tag = JSON.stringify(settings);
 const ref = engine === 'chatterbox' ? await referenceFor(voiceName) : null;
 
@@ -206,7 +242,11 @@ const plans = files.map((f) => {
   const dir = join(ROOT, 'public/locato/voice', name);
   mkdirSync(dir, {recursive: true});
   const lines = linesFor(spec.template, spec.props);
-  const clip = (text) => ({text, said: speakable(text), file: join(dir, `${createHash('sha1').update(`${tag}|${speakable(text)}`).digest('hex').slice(0, 10)}.wav`)});
+  const clip = (text) => {
+    const lib = library?.clips[clipKey(text)];
+    if (lib) return {text, said: speakable(text), url: lib.url, duration: lib.duration, fromLibrary: true};
+    return {text, said: speakable(text), file: join(dir, `${createHash('sha1').update(`${tag}|${speakable(text)}`).digest('hex').slice(0, 10)}.wav`)};
+  };
   const voice = Object.fromEntries(Object.entries(lines).filter(([, v]) => v).map(([k, v]) => [k, Array.isArray(v) ? v.map(clip) : clip(v)]));
   return {f, spec, dir, voice};
 });
@@ -214,13 +254,14 @@ if (args.includes('--lines')) {
   // dry run: what would be said, nothing generated
   for (const p of plans) {
     console.log(p.f);
-    for (const [k, v] of Object.entries(p.voice)) for (const c of [v].flat()) console.log(`  ${k.padEnd(8)} ${c.text}${c.said !== c.text ? `   (said: ${c.said})` : ''}`);
+    for (const [k, v] of Object.entries(p.voice)) for (const c of [v].flat()) console.log(`  ${k.padEnd(8)} ${c.fromLibrary ? '[library] ' : ''}${c.text}${c.said !== c.text ? `   (said: ${c.said})` : ''}`);
     if (!readdirSync(p.dir).length) rmSync(p.dir, {recursive: true});
   }
   process.exit(0);
 }
 const all = plans.flatMap((p) => Object.values(p.voice).flat());
-const todo = [...new Map(all.filter((c) => !existsSync(c.file)).map((c) => [c.file, c])).values()];
+const todo = [...new Map(all.filter((c) => !c.fromLibrary && !existsSync(c.file)).map((c) => [c.file, c])).values()];
+if (library) console.log(`  ${all.filter((c) => c.fromLibrary).length} line(s) from the library, ${todo.length} to make`);
 
 // 2. generate what's missing
 if (engine === 'kokoro') {
@@ -263,20 +304,34 @@ if (engine === 'kokoro') {
   }
 }
 
+// 2b. new lines join the library, so the next video that says them doesn't make them again
+if (library && engine === 'chatterbox') {
+  for (const c of all.filter((c) => !c.fromLibrary)) {
+    if (c.url) continue;
+    const q = new URLSearchParams({text: c.text, duration: durationOf(c.file).toFixed(3), source: 'generated'});
+    try {
+      const r = await api(`/voices/${libraryId}/clips?${q}`, {method: 'PUT', body: readFileSync(c.file), headers: {'content-type': 'audio/wav'}});
+      if (r.clip?.url) for (const same of all.filter((x) => x.text === c.text)) same.url = r.clip.url;
+    } catch (e) {
+      console.warn(`  (couldn't add "${c.text}" to the library: ${e.message}; the video uses the local clip)`);
+    }
+  }
+}
+
 // 3. write specs
 for (const p of plans) {
   const out = {};
   for (const [k, v] of Object.entries(p.voice)) {
-    const entry = (c) => ({src: c.file.replace(join(ROOT, 'public') + '/', ''), duration: +durationOf(c.file).toFixed(3), text: c.text});
+    const entry = (c) => (c.url ? {src: c.url, duration: c.fromLibrary ? c.duration : +durationOf(c.file).toFixed(3), text: c.text} : {src: c.file.replace(join(ROOT, 'public') + '/', ''), duration: +durationOf(c.file).toFixed(3), text: c.text});
     out[k] = Array.isArray(v) ? v.map(entry) : entry(v);
   }
   const used = new Set(Object.values(out).flat().map((c) => basename(c.src)));
-  for (const old of readdirSync(p.dir)) if (!used.has(old)) rmSync(join(p.dir, old));
+  for (const old of readdirSync(p.dir)) if (!used.has(old) && !Object.values(out).flat().some((c) => /^https?:/.test(c.src) && all.some((a) => a.file && basename(a.file) === old))) rmSync(join(p.dir, old));
   p.spec.props.voice = out;
-  p.spec.voiceSettings = settings;
+  p.spec.voiceSettings = library ? {...settings, library: libraryId} : settings;
   writeFileSync(p.f, JSON.stringify(p.spec, null, 2) + '\n');
   const list = Object.values(out).flat();
   console.log(`✓ ${p.f}: ${list.length} lines, ${list.reduce((s, c) => s + c.duration, 0).toFixed(1)}s of speech`);
   for (const c of list) console.log(`    ${c.duration.toFixed(2)}s  ${c.text}`);
-  if (args.includes('--check')) for (const c of list) console.log(`    heard: ${(await transcribe(join(ROOT, 'public', c.src))).padEnd(48)} (wrote: ${c.text})`);
+  if (args.includes('--check')) for (const c of list) if (!/^https?:/.test(c.src)) console.log(`    heard: ${(await transcribe(join(ROOT, 'public', c.src))).padEnd(48)} (wrote: ${c.text})`);
 }
