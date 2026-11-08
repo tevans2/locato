@@ -181,6 +181,7 @@ Deployed to Fly.io: prod app `locato` and staging `locato-staging`, each a singl
 
 ## More docs
 
+- **[`docs/load-testing.md`](docs/load-testing.md)** — k6 staging tests for arrivals, solo API/analytics and multiplayer, with load profiles and capacity interpretation.
 - **[`docs/multiplayer.md`](docs/multiplayer.md)** — server-authoritative multiplayer: race model, scoring, protocol contract, and code map.
 - **[`docs/deployment.md`](docs/deployment.md)** — Fly.io deployment and operations.
 - **[`CATEGORY_IDEAS.md`](CATEGORY_IDEAS.md)** — forward-looking backlog of prompt-category ideas (not yet implemented).

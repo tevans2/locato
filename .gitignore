@@ -3,6 +3,7 @@
 node_modules/
 dist/
 .data/
+loadtest/results/
 
 # Local development and generated scratch files
 i-want-to-create-an-html/work/
