@@ -17,10 +17,12 @@
     "resolveJsonModule": true
   },
   "exclude": [
-    "remotion.config.ts"
+    "remotion.config.ts",
+    "studio/build.ts"
   ],
   "include": [
     "src",
+    "studio",
     "public/**/*.json"
   ]
 }

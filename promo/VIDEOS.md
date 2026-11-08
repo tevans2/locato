@@ -68,6 +68,17 @@ npm run new -- quiz --kind flags --hook b           # hook variants from the rep
 npm run new -- quiz --kind route --count 3          # fewer, longer rounds
 ```
 
+## Studio (build and preview in the admin)
+Admin → Promo → **Create**: pick a format, modes, countries, hook, caption, voice and music; the preview plays the real template
+with the voice library's lines (any line not recorded yet is listed and silent). 🎲 picks new countries. **Save draft** keeps the
+recipe; **Render** queues it. Renders run on the Mac:
+
+    npm run render-runner            # waits for jobs (keeps the Mac awake); Ctrl-C to stop
+    npm run render-runner -- --once  # render what's queued, then stop
+
+Each job builds the spec with the same seed as the preview (`--no-fresh`, so the picks match), renders it, and stages it for
+posting (on hold if you ticked that). Its status, log and video link show in the Studio's list.
+
 ## Recipes and content
 
 A **recipe** says what a video is; `compile()` turns it into the exact spec the template renders. Same recipe + same seed = same video.

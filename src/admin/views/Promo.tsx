@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminClient, GrowthReport } from "../api";
 import { formatBytes, formatDateTime, formatNumber } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
@@ -37,9 +37,9 @@ interface Clip { readonly key: string; readonly text: string; readonly url?: str
 interface Music { readonly name: string; readonly bytes: number; readonly licence: string | null; readonly added_at: string }
 interface Run { readonly id: number; readonly at: string; readonly trigger: string; readonly scheduled: number; readonly posted: number; readonly log: string; readonly error: string | null }
 
-const TABS = ["queue", "posted", "content", "voices", "music", "runs"] as const;
+const TABS = ["create", "queue", "posted", "content", "voices", "music", "runs"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { queue: "Queue", posted: "Posted", content: "Content", voices: "Voices", music: "Music", runs: "Runs" };
+const TAB_LABEL: Record<Tab, string> = { create: "Create", queue: "Queue", posted: "Posted", content: "Content", voices: "Voices", music: "Music", runs: "Runs" };
 
 const when = (iso: string | null) => (iso ? formatDateTime(Date.parse(iso)) : "—");
 const failed = (helpers: ActionHelpers, err: unknown) => helpers.notify(err instanceof Error ? err.message : String(err), "bad");
@@ -111,6 +111,7 @@ export function PromoView({ client, helpers }: { client: AdminClient; helpers: A
         {TABS.map((t) => <button key={t} type="button" className="adm-chip-btn" aria-pressed={t === tab} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>)}
         <button type="button" className="adm-btn is-small" disabled={running} onClick={() => void runNow()} title="Top up Buffer and record what was posted (the service also does this every 4 hours)">{running ? "Running…" : "Run posting now"}</button>
       </div>
+      {tab === "create" && <CreateTab client={client} />}
       {tab === "queue" && <QueueTab call={call} helpers={helpers} />}
       {tab === "posted" && <PostedTab call={call} client={client} />}
       {tab === "content" && <ContentTab call={call} helpers={helpers} />}
@@ -119,6 +120,37 @@ export function PromoView({ client, helpers }: { client: AdminClient; helpers: A
       {tab === "runs" && <RunsTab call={call} />}
     </div>
   );
+}
+
+// ---- create: the promo service's Studio (build a video from a recipe, preview it live, queue it for rendering) ---------
+// It's the service's own page in a frame; it asks this page for a token over postMessage and gets one only if it really
+// is the promo service's origin.
+function CreateTab({ client }: { client: AdminClient }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sendToken = useCallback(async () => {
+    try {
+      const s = await client.send<PromoSession>("POST", "/promo-token");
+      setApiUrl(s.apiUrl);
+      frame.current?.contentWindow?.postMessage({ type: "locato-promo:token", token: s.token }, new URL(s.apiUrl).origin);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [client]);
+  useEffect(() => { void sendToken(); }, [sendToken]);
+  useEffect(() => {
+    if (!apiUrl) return;
+    const origin = new URL(apiUrl).origin;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === origin && e.source === frame.current?.contentWindow && (e.data as { type?: string })?.type === "locato-promo:token-request") void sendToken();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [apiUrl, sendToken]);
+  if (error) return <ErrorNote message={error} />;
+  if (!apiUrl) return <Loading />;
+  return <iframe ref={frame} title="Promo Studio" src={`${apiUrl}/studio/`} onLoad={() => void sendToken()} style={{ width: "100%", height: "calc(100vh - 170px)", minHeight: 720, border: 0, borderRadius: 12 }} />;
 }
 
 // ---- queue ------------------------------------------------------------------------------------------------------------

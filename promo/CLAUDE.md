@@ -31,5 +31,7 @@ from the game's Docker image. Full guide: `VIDEOS.md`. Posting: `social/profile-
 - `npm run content [-- list|validate|pull|push|schema]` · `npm run voices [-- create|add|import|from-spec|missing|apply|ls|rm]`
 - `npm run stage -- videos/<week>-*.json` (queue for posting) · `npm run stage -- --video x.mp4 --caption "…"` (a hand-made video) · `npm run queue` · `npm run publish -- …` (post now)
 - Posts for every video (rendered or uploaded, from the Mac or the admin) are built by `src/content/posts.ts`: change captions/metadata there.
+- Studio (admin → Promo → Create; `studio/`, served by the Worker at `/studio/`): builds a recipe and previews it with the real templates in the browser;
+  Render queues a job, and `npm run render-runner` on the Mac renders it, stages it and reports back. `npm run studio:build` (needs `locato:sync`).
 - `npm run worker:dev` (local service) · `npm run worker:migrate` · `npm run worker:deploy` · infra: `infra/README.md`
 - Deploys: the promo service deploys from `main` via `.github/workflows/promo-deploy.yml`; the game's deploys ignore `promo/**`. Terraform is manual.
