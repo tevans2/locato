@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mintPromoToken, promoConfigFromEnv } from "../server/admin/promoToken";
 // The promo service's own check: the token format is a contract between the two, so test them together.
+// promo/ is not in the game's Docker image, so tsconfig.json excludes this file from the build's typecheck; vitest runs it in CI.
 import { authenticate } from "../promo/worker/src/auth";
 
 const SECRET = "test-secret-for-promo-tokens";
