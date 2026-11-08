@@ -167,6 +167,21 @@ Setup (already done on this Mac): Chatterbox lives in its own Python environment
 
 ### Voice library
 
+**The default voice is George** (`PROMO_VOICE_LIBRARY=george` in `.env`): `npm run new` / `new:week` take every line George
+already has from the library and only record what's missing (with George's settings), adding those to the library too.
+Fill a whole voice in one go (every line the templates can say, about 1,000), checked and uploaded as it goes, resumable:
+
+```sh
+npm run voices:build -- george --list           # what it would record (and which names are respelled)
+caffeinate -dimsu npm run voices:build -- george   # record; lines that keep failing go to out/voice-build/george/report.json
+```
+
+**Pronunciation:** `content/pronunciations.json` holds respellings for names voices get wrong (Ouagadougou → "Wah-gah-doo-goo").
+Every voice uses it. Each take is checked by Whisper: fixed words must be heard in order, names are judged by their consonant
+sounds (so odd spellings of a correct name pass, mispronunciations don't; British dropped r's are fine). Add a name only when a
+voice gets it wrong: respelling a name it already says well can make it worse.
+
+
 A shared **voice library**: one clip per line per voice, reused by every video that says it ("That's Kenya!" is recorded once).
 Clips are made on the Mac (`npm run voice`) or recorded by a person, then uploaded through the promo service, which keeps the audio
 in the public bucket (media.locato.quest) and the record in its database. Nothing is generated on a server. A new voice or line is
@@ -228,6 +243,7 @@ Buffer topped up and records what went out.
 npm run stage -- videos/2026-11-16-*.json      # upload + queue (13:00 and 19:00 Johannesburg by default)
 npm run queue                                  # status; --hold / --release / --remove <name>; --run; --done
 npm run publish -- videos/x.json               # stage with a start of "now", then post straight away
+npm run stage -- --video ~/Desktop/clip.mp4 --caption "…"   # any finished mp4 you made yourself (or Promo → Queue → Upload a video)
 ```
 
 Also in the admin: Promo → Queue, Posted (with visitors per video from its ?ref= link), Runs.

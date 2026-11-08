@@ -8,7 +8,7 @@ import type { ActionHelpers } from "./Users";
 // separate from the game. This tab talks to it straight from the browser with a short-lived token the game's admin
 // API signs for the signed-in admin; the game server never calls the promo service.
 
-type CallOptions = { readonly json?: unknown; readonly body?: Blob; readonly contentType?: string };
+type CallOptions = { readonly json?: unknown; readonly body?: Blob; readonly contentType?: string; readonly onProgress?: (fraction: number) => void };
 type PromoCall = <T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, options?: CallOptions) => Promise<T>;
 type PromoSession = { readonly token: string; readonly expiresAt: number; readonly apiUrl: string };
 
@@ -56,6 +56,24 @@ function usePromo(client: AdminClient): PromoCall {
         body = JSON.stringify(options.json);
         headers["content-type"] = "application/json";
       } else if (options.contentType) headers["content-type"] = options.contentType;
+      if (options.onProgress && body instanceof Blob) {
+        // uploads report progress (fetch can't): useful for big videos on a phone connection
+        const onProgress = options.onProgress;
+        return await new Promise<T>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open(method, `${apiUrl}${path}`);
+          for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+          xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+          xhr.onload = () => {
+            let data: { error?: string } = {};
+            try { data = JSON.parse(xhr.responseText) as { error?: string }; } catch { /* not JSON */ }
+            if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
+            else reject(new Error(data.error ?? `Promo service: ${xhr.status}`));
+          };
+          xhr.onerror = () => reject(new Error("Upload failed (network)."));
+          xhr.send(body);
+        });
+      }
       const response = await fetch(`${apiUrl}${path}`, { method, headers, ...(body !== undefined ? { body } : {}) });
       if (path.endsWith("/audio")) {
         if (!response.ok) throw new Error(`Promo service: ${response.status}`);
@@ -117,6 +135,7 @@ function channelBadge(row: VideoRow, channel: Channel) {
 
 function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }) {
   const queue = useResource(() => call<{ videos: readonly VideoRow[] }>("GET", "/queue?status=active"), [call], 60_000);
+  const [uploading, setUploading] = useState(false);
 
   async function setHold(row: VideoRow, hold: boolean) {
     try {
@@ -143,7 +162,14 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
 
   const rows = queue.data?.videos;
   return (
-    <Panel title="Queue" subtitle="Staged videos. The promo service moves them into Buffer as room frees up (10 per channel on the free plan)." flush>
+    <div className="adm-stack">
+    {uploading && <UploadVideo call={call} helpers={helpers} onDone={() => { setUploading(false); queue.refresh(); }} onCancel={() => setUploading(false)} />}
+    <Panel
+      title="Queue"
+      subtitle="Staged videos. The promo service moves them into Buffer as room frees up (10 per channel on the free plan)."
+      actions={!uploading && <button type="button" className="adm-btn is-small is-primary" onClick={() => setUploading(true)}>Upload a video</button>}
+      flush
+    >
       {queue.error && <ErrorNote message={queue.error} onRetry={queue.refresh} />}
       {!rows ? <Loading /> : rows.length === 0 ? <Empty>Nothing queued. Stage a batch from the Mac: npm run stage -- videos/&lt;week&gt;-*.json</Empty> : (
         <div className="adm-table-wrap">
@@ -166,6 +192,127 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
           </table>
         </div>
       )}
+    </Panel>
+    </div>
+  );
+}
+
+// ---- upload a finished video ---------------------------------------------------------------------------------------
+// The same rules as the Mac's `npm run stage -- --video` (promo/src/content/posts.ts); the game doesn't import promo code.
+const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
+const videoSlug = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "video";
+interface VideoInfo { readonly width: number; readonly height: number; readonly duration: number; readonly bytes: number }
+function videoChecks(v: VideoInfo): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [], warnings: string[] = [];
+  if (v.bytes > MAX_VIDEO_BYTES) errors.push(`${(v.bytes / 1048576).toFixed(1)} MB is over the 60 MB upload limit (export at a lower bitrate).`);
+  if (!(v.duration > 0)) errors.push("Couldn't read the video's length.");
+  else if (v.duration > 600) errors.push(`${Math.round(v.duration)}s is too long (max 10 minutes).`);
+  else {
+    if (v.duration > 180) warnings.push("Over 3 minutes: YouTube may post it as a regular video, not a Short.");
+    if (v.duration > 90) warnings.push("Over 90 seconds: Instagram may not show the Reel everywhere.");
+  }
+  if (v.width && v.height) {
+    if (v.width > v.height) errors.push(`${v.width}×${v.height} is landscape; Shorts, Reels and TikTok need portrait (9:16).`);
+    else if (Math.abs(v.width / v.height - 9 / 16) > 0.03) warnings.push(`${v.width}×${v.height} isn't 9:16, so platforms will crop or add bars.`);
+    if (v.height < 1280) warnings.push(`${v.width}×${v.height} is low resolution (1080×1920 is best).`);
+  }
+  return { errors, warnings };
+}
+const readVideo = (file: File) =>
+  new Promise<VideoInfo>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({ width: v.videoWidth, height: v.videoHeight, duration: v.duration, bytes: file.size }); };
+    v.onerror = () => { URL.revokeObjectURL(url); resolve({ width: 0, height: 0, duration: 0, bytes: file.size }); };
+    v.src = url;
+  });
+
+function UploadVideo({ call, helpers, onDone, onCancel }: { call: PromoCall; helpers: ActionHelpers; onDone: () => void; onCancel: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [info, setInfo] = useState<VideoInfo | null>(null);
+  const [name, setName] = useState("");
+  const [caption, setCaption] = useState("");
+  const [title, setTitle] = useState("");
+  const [channels, setChannels] = useState<readonly Channel[]>(CHANNELS);
+  const [when, setWhen] = useState<"next" | "at">("next");
+  const [at, setAt] = useState("");
+  const [hold, setHold] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const checks = info ? videoChecks(info) : null;
+
+  async function pick(f: File | null) {
+    setFile(f);
+    setInfo(null);
+    if (!f) return;
+    setName(videoSlug(f.name));
+    setInfo(await readVideo(f));
+  }
+  async function submit() {
+    if (!file || !checks || checks.errors.length || !caption.trim() || !name || !channels.length) return;
+    try {
+      const existing = await call<{ status: string }>("GET", `/queue/${name}`).catch(() => null);
+      if (existing && existing.status !== "removed") throw new Error(`"${name}" is already in the queue (${existing.status}). Pick another name.`);
+      setProgress(0);
+      const up = await call<{ url: string }>("PUT", `/media/videos/${name}`, { body: file, contentType: "video/mp4", onProgress: setProgress });
+      const r = await call<{ dueAt: string; channels: readonly string[] }>("POST", "/queue/upload", {
+        json: { name, video: up.url, caption: caption.trim(), ...(title.trim() ? { title: title.trim() } : {}), channels, ...(when === "at" && at ? { dueAt: new Date(at).toISOString() } : {}), ...(hold ? { hold: true } : {}), meta: { file: file.name } },
+      });
+      helpers.notify(`Queued ${name} for ${formatDateTime(Date.parse(r.dueAt))} on ${r.channels.join(", ")}.`);
+      onDone();
+    } catch (err) {
+      failed(helpers, err);
+      setProgress(null);
+    }
+  }
+
+  const busy = progress !== null;
+  return (
+    <Panel title="Upload a video" subtitle="Any finished portrait video (made by hand, CapCut, a screen recording…). It's queued and posted like the rendered ones.">
+      <div className="adm-stack">
+        <label className="adm-field">
+          <span>Video file (.mp4)</span>
+          <input type="file" accept="video/mp4,video/quicktime" onChange={(e) => void pick(e.target.files?.[0] ?? null)} disabled={busy} />
+        </label>
+        {info && checks && (
+          <div className="adm-small">
+            <span className="adm-muted">{info.width}×{info.height} · {info.duration.toFixed(1)}s · {formatBytes(info.bytes)}</span>
+            {checks.errors.map((e) => <div key={e}><Badge tone="bad">can't post</Badge> {e}</div>)}
+            {checks.warnings.map((w) => <div key={w}><Badge tone="warn">check</Badge> {w}</div>)}
+          </div>
+        )}
+        <label className="adm-field">
+          <span>Name (used in its link: locato.quest/?ref={name.replace(/[^a-z0-9]+/g, "").slice(0, 24) || "…"})</span>
+          <input value={name} onChange={(e) => setName(videoSlug(e.target.value))} disabled={busy} />
+        </label>
+        <label className="adm-field">
+          <span>Caption (TikTok and Instagram; a question and 3 hashtags work best)</span>
+          <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={3} maxLength={2000} disabled={busy} style={{ font: "inherit", width: "100%" }} placeholder="How many countries can you name on this road trip? 👇 #geography #maps #quiz" />
+        </label>
+        <label className="adm-field">
+          <span>YouTube title (optional: defaults to the caption without hashtags)</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} disabled={busy} />
+        </label>
+        <div className="adm-chips" role="group" aria-label="Channels">
+          {CHANNELS.map((c) => (
+            <button key={c} type="button" className="adm-chip-btn" aria-pressed={channels.includes(c)} disabled={busy} onClick={() => setChannels(channels.includes(c) ? channels.filter((x) => x !== c) : [...channels, c])}>{c}</button>
+          ))}
+        </div>
+        <div className="adm-inline-form">
+          <select value={when} onChange={(e) => setWhen(e.target.value as "next" | "at")} aria-label="When" disabled={busy}>
+            <option value="next">Next free posting slot</option>
+            <option value="at">At a set time…</option>
+          </select>
+          {when === "at" && <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} aria-label="Post at" disabled={busy} />}
+          <label><input type="checkbox" checked={hold} onChange={(e) => setHold(e.target.checked)} disabled={busy} /> Hold (don't post until released)</label>
+        </div>
+        <div className="adm-actions">
+          <button type="button" className="adm-btn is-primary" disabled={busy || !file || !checks || checks.errors.length > 0 || !caption.trim() || !name || !channels.length || (when === "at" && !at)} onClick={() => void submit()}>
+            {busy ? `Uploading… ${Math.round((progress ?? 0) * 100)}%` : "Upload and queue"}
+          </button>
+          <button type="button" className="adm-btn" onClick={onCancel} disabled={busy}>Cancel</button>
+        </div>
+      </div>
     </Panel>
   );
 }
@@ -193,7 +340,7 @@ function PostedTab({ call, client }: { call: PromoCall; client: AdminClient }) {
                   <tr key={row.name}>
                     <td>{when(row.postedAt)}</td>
                     <td><strong>{row.name}</strong>{row.ref && <div className="adm-muted adm-small">ref={row.ref}</div>}</td>
-                    <td className="adm-muted">{[meta.kind, meta.mode, meta.hook].filter((x) => typeof x === "string").join(" · ") || "—"}</td>
+                    <td className="adm-muted">{meta.format === "manual" ? `manual${typeof meta.file === "string" ? ` · ${meta.file}` : ""}` : [meta.kind, meta.mode, meta.hook].filter((x) => typeof x === "string").join(" · ") || "—"}</td>
                     <td className="num">{s ? formatNumber(s.visitors) : "—"}</td>
                     <td className="num">{s ? formatNumber(s.played) : "—"}</td>
                     <td className="num">{s ? formatNumber(s.signups) : "—"}</td>

@@ -6,6 +6,8 @@
 //   ── queue / videos ──
 //   PUT    /media/videos/:name                       upload an mp4 (→ public bucket) → {url}
 //   POST   /queue                                    add/replace a video: {name, dueAt, video, posts, ref?, meta?, hold?}
+//   POST   /queue/upload                             queue an uploaded mp4 from a caption: {name, video, caption, title?, channels?, dueAt?, hold?}
+//   GET    /queue/:name                              one video (404 if the name is free)
 //   GET    /queue?status=active|posted|removed|all&limit=100
 //   PATCH  /queue/:name                              {hold: true|false}
 //   DELETE /queue/:name                              take it out (its unsent Buffer posts are deleted; the record stays, status "removed")
@@ -25,7 +27,8 @@ import phrases from '../../content/phrases.json';
 import lists from '../../content/lists.json';
 import presets from '../../content/presets.json';
 import plans from '../../content/plans.json';
-import {gql, fill, SERVICES, type Entry} from '../../tools/locato/autopost';
+import {gql, fill, slotsAfter, SERVICES, type Entry} from '../../tools/locato/autopost';
+import {CHANNELS, buildPosts, linkFor, refFor, titleFromCaption} from '../../src/content/posts';
 import {KINDS, mergeContent, validateItem} from '../../src/content/merge';
 import type {ContentKind} from '../../src/content/types';
 import {ClipInfo, VoiceInfo, clipFile, clipKey} from '../../src/content/voice';
@@ -101,6 +104,10 @@ async function route(req: Request, env: Env, who: Who): Promise<Response> {
     const key = `videos/${name}.mp4`;
     const b = await bytesOf(req, MAX_VIDEO);
     const head = await env.MEDIA.head(key);
+    // never swap the file under a video that's already in Buffer or posted: its posts point at this file
+    const existing = await getEntry(env, name);
+    if (head && head.size !== b.byteLength && existing && !existing.removed && Object.keys(existing.published ?? {}).length)
+      throw new HttpError(409, `"${name}" is already ${statusOf(existing) === 'posted' ? 'posted' : 'in Buffer'} with a different file; upload it under another name`);
     if (!head || head.size !== b.byteLength) await env.MEDIA.put(key, b, {httpMetadata: {contentType: 'video/mp4'}});
     await audit(env, who.name, 'video.upload', {name, bytes: b.byteLength});
     return json({url: `${env.MEDIA_URL}/${key}?v=${b.byteLength}`, bytes: b.byteLength, uploaded: !head || head.size !== b.byteLength});
@@ -130,9 +137,37 @@ async function route(req: Request, env: Env, who: Who): Promise<Response> {
       return {name: e.name, status: statusOf(e), dueAt: e.dueAt, hold: !!e.hold, video: e.video, ref: e.ref ?? null, meta: e.meta ?? null, postedAt: e.postedAt ?? null, channels: Object.keys(e.posts), published: e.published ?? {}, errors: e.errors ?? {}, log: e.log ?? []};
     })});
   }
+  if (path === '/queue/upload' && method === 'POST') {
+    const b = await body(req, z.object({
+      name: z.string().regex(NAME), video: z.string().url(), caption: z.string().min(1).max(2000), title: z.string().max(100).optional(),
+      channels: z.array(z.enum(CHANNELS)).min(1).optional(), dueAt: z.string().datetime().optional(), hold: z.boolean().optional(),
+      meta: z.record(z.string(), z.unknown()).optional(),
+    }));
+    const old = await getEntry(env, b.name);
+    if (old && !old.removed && Object.keys(old.published ?? {}).length) throw new HttpError(409, `${b.name} is already in Buffer (${statusOf(old)}); remove it first to replace it`);
+    let dueAt = b.dueAt;
+    if (!dueAt) {
+      // the next free posting slot after everything already queued
+      const active = await env.DB.prepare("SELECT due_at FROM videos WHERE status IN ('queued','scheduled','problem') AND name != ?").bind(b.name).all<{due_at: string}>();
+      const taken = new Set(active.results.map((r) => Date.parse(r.due_at)));
+      const after = new Date(Math.max(Date.now() + 10 * 60e3, ...[...taken]));
+      for (const slot of slotsAfter(after, env.TIMES.split(','), env.TIMEZONE)) if (!taken.has(Date.parse(slot))) { dueAt = slot; break; }
+    }
+    if (!dueAt || Date.parse(dueAt) < Date.now() + 5 * 60e3) throw new HttpError(400, 'The time must be at least 5 minutes from now');
+    const caption = b.caption.trim();
+    const e: VideoEntry = {
+      name: b.name, video: b.video, dueAt, hold: b.hold ?? old?.hold, stagedAt: now(), ref: refFor(b.name),
+      posts: buildPosts({video: b.video, caption, title: b.title?.trim() || titleFromCaption(caption), link: linkFor(b.name), channels: b.channels}) as Entry['posts'],
+      meta: {format: 'manual', via: who.kind === 'admin' ? 'admin' : 'mac', ...b.meta},
+    };
+    await putEntry(env, e);
+    await audit(env, who.name, 'queue.upload', {name: b.name, dueAt, channels: Object.keys(e.posts)});
+    return json({ok: true, name: b.name, dueAt, status: statusOf(e), channels: Object.keys(e.posts)});
+  }
   if ((p = m(/^\/queue\/([a-z0-9-]+)$/))) {
     const e = await getEntry(env, p[1]);
     if (!e) throw new HttpError(404, `No video "${p[1]}"`);
+    if (method === 'GET') return json({name: e.name, status: statusOf(e), dueAt: e.dueAt, hold: !!e.hold, video: e.video, channels: Object.keys(e.posts), published: e.published ?? {}});
     if (method === 'PATCH') {
       const b = await body(req, z.object({hold: z.boolean()}));
       e.hold = b.hold;

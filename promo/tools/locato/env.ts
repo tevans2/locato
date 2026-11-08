@@ -116,7 +116,7 @@ export function writeSpec(template: string, props: object, name: string, extra: 
     const pass = (k: 'voice' | 'intensity' | 'engine' | 'speed') => (v[k] ? [`--${k}`, String(v[k])] : []);
     const r = spawnSync('node', [join(ROOT, 'tools/voice/voice.mjs'), file, ...pass('voice'), ...pass('intensity'), ...pass('engine'), ...pass('speed')], {cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
     const out = (r.stdout ?? '').split('\n').filter((l) => /✓|s {2}/.test(l));
-    if (r.status === 0) console.log(`  voice: ${out[0]?.replace(/.*: /, '') ?? 'added'} (${v.intensity ?? 'lively'}${v.voice ? `, ${v.voice}` : ''})`);
+    if (r.status === 0) console.log(`  voice: ${out[0]?.replace(/.*: /, '') ?? 'added'} (${process.env.PROMO_VOICE_LIBRARY && process.env.PROMO_VOICE_LIBRARY !== 'none' ? `${process.env.PROMO_VOICE_LIBRARY}'s library` : `${v.intensity ?? 'lively'}${v.voice ? `, ${v.voice}` : ''}`})`);
     else console.warn(`  voice failed, video will be silent apart from music:\n${r.stderr}`);
   }
   console.log(`  check:  npm run check -- ${rel}`);

@@ -80,6 +80,19 @@ npm run queue -- --done                 # posted videos, with their live links
 npm run publish -- videos/x.json        # stage with a start of "now" and post straight away (--every 15 for a batch)
 ```
 
+**Videos you made yourself** (CapCut, a screen recording, an explainer…) go through the same queue:
+
+```bash
+npm run stage -- --video ~/Desktop/road-trip.mp4 --caption "How many countries can you name? 👇 #geography #maps #quiz" \
+  [--title "YouTube title"] [--name road-trip] [--channels tiktok,youtube] [--start 2026-11-20T19:00] [--hold] [--dry-run]
+npm run publish -- --video ~/Desktop/road-trip.mp4 --caption "…"     # post it now
+```
+Or from anywhere, in the admin: **Promo → Queue → Upload a video** (file, caption, optional YouTube title, channels, time, hold).
+Both check the file first: portrait (9:16), at most 60 MB and 10 minutes, with warnings for anything platforms may crop or not
+treat as a Short/Reel. The name becomes its tracking link (`locato.quest/?ref=roadtrip`), so it shows with visitors in Posted.
+A video that's already in Buffer or posted can't have its file swapped: upload a new take under another name.
+`--channels` works for rendered videos too.
+
 The same controls are in the admin: **Promo** → Queue, Posted (with visitors, plays and sign-ups per video from its
 `?ref=` link), Content, Voices, Music, Runs.
 
