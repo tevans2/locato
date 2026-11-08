@@ -22,5 +22,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "server", "tests", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "server", "tests", "vite.config.ts", "vitest.config.ts"],
+  // Imports promo/ (not in the Docker image), so the game build mustn't typecheck it; vitest still runs it in CI.
+  "exclude": ["tests/promoToken.test.ts"]
 }
