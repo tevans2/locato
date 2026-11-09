@@ -41,6 +41,11 @@ const TABS = ["create", "queue", "posted", "content", "voices", "music", "runs"]
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = { create: "Create", queue: "Queue", posted: "Posted", content: "Content", voices: "Voices", music: "Music", runs: "Runs" };
 
+/** An ISO time as a value for <input type="datetime-local"> in the browser's time zone. */
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+};
 const when = (iso: string | null) => (iso ? formatDateTime(Date.parse(iso)) : "—");
 const failed = (helpers: ActionHelpers, err: unknown) => helpers.notify(err instanceof Error ? err.message : String(err), "bad");
 
@@ -178,6 +183,30 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
       failed(helpers, err);
     }
   }
+  function reschedule(row: VideoRow) {
+    const pick = { value: toLocalInput(row.dueAt) };
+    const inBuffer = Object.keys(row.published).length > 0;
+    helpers.confirm({
+      title: `Move ${row.name}`,
+      body: (
+        <div className="adm-stack">
+          <p>Now: {when(row.dueAt)}. The new time applies to every channel{inBuffer ? "; its posts already in Buffer are taken out and put back in at the new time" : ""}.</p>
+          <label className="adm-field">
+            <span>New time (your time zone)</span>
+            <input type="datetime-local" defaultValue={pick.value} min={toLocalInput(new Date(Date.now() + 5 * 60e3).toISOString())} onChange={(e) => { pick.value = e.target.value; }} />
+          </label>
+        </div>
+      ),
+      confirmLabel: "Move",
+      run: async () => {
+        const at = new Date(pick.value);
+        if (!pick.value || Number.isNaN(at.getTime())) throw new Error("Pick a date and time.");
+        const r = await call<{ dueAt: string; pulledFromBuffer: readonly string[]; refilled: boolean | null }>("PATCH", `/queue/${row.name}`, { json: { dueAt: at.toISOString() } });
+        helpers.notify(`${row.name} moved to ${when(r.dueAt)}${r.pulledFromBuffer.length ? (r.refilled === false ? ". Couldn't put it back in Buffer yet; the next posting run will." : ", and updated in Buffer.") : "."}`);
+        queue.refresh();
+      },
+    });
+  }
   function remove(row: VideoRow) {
     helpers.confirm({
       title: `Take ${row.name} out of the queue?`,
@@ -215,6 +244,7 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
                   <td>{row.hold ? <Badge tone="warn">on hold</Badge> : <Badge tone={row.status === "problem" ? "bad" : row.status === "scheduled" ? "brand" : "neutral"}>{row.status}</Badge>}</td>
                   <td><span className="adm-chips">{CHANNELS.map((c) => channelBadge(row, c))}</span></td>
                   <td className="num">
+                    <button type="button" className="adm-btn is-small" onClick={() => reschedule(row)} disabled={Object.values(row.published).some((p) => p?.status === "sent")} title="Change when it goes out">Move</button>{" "}
                     <button type="button" className="adm-btn is-small" onClick={() => void setHold(row, !row.hold)}>{row.hold ? "Release" : "Hold"}</button>{" "}
                     <button type="button" className="adm-btn is-small is-danger" onClick={() => remove(row)}>Remove</button>
                   </td>

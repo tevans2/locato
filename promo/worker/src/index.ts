@@ -9,7 +9,7 @@
 //   POST   /queue/upload                             queue an uploaded mp4 from a caption: {name, video, caption, title?, channels?, dueAt?, hold?}
 //   GET    /queue/:name                              one video (404 if the name is free)
 //   GET    /queue?status=active|posted|removed|all&limit=100
-//   PATCH  /queue/:name                              {hold: true|false}
+//   PATCH  /queue/:name                              {hold?: true|false, dueAt?: ISO time} (a new time moves its Buffer posts too)
 //   DELETE /queue/:name                              take it out (its unsent Buffer posts are deleted; the record stays, status "removed")
 //   POST   /tick                                     run the posting step now          GET /runs?limit=10
 //   ── content (phrases, lists, presets, plans) ──
@@ -174,11 +174,39 @@ async function route(req: Request, env: Env, who: Who): Promise<Response> {
     if (!e) throw new HttpError(404, `No video "${p[1]}"`);
     if (method === 'GET') return json({name: e.name, status: statusOf(e), dueAt: e.dueAt, hold: !!e.hold, video: e.video, channels: Object.keys(e.posts), published: e.published ?? {}});
     if (method === 'PATCH') {
-      const b = await body(req, z.object({hold: z.boolean()}));
-      e.hold = b.hold;
+      const b = await body(req, z.object({hold: z.boolean().optional(), dueAt: z.string().datetime({offset: true}).optional()}));
+      if (b.hold === undefined && b.dueAt === undefined) throw new HttpError(400, 'Send hold and/or dueAt');
+      let moved: {from: string; to: string; pulled: string[]} | null = null;
+      if (b.dueAt !== undefined && Date.parse(b.dueAt) !== Date.parse(e.dueAt)) {
+        // reschedule: a new time for every channel. Posts already in Buffer are taken out and go back in at the new time.
+        if (e.removed) throw new HttpError(409, `${e.name} was removed; upload or stage it again instead`);
+        if (Date.parse(b.dueAt) < Date.now() + 5 * 60e3) throw new HttpError(400, 'The new time must be at least 5 minutes from now');
+        const sent = Object.entries(e.published ?? {}).filter(([, pub]) => pub && (pub.status === 'sent' || Date.parse(pub.dueAt) < Date.now()));
+        if (sent.length) throw new HttpError(409, `${e.name} has already gone out on ${sent.map(([c]) => c).join(', ')}; it can't be moved`);
+        const pulled: string[] = [];
+        for (const [c, pub] of Object.entries(e.published ?? {})) {
+          if (!pub) continue;
+          if (!env.BUFFER_API_KEY) throw new HttpError(500, 'BUFFER_API_KEY is not set');
+          const r = await gql(env.BUFFER_API_KEY, 'mutation($i: DeletePostInput!){ deletePost(input:$i){ __typename } }', {i: {id: pub.postId}}).catch((err: Error) => ({deletePost: {__typename: err.message}}));
+          if (r.deletePost?.__typename !== 'DeletePostSuccess') {
+            // keep what's done so far consistent, then stop: nothing is left half-moved without a record
+            await putEntry(env, e);
+            throw new HttpError(502, `Buffer wouldn't remove the ${c} post (${r.deletePost?.__typename ?? 'no answer'}); ${pulled.length ? `already moved: ${pulled.join(', ')}. ` : ''}try again`);
+          }
+          delete e.published![c as keyof typeof e.published];
+          pulled.push(c);
+        }
+        moved = {from: e.dueAt, to: new Date(b.dueAt).toISOString(), pulled};
+        e.dueAt = moved.to;
+        (e.log ??= []).push(`${now()} moved from ${moved.from} to ${moved.to} by ${who.name}${pulled.length ? `; took its posts out of Buffer: ${pulled.join(', ')}` : ''}`);
+      }
+      if (b.hold !== undefined) e.hold = b.hold;
       await putEntry(env, e);
-      await audit(env, who.name, b.hold ? 'queue.hold' : 'queue.release', {name: e.name});
-      return json({ok: true, status: statusOf(e)});
+      if (moved) await audit(env, who.name, 'queue.reschedule', {name: e.name, ...moved});
+      if (b.hold !== undefined) await audit(env, who.name, b.hold ? 'queue.hold' : 'queue.release', {name: e.name});
+      // posts that were in Buffer go straight back in at the new time (unless it's held)
+      const refill = moved?.pulled.length && !e.hold ? await runPosting(env, `reschedule:${who.name}`) : null;
+      return json({ok: true, status: statusOf((await getEntry(env, e.name)) ?? e), dueAt: e.dueAt, pulledFromBuffer: moved?.pulled ?? [], refilled: refill ? !refill.error : null});
     }
     if (method === 'DELETE') {
       const pulled: string[] = [];
