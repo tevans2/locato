@@ -68,6 +68,17 @@ npm run new -- quiz --kind flags --hook b           # hook variants from the rep
 npm run new -- quiz --kind route --count 3          # fewer, longer rounds
 ```
 
+## Studio (build and preview in the admin)
+Admin → Promo → **Create**: pick a format, modes, countries, hook, caption, voice and music; the preview plays the real template
+with the voice library's lines (any line not recorded yet is listed and silent). 🎲 picks new countries. **Save draft** keeps the
+recipe; **Render** queues it. Renders run on the Mac:
+
+    npm run render-runner            # waits for jobs (keeps the Mac awake); Ctrl-C to stop
+    npm run render-runner -- --once  # render what's queued, then stop
+
+Each job builds the spec with the same seed as the preview (`--no-fresh`, so the picks match), renders it, and stages it for
+posting (on hold if you ticked that). Its status, log and video link show in the Studio's list.
+
 ## Recipes and content
 
 A **recipe** says what a video is; `compile()` turns it into the exact spec the template renders. Same recipe + same seed = same video.
@@ -242,6 +253,7 @@ Buffer topped up and records what went out.
 ```bash
 npm run stage -- videos/2026-11-16-*.json      # upload + queue (13:00 and 19:00 Johannesburg by default)
 npm run queue                                  # status; --hold / --release / --remove <name>; --run; --done
+npm run queue -- --move <name> 2026-11-12T18:00  # a new time (posts already in Buffer are moved too; or Promo → Queue → Move)
 npm run publish -- videos/x.json               # stage with a start of "now", then post straight away
 npm run stage -- --video ~/Desktop/clip.mp4 --caption "…"   # any finished mp4 you made yourself (or Promo → Queue → Upload a video)
 ```

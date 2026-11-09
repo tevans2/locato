@@ -37,9 +37,11 @@ describe("promo admin tokens", () => {
     const strict = adminContentSecurityPolicy(null);
     expect(strict).toContain("connect-src 'self';");
     expect(strict).not.toContain("media-src");
+    expect(strict).not.toContain("frame-src");
     const promo = adminContentSecurityPolicy(promoConfigFromEnv({ PROMO_API_URL: "https://promo.locato.quest/", PROMO_ADMIN_SECRET: "s" }));
     expect(promo).toContain("connect-src 'self' https://promo.locato.quest;");
     expect(promo).toContain("media-src 'self' blob: https://media.locato.quest;");
+    expect(promo).toContain("frame-src https://promo.locato.quest;");
     expect(promo).toContain("script-src 'self';");
     expect(promo).toContain("frame-ancestors 'none'");
   });

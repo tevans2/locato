@@ -39,3 +39,21 @@ export async function authenticate(req: Request, env: {PROMO_SERVICE_TOKEN?: str
   // constant-time compare (a Workers extension to SubtleCrypto)
   return (crypto.subtle as unknown as {timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean}).timingSafeEqual(a, b) ? {kind: 'service', name: 'service'} : null;
 }
+
+// ---- signed links (private files a browser <audio> can't send a header for, e.g. music previews) ----------------
+const b64url = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function linkSig(secret: string, path: string, exp: number) {
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name: 'HMAC', hash: 'SHA-256'}, false, ['sign']);
+  return b64url(await crypto.subtle.sign('HMAC', key, enc.encode(`${path}|${exp}`)));
+}
+/** A URL for `path` that works without a token until `ttlSeconds` from now. */
+export async function signedUrl(origin: string, path: string, secret: string, ttlSeconds = 7200) {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  return `${origin}${path}?exp=${exp}&sig=${await linkSig(secret, path, exp)}`;
+}
+export async function verifySignedUrl(url: URL, secret: string | undefined) {
+  const exp = Number(url.searchParams.get('exp')), sig = url.searchParams.get('sig');
+  if (!secret || !sig || !(exp * 1000 > Date.now())) return false;
+  const want = enc.encode(await linkSig(secret, url.pathname, exp)), got = enc.encode(sig);
+  return want.length === got.length && (crypto.subtle as unknown as {timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean}).timingSafeEqual(want, got);
+}

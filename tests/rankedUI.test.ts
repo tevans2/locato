@@ -225,7 +225,12 @@ it("keeps Flyover local from Take off through results and posts its client score
   expect(ui.state()).toBeNull();
   ui.advance(90_000);
   await ui.posted();
-  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: 0 });
+  // Flyover keeps flying on real timers (its input loop and animation frames) while the test fakes the clock, so on a
+  // slow machine the plane can cross a country and score before the 90 s pass. What matters is that the leaderboard
+  // gets exactly the score the player was shown.
+  const shown = Number(ui.$(".shell-results-stat.is-hero strong").textContent?.match(/\d+/)?.[0]);
+  expect(Number.isInteger(shown)).toBe(true);
+  expect(ui.service.getUserLeaderboardRank(ui.user.id, "flyover", "")).toMatchObject({ score: shown });
 });
 
 it("keeps the puzzle tray and accuracy check, and refuses to post misplaced pieces", async () => {

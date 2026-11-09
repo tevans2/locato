@@ -47,13 +47,15 @@
     "publish": "bun tools/locato/queue.ts publish",
     "stage": "bun tools/locato/queue.ts stage",
     "queue": "bun tools/locato/queue.ts",
-    "worker:deploy": "set -a && . ./.env && set +a && wrangler deploy --config worker/wrangler.jsonc",
+    "worker:deploy": "bun studio/build.ts && set -a && . ./.env && set +a && wrangler deploy --config worker/wrangler.jsonc",
     "content": "bun tools/locato/content.ts",
     "voices": "bun tools/locato/voices.ts",
     "worker:migrate": "set -a && . ./.env && set +a && wrangler d1 migrations apply locato-promo --remote --config worker/wrangler.jsonc",
-    "worker:dev": "wrangler d1 migrations apply locato-promo --local --config worker/wrangler.jsonc --persist-to .wrangler-local && wrangler dev --config worker/wrangler.jsonc --local --persist-to .wrangler-local --port 8787",
+    "worker:dev": "bun studio/build.ts && wrangler d1 migrations apply locato-promo --local --config worker/wrangler.jsonc --persist-to .wrangler-local && wrangler dev --config worker/wrangler.jsonc --local --persist-to .wrangler-local --port 8787",
     "voices:build": "bun tools/locato/voicebuild.ts",
-    "voices:review": "bun tools/voice/review.ts"
+    "voices:review": "bun tools/voice/review.ts",
+    "studio:build": "bun studio/build.ts",
+    "render-runner": "bun tools/locato/runner.ts"
   },
   "allowScripts": {
     "esbuild": false

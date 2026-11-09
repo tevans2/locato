@@ -1,8 +1,8 @@
 import React from 'react';
-import {Img, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {Img, useCurrentFrame, useVideoConfig} from 'remotion';
 import {C, MUSIC, SAFE, W} from '../brand';
 import {clamp01, fade, prog} from '../anim';
-import {Answer, Badge, Center, Countdown, Flag, Frame, Header, OutroAndEnd, Sfx, Shape, VoiceTrack, outroCues, voiceSpans, type Cue, type VoiceCue} from '../components';
+import {Answer, Badge, Center, Countdown, Flag, Frame, Header, OutroAndEnd, Sfx, Shape, VoiceTrack, outroCues, voiceSpans, type Cue, type VoiceCue, mediaSrc} from '../components';
 import {MAP_COLORS, WorldMap, type MapLabel, type Pin} from '../map';
 import {QUIZ, quizTiming, type QuizProps, type QuizRound} from '../schema';
 
@@ -185,8 +185,8 @@ const Stage: React.FC<{r: QuizRound; t: number; rev: number; thinkP: number; rev
       const img: React.CSSProperties = {gridArea: '1/1', maxWidth: 880, maxHeight: 600, borderRadius: 14};
       return (
         <div style={{display: 'grid', placeItems: 'center', boxShadow: `0 0 0 ${3 + 3 * rev}px ${rev > 0 ? C.accent : C.border}`, borderRadius: 14}}>
-          <Img src={staticFile(r.stages[Math.max(0, k - 1)])} style={img} />
-          <Img src={staticFile(r.stages[k])} style={{...img, opacity: k === 0 ? 1 : nextP}} />
+          <Img src={mediaSrc(r.stages[Math.max(0, k - 1)])} style={img} />
+          <Img src={mediaSrc(r.stages[k])} style={{...img, opacity: k === 0 ? 1 : nextP}} />
         </div>
       );
     }

@@ -11,6 +11,7 @@ node_modules/
 .cache/
 out/
 dist/
+studio-dist/
 .locks/
 .wrangler/
 .wrangler-local/

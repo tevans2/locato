@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Promo Studio</title>
+<style>
+  :root{--bg:#f7f6f1;--card:#fff;--line:#e3e0d6;--ink:#1b3023;--muted:#5b6b5f;--accent:#2f6b45;--warn:#8a5a00;--err:#b3261e}
+  @media (prefers-color-scheme: dark){:root{--bg:#141c17;--card:#1c2620;--line:#2c3a31;--ink:#e6efe8;--muted:#9fb0a4;--accent:#7fc497;--warn:#e0b860;--err:#ff8a80}}
+  *{box-sizing:border-box} body{margin:0;font:14px/1.45 -apple-system,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  .pad{padding:24px} .studio{display:grid;grid-template-columns:minmax(320px,1fr) 360px minmax(260px,0.8fr);gap:18px;padding:16px;align-items:start}
+  @media (max-width:1100px){.studio{grid-template-columns:1fr}}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px} .preview{display:flex;flex-direction:column;align-items:center;gap:8px;position:sticky;top:16px}
+  h2{margin:0 0 12px;font-size:18px} h3{margin:16px 0 8px;font-size:15px} h3:first-child{margin-top:0}
+  label{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-weight:600;font-size:13px} label.check{flex-direction:row;align-items:center;font-weight:500}
+  .label{font-weight:600;font-size:13px;margin:12px 0 6px}
+  input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end} .row>label{flex:1 1 140px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px} button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 11px}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff} button:disabled{opacity:.45;cursor:default} button.primary{background:var(--accent);border-color:var(--accent);color:#fff;border-radius:10px;padding:8px 18px}
+  .seed{display:flex;gap:6px} .seed input{flex:1} .muted{color:var(--muted)} .small{font-size:12px} .err{color:var(--err)} .warn{color:var(--warn)} .ok{color:var(--accent)}
+  .rounds{padding-left:20px;margin:0} .rounds li{margin:3px 0} .jobs{list-style:none;padding:0;margin:0} .jobs li{border-top:1px solid var(--line);padding:8px 0} .jobs .row{margin-top:4px}
+  .st{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--bg);border:1px solid var(--line)} .st-done{color:var(--accent)} .st-failed{color:var(--err)} .st-rendering,.st-queued{color:var(--warn)}
+  code{font-size:12px}
+</style>
+</head>
+<body><div id="root"></div><script type="module" src="/studio/__APP__"></script></body>
+</html>
