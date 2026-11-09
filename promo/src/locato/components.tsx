@@ -53,8 +53,8 @@ const MusicBed: React.FC<{music: Music; duck?: Span[]}> = ({music, duck = []}) =
 export type VoiceCue = {at: number; clip?: VoiceClip};
 
 /** Spoken lines at the given times. */
-/** A public/ path, or a full URL (e.g. a clip in the R2 voice library). */
-export const mediaSrc = (src: string) => (/^https?:\/\//.test(src) ? src : staticFile(src));
+/** A public/ path, or a full URL (a clip in the R2 voice library; data:/blob: URLs from the Studio's live preview). */
+export const mediaSrc = (src: string) => (/^(https?:\/\/|data:|blob:)/.test(src) ? src : staticFile(src));
 
 export const VoiceTrack: React.FC<{cues: VoiceCue[]}> = ({cues}) => {
   const {fps} = useVideoConfig();

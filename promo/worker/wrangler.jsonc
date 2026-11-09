@@ -7,6 +7,8 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
   "routes": [{"pattern": "promo.locato.quest", "custom_domain": true}],
+  // the Studio (/studio/) and the game data it previews with (/locato/…), built by `bun studio/build.ts`
+  "assets": {"directory": "../studio-dist"},
   // every 4 hours; no Buffer requests when nothing is waiting or due for a check
   "triggers": {"crons": ["15 */4 * * *"]},
   "d1_databases": [

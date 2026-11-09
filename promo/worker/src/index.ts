@@ -9,7 +9,7 @@
 //   POST   /queue/upload                             queue an uploaded mp4 from a caption: {name, video, caption, title?, channels?, dueAt?, hold?}
 //   GET    /queue/:name                              one video (404 if the name is free)
 //   GET    /queue?status=active|posted|removed|all&limit=100
-//   PATCH  /queue/:name                              {hold: true|false}
+//   PATCH  /queue/:name                              {hold?: true|false, dueAt?: ISO time} (a new time moves its Buffer posts too)
 //   DELETE /queue/:name                              take it out (its unsent Buffer posts are deleted; the record stays, status "removed")
 //   POST   /tick                                     run the posting step now          GET /runs?limit=10
 //   ── content (phrases, lists, presets, plans) ──
@@ -21,6 +21,10 @@
 //   DELETE /voices/:id/clips/:key                    (the record goes; the file stays in R2)
 //   ── music (private bucket) ──
 //   GET    /music    PUT /music/:name?licence=…  body: the audio    GET /music/:name/audio (stream it, for previews)
+//   ── studio jobs (drafts + renders) ──
+//   POST   /jobs {name, recipe, seed, queue?, hold?}    GET /jobs?status=open|all     GET|PATCH /jobs/:id
+//   POST   /jobs/claim (Mac runner)    POST /jobs/:id/progress {log}    POST /jobs/:id/finish {ok, result?, error?, log?}
+//   POST   /music/:name/link                        a signed URL for previews (2 h)
 //   GET    /audit?limit=50
 import {z} from 'zod';
 import phrases from '../../content/phrases.json';
@@ -32,7 +36,8 @@ import {CHANNELS, buildPosts, linkFor, refFor, titleFromCaption} from '../../src
 import {KINDS, mergeContent, validateItem} from '../../src/content/merge';
 import type {ContentKind} from '../../src/content/types';
 import {ClipInfo, VoiceInfo, clipFile, clipKey} from '../../src/content/voice';
-import {authenticate, type Who} from './auth';
+import {authenticate, signedUrl, verifySignedUrl, type Who} from './auth';
+import {Recipe} from '../../src/content/types';
 import {audit, d1Store, getEntry, now, putEntry, statusOf, type Env, type VideoEntry} from './data';
 
 const DEFAULTS: Record<ContentKind, unknown[]> = {phrases, lists, presets, plans};
@@ -169,11 +174,39 @@ async function route(req: Request, env: Env, who: Who): Promise<Response> {
     if (!e) throw new HttpError(404, `No video "${p[1]}"`);
     if (method === 'GET') return json({name: e.name, status: statusOf(e), dueAt: e.dueAt, hold: !!e.hold, video: e.video, channels: Object.keys(e.posts), published: e.published ?? {}});
     if (method === 'PATCH') {
-      const b = await body(req, z.object({hold: z.boolean()}));
-      e.hold = b.hold;
+      const b = await body(req, z.object({hold: z.boolean().optional(), dueAt: z.string().datetime({offset: true}).optional()}));
+      if (b.hold === undefined && b.dueAt === undefined) throw new HttpError(400, 'Send hold and/or dueAt');
+      let moved: {from: string; to: string; pulled: string[]} | null = null;
+      if (b.dueAt !== undefined && Date.parse(b.dueAt) !== Date.parse(e.dueAt)) {
+        // reschedule: a new time for every channel. Posts already in Buffer are taken out and go back in at the new time.
+        if (e.removed) throw new HttpError(409, `${e.name} was removed; upload or stage it again instead`);
+        if (Date.parse(b.dueAt) < Date.now() + 5 * 60e3) throw new HttpError(400, 'The new time must be at least 5 minutes from now');
+        const sent = Object.entries(e.published ?? {}).filter(([, pub]) => pub && (pub.status === 'sent' || Date.parse(pub.dueAt) < Date.now()));
+        if (sent.length) throw new HttpError(409, `${e.name} has already gone out on ${sent.map(([c]) => c).join(', ')}; it can't be moved`);
+        const pulled: string[] = [];
+        for (const [c, pub] of Object.entries(e.published ?? {})) {
+          if (!pub) continue;
+          if (!env.BUFFER_API_KEY) throw new HttpError(500, 'BUFFER_API_KEY is not set');
+          const r = await gql(env.BUFFER_API_KEY, 'mutation($i: DeletePostInput!){ deletePost(input:$i){ __typename } }', {i: {id: pub.postId}}).catch((err: Error) => ({deletePost: {__typename: err.message}}));
+          if (r.deletePost?.__typename !== 'DeletePostSuccess') {
+            // keep what's done so far consistent, then stop: nothing is left half-moved without a record
+            await putEntry(env, e);
+            throw new HttpError(502, `Buffer wouldn't remove the ${c} post (${r.deletePost?.__typename ?? 'no answer'}); ${pulled.length ? `already moved: ${pulled.join(', ')}. ` : ''}try again`);
+          }
+          delete e.published![c as keyof typeof e.published];
+          pulled.push(c);
+        }
+        moved = {from: e.dueAt, to: new Date(b.dueAt).toISOString(), pulled};
+        e.dueAt = moved.to;
+        (e.log ??= []).push(`${now()} moved from ${moved.from} to ${moved.to} by ${who.name}${pulled.length ? `; took its posts out of Buffer: ${pulled.join(', ')}` : ''}`);
+      }
+      if (b.hold !== undefined) e.hold = b.hold;
       await putEntry(env, e);
-      await audit(env, who.name, b.hold ? 'queue.hold' : 'queue.release', {name: e.name});
-      return json({ok: true, status: statusOf(e)});
+      if (moved) await audit(env, who.name, 'queue.reschedule', {name: e.name, ...moved});
+      if (b.hold !== undefined) await audit(env, who.name, b.hold ? 'queue.hold' : 'queue.release', {name: e.name});
+      // posts that were in Buffer go straight back in at the new time (unless it's held)
+      const refill = moved?.pulled.length && !e.hold ? await runPosting(env, `reschedule:${who.name}`) : null;
+      return json({ok: true, status: statusOf((await getEntry(env, e.name)) ?? e), dueAt: e.dueAt, pulledFromBuffer: moved?.pulled ?? [], refilled: refill ? !refill.error : null});
     }
     if (method === 'DELETE') {
       const pulled: string[] = [];
@@ -307,11 +340,78 @@ async function route(req: Request, env: Env, who: Who): Promise<Response> {
     return new Response(obj.body, {headers: {'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=3600'}});
   }
 
+  // ---- studio jobs
+  if (path === '/jobs' && method === 'POST') {
+    const b = await body(req, z.object({name: z.string().regex(NAME), recipe: z.unknown(), seed: z.string().min(1).max(100), queue: z.boolean().optional(), hold: z.boolean().optional()}));
+    const r = Recipe.safeParse(b.recipe);
+    if (!r.success) throw new HttpError(400, `recipe: ${r.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')}`);
+    const taken = await env.DB.prepare("SELECT 1 FROM videos WHERE name = ? AND status != 'removed' UNION SELECT 1 FROM jobs WHERE name = ? AND status NOT IN ('cancelled', 'failed')").bind(b.name, b.name).first();
+    if (taken) throw new HttpError(409, `The name "${b.name}" is already used; pick another`);
+    const id = crypto.randomUUID(), t = now();
+    await env.DB.prepare('INSERT INTO jobs (id, name, recipe, seed, status, hold, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, b.name, JSON.stringify(r.data), b.seed, b.queue ? 'queued' : 'draft', b.hold === false ? 0 : 1, who.name, t, t).run();
+    await audit(env, who.name, b.queue ? 'job.queue' : 'job.draft', {id, name: b.name});
+    return json({ok: true, id, status: b.queue ? 'queued' : 'draft'});
+  }
+  if (path === '/jobs' && method === 'GET') {
+    const status = url.searchParams.get('status') ?? 'open';
+    const where = status === 'all' ? '1=1' : "status IN ('draft', 'queued', 'rendering') OR finished_at > datetime('now', '-3 days')";
+    const r = await env.DB.prepare(`SELECT * FROM jobs WHERE ${where} ORDER BY created_at DESC LIMIT 100`).all<any>();
+    return json({jobs: r.results.map(jobRow)});
+  }
+  if (path === '/jobs/claim' && method === 'POST') {
+    if (who.kind !== 'service') throw new HttpError(403, 'Only the render runner claims jobs');
+    const runner = ((await req.json().catch(() => ({}))) as {runner?: string}).runner ?? 'runner';
+    const t = now();
+    const row = await env.DB.prepare("UPDATE jobs SET status = 'rendering', claimed_by = ?1, claimed_at = ?2, updated_at = ?2, log = NULL, error = NULL WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) RETURNING *").bind(runner, t).first<any>();
+    return json({job: row ? jobRow(row) : null});
+  }
+  if ((p = m(/^\/jobs\/([0-9a-f-]{36})(?:\/(progress|finish))?$/))) {
+    const id = p[1], action = p[2];
+    const row = await env.DB.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first<any>();
+    if (!row) throw new HttpError(404, 'No such job');
+    if (!action && method === 'GET') return json({job: jobRow(row)});
+    if (!action && method === 'PATCH') {
+      const b = await body(req, z.object({name: z.string().regex(NAME).optional(), recipe: z.unknown().optional(), seed: z.string().min(1).max(100).optional(), hold: z.boolean().optional(), status: z.enum(['draft', 'queued', 'cancelled']).optional()}));
+      if (['rendering', 'done'].includes(row.status)) throw new HttpError(409, `This job is ${row.status}; make a new one instead`);
+      const recipe = b.recipe === undefined ? row.recipe : (() => { const r = Recipe.safeParse(b.recipe); if (!r.success) throw new HttpError(400, `recipe: ${r.error.issues.map((e) => e.message).join('; ')}`); return JSON.stringify(r.data); })();
+      await env.DB.prepare('UPDATE jobs SET name = ?, recipe = ?, seed = ?, hold = ?, status = ?, error = NULL, updated_at = ? WHERE id = ?')
+        .bind(b.name ?? row.name, recipe, b.seed ?? row.seed, b.hold === undefined ? row.hold : b.hold ? 1 : 0, b.status ?? row.status, now(), id).run();
+      await audit(env, who.name, `job.${b.status ?? 'update'}`, {id, name: b.name ?? row.name});
+      return json({ok: true});
+    }
+    if (who.kind !== 'service') throw new HttpError(403, 'Only the render runner reports progress');
+    if (action === 'progress' && method === 'POST') {
+      const b = await body(req, z.object({log: z.string().max(20000)}));
+      await env.DB.prepare('UPDATE jobs SET log = ?, updated_at = ? WHERE id = ?').bind(b.log, now(), id).run();
+      return json({ok: true});
+    }
+    if (action === 'finish' && method === 'POST') {
+      const b = await body(req, z.object({ok: z.boolean(), result: z.record(z.string(), z.unknown()).optional(), error: z.string().max(4000).optional(), log: z.string().max(20000).optional()}));
+      const t = now();
+      await env.DB.prepare('UPDATE jobs SET status = ?, result = ?, error = ?, log = COALESCE(?, log), finished_at = ?, updated_at = ? WHERE id = ?')
+        .bind(b.ok ? 'done' : 'failed', b.result ? JSON.stringify(b.result) : null, b.error ?? null, b.log ?? null, t, t, id).run();
+      await audit(env, who.name, b.ok ? 'job.done' : 'job.failed', {id, name: row.name, error: b.error});
+      return json({ok: true});
+    }
+  }
+  if ((p = m(/^\/music\/([a-z0-9-]+)\/link$/)) && method === 'POST') {
+    const row = await env.DB.prepare('SELECT 1 FROM music WHERE name = ?').bind(p[1]).first();
+    if (!row) throw new HttpError(404, `No music "${p[1]}" (upload it in Promo → Music)`);
+    if (!env.PROMO_ADMIN_SECRET) throw new HttpError(500, 'PROMO_ADMIN_SECRET is not set');
+    return json({url: await signedUrl(url.origin, `/music/${p[1]}/audio`, env.PROMO_ADMIN_SECRET)});
+  }
+
   if (path === '/audit' && method === 'GET') {
     const r = await env.DB.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT ?').bind(Math.min(500, Number(url.searchParams.get('limit') ?? 50))).all();
     return json({audit: r.results});
   }
   throw new HttpError(404, `No route ${method} ${path}`);
+}
+
+function jobRow(r: any) {
+  return {id: r.id, name: r.name, recipe: JSON.parse(r.recipe), seed: r.seed, status: r.status, hold: !!r.hold, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+    claimedBy: r.claimed_by, claimedAt: r.claimed_at, finishedAt: r.finished_at, log: r.log, error: r.error, result: r.result ? JSON.parse(r.result) : null};
 }
 
 async function onlineContent(env: Env) {
@@ -326,6 +426,15 @@ export default {
     if (req.method === 'OPTIONS') return cors(req, env, new Response(null, {status: 204}));
     const path = new URL(req.url).pathname;
     if (path === '/health') return cors(req, env, json({ok: true, service: 'locato-promo', time: now(), channels: SERVICES}));
+    // a signed preview link (no token: <audio> can't send one)
+    const music = path.match(/^\/music\/([a-z0-9-]+)\/audio$/);
+    if (music && req.method === 'GET' && new URL(req.url).searchParams.has('sig')) {
+      if (!(await verifySignedUrl(new URL(req.url), env.PROMO_ADMIN_SECRET))) return json({error: 'Link expired or invalid'}, 403);
+      const row = await env.DB.prepare('SELECT file FROM music WHERE name = ?').bind(music[1]).first<{file: string}>();
+      const obj = row && (await env.PRIVATE.get(row.file));
+      if (!obj) return json({error: 'Not found'}, 404);
+      return new Response(obj.body, {headers: {'content-type': obj.httpMetadata?.contentType ?? 'audio/mp4', 'cache-control': 'private, max-age=3600'}});
+    }
     try {
       const who = await authenticate(req, env);
       if (!who) throw new HttpError(401, 'Not signed in (service token or admin token required)');

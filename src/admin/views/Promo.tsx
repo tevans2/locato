@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminClient, GrowthReport } from "../api";
 import { formatBytes, formatDateTime, formatNumber } from "../format";
 import { Badge, Empty, ErrorNote, Loading, Panel, useResource } from "../ui";
@@ -37,10 +37,15 @@ interface Clip { readonly key: string; readonly text: string; readonly url?: str
 interface Music { readonly name: string; readonly bytes: number; readonly licence: string | null; readonly added_at: string }
 interface Run { readonly id: number; readonly at: string; readonly trigger: string; readonly scheduled: number; readonly posted: number; readonly log: string; readonly error: string | null }
 
-const TABS = ["queue", "posted", "content", "voices", "music", "runs"] as const;
+const TABS = ["create", "queue", "posted", "content", "voices", "music", "runs"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { queue: "Queue", posted: "Posted", content: "Content", voices: "Voices", music: "Music", runs: "Runs" };
+const TAB_LABEL: Record<Tab, string> = { create: "Create", queue: "Queue", posted: "Posted", content: "Content", voices: "Voices", music: "Music", runs: "Runs" };
 
+/** An ISO time as a value for <input type="datetime-local"> in the browser's time zone. */
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+};
 const when = (iso: string | null) => (iso ? formatDateTime(Date.parse(iso)) : "—");
 const failed = (helpers: ActionHelpers, err: unknown) => helpers.notify(err instanceof Error ? err.message : String(err), "bad");
 
@@ -111,6 +116,7 @@ export function PromoView({ client, helpers }: { client: AdminClient; helpers: A
         {TABS.map((t) => <button key={t} type="button" className="adm-chip-btn" aria-pressed={t === tab} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>)}
         <button type="button" className="adm-btn is-small" disabled={running} onClick={() => void runNow()} title="Top up Buffer and record what was posted (the service also does this every 4 hours)">{running ? "Running…" : "Run posting now"}</button>
       </div>
+      {tab === "create" && <CreateTab client={client} />}
       {tab === "queue" && <QueueTab call={call} helpers={helpers} />}
       {tab === "posted" && <PostedTab call={call} client={client} />}
       {tab === "content" && <ContentTab call={call} helpers={helpers} />}
@@ -119,6 +125,37 @@ export function PromoView({ client, helpers }: { client: AdminClient; helpers: A
       {tab === "runs" && <RunsTab call={call} />}
     </div>
   );
+}
+
+// ---- create: the promo service's Studio (build a video from a recipe, preview it live, queue it for rendering) ---------
+// It's the service's own page in a frame; it asks this page for a token over postMessage and gets one only if it really
+// is the promo service's origin.
+function CreateTab({ client }: { client: AdminClient }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sendToken = useCallback(async () => {
+    try {
+      const s = await client.send<PromoSession>("POST", "/promo-token");
+      setApiUrl(s.apiUrl);
+      frame.current?.contentWindow?.postMessage({ type: "locato-promo:token", token: s.token }, new URL(s.apiUrl).origin);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [client]);
+  useEffect(() => { void sendToken(); }, [sendToken]);
+  useEffect(() => {
+    if (!apiUrl) return;
+    const origin = new URL(apiUrl).origin;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === origin && e.source === frame.current?.contentWindow && (e.data as { type?: string })?.type === "locato-promo:token-request") void sendToken();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [apiUrl, sendToken]);
+  if (error) return <ErrorNote message={error} />;
+  if (!apiUrl) return <Loading />;
+  return <iframe ref={frame} title="Promo Studio" src={`${apiUrl}/studio/`} onLoad={() => void sendToken()} style={{ width: "100%", height: "calc(100vh - 170px)", minHeight: 720, border: 0, borderRadius: 12 }} />;
 }
 
 // ---- queue ------------------------------------------------------------------------------------------------------------
@@ -145,6 +182,30 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
     } catch (err) {
       failed(helpers, err);
     }
+  }
+  function reschedule(row: VideoRow) {
+    const pick = { value: toLocalInput(row.dueAt) };
+    const inBuffer = Object.keys(row.published).length > 0;
+    helpers.confirm({
+      title: `Move ${row.name}`,
+      body: (
+        <div className="adm-stack">
+          <p>Now: {when(row.dueAt)}. The new time applies to every channel{inBuffer ? "; its posts already in Buffer are taken out and put back in at the new time" : ""}.</p>
+          <label className="adm-field">
+            <span>New time (your time zone)</span>
+            <input type="datetime-local" defaultValue={pick.value} min={toLocalInput(new Date(Date.now() + 5 * 60e3).toISOString())} onChange={(e) => { pick.value = e.target.value; }} />
+          </label>
+        </div>
+      ),
+      confirmLabel: "Move",
+      run: async () => {
+        const at = new Date(pick.value);
+        if (!pick.value || Number.isNaN(at.getTime())) throw new Error("Pick a date and time.");
+        const r = await call<{ dueAt: string; pulledFromBuffer: readonly string[]; refilled: boolean | null }>("PATCH", `/queue/${row.name}`, { json: { dueAt: at.toISOString() } });
+        helpers.notify(`${row.name} moved to ${when(r.dueAt)}${r.pulledFromBuffer.length ? (r.refilled === false ? ". Couldn't put it back in Buffer yet; the next posting run will." : ", and updated in Buffer.") : "."}`);
+        queue.refresh();
+      },
+    });
   }
   function remove(row: VideoRow) {
     helpers.confirm({
@@ -183,6 +244,7 @@ function QueueTab({ call, helpers }: { call: PromoCall; helpers: ActionHelpers }
                   <td>{row.hold ? <Badge tone="warn">on hold</Badge> : <Badge tone={row.status === "problem" ? "bad" : row.status === "scheduled" ? "brand" : "neutral"}>{row.status}</Badge>}</td>
                   <td><span className="adm-chips">{CHANNELS.map((c) => channelBadge(row, c))}</span></td>
                   <td className="num">
+                    <button type="button" className="adm-btn is-small" onClick={() => reschedule(row)} disabled={Object.values(row.published).some((p) => p?.status === "sent")} title="Change when it goes out">Move</button>{" "}
                     <button type="button" className="adm-btn is-small" onClick={() => void setHold(row, !row.hold)}>{row.hold ? "Release" : "Hold"}</button>{" "}
                     <button type="button" className="adm-btn is-small is-danger" onClick={() => remove(row)}>Remove</button>
                   </td>

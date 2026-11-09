@@ -11,6 +11,7 @@
 //   npm run queue                                    what's queued, in Buffer, or has a problem
 //   npm run queue -- --done [--last 20]              posted videos, with their live links
 //   npm run queue -- --hold <name>  /  --release <name>
+//   npm run queue -- --move <name> <HH:MM|YYYY-MM-DDTHH:MM>   a new time (its posts already in Buffer move too)
 //   npm run queue -- --remove <name>                 take it out (its unsent Buffer posts are deleted; the record stays)
 //   npm run queue -- --run                           run the posting step now (the timer does it every 4 hours)
 //   npm run queue -- --last-run                      the posting step's last log
@@ -193,6 +194,13 @@ async function tick() {
 if (argv[0] === 'stage') await (opt('video') ? stageVideo() : stage());
 else if (argv[0] === 'publish') {
   if (await (opt('video') ? stageVideo('now') : stage('now'))) await tick();
+} else if (opt('move')) {
+  const name = opt('move')!;
+  const when = argv[argv.indexOf('--move') + 2];
+  if (!when) throw new Error('Usage: npm run queue -- --move <name> <HH:MM|YYYY-MM-DDTHH:MM>  (your time zone: ' + TZ + ')');
+  const [d, hm] = when.includes('T') ? when.split('T') : [localDate(new Date(), TZ), when];
+  const r = await api<{dueAt: string; pulledFromBuffer: string[]; refilled: boolean | null}>(`/queue/${name}`, {method: 'PATCH', json: {dueAt: localToUtc(d, hm, TZ)}});
+  console.log(`${name}: moved to ${fmt(r.dueAt)}${r.pulledFromBuffer.length ? (r.refilled === false ? ' (back into Buffer on the next posting run)' : ' and updated in Buffer') : ''}`);
 } else if (opt('hold') || opt('release')) {
   const name = opt('hold') ?? opt('release')!;
   await api(`/queue/${name}`, {method: 'PATCH', json: {hold: !!opt('hold')}});

@@ -31,7 +31,7 @@ const originOf = (url: string) => {
 
 /**
  * The admin page's Content-Security-Policy. Strict by default; with the promo service configured, the Promo tab may also
- * call its API (connect-src) and play its voice clips plus local previews (media-src).
+ * call its API (connect-src), play its voice clips plus local previews (media-src) and show its Studio (frame-src).
  */
 export function adminContentSecurityPolicy(promo: PromoConfig | null): string {
   const api = promo ? originOf(promo.apiUrl) : null;
@@ -44,6 +44,7 @@ export function adminContentSecurityPolicy(promo: PromoConfig | null): string {
     "font-src 'self'",
     `connect-src 'self'${api ? ` ${api}` : ""}`,
     ...(promo ? [`media-src 'self' blob:${media ? ` ${media}` : ""}`] : []),
+    ...(api ? [`frame-src ${api}`] : []),
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'none'",
