@@ -24,6 +24,7 @@
     "@remotion/renderer": "^4.0.541",
     "@types/d3-geo": "^3.1.1",
     "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
     "d3-geo": "^3.1.1",
     "eslint": "10.12.0",
