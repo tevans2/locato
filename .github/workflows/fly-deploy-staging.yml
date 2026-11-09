@@ -15,9 +15,12 @@ on:
       - main
   workflow_dispatch:
 
+# Deploys (pushes to staging, manual runs) queue one after another and are never cancelled: a cancelled deploy
+# leaves a failed check behind. PR checks get their own group per PR, so opening a PR can't cancel a deploy;
+# a newer push to the same PR replaces its older check.
 concurrency:
-  group: fly-deploy-staging
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('staging-check-pr-{0}', github.event.pull_request.number) || 'fly-deploy-staging' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   deploy:
@@ -25,34 +28,84 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read # to see earlier staging deploys
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # On a PR to main, staging usually already runs this code (the push to staging deployed it). Wait for any
+      # staging deploy still running, then skip the test/build/deploy if staging already has every game file of
+      # this PR. Promo-only differences don't count: the game's deploys ignore promo/ (except the shared token code).
+      - name: Is staging already up to date?
+        id: current
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW: fly-deploy-staging.yml
+        run: |
+          # 1. let deploys that are still running or queued finish first (never race or cancel them)
+          for i in $(seq 1 60); do
+            busy=$(gh run list -w "$WORKFLOW" -L 30 --json databaseId,event,status \
+              -q '[.[] | select(.event != "pull_request" and .status != "completed")] | .[0].databaseId // empty')
+            [ -z "$busy" ] && break
+            echo "Waiting for staging deploy run $busy to finish…"
+            gh run watch "$busy" --interval 15 > /dev/null 2>&1 || true
+          done
+          # 2. the commit staging runs now: the latest run whose deploy step actually succeeded
+          deployed=""
+          for id in $(gh run list -w "$WORKFLOW" -L 40 --json databaseId,conclusion -q '.[] | select(.conclusion == "success") | .databaseId'); do
+            ok=$(gh run view "$id" --json jobs,headSha \
+              -q 'if ([.jobs[].steps[] | select(.name == "Deploy to Fly (staging)" and .conclusion == "success")] | length) > 0 then .headSha else empty end')
+            if [ -n "$ok" ]; then deployed="$ok"; break; fi
+          done
+          echo "Staging runs: ${deployed:-unknown} · this PR: $HEAD_SHA"
+          if [ -z "$deployed" ] || ! git cat-file -e "$deployed^{commit}" 2>/dev/null || ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+            echo "Can't tell what staging runs; deploying."
+            echo "deploy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # 3. game files that differ between staging and this PR (same filter as the push trigger)
+          changed=$(git diff --name-only "$deployed" "$HEAD_SHA" | grep -vE '^promo/' || true)
+          changed="$changed$(git diff --name-only "$deployed" "$HEAD_SHA" | grep -E '^promo/worker/src/auth\.ts$' || true)"
+          if [ -z "$changed" ]; then
+            echo "Staging already runs this PR's game code; skipping the test, build and deploy."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Game files differ from staging:"; echo "$changed" | head -20
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Scan for secrets before deployment
+        if: steps.current.outputs.deploy != 'false'
         uses: ./.github/actions/secret-scan
 
       - name: Set up Node.js
+        if: steps.current.outputs.deploy != 'false'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.current.outputs.deploy != 'false'
         run: npm ci
 
       - name: Run tests
+        if: steps.current.outputs.deploy != 'false'
         run: npm test
 
       - name: Build frontend
+        if: steps.current.outputs.deploy != 'false'
         run: npm run build
 
       - name: Set up flyctl
+        if: steps.current.outputs.deploy != 'false'
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly (staging)
+        if: steps.current.outputs.deploy != 'false'
         # fly.staging.toml already targets the locato-staging app.
         run: >
           flyctl deploy --remote-only --config fly.staging.toml
