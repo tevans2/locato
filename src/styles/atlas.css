@@ -207,6 +207,7 @@
   background: var(--surface);
   color: var(--text);
   text-align: left;
+  text-decoration: none;
   transition: border-color 150ms ease, transform 180ms var(--shell-ease), box-shadow 180ms ease;
 }
 

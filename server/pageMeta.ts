@@ -1,7 +1,11 @@
 import { GAME_MODE_GROUPS } from "../src/core/gameModes";
+import { ACADEMY_TITLE, ATLAS_TITLE, DAILY_TITLE, MYSTERY_DAILY_TITLE, OVERLAND_DAILY_TITLE, gamePageTitle, LEADERBOARDS_TITLE, MULTIPLAYER_TITLE } from "../src/core/pageTitles";
+import { PROFILE_COUNTRY_COUNT } from "../src/core/countries/profiles";
+import { canonicalPath, countryFor, countryMeta, isIndexable, renderFallbackBody, structuredData } from "./seo";
 
-// Link previews are read by crawlers that don't run the app, so the server fills in the page
-// title, description and URL for the links people actually share: results, dailies and rooms.
+// Link previews and search engines read the shell before the app runs, so the server fills in
+// the page title, description and URL for each route (shared dailies, rooms, games, countries),
+// plus the search parts from ./seo.ts.
 
 export interface PageMeta {
   readonly title: string;
@@ -15,22 +19,34 @@ const DEFAULT_META: PageMeta = {
 
 const DAILY_GAMES: Readonly<Record<string, PageMeta>> = {
   overland: {
-    title: "Locato Overland — today's route",
+    title: OVERLAND_DAILY_TITLE,
     description: "Link two countries by land, border by border. One route a day, the same for everyone. How short can you make it?",
   },
   mystery: {
-    title: "Locato Mystery country — today's mystery",
+    title: MYSTERY_DAILY_TITLE,
     description: "Find today's hidden country from distance clues. Everyone gets the same one. How few guesses do you need?",
   },
 };
 
-function gameLabel(id: string): string | null {
-  for (const group of GAME_MODE_GROUPS) {
-    const mode = group.modes.find((entry) => entry.id === id);
-    if (mode) return mode.label;
-  }
-  return null;
-}
+const VIEW_META: Record<string, PageMeta> = {
+  atlas: {
+    title: ATLAS_TITLE,
+    description: `Browse all ${PROFILE_COUNTRY_COUNT} countries with their flags, capitals, outlines, populations and neighbours, then quiz yourself on them.`,
+  },
+  academy: {
+    title: ACADEMY_TITLE,
+    description: "Short lessons with spaced repetition that teach you the world's flags, capitals and countries, region by region.",
+  },
+  multiplayer: {
+    title: MULTIPLAYER_TITLE,
+    description: "Play live flag, map and capital quizzes against friends. Make a room, share the link, no sign-up needed.",
+  },
+  leaderboards: {
+    title: LEADERBOARDS_TITLE,
+    description: "Top scores for every Locato game: flags, capitals, outlines, map games and more.",
+  },
+};
+VIEW_META.flags = VIEW_META.atlas!;
 
 export function pageMetaFor(url: URL): PageMeta {
   const params = url.searchParams;
@@ -40,14 +56,18 @@ export function pageMetaFor(url: URL): PageMeta {
   }
   if (params.get("view") === "daily-challenge") {
     return {
-      title: "Locato Daily — today's geography challenge",
+      title: DAILY_TITLE,
       description: "Ten rounds of flags, maps, borders and Street View. The same puzzle for everyone today. Can you beat my score?",
     };
   }
+  const country = countryFor(url);
+  if (country) return countryMeta(country);
+  const view = params.get("view");
+  if (view && VIEW_META[view]) return VIEW_META[view]!;
   const game = params.get("game");
   if (game && params.get("daily") === "1" && DAILY_GAMES[game]) return DAILY_GAMES[game]!;
-  const label = game ? gameLabel(game) : null;
-  if (label) return { title: `${label} — Locato`, description: `Play ${label} on Locato, free geography games with a new challenge every day. No sign-up needed.` };
+  const mode = game ? GAME_MODE_GROUPS.flatMap((group) => group.modes).find((entry) => entry.id === game) : undefined;
+  if (mode) return { title: gamePageTitle(mode.label), description: `${mode.blurb} Play ${mode.label} free on Locato, with a new geography challenge every day. No sign-up needed.` };
   return DEFAULT_META;
 }
 
@@ -75,5 +95,10 @@ export function renderPageMeta(html: string, url: URL, origin: string): string {
   out = setContent(out, "property", "og:url", canonical.toString());
   out = setContent(out, "property", "og:image", `${origin}/og-image.png`);
   out = setContent(out, "name", "twitter:image", `${origin}/og-image.png`);
+  // Search: one canonical address per page, private pages kept out, content and links in #app.
+  out = out.replace(/(<link rel="canonical" href=")[^"]*(")/, (_m, start: string, end: string) => `${start}${escapeAttribute(origin + canonicalPath(url))}${end}`);
+  out = setContent(out, "name", "robots", isIndexable(url) ? "index, follow, max-image-preview:large" : "noindex, follow");
+  out = out.replace("</head>", `${structuredData(url, origin)}</head>`);
+  out = out.replace(/(<main id="app"[^>]*>)\s*(<\/main>)/, (_m, start: string, end: string) => `${start}${renderFallbackBody(url, meta)}${end}`);
   return out;
 }
