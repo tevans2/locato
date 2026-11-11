@@ -66,7 +66,7 @@ describe("Country profile screen", () => {
   it("renders the key facts for a known country and sets the document title", () => {
     document.title = "Locato";
     const ui = mount("JP");
-    expect(document.title).toBe("Japan · Locato");
+    expect(document.title).toBe("Japan: flag, capital, map and facts · Locato");
     expect(ui.q("h1").textContent).toBe("Japan");
     expect(ui.q(".cp-kicker").textContent).toContain("Eastern Asia");
     expect(ui.fact("capital")).toContain("Tokyo");
@@ -88,7 +88,7 @@ describe("Country profile screen", () => {
     ui.screen.destroy();
     screens.length = 0;
     // The app sets the next route's title; unmounting no longer restores an older one over it.
-    expect(document.title).toBe("Japan · Locato");
+    expect(document.title).toBe("Japan: flag, capital, map and facts · Locato");
   });
 
   it("shows a friendly not-found state with a working search picker", () => {

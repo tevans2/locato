@@ -132,10 +132,10 @@ describe("shareable game routes", () => {
 describe("route titles", () => {
   it("names every page in the tab title", () => {
     expect(routeTitle({ type: "landing" })).toBe(HOME_TITLE);
-    expect(routeTitle({ type: "solo-game", categoryIds: ["capitals"] })).toBe("Capitals · Locato");
+    expect(routeTitle({ type: "solo-game", categoryIds: ["capitals"] })).toBe("Capitals: free geography quiz · Locato");
     expect(routeTitle({ type: "country-guessing", mode: "name-all", run: "timed" })).toBe("Name all countries · Timed · Locato");
-    expect(routeTitle({ type: "mystery", daily: true })).toBe("Today's mystery · Locato");
+    expect(routeTitle({ type: "mystery", daily: true })).toBe("Locato Mystery country — today's mystery");
     expect(routeTitle({ type: "multiplayer", joinCode: "abcd" })).toBe("Room ABCD · Multiplayer · Locato");
-    expect(routeTitle({ type: "leaderboards" })).toBe("Leaderboards · Locato");
+    expect(routeTitle({ type: "leaderboards" })).toBe("Geography game leaderboards · Locato");
   });
 });

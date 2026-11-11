@@ -29,3 +29,17 @@ export function el<K extends keyof HTMLElementTagNameMap>(tagName: K, options: E
 export function clearNode(node: HTMLElement): void {
   node.replaceChildren();
 }
+
+/**
+ * A real link (so crawlers and "open in new tab" work) that the app handles itself on a plain
+ * click. Modified clicks (cmd, ctrl, shift, middle button) fall through to the browser.
+ */
+export function appLink(href: string, onNavigate: () => void, options: ElementOptions<"a"> = {}): HTMLAnchorElement {
+  const anchor = el("a", { ...options, attrs: { ...options.attrs, href } });
+  anchor.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onNavigate();
+  });
+  return anchor;
+}

@@ -21,6 +21,7 @@ import { createIpCountryRecorder } from "./admin/ipCountryRecorder";
 import { handleAnalyticsEvents } from "./analytics/routes";
 import { clientIp, cloudflareCountry } from "./clientIp";
 import { renderPageMeta } from "./pageMeta";
+import { robotsTxt, sitemapXml } from "./seo";
 import { compressBody, createStaticFiles, etagMatches, NO_CACHE, weakEtag } from "./staticFiles";
 
 interface WebSocketData {
@@ -74,6 +75,8 @@ function safeStaticPath(pathname: string): string | null {
 }
 
 const staticFiles = createStaticFiles(DIST_DIR);
+// Staging sets SEARCH_INDEXING=off so only the real site shows up in search results.
+const searchIndexing = process.env.SEARCH_INDEXING !== "off";
 
 // The app shell, with link-preview tags for the URL being opened (server/pageMeta.ts). Browsers
 // revalidate it on every visit (no-cache) so a deploy shows at once; the ETag makes that a 304.
@@ -83,6 +86,7 @@ function serveIndex(request: Request, url: URL): Response {
   const html = renderPageMeta(shell, url, new URL(baseUrl).origin);
   const etag = weakEtag(html);
   const headers = new Headers({ "content-type": "text/html; charset=utf-8", "cache-control": NO_CACHE, etag, vary: "Accept-Encoding" });
+  if (!searchIndexing) headers.set("x-robots-tag", "noindex, nofollow");
   if (etagMatches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers });
   const { body, encoding } = compressBody(html, request.headers.get("accept-encoding"));
   if (encoding) headers.set("content-encoding", encoding);
@@ -232,6 +236,13 @@ const server = Bun.serve<WebSocketData>({
     const url = new URL(request.url);
     const { method } = request;
 
+    if (url.pathname === "/robots.txt") {
+      const body = searchIndexing ? robotsTxt(new URL(baseUrl).origin) : "User-agent: *\nDisallow: /\n";
+      return new Response(body, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
+    }
+    if (url.pathname === "/sitemap.xml" && searchIndexing) {
+      return new Response(sitemapXml(new URL(baseUrl).origin), { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+    }
     if (url.pathname === "/health") return new Response("ok", { headers: { "content-type": "text/plain; charset=utf-8" } });
     // Banned addresses: before the sockets and API routes below (handleAuthRequest checks again).
     const ipBlocked = ipBanResponse(request, url, authService);

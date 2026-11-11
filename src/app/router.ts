@@ -1,4 +1,5 @@
 import { isFlagPool, type FlagPool } from "../core/flagPools";
+import { ACADEMY_TITLE, ATLAS_TITLE, DAILY_TITLE, MYSTERY_DAILY_TITLE, OVERLAND_DAILY_TITLE, gamePageTitle, LEADERBOARDS_TITLE, MULTIPLAYER_TITLE } from "../core/pageTitles";
 import { gameModeCatalogueEntry, isPromptGameModeId, isWorldMapGameModeId, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
 
 export type AppRoute =
@@ -163,23 +164,23 @@ export const HOME_TITLE = "Locato — A daily geography challenge";
  * a more specific name (a country's profile) refine it once they know it.
  */
 export function routeTitle(route: AppRoute): string {
-  const game = (id: GameModeId) => `${gameModeCatalogueEntry(id).label}${"run" in route && route.run === "timed" ? " · Timed" : ""} · Locato`;
+  const game = (id: GameModeId) => "run" in route && route.run === "timed" ? `${gameModeCatalogueEntry(id).label} · Timed · Locato` : gamePageTitle(gameModeCatalogueEntry(id).label);
   switch (route.type) {
     case "landing": return HOME_TITLE;
     case "solo-game": return game(route.categoryIds?.find(isPromptGameModeId) ?? "flags");
     case "country-guessing": return game(route.mode ?? "name-all");
     case "map-tap": case "streetview-country": case "geoguessr": case "worldsplit": case "flyover": return game(route.type);
-    case "overland": case "mystery": return route.daily ? `Today's ${route.type === "overland" ? "route" : "mystery"} · Locato` : game(route.type);
-    case "daily-challenge": return "Daily challenge · Locato";
+    case "overland": case "mystery": return route.daily ? (route.type === "overland" ? OVERLAND_DAILY_TITLE : MYSTERY_DAILY_TITLE) : game(route.type);
+    case "daily-challenge": return DAILY_TITLE;
     case "daily-practice": return "Daily practice · Locato";
-    case "multiplayer": return route.joinCode ? `Room ${route.joinCode.toUpperCase()} · Multiplayer · Locato` : "Multiplayer · Locato";
+    case "multiplayer": return route.joinCode ? `Room ${route.joinCode.toUpperCase()} · Multiplayer · Locato` : MULTIPLAYER_TITLE;
     case "stats": return "Stats · Locato";
     case "friends": return "Friends · Locato";
-    case "leaderboards": return route.mode ? `${gameModeCatalogueEntry(route.mode).label} leaderboard · Locato` : "Leaderboards · Locato";
-    case "academy": return "Academy · Locato";
+    case "leaderboards": return route.mode ? `${gameModeCatalogueEntry(route.mode).label} leaderboard · Locato` : LEADERBOARDS_TITLE;
+    case "academy": return ACADEMY_TITLE;
     case "academy-lesson": return "Lesson · Academy · Locato";
     case "academy-placement": return "Placement · Academy · Locato";
-    case "atlas": case "flag-gallery": return "Atlas · Locato";
+    case "atlas": case "flag-gallery": return ATLAS_TITLE;
     case "country-profile": return "Country · Locato";
   }
 }

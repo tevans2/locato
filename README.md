@@ -81,7 +81,8 @@ All configuration is via environment variables (none required for basic local pl
 | `DATABASE_PATH` | `./.data/locato.db` | SQLite file location (a Fly volume in deploys). |
 | `SESSION_TTL_DAYS` | `30` | Session lifetime. |
 | `NODE_ENV` | — | `production` marks session cookies `Secure`. |
-| `BASE_URL` | `http://localhost:$PORT` | Public origin; used to build OAuth callback URLs. |
+| `BASE_URL` | `http://localhost:$PORT` | Public origin; used to build OAuth callback URLs, canonical links and the sitemap. |
+| `SEARCH_INDEXING` | on | Set to `off` (staging does) to send noindex on every page and disallow all crawling in robots.txt. |
 | `ALLOWED_ORIGINS` | _(same origin)_ | Comma-separated origin allowlist for the WebSocket upgrade. |
 | `ADMIN_EMAILS` | _(none)_ | Comma-separated emails of accounts that are always admins. Other admins are granted from the console. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | — | Enables GitHub OAuth. |

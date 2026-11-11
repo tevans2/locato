@@ -125,3 +125,20 @@ p { line-height: 1.5; }
 
 /* Headings take focus programmatically after a navigation (App.focusNewScreen); no ring for that. */
 h1[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }
+
+/* Server-rendered page content (server/seo.ts) shown until the app mounts over it. */
+.seo-fallback {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  color: var(--text);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  line-height: 1.55;
+}
+.seo-fallback h1, .seo-fallback h2 { font-family: var(--font-editorial, Georgia, serif); line-height: 1.2; }
+.seo-fallback a { color: var(--brand); }
+.seo-fallback img { max-width: 240px; height: auto; border: 1px solid var(--border); border-radius: 6px; }
+.seo-fallback dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+.seo-fallback dt { color: var(--muted); }
+.seo-fallback dd { margin: 0; }
+.seo-columns { columns: 3 160px; padding-left: 1.2em; }
