@@ -3,6 +3,8 @@ primary_region = "jnb"
 
 [env]
   NODE_ENV = "production"
+  # Keep staging out of search results (robots.txt disallows everything, pages send noindex).
+  SEARCH_INDEXING = "off"
   ROOM_TTL_SECONDS = "7200"
   MAX_PLAYERS_PER_ROOM = "8"
   MAX_ROOMS = "500"

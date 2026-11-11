@@ -24,7 +24,7 @@ import {
   PROFILE_COUNTRY_COUNT,
   type CountryProfile,
 } from "../../core/countries/profiles";
-import { el } from "../dom/createElement";
+import { appLink, el } from "../dom/createElement";
 import { createSiteHeader, markShellScreen, type SiteHeaderHandle } from "../shell";
 import { profileIcon, type ProfileIconName } from "../components/academy/profileIcons";
 import { createProfileSearch, type ProfileSearch } from "../components/academy/profileSearch";
@@ -40,6 +40,7 @@ import {
   standfirst,
   unStatus,
 } from "../components/academy/profileFacts";
+import { countryPageTitle } from "../../core/pageTitles";
 import "../../styles/country-profile.css";
 
 export interface CountryProfileScreenOptions {
@@ -257,7 +258,7 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
     document.title = "Country not found · Locato";
     renderNotFound();
   } else {
-    document.title = `${profile.name} · Locato`;
+    document.title = countryPageTitle(profile.name);
     element.dataset.country = profile.code;
     renderProfile(profile);
 
@@ -302,10 +303,11 @@ export function createCountryProfileScreen(options: CountryProfileScreenOptions)
     );
   }
 
-  function countryChip(p: CountryProfile, extraClass = ""): HTMLButtonElement {
-    return button(`cp-chip${extraClass}`, [flagImage(p, "cp-chip-flag", ""), el("span", { className: "cp-chip-name", text: p.name })], () => options.onOpenCountry(p.code), {
-      "aria-label": `Open ${p.name}`,
-      "data-code": p.code,
+  function countryChip(p: CountryProfile, extraClass = ""): HTMLAnchorElement {
+    return appLink(`?country=${p.code.toLowerCase()}`, () => options.onOpenCountry(p.code), {
+      className: `cp-chip${extraClass}`,
+      attrs: { "aria-label": `Open ${p.name}`, "data-code": p.code },
+      children: [flagImage(p, "cp-chip-flag", ""), el("span", { className: "cp-chip-name", text: p.name })],
     });
   }
 

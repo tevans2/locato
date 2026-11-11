@@ -5,8 +5,9 @@ import { CONTINENTS, type Continent, type CountryIndex } from "../../core/countr
 import { allCountryProfiles, formatArea, formatPopulation, type CountryProfile } from "../../core/countries/profiles";
 import { buildSearchEntries, normalizeSearch, searchCountries } from "../components/academy/profileSearch";
 import { profileIcon } from "../components/academy/profileIcons";
-import { el } from "../dom/createElement";
+import { appLink, el } from "../dom/createElement";
 import { createSitePage, type ShellContext } from "../shell";
+import { ATLAS_TITLE } from "../../core/pageTitles";
 import "../../styles/atlas.css";
 
 /*
@@ -69,7 +70,7 @@ export function filterAtlas(profiles: readonly CountryProfile[], entries: Return
 
 export function createAtlasScreen(options: AtlasScreenOptions): Screen {
   const { shell } = options;
-  document.title = "Atlas · Locato";
+  document.title = ATLAS_TITLE;
   const profiles = allCountryProfiles();
   const entries = buildSearchEntries(profiles, options.countryIndex);
   const state: AtlasState = { ...remembered };
@@ -145,9 +146,12 @@ export function createAtlasScreen(options: AtlasScreenOptions): Screen {
     const pip = el("span", { className: "atlas-pip", attrs: { "data-mastery": "new" } });
     pips.set(p.code, pip);
     const meta = state.sort === "population" ? `${formatPopulation(p.populationMillions)} people` : state.sort === "area" ? formatArea(p.areaKm2) : p.capital;
-    const button = el("button", {
+    const button = appLink(`?country=${p.code.toLowerCase()}`, () => {
+      remembered.scrollTop = page.element.scrollTop;
+      shell.openCountry(p.code);
+    }, {
       className: "atlas-card",
-      attrs: { type: "button", "data-code": p.code, "aria-label": `${p.name}, capital ${p.capital}` },
+      attrs: { "data-code": p.code, "aria-label": `${p.name}, capital ${p.capital}` },
       children: [
         el("span", { className: "atlas-card-flag", children: [el("img", { attrs: { src: p.flagSrc, alt: "", loading: "lazy", decoding: "async", width: "96", height: "64" } })] }),
         el("span", {
@@ -157,10 +161,6 @@ export function createAtlasScreen(options: AtlasScreenOptions): Screen {
         pip,
       ],
     });
-    button.addEventListener("click", () => {
-      remembered.scrollTop = page.element.scrollTop;
-      shell.openCountry(p.code);
-    }, { signal });
     return el("li", { children: [button] });
   }
 

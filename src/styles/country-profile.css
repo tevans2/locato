@@ -441,6 +441,8 @@ svg.cp-feature-shape path { fill: var(--brand); stroke: var(--brand); stroke-wid
 #country-profile .cp-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 #country-profile .cp-chip {
   display: inline-flex;
+  color: inherit;
+  text-decoration: none;
   align-items: center;
   gap: 9px;
   min-height: 38px;

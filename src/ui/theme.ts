@@ -16,8 +16,9 @@ export function currentTheme(): LocatoTheme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
+/** Light by default; dark only once the player has picked it with the toggle. */
 export function initializeTheme(storage?: Storage): LocatoTheme {
-  const theme = storedTheme(storage) ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const theme = storedTheme(storage) ?? "light";
   document.documentElement.dataset.theme = theme;
   return theme;
 }
