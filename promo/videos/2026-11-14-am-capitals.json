@@ -1,0 +1,160 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-14:0",
+  "createdAt": "2026-11-09T07:26:13.304Z",
+  "link": "https://locato.quest/?ref=20261114amcapitals",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "b"
+    },
+    "modes": [
+      "capital"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "Only geography nerds get #5",
+    "badge": "Capitals",
+    "rounds": [
+      {
+        "type": "capital",
+        "code": "NZ",
+        "country": "New Zealand",
+        "answer": "Wellington",
+        "note": "Capital of New Zealand",
+        "seconds": 1.5,
+        "say": "That's Wellington!"
+      },
+      {
+        "type": "capital",
+        "code": "NL",
+        "country": "Netherlands",
+        "answer": "Amsterdam",
+        "note": "Capital of Netherlands",
+        "seconds": 2,
+        "say": "That's Amsterdam!"
+      },
+      {
+        "type": "capital",
+        "code": "ME",
+        "country": "Montenegro",
+        "answer": "Podgorica",
+        "note": "Capital of Montenegro",
+        "seconds": 2.5,
+        "say": "That's Podgorica!"
+      },
+      {
+        "type": "capital",
+        "code": "GN",
+        "country": "Guinea",
+        "answer": "Conakry",
+        "note": "Capital of Guinea",
+        "seconds": 3,
+        "say": "That's Conakry!"
+      },
+      {
+        "type": "capital",
+        "code": "KN",
+        "country": "Saint Kitts and Nevis",
+        "answer": "Basseterre",
+        "note": "Capital of Saint Kitts and Nevis",
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's Basseterre!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Only geography nerds get #5.",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "capitals",
+      "mode": "score",
+      "hook": "b",
+      "hookId": "hook.only-nerds",
+      "hookText": "Only geography nerds get #5",
+      "count": 5,
+      "modes": [
+        "capital",
+        "capital",
+        "capital",
+        "capital",
+        "capital"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/001cdf10a9ddb1-7b27fba0.wav",
+        "duration": 2.854,
+        "text": "Only geography nerds get #5."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/176d35bb5700d6-e87c5285.wav",
+          "duration": 1.287,
+          "text": "That's Wellington!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0a302b06b339f6-259a7053.wav",
+          "duration": 1.468,
+          "text": "That's Amsterdam!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/065415023574d3-c8f60bd0.wav",
+          "duration": 2.016,
+          "text": "That's Podgorica!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/04ea7beed72ae9-fb3bce17.wav",
+          "duration": 1.191,
+          "text": "That's Conakry!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/11252251bc0e18-e81ecff7.wav",
+          "duration": 1.213,
+          "text": "That's Basseterre!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

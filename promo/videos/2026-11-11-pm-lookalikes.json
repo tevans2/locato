@@ -1,0 +1,111 @@
+{
+  "template": "lookalikes",
+  "seed": "2026-11-11:1",
+  "createdAt": "2026-11-09T07:22:44.209Z",
+  "link": "https://locato.quest/?ref=20261111pmlookalikes",
+  "recipe": {
+    "format": "lookalikes",
+    "skill": "flag"
+  },
+  "props": {
+    "title": "Can you tell these flags apart?",
+    "badge": "Look-alikes",
+    "sets": [
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "LV",
+            "name": "Latvia"
+          },
+          {
+            "code": "AT",
+            "name": "Austria"
+          }
+        ],
+        "tip": "Austria is bright red with an equal white stripe; Latvia is a darker carmine with a thinner white stripe."
+      },
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "QA",
+            "name": "Qatar"
+          },
+          {
+            "code": "BH",
+            "name": "Bahrain"
+          }
+        ],
+        "tip": "Qatar is maroon with nine serrated points; Bahrain is red with five."
+      },
+      {
+        "skill": "flag",
+        "items": [
+          {
+            "code": "LU",
+            "name": "Luxembourg"
+          },
+          {
+            "code": "NL",
+            "name": "Netherlands"
+          }
+        ],
+        "tip": "Both red-white-blue. Luxembourg's blue is a light sky blue; the Netherlands' is darker."
+      }
+    ],
+    "secondsPerSet": 4,
+    "outro": {
+      "question": "How many did you get?",
+      "note": "Comment your score 👇",
+      "cta": "Train your eye in the free Academy"
+    },
+    "voiceText": {
+      "hook": "Can you tell these flags apart?",
+      "outro": "How many did you get? Comment your score!",
+      "cta": "Play it free at locato.quest!"
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/14f30ce1ded3ed-00ad4b66.wav",
+        "duration": 1.875,
+        "text": "Can you tell these flags apart?"
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/1a69c362d30253-1624b54d.wav",
+        "duration": 2.501,
+        "text": "How many did you get? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/1b46ca5b90bf75-1cf6b375.wav",
+        "duration": 2.707,
+        "text": "Play it free at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0815c3f1622042-b7f5ef4c.wav",
+          "duration": 1.752,
+          "text": "Latvia. Austria."
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0e9ffa243dea34-23c3eb03.wav",
+          "duration": 2.361,
+          "text": "Qatar. Bahrain."
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0c52d19b7a5b64-4c783370.wav",
+          "duration": 2.223,
+          "text": "Luxembourg. Netherlands."
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-12:1",
+  "createdAt": "2026-11-09T07:23:44.328Z",
+  "link": "https://locato.quest/?ref=20261112pmroute",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "d"
+    },
+    "count": 3,
+    "modes": [
+      "route"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "This starts easy. It doesn't stay easy.",
+    "badge": "Overland",
+    "rounds": [
+      {
+        "type": "route",
+        "from": {
+          "code": "BO",
+          "name": "Bolivia",
+          "c": [
+            963.1,
+            1050.5
+          ]
+        },
+        "to": {
+          "code": "EC",
+          "name": "Ecuador",
+          "c": [
+            841.4,
+            902.8
+          ]
+        },
+        "path": [
+          {
+            "code": "PE",
+            "name": "Peru"
+          }
+        ],
+        "view": [
+          726.3,
+          845.2,
+          1114.4,
+          1140.2
+        ],
+        "answer": "1 country",
+        "note": "Peru",
+        "seconds": 4,
+        "say": "Just 1: Peru!"
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "PL",
+          "name": "Poland",
+          "c": [
+            1636.9,
+            385.6
+          ]
+        },
+        "to": {
+          "code": "AF",
+          "name": "Afghanistan",
+          "c": [
+            2018,
+            560.5
+          ]
+        },
+        "path": [
+          {
+            "code": "RU",
+            "name": "Russia"
+          },
+          {
+            "code": "CN",
+            "name": "China"
+          }
+        ],
+        "view": [
+          1460.2,
+          -93.1,
+          2839,
+          954.7
+        ],
+        "answer": "2 countries",
+        "note": "Russia → China",
+        "seconds": 4,
+        "say": "Just 2: Russia, China!"
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "BA",
+          "name": "Bosnia and Herzegovina",
+          "c": [
+            1631,
+            460.4
+          ]
+        },
+        "to": {
+          "code": "IQ",
+          "name": "Iraq",
+          "c": [
+            1843.3,
+            568.2
+          ]
+        },
+        "path": [
+          {
+            "code": "RS",
+            "name": "Serbia"
+          },
+          {
+            "code": "BG",
+            "name": "Bulgaria"
+          },
+          {
+            "code": "TR",
+            "name": "Turkiye"
+          }
+        ],
+        "view": [
+          1581.6,
+          395.8,
+          1918.9,
+          652.3
+        ],
+        "answer": "3 countries",
+        "note": "Serbia → Bulgaria → Turkiye",
+        "seconds": 4,
+        "boss": true,
+        "say": "Just 3: Serbia, Bulgaria, Turkiye!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 3/3? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "This starts easy. It doesn't stay easy.",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 3 out of 3? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "route",
+      "mode": "score",
+      "hook": "d",
+      "hookId": "hook.starts-easy",
+      "hookText": "This starts easy. It doesn't stay easy.",
+      "count": 3,
+      "modes": [
+        "route",
+        "route",
+        "route"
+      ],
+      "timers": [
+        4,
+        4,
+        4
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/023f875f44ad22-6b90f104.wav",
+        "duration": 2.983,
+        "text": "This starts easy. It doesn't stay easy."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/1a12fddc1d6dc2-10acb361.wav",
+        "duration": 3.793,
+        "text": "Got 3 out of 3? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1b0fd77432c5f6-34dc7ef0.wav",
+          "duration": 1.706,
+          "text": "Just 1: Peru!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0dd191f79f34a7-809ab27a.wav",
+          "duration": 2.249,
+          "text": "Just 2: Russia, China!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1c8151d4d46484-210793d6.wav",
+          "duration": 4.261,
+          "text": "Just 3: Serbia, Bulgaria, Turkiye!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

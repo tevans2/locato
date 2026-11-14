@@ -1,0 +1,160 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-14:1",
+  "createdAt": "2026-11-09T07:26:14.293Z",
+  "link": "https://locato.quest/?ref=20261114pmshapesonelife",
+  "recipe": {
+    "format": "quiz",
+    "modes": [
+      "shape"
+    ],
+    "rules": {
+      "mode": "one-life"
+    }
+  },
+  "props": {
+    "mode": "one-life",
+    "title": "Miss one and you're out",
+    "badge": "Country outlines",
+    "rounds": [
+      {
+        "type": "shape",
+        "code": "CL",
+        "country": "Chile",
+        "answer": "Chile",
+        "note": "South America",
+        "seconds": 1.5,
+        "say": "That's Chile!"
+      },
+      {
+        "type": "shape",
+        "code": "MA",
+        "country": "Morocco",
+        "answer": "Morocco",
+        "note": "Africa",
+        "seconds": 2,
+        "say": "That's Morocco!"
+      },
+      {
+        "type": "shape",
+        "code": "SE",
+        "country": "Sweden",
+        "answer": "Sweden",
+        "note": "Europe",
+        "seconds": 2.5,
+        "say": "That's Sweden!"
+      },
+      {
+        "type": "shape",
+        "code": "TM",
+        "country": "Turkmenistan",
+        "answer": "Turkmenistan",
+        "note": "Asia",
+        "seconds": 3,
+        "say": "That's Turkmenistan!"
+      },
+      {
+        "type": "shape",
+        "code": "SM",
+        "country": "San Marino",
+        "answer": "San Marino",
+        "note": "Europe",
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's San Marino!"
+      }
+    ],
+    "outro": {
+      "question": "Where did you get eliminated?",
+      "note": "Comment your round 👇",
+      "cta": "Made it to the end? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Miss one and you're out.",
+      "outro": "Where did you get eliminated? Comment your round!",
+      "cta": "Made it to the end? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "shapes",
+      "mode": "one-life",
+      "hook": "c",
+      "hookId": "hook.miss-one",
+      "hookText": "Miss one and you're out",
+      "count": 5,
+      "modes": [
+        "shape",
+        "shape",
+        "shape",
+        "shape",
+        "shape"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.one-life",
+        "note": "note.round",
+        "cta": "cta.made-it",
+        "caption": "caption.how-far"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/1919c9132ad9fa-9f3938ae.wav",
+        "duration": 1.522,
+        "text": "Miss one and you're out."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/15f367492e4642-6f91be5e.wav",
+        "duration": 2.646,
+        "text": "Where did you get eliminated? Comment your round!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/03872e53cd6381-af5c08bb.wav",
+        "duration": 3.81,
+        "text": "Made it to the end? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0906e35170428c-a9654277.wav",
+          "duration": 1.164,
+          "text": "That's Chile!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0bba4d81626a0c-55897dc9.wav",
+          "duration": 1.358,
+          "text": "That's Morocco!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1d76b399505a96-62db8ff8.wav",
+          "duration": 1.018,
+          "text": "That's Sweden!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/17985457235a69-56162551.wav",
+          "duration": 1.371,
+          "text": "That's Turkmenistan!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0bcf7b2c1b6ccf-4d76af42.wav",
+          "duration": 1.089,
+          "text": "That's San Marino!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

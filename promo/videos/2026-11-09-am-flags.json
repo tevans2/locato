@@ -1,0 +1,160 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-09:0",
+  "createdAt": "2026-11-09T07:22:38.205Z",
+  "link": "https://locato.quest/?ref=20261109amflags",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "a"
+    },
+    "modes": [
+      "flag"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Flags",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "AR",
+        "country": "Argentina",
+        "answer": "Argentina",
+        "note": "South America",
+        "seconds": 1.5,
+        "say": "That's Argentina!"
+      },
+      {
+        "type": "flag",
+        "code": "NZ",
+        "country": "New Zealand",
+        "answer": "New Zealand",
+        "note": "Oceania",
+        "seconds": 2,
+        "say": "That's New Zealand!"
+      },
+      {
+        "type": "flag",
+        "code": "HR",
+        "country": "Croatia",
+        "answer": "Croatia",
+        "note": "Europe",
+        "seconds": 2.5,
+        "say": "That's Croatia!"
+      },
+      {
+        "type": "flag",
+        "code": "KP",
+        "country": "North Korea",
+        "answer": "North Korea",
+        "note": "Asia",
+        "seconds": 3,
+        "say": "That's North Korea!"
+      },
+      {
+        "type": "flag",
+        "code": "KM",
+        "country": "Comoros",
+        "answer": "Comoros",
+        "note": "Africa",
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's Comoros!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Can you get 5/5?",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "flags",
+      "mode": "score",
+      "hook": "a",
+      "hookId": "hook.can-you-get",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "modes": [
+        "flag",
+        "flag",
+        "flag",
+        "flag",
+        "flag"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/160d7ac23d8c5f-5960bbd9.wav",
+        "duration": 1.925,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0437d59a2578e4-55d094d0.wav",
+          "duration": 1.598,
+          "text": "That's Argentina!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/18dd05c0e60045-8f0cc99f.wav",
+          "duration": 1.353,
+          "text": "That's New Zealand!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0c83a067648de8-973bc568.wav",
+          "duration": 1.304,
+          "text": "That's Croatia!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0732b0e8ce3d08-c9c0e883.wav",
+          "duration": 1.408,
+          "text": "That's North Korea!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1a7c432f2ae40f-d22a5019.wav",
+          "duration": 2.069,
+          "text": "That's Comoros!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

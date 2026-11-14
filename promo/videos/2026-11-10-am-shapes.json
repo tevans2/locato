@@ -1,0 +1,160 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-10:0",
+  "createdAt": "2026-11-09T07:22:41.366Z",
+  "link": "https://locato.quest/?ref=20261110amshapes",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "d"
+    },
+    "modes": [
+      "shape"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "This starts easy. It doesn't stay easy.",
+    "badge": "Country outlines",
+    "rounds": [
+      {
+        "type": "shape",
+        "code": "PE",
+        "country": "Peru",
+        "answer": "Peru",
+        "note": "South America",
+        "seconds": 1.5,
+        "say": "That's Peru!"
+      },
+      {
+        "type": "shape",
+        "code": "VE",
+        "country": "Venezuela",
+        "answer": "Venezuela",
+        "note": "South America",
+        "seconds": 2,
+        "say": "That's Venezuela!"
+      },
+      {
+        "type": "shape",
+        "code": "LA",
+        "country": "Laos",
+        "answer": "Laos",
+        "note": "Asia",
+        "seconds": 2.5,
+        "say": "That's Laos!"
+      },
+      {
+        "type": "shape",
+        "code": "GD",
+        "country": "Grenada",
+        "answer": "Grenada",
+        "note": "North America",
+        "seconds": 3,
+        "say": "That's Grenada!"
+      },
+      {
+        "type": "shape",
+        "code": "AG",
+        "country": "Antigua and Barbuda",
+        "answer": "Antigua and Barbuda",
+        "note": "North America",
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's Antigua and Barbuda!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "This starts easy. It doesn't stay easy.",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "shapes",
+      "mode": "score",
+      "hook": "d",
+      "hookId": "hook.starts-easy",
+      "hookText": "This starts easy. It doesn't stay easy.",
+      "count": 5,
+      "modes": [
+        "shape",
+        "shape",
+        "shape",
+        "shape",
+        "shape"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/023f875f44ad22-6b90f104.wav",
+        "duration": 2.983,
+        "text": "This starts easy. It doesn't stay easy."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/17d34d0c71b81c-3701f41c.wav",
+          "duration": 1.157,
+          "text": "That's Peru!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0c98c0d9d422fd-ef1473f6.wav",
+          "duration": 1.224,
+          "text": "That's Venezuela!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1aaafc1c372480-9e2408fa.wav",
+          "duration": 1.14,
+          "text": "That's Laos!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0e9fa4affa864a-8cd755a4.wav",
+          "duration": 1.869,
+          "text": "That's Grenada!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/115ecc2a5675e0-87d5dbaa.wav",
+          "duration": 3.603,
+          "text": "That's Antigua and Barbuda!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

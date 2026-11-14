@@ -1,0 +1,206 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-12:0",
+  "createdAt": "2026-11-09T07:22:45.170Z",
+  "link": "https://locato.quest/?ref=20261112ammix",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "b"
+    },
+    "modes": "mix"
+  },
+  "props": {
+    "mode": "score",
+    "title": "Only geography nerds get #5",
+    "badge": "Every mode",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "PL",
+        "country": "Poland",
+        "answer": "Poland",
+        "note": "Europe",
+        "seconds": 1.5,
+        "say": "That's Poland!"
+      },
+      {
+        "type": "shape",
+        "code": "TR",
+        "country": "Turkiye",
+        "answer": "Turkiye",
+        "note": "Asia",
+        "seconds": 2,
+        "say": "That's Turkiye!"
+      },
+      {
+        "type": "capital",
+        "code": "ML",
+        "country": "Mali",
+        "answer": "Bamako",
+        "note": "Capital of Mali",
+        "seconds": 2.5,
+        "say": "That's Bamako!"
+      },
+      {
+        "type": "spot",
+        "code": "ST",
+        "country": "Sao Tome and Principe",
+        "answer": "Sao Tome and Principe",
+        "note": "Africa",
+        "view": [
+          1421.9,
+          787.8,
+          1681.9,
+          985.4
+        ],
+        "c": [
+          1551.9,
+          886.5
+        ],
+        "seconds": 4,
+        "say": "That's Sao Tome and Principe!"
+      },
+      {
+        "type": "route",
+        "from": {
+          "code": "LU",
+          "name": "Luxembourg",
+          "c": [
+            1541.2,
+            407.4
+          ]
+        },
+        "to": {
+          "code": "PK",
+          "name": "Pakistan",
+          "c": [
+            2051,
+            598.5
+          ]
+        },
+        "path": [
+          {
+            "code": "DE",
+            "name": "Germany"
+          },
+          {
+            "code": "PL",
+            "name": "Poland"
+          },
+          {
+            "code": "RU",
+            "name": "Russia"
+          },
+          {
+            "code": "CN",
+            "name": "China"
+          }
+        ],
+        "view": [
+          1393.3,
+          -121.4,
+          2846.4,
+          983
+        ],
+        "answer": "4 countries",
+        "note": "Germany → Poland → Russia → China",
+        "seconds": 4,
+        "boss": true,
+        "say": "Just 4: Germany, Poland, Russia, China!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Only geography nerds get #5.",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "mix",
+      "mode": "score",
+      "hook": "b",
+      "hookId": "hook.only-nerds",
+      "hookText": "Only geography nerds get #5",
+      "count": 5,
+      "modes": [
+        "flag",
+        "shape",
+        "capital",
+        "spot",
+        "route"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        4,
+        4
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/001cdf10a9ddb1-7b27fba0.wav",
+        "duration": 2.854,
+        "text": "Only geography nerds get #5."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/13ab6682cd14d0-af4dfbc7.wav",
+          "duration": 1.232,
+          "text": "That's Poland!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0ac5e0377eb9e2-2da70feb.wav",
+          "duration": 3.14,
+          "text": "That's Turkiye!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1f7ed0d72f89df-1be6b9b4.wav",
+          "duration": 2.22,
+          "text": "That's Bamako!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1923e6c08d1419-4d5e84b4.wav",
+          "duration": 3.726,
+          "text": "That's Sao Tome and Principe!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/007385949409be-f7e8094d.wav",
+          "duration": 3.423,
+          "text": "Just 4: Germany, Poland, Russia, China!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

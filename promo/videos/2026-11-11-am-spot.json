@@ -1,0 +1,210 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-11:0",
+  "createdAt": "2026-11-09T07:22:43.252Z",
+  "link": "https://locato.quest/?ref=20261111amspot",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "a"
+    },
+    "modes": [
+      "spot"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "Can you get 5/5?",
+    "badge": "Spot the country",
+    "rounds": [
+      {
+        "type": "spot",
+        "code": "KR",
+        "country": "South Korea",
+        "answer": "South Korea",
+        "note": "Asia",
+        "view": [
+          2367.7,
+          435.9,
+          2627.7,
+          633.5
+        ],
+        "c": [
+          2497.3,
+          534.8
+        ],
+        "seconds": 2.5,
+        "say": "That's South Korea!"
+      },
+      {
+        "type": "spot",
+        "code": "IR",
+        "country": "Iran",
+        "answer": "Iran",
+        "note": "Asia",
+        "view": [
+          1621.9,
+          345.7,
+          2222.7,
+          802.4
+        ],
+        "c": [
+          1927.6,
+          573
+        ],
+        "seconds": 3,
+        "say": "That's Iran!"
+      },
+      {
+        "type": "spot",
+        "code": "EE",
+        "country": "Estonia",
+        "answer": "Estonia",
+        "note": "Europe",
+        "view": [
+          1544.3,
+          227.9,
+          1804.3,
+          425.5
+        ],
+        "c": [
+          1675.3,
+          325.8
+        ],
+        "seconds": 3.5,
+        "say": "That's Estonia!"
+      },
+      {
+        "type": "spot",
+        "code": "BN",
+        "country": "Brunei",
+        "answer": "Brunei",
+        "note": "Asia",
+        "view": [
+          2323.4,
+          746.3,
+          2583.4,
+          943.8
+        ],
+        "c": [
+          2453.8,
+          845.3
+        ],
+        "seconds": 4,
+        "say": "That's Brunei!"
+      },
+      {
+        "type": "spot",
+        "code": "TJ",
+        "country": "Tajikistan",
+        "answer": "Tajikistan",
+        "note": "Asia",
+        "view": [
+          1920.1,
+          412.8,
+          2180.1,
+          610.4
+        ],
+        "c": [
+          2047.8,
+          514.8
+        ],
+        "seconds": 4.5,
+        "boss": true,
+        "say": "That's Tajikistan!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Can you get 5/5?",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "spot",
+      "mode": "score",
+      "hook": "a",
+      "hookId": "hook.can-you-get",
+      "hookText": "Can you get 5/5?",
+      "count": 5,
+      "modes": [
+        "spot",
+        "spot",
+        "spot",
+        "spot",
+        "spot"
+      ],
+      "timers": [
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/160d7ac23d8c5f-5960bbd9.wav",
+        "duration": 1.925,
+        "text": "Can you get 5/5?"
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/17df9973bb8683-4ff2e892.wav",
+          "duration": 1.534,
+          "text": "That's South Korea!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/17565cd7d46f73-6430672a.wav",
+          "duration": 1.163,
+          "text": "That's Iran!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1fee1415d27590-44b9fa91.wav",
+          "duration": 1.196,
+          "text": "That's Estonia!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0e5c2689460bdd-1090f92b.wav",
+          "duration": 1.761,
+          "text": "That's Brunei!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/13a23be8af97f8-cdb1141f.wav",
+          "duration": 1.945,
+          "text": "That's Tajikistan!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

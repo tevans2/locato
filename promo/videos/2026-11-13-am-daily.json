@@ -1,0 +1,134 @@
+{
+  "template": "daily",
+  "seed": "2026-11-13:0",
+  "createdAt": "2026-11-09T07:26:10.048Z",
+  "link": "https://locato.quest/?ref=20261113amdaily",
+  "recipe": {
+    "format": "daily",
+    "date": "2026-11-13"
+  },
+  "props": {
+    "variant": "daily",
+    "title": "Warm up for today's Daily",
+    "badge": "Around the Mediterranean",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "EG",
+        "country": "Egypt",
+        "answer": "Egypt",
+        "note": "Africa",
+        "say": "That's Egypt!"
+      },
+      {
+        "type": "capital",
+        "code": "MA",
+        "country": "Morocco",
+        "answer": "Rabat",
+        "note": "Capital of Morocco",
+        "say": "That's Rabat!"
+      },
+      {
+        "type": "shape",
+        "code": "BA",
+        "country": "Bosnia and Herzegovina",
+        "answer": "Bosnia and Herzegovina",
+        "note": "Europe",
+        "say": "That's Bosnia and Herzegovina!"
+      },
+      {
+        "type": "flag",
+        "code": "TN",
+        "country": "Tunisia",
+        "answer": "Tunisia",
+        "note": "Africa",
+        "say": "That's Tunisia!"
+      },
+      {
+        "type": "capital",
+        "code": "DZ",
+        "country": "Algeria",
+        "answer": "Algiers",
+        "note": "Capital of Algeria",
+        "say": "That's Algiers!"
+      }
+    ],
+    "secondsPerRound": 3,
+    "outro": {
+      "question": "Ready for the real one?",
+      "note": "Comment your score 👇",
+      "cta": "Today's Daily: Around the Mediterranean"
+    },
+    "voiceText": {
+      "hook": "Warm up for today's Daily: Around the Mediterranean!",
+      "outro": "Ready for the real one? Comment your score!",
+      "cta": "Play today's Daily for free at locato.quest!"
+    },
+    "meta": {
+      "format": "daily-warmup",
+      "date": "2026-11-13",
+      "theme": "mediterranean",
+      "hookId": "hook.daily-warmup",
+      "count": 5,
+      "modes": [
+        "flag",
+        "capital",
+        "shape",
+        "flag",
+        "capital"
+      ]
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/072cbbec61cf1d-316a6023.wav",
+        "duration": 2.716,
+        "text": "Warm up for today's Daily: Around the Mediterranean!"
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/027ae5550b307e-014aab03.wav",
+        "duration": 2.478,
+        "text": "Ready for the real one? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/11d379739e164c-0bb5aade.wav",
+        "duration": 4.5,
+        "text": "Play today's Daily for free at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1b1ef62f5b783f-c5c05742.wav",
+          "duration": 1.452,
+          "text": "That's Egypt!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1931776159b39c-f256bf09.wav",
+          "duration": 1.195,
+          "text": "That's Rabat!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1bb5a6d0fcecbd-791c993e.wav",
+          "duration": 3.54,
+          "text": "That's Bosnia and Herzegovina!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/177a76c4a888d5-75db4802.wav",
+          "duration": 1.23,
+          "text": "That's Tunisia!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/075d3f8790932f-67856625.wav",
+          "duration": 1.113,
+          "text": "That's Algiers!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

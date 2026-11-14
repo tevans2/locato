@@ -1,0 +1,160 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-10:1",
+  "createdAt": "2026-11-09T07:22:42.201Z",
+  "link": "https://locato.quest/?ref=20261110pmflagsonelife",
+  "recipe": {
+    "format": "quiz",
+    "modes": [
+      "flag"
+    ],
+    "rules": {
+      "mode": "one-life"
+    }
+  },
+  "props": {
+    "mode": "one-life",
+    "title": "Miss one and you're out",
+    "badge": "Flags",
+    "rounds": [
+      {
+        "type": "flag",
+        "code": "CN",
+        "country": "China",
+        "answer": "China",
+        "note": "Asia",
+        "seconds": 1.5,
+        "say": "That's China!"
+      },
+      {
+        "type": "flag",
+        "code": "SG",
+        "country": "Singapore",
+        "answer": "Singapore",
+        "note": "Asia",
+        "seconds": 2,
+        "say": "That's Singapore!"
+      },
+      {
+        "type": "flag",
+        "code": "TO",
+        "country": "Tonga",
+        "answer": "Tonga",
+        "note": "Oceania",
+        "seconds": 2.5,
+        "say": "That's Tonga!"
+      },
+      {
+        "type": "flag",
+        "code": "PS",
+        "country": "Palestine",
+        "answer": "Palestine",
+        "note": "Asia",
+        "seconds": 3,
+        "say": "That's Palestine!"
+      },
+      {
+        "type": "flag",
+        "code": "FM",
+        "country": "Micronesia",
+        "answer": "Micronesia",
+        "note": "Oceania",
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's Micronesia!"
+      }
+    ],
+    "outro": {
+      "question": "Where did you get eliminated?",
+      "note": "Comment your round 👇",
+      "cta": "Made it to the end? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Miss one and you're out.",
+      "outro": "Where did you get eliminated? Comment your round!",
+      "cta": "Made it to the end? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "flags",
+      "mode": "one-life",
+      "hook": "c",
+      "hookId": "hook.miss-one",
+      "hookText": "Miss one and you're out",
+      "count": 5,
+      "modes": [
+        "flag",
+        "flag",
+        "flag",
+        "flag",
+        "flag"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.one-life",
+        "note": "note.round",
+        "cta": "cta.made-it",
+        "caption": "caption.how-far"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/1919c9132ad9fa-9f3938ae.wav",
+        "duration": 1.522,
+        "text": "Miss one and you're out."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/15f367492e4642-6f91be5e.wav",
+        "duration": 2.646,
+        "text": "Where did you get eliminated? Comment your round!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/03872e53cd6381-af5c08bb.wav",
+        "duration": 3.81,
+        "text": "Made it to the end? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/16277a379436f9-c17557b5.wav",
+          "duration": 1.212,
+          "text": "That's China!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/11bcd23b3515d9-d1a32ed6.wav",
+          "duration": 1.337,
+          "text": "That's Singapore!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0c5ed80ad468e5-1741bf46.wav",
+          "duration": 1.112,
+          "text": "That's Tonga!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/123c0e0e48c312-0450ca49.wav",
+          "duration": 1.683,
+          "text": "That's Palestine!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/10c529be20c510-ca87b9a1.wav",
+          "duration": 1.248,
+          "text": "That's Micronesia!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

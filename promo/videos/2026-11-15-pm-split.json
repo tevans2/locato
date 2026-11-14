@@ -1,0 +1,321 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-15:1",
+  "createdAt": "2026-11-09T07:26:16.366Z",
+  "link": "https://locato.quest/?ref=20261115pmsplit",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "a"
+    },
+    "count": 3,
+    "modes": [
+      "split"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "Can you get 3/3?",
+    "badge": "Worldsplit",
+    "rounds": [
+      {
+        "type": "split",
+        "view": [
+          0,
+          -340,
+          3000,
+          1940
+        ],
+        "a": [
+          1581.4,
+          -340
+        ],
+        "b": [
+          2192.3,
+          1940
+        ],
+        "sideA": {
+          "label": "East",
+          "pop": 4841,
+          "at": [
+            2443.4,
+            800
+          ],
+          "poly": [
+            [
+              1581.4,
+              -340
+            ],
+            [
+              3000,
+              -340
+            ],
+            [
+              3000,
+              1940
+            ],
+            [
+              2192.3,
+              1940
+            ]
+          ]
+        },
+        "sideB": {
+          "label": "West",
+          "pop": 3300,
+          "at": [
+            943.4,
+            800
+          ],
+          "poly": [
+            [
+              0,
+              -340
+            ],
+            [
+              1581.4,
+              -340
+            ],
+            [
+              2192.3,
+              1940
+            ],
+            [
+              0,
+              1940
+            ]
+          ]
+        },
+        "answer": "East: 59%",
+        "note": "59% vs 41% of the world",
+        "seconds": 4,
+        "say": "The east side, with 59 percent!"
+      },
+      {
+        "type": "split",
+        "view": [
+          0,
+          -340,
+          3000,
+          1940
+        ],
+        "a": [
+          150.2,
+          -340
+        ],
+        "b": [
+          3000,
+          1305.3
+        ],
+        "sideA": {
+          "label": "North-east",
+          "pop": 5416,
+          "at": [
+            2050.1,
+            208.4
+          ],
+          "poly": [
+            [
+              150.2,
+              -340
+            ],
+            [
+              3000,
+              -340
+            ],
+            [
+              3000,
+              1305.3
+            ]
+          ]
+        },
+        "sideB": {
+          "label": "South-west",
+          "pop": 2725,
+          "at": [
+            1230,
+            901.1
+          ],
+          "poly": [
+            [
+              0,
+              -340
+            ],
+            [
+              150.2,
+              -340
+            ],
+            [
+              3000,
+              1305.3
+            ],
+            [
+              3000,
+              1940
+            ],
+            [
+              0,
+              1940
+            ]
+          ]
+        },
+        "answer": "North-east: 67%",
+        "note": "67% vs 33% of the world",
+        "seconds": 4,
+        "say": "The north-east side, with 67 percent!"
+      },
+      {
+        "type": "split",
+        "view": [
+          0,
+          -340,
+          3000,
+          1940
+        ],
+        "a": [
+          0,
+          146.5
+        ],
+        "b": [
+          3000,
+          950.3
+        ],
+        "sideA": {
+          "label": "North",
+          "pop": 5160,
+          "at": [
+            1500,
+            104.2
+          ],
+          "poly": [
+            [
+              0,
+              -340
+            ],
+            [
+              3000,
+              -340
+            ],
+            [
+              3000,
+              950.3
+            ],
+            [
+              0,
+              146.5
+            ]
+          ]
+        },
+        "sideB": {
+          "label": "South",
+          "pop": 2981,
+          "at": [
+            1500,
+            1244.2
+          ],
+          "poly": [
+            [
+              3000,
+              950.3
+            ],
+            [
+              3000,
+              1940
+            ],
+            [
+              0,
+              1940
+            ],
+            [
+              0,
+              146.5
+            ]
+          ]
+        },
+        "answer": "North: 63%",
+        "note": "63% vs 37% of the world",
+        "seconds": 4,
+        "boss": true,
+        "say": "The north side, with 63 percent!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 3/3? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Can you get 3/3?",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 3 out of 3? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "split",
+      "mode": "score",
+      "hook": "a",
+      "hookId": "hook.can-you-get",
+      "hookText": "Can you get 3/3?",
+      "count": 3,
+      "modes": [
+        "split",
+        "split",
+        "split"
+      ],
+      "timers": [
+        4,
+        4,
+        4
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/05b654aad3c44e-7e87d6c2.wav",
+        "duration": 2.294,
+        "text": "Can you get 3/3?"
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/1a12fddc1d6dc2-10acb361.wav",
+        "duration": 3.793,
+        "text": "Got 3 out of 3? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1110cd26fd5b9c-8a2ca04b.wav",
+          "duration": 2.327,
+          "text": "The east side, with 59 percent!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/07370ef1bf59aa-917ecb08.wav",
+          "duration": 2.471,
+          "text": "The north-east side, with 67 percent!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/122747e8c999ef-a3cf5684.wav",
+          "duration": 3.239,
+          "text": "The north side, with 63 percent!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}

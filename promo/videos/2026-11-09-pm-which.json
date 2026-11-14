@@ -1,0 +1,182 @@
+{
+  "template": "quiz",
+  "seed": "2026-11-09:1",
+  "createdAt": "2026-11-09T07:22:39.751Z",
+  "link": "https://locato.quest/?ref=20261109pmwhich",
+  "recipe": {
+    "format": "quiz",
+    "copy": {
+      "hook": "b"
+    },
+    "modes": [
+      "which"
+    ]
+  },
+  "props": {
+    "mode": "score",
+    "title": "Only geography nerds get #5",
+    "badge": "Which one is it?",
+    "rounds": [
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "US",
+        "country": "United States",
+        "answer": "United States",
+        "options": [
+          "Liberia",
+          "Malaysia",
+          "United States"
+        ],
+        "seconds": 1.5,
+        "say": "That's United States!"
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "BE",
+        "country": "Belgium",
+        "answer": "Belgium",
+        "options": [
+          "Germany",
+          "Belgium"
+        ],
+        "seconds": 2,
+        "say": "That's Belgium!"
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "IN",
+        "country": "India",
+        "answer": "India",
+        "options": [
+          "Niger",
+          "India"
+        ],
+        "seconds": 2.5,
+        "say": "That's India!"
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "TD",
+        "country": "Chad",
+        "answer": "Chad",
+        "options": [
+          "Chad",
+          "Romania"
+        ],
+        "seconds": 3,
+        "say": "That's Chad!"
+      },
+      {
+        "type": "which",
+        "skill": "flag",
+        "code": "NI",
+        "country": "Nicaragua",
+        "answer": "Nicaragua",
+        "options": [
+          "El Salvador",
+          "Honduras",
+          "Nicaragua"
+        ],
+        "seconds": 3.5,
+        "boss": true,
+        "say": "That's Nicaragua!"
+      }
+    ],
+    "outro": {
+      "question": "What did you score?",
+      "note": "Comment your score 👇",
+      "cta": "Got 5/5? Prove it in the full game."
+    },
+    "voiceText": {
+      "hook": "Only geography nerds get #5.",
+      "outro": "What did you score? Comment your score!",
+      "cta": "Got 5 out of 5? Prove it at locato.quest!"
+    },
+    "meta": {
+      "format": "score-challenge",
+      "kind": "which",
+      "mode": "score",
+      "hook": "b",
+      "hookId": "hook.only-nerds",
+      "hookText": "Only geography nerds get #5",
+      "count": 5,
+      "modes": [
+        "which",
+        "which",
+        "which",
+        "which",
+        "which"
+      ],
+      "timers": [
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "continent": null,
+      "copy": {
+        "question": "question.score",
+        "note": "note.score",
+        "cta": "cta.prove-it",
+        "caption": "caption.legend"
+      }
+    },
+    "voice": {
+      "hook": {
+        "src": "https://media.locato.quest/audio/voice/george/001cdf10a9ddb1-7b27fba0.wav",
+        "duration": 2.854,
+        "text": "Only geography nerds get #5."
+      },
+      "outro": {
+        "src": "https://media.locato.quest/audio/voice/george/08465288cebba7-da8a81be.wav",
+        "duration": 2.51,
+        "text": "What did you score? Comment your score!"
+      },
+      "cta": {
+        "src": "https://media.locato.quest/audio/voice/george/06d8e10e02ef62-a19a0d87.wav",
+        "duration": 5.012,
+        "text": "Got 5 out of 5? Prove it at locato.quest!"
+      },
+      "answers": [
+        {
+          "src": "https://media.locato.quest/audio/voice/george/0dfb15583aae41-4e33179a.wav",
+          "duration": 1.36,
+          "text": "That's United States!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/186752e47cb3d8-11c8c00f.wav",
+          "duration": 1.244,
+          "text": "That's Belgium!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1fd9bb1d5e9304-cb40c751.wav",
+          "duration": 1.065,
+          "text": "That's India!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/1fe7849066cc8a-6a82d02b.wav",
+          "duration": 1.111,
+          "text": "That's Chad!"
+        },
+        {
+          "src": "https://media.locato.quest/audio/voice/george/123bf4b7928e98-69b504e0.wav",
+          "duration": 1.337,
+          "text": "That's Nicaragua!"
+        }
+      ]
+    }
+  },
+  "voiceSettings": {
+    "engine": "chatterbox",
+    "voice": "bm_george",
+    "intensity": "hype",
+    "exaggeration": 1.3,
+    "cfg": 0.3,
+    "library": "george"
+  }
+}
