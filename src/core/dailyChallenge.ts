@@ -4,7 +4,8 @@ import { fameTier, type FameTier } from "./countries/fame";
 import { dailyThemeForDate, type DailyTheme } from "./dailyThemes";
 import { createSeededRandom, shuffle } from "./game";
 import { MAP_TAP_LOCATIONS } from "./maptap/locations";
-import { streetViewCountryRounds } from "./streetview";
+import { streetViewCountryRounds, streetViewRoundForReplay, type StreetViewCountryRound } from "./streetview";
+import { dailyStreetViewRound } from "./streetview/dailyRotation";
 import { createThemedOverlandRoute, overlandRouteBetween, type OverlandRound, type OverlandRoute } from "./overland";
 
 export const DAILY_PROMPT_COUNTRY_COUNT = 8;
@@ -65,8 +66,10 @@ export function parseDailyRoundResults(value: unknown): readonly DailyRoundResul
       if (typeof r.targetId !== "string" || !MAP_TAP_LOCATIONS.some((location) => location.id === r.targetId) ||
         (r.distanceKm !== undefined && (!Number.isFinite(r.distanceKm) || r.distanceKm < 0 || r.distanceKm > 21_000))) return null;
     } else if (typeof r.countryCode !== "string" || !/^[A-Z]{2}$/.test(r.countryCode)) return null;
+    if (r.categoryId === "streetview-country" && r.targetId !== undefined &&
+      (typeof r.targetId !== "string" || r.targetId.length > 80 || !streetViewRoundForReplay(r.countryCode!, r.targetId))) return null;
     results.push({ categoryId: r.categoryId, points: r.points, hintsUsed: r.hintsUsed, wrongGuesses: r.wrongGuesses, missed: r.missed,
-      ...(r.categoryId === "map-tap" ? { targetId: r.targetId!, ...(r.distanceKm !== undefined ? { distanceKm: r.distanceKm } : {}) } : { countryCode: r.countryCode! }) });
+      ...(r.categoryId === "map-tap" ? { targetId: r.targetId!, ...(r.distanceKm !== undefined ? { distanceKm: r.distanceKm } : {}) } : { countryCode: r.countryCode!, ...(r.categoryId === "streetview-country" && r.targetId ? { targetId: r.targetId } : {}) }) });
   }
   return results;
 }
@@ -80,6 +83,8 @@ export interface DailyChallenge {
   readonly countryIds: readonly CountryId[];
   readonly mapTapTargetId: string;
   readonly streetViewCountryCode: string;
+  readonly streetViewRound?: StreetViewCountryRound;
+  readonly streetViewRotation?: true;
   readonly promptSlots?: readonly PromptSlot[];
   readonly theme?: DailyTheme;
   /** Round 8: link two of the theme's countries by land. Absent on dailies started before it. */
@@ -102,7 +107,7 @@ export function createLegacyDailyChallenge(index: CountryIndex, date: string): D
   const mapTapTargetId = shuffle(MAP_TAP_LOCATIONS, createSeededRandom(`${seed}:maptap`))[0]?.id ?? "";
   const eligibleStreetViewRounds = streetViewCountryRounds.filter((round) => index.byCode.has(round.countryCode));
   const streetViewSource = eligibleStreetViewRounds.length > 0 ? eligibleStreetViewRounds : streetViewCountryRounds;
-  const streetViewCountryCode = shuffle(streetViewSource, createSeededRandom(`${seed}:streetview`))[0]?.countryCode ?? "";
+  const streetRound = shuffle(streetViewSource, createSeededRandom(`${seed}:streetview`))[0];
 
   return {
     date,
@@ -110,12 +115,14 @@ export function createLegacyDailyChallenge(index: CountryIndex, date: string): D
     categoryIds: DAILY_CATEGORY_IDS,
     countryIds,
     mapTapTargetId,
-    streetViewCountryCode,
+    streetViewCountryCode: streetRound?.countryCode ?? "",
+    ...(streetRound ? { streetViewRound: streetRound } : {}),
   };
 }
 
-export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate()): DailyChallenge {
-  return buildThemedDailyChallenge(index, date, true, `daily:${date}`, true);
+export function createDailyChallenge(index: CountryIndex, date = getLocalDailyDate(), options: { readonly legacyStreetView?: boolean } = {}): DailyChallenge {
+  const rotation = options.legacyStreetView ? undefined : dailyStreetViewRound(date);
+  return buildThemedDailyChallenge(index, date, true, `daily:${date}`, true, rotation);
 }
 
 /** Preserve the questions of attempts started before every round followed its theme. */
@@ -129,11 +136,11 @@ export function createDailyChallengeWithoutOverland(index: CountryIndex, date: s
 }
 
 /** Server callers supply a private seed; the public date must not reveal the ranked queue. */
-export function createServerDailyChallenge(index: CountryIndex, date: string, seed: string): DailyChallenge {
-  return buildThemedDailyChallenge(index, date, true, seed);
+export function createServerDailyChallenge(index: CountryIndex, date: string, seed: string, streetViewSeed?: string): DailyChallenge {
+  return buildThemedDailyChallenge(index, date, true, seed, false, dailyStreetViewRound(date, streetViewSeed ?? seed));
 }
 
-function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`, withOverland = false): DailyChallenge {
+function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScoped: boolean, seed = `daily:${date}`, withOverland = false, rotation?: StreetViewCountryRound): DailyChallenge {
   const theme = dailyThemeForDate(date);
   // With an Overland round 8, the prompt stage keeps the first seven rounds.
   const categories = ["flags", "flags", "capitals", "capitals", "shapes", "shapes", "pick-country", "spot-country"].slice(0, withOverland ? 7 : 8);
@@ -161,9 +168,12 @@ function buildThemedDailyChallenge(index: CountryIndex, date: string, themeScope
   const streetSource = mediumStreetRounds.length ? mediumStreetRounds : themedStreetRounds.length ? themedStreetRounds
     : themeScoped ? streetViewCountryRounds.filter((round) => theme.countryCodes.includes(round.countryCode))
     : streetRounds.length ? streetRounds : streetViewCountryRounds;
-  const streetViewCountryCode = shuffle(streetSource, createSeededRandom(`${seed}:streetview`))[0]?.countryCode ?? "";
+  const useRotation = rotation !== undefined && index.byCode.has(rotation.countryCode);
+  const streetRound = useRotation ? rotation : shuffle(streetSource, createSeededRandom(`${seed}:streetview`))[0];
+  const streetViewCountryCode = streetRound?.countryCode ?? "";
   return { date, seed, categoryIds: DAILY_CATEGORY_IDS, countryIds: promptSlots.map((slot) => slot.countryId), promptSlots, theme, challengeVersion: 2,
-    ...(themeScoped ? { themeScoped: true } : {}), mapTapTargetId, streetViewCountryCode,
+    ...(themeScoped ? { themeScoped: true } : {}), mapTapTargetId, streetViewCountryCode, ...(streetRound ? { streetViewRound: streetRound } : {}),
+    ...(useRotation ? { streetViewRotation: true } : {}),
     ...(withOverland ? { overlandRoute: createThemedOverlandRoute(theme.countryCodes, seed) } : {}) };
 }
 

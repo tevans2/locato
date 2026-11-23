@@ -12,7 +12,7 @@ import { MAP_TAP_LOCATIONS } from "../../src/core/maptap/locations";
 import { isValidLatLng, scoreMapTapGuess } from "../../src/core/maptap/distance";
 import type { MapTapLocation } from "../../src/core/maptap/types";
 import { createGeoGuessrQueue, scoreGeoGuessrGuess, type GeoGuessrLocation } from "../../src/core/geoguessr";
-import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
+import { selectStreetViewRounds, streetViewCatalog, streetViewRoundId, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
 import { buildWorldSplitCountries, scoreWorldSplit, splitLineLength, WORLD_SPLIT_ROUNDS, type WorldSplitRound } from "../../src/core/worldsplit";
 import { MYSTERY_MAX_GUESSES, createMysteryRound, createMysteryTargets, guessMystery, hintMystery, mysteryRoundPoints, revealMystery, type MysteryGuess, type MysteryGuessError, type MysteryRound } from "../../src/core/mystery";
 import { OVERLAND_HINT_LABELS, OVERLAND_VERDICTS, createOverlandRound, createOverlandRoutes, guessOverland, hintOverland, overlandGraph, overlandRoundPoints, revealOverland, type OverlandGuess, type OverlandGuessError, type OverlandRound, type OverlandRoute } from "../../src/core/overland";
@@ -93,7 +93,7 @@ export interface RankedGamesOptions {
   readonly clock?: () => number;
   readonly countries?: CountryIndex;
   readonly world?: readonly WorldCountryFeature[];
-  readonly streetRounds?: () => Promise<readonly StreetViewCountryRound[]>;
+  readonly streetRounds?: (userId: string) => Promise<readonly StreetViewCountryRound[]>;
   /** Resolve on the server so the client cannot replace the scoring origin with a snapped coordinate. */
   readonly resolvePanorama?: (frame: StreetViewFrame) => Promise<{ readonly panoId: string; readonly lat: number; readonly lng: number }>;
   readonly challengeSecret?: string;
@@ -164,17 +164,18 @@ export class RankedGames {
     } else if (mode === "overland") {
       queue.push(...createOverlandRoutes(seed).map((route) => ({ mode, route })));
     } else if (mode === "geoguessr" || mode === "streetview-country") {
-      const rounds = this.options.streetRounds ? await this.options.streetRounds() : streetViewCountryRounds;
+      const rounds = this.options.streetRounds ? await this.options.streetRounds(userId) : selectStreetViewRounds(streetViewCatalog, 5, { random: rng });
       if (mode === "geoguessr") queue.push(...createGeoGuessrQueue(seed, 5, rounds).map((geo) => ({ mode, geo })));
       else queue.push(...shuffle(rounds, rng).slice(0, 5).map((street) => ({ mode, street })));
     } else if (mode === "daily") {
-      const daily = createServerDailyChallenge(this.countries, variant, seed);
+      const daily = createServerDailyChallenge(this.countries, variant, seed, this.dailySecret);
       for (const slot of daily.promptSlots!) {
         const country = this.countries.byId[slot.countryId]!;
         queue.push({ mode: slot.categoryId === "pick-country" ? "click-country" : slot.categoryId, country, mapCountry: this.map.find((c) => c.code === country.code)! });
       }
       queue.push({ mode: "map-tap", location: MAP_TAP_LOCATIONS.find((l) => l.id === daily.mapTapTargetId)! });
-      queue.push({ mode: "streetview-country", street: streetViewCountryRounds.find((r) => r.countryCode === daily.streetViewCountryCode)! });
+      if (!daily.streetViewRound) return { error: "Street View is unavailable. Please try again later." };
+      queue.push({ mode: "streetview-country", street: daily.streetViewRound });
     } else if (mode !== "flyover") return { error: "Invalid ranked game." };
     if (mode !== "flyover" && queue.length === 0) return { error: "No challenges are available." };
     if (mode === "daily") {
@@ -231,7 +232,9 @@ export class RankedGames {
         if (run.mode === "daily") {
           const current = run.queue[run.index]!;
           run.rounds.push({ categoryId: current.mode === "click-country" ? "pick-country" : current.mode, points: result.points, hintsUsed: 0, wrongGuesses: run.wrong, missed: result.points === 0,
-            ...(current.location ? { targetId: current.location.id } : { countryCode: current.country?.code ?? current.street!.countryCode }) });
+            ...(current.location ? { targetId: current.location.id }
+              : current.street ? { countryCode: current.street.countryCode, targetId: streetViewRoundId(current.street) }
+              : { countryCode: current.country!.code }) });
         }
         run.score += result.points;
         run.marks.push(result.points > 0 ? "correct" : "miss");

@@ -2,7 +2,11 @@ import type { Country, CountryId, CountryIndex } from "../../core/countries";
 import type { ShellContext } from "../shell/types";
 import type { GameModeId } from "../../core/gameModes";
 import { STREET_VIEW_ATTEMPT_COUNTRIES, STREET_VIEW_POINTS_BY_GUESS, streetViewCountryPoints } from "../../core/leaderboards";
-import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../core/streetview";
+import {
+  mergeStreetViewRounds, rememberStreetViewRounds, selectStreetViewRounds, streetViewCatalog,
+  type StreetViewCountryRound, type StreetViewFrame,
+} from "../../core/streetview";
+import { readStreetViewHistory, saveStreetViewHistory } from "../../storage/streetViewHistory";
 import { submitCountryGuess } from "../../core/map";
 import type { Screen } from "../../app/router";
 import { el } from "../dom/createElement";
@@ -61,7 +65,7 @@ interface RunRound {
 type RoundStatus = "playing" | "won" | "lost";
 type DailyStreetViewResult = { readonly missed: boolean; readonly wrongGuesses: number };
 
-const ROUND_CACHE_TARGET_SIZE = 1;
+const ONLINE_CANDIDATE_COUNT = 5;
 const STREETVIEW_PRELOAD_SLOT_COUNT = 1;
 const STREETVIEW_VISUAL_WARMUP_MS = 150;
 const STREETVIEW_LOAD_TIMEOUT_MS = 1800;
@@ -77,22 +81,6 @@ interface StreetViewPreloadSlot {
 
 function googleMapsEmbedApiKey(): string {
   return import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
-}
-
-function eligibleRounds(countryIndex: CountryIndex): readonly StreetViewCountryRound[] {
-  return streetViewCountryRounds.filter((round) => round.frames.length === 3 && countryIndex.byCode.has(round.countryCode));
-}
-
-let lastStreetViewCountryCode: string | null = null;
-
-function chooseRound(countryIndex: CountryIndex): StreetViewCountryRound {
-  const rounds = eligibleRounds(countryIndex);
-  if (rounds.length === 0) throw new Error("No Street View country rounds match the country index.");
-
-  const availableRounds = rounds.length > 1 ? rounds.filter((item) => item.countryCode !== lastStreetViewCountryCode) : rounds;
-  const selected = availableRounds[Math.floor(Math.random() * availableRounds.length)]!;
-  lastStreetViewCountryCode = selected.countryCode;
-  return selected;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -202,11 +190,15 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
   const runLength = scored ? STREET_VIEW_ATTEMPT_COUNTRIES : STREETVIEW_RUN_LENGTH;
   const maxAttempts = 3;
   const guessedCountryIds = new Set<CountryId>();
-  const roundCache: StreetViewCountryRound[] = [];
+  const roundStorage = options.storage ?? shell.storage ?? null;
+  const catalog = streetViewCatalog.filter(({ countryCode }) => options.countryIndex.byCode.has(countryCode));
+  let roundHistory = readStreetViewHistory(roundStorage);
+  let nextRound: StreetViewCountryRound | null = null;
   let status: RoundStatus = "playing";
   let attemptIndex = 0;
   const privateRound = (): StreetViewCountryRound => ({ countryCode: "", frames: Array.from({ length: 3 }, (_, i) => ({ lat: 0, lng: 0, heading: 0, label: `Frame ${i + 1}` })) });
-  let round = options.ranked ? privateRound() : options.dailyChallenge?.round ?? chooseRound(options.countryIndex);
+  let round = options.ranked ? privateRound() : options.dailyChallenge?.round ?? chooseRound();
+  if (!options.ranked && !isDailyChallenge) rememberRound(round);
   let pendingDailyResult: DailyStreetViewResult | null = null;
   let dailyCompleted = false;
   let loadingRound = false;
@@ -457,15 +449,11 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
       }
     }
 
-    const nextCachedRound = roundCache[0];
+    const nextCachedRound = nextRound;
     if (nextCachedRound) {
       for (let nextAttemptIndex = 0; nextAttemptIndex < maxAttempts; nextAttemptIndex += 1) {
         addUrl(services.embedUrl(apiKey, nextCachedRound, nextAttemptIndex));
       }
-    }
-
-    for (const cachedRound of roundCache.slice(1)) {
-      addUrl(services.embedUrl(apiKey, cachedRound, 0));
     }
 
     return urls.slice(0, STREETVIEW_PRELOAD_SLOT_COUNT);
@@ -628,47 +616,38 @@ export function createStreetViewCountryScreen(options: StreetViewCountryScreenOp
     input.focus();
   }
 
-  async function fillRoundCache(): Promise<void> {
-    if (options.ranked) return;
-    if (isDailyChallenge || !apiKey || controller.signal.aborted) return;
-    if (cachePromise) return cachePromise;
+  function chooseRound(online: readonly StreetViewCountryRound[] = []): StreetViewCountryRound {
+    const candidates = online.length ? mergeStreetViewRounds([...catalog, ...online]) : catalog;
+    const selected = selectStreetViewRounds(candidates, 1, {
+      history: roundHistory, preferredCountries: new Set(online.map(({ countryCode }) => countryCode)),
+    })[0];
+    if (!selected) throw new Error("No Street View country rounds match the country index.");
+    return selected;
+  }
 
-    const needed = ROUND_CACHE_TARGET_SIZE - roundCache.length;
-    if (needed <= 0) {
-      preloadUpcomingStreetViewFrames();
-      return;
-    }
-
-    cachePromise = services.fetchRounds(options.countryIndex, needed, controller.signal)
-      .then((rounds) => {
-        for (const candidate of rounds) {
-          if (roundCache.length >= ROUND_CACHE_TARGET_SIZE) break;
-          roundCache.push(candidate);
-        }
-        preloadUpcomingStreetViewFrames();
-      })
-      .finally(() => {
-        cachePromise = null;
-      });
-
-    return cachePromise;
+  function rememberRound(selected: StreetViewCountryRound): void {
+    roundHistory = rememberStreetViewRounds(roundHistory, [selected]);
+    saveStreetViewHistory(roundStorage, roundHistory);
   }
 
   function warmRoundCache(): void {
-    if (!isDailyChallenge) void fillRoundCache();
-  }
-
-  function takeCachedRound(): StreetViewCountryRound | null {
-    const cached = roundCache.shift() ?? null;
-    warmRoundCache();
-    return cached;
+    if (options.ranked || isDailyChallenge || !apiKey || controller.signal.aborted || cachePromise || nextRound) return;
+    cachePromise = services.fetchRounds(options.countryIndex, ONLINE_CANDIDATE_COUNT, controller.signal)
+      .catch(() => [])
+      .then((rounds) => {
+        if (controller.signal.aborted) return;
+        nextRound = chooseRound(rounds);
+        preloadUpcomingStreetViewFrames();
+      })
+      .finally(() => { cachePromise = null; });
   }
 
   function startNextRound(message = "Next country loaded.", tone: "neutral" | "good" | "bad" = "neutral"): void {
     if (options.ranked) { round = privateRound(); resetCurrentCountry(message, tone); return; }
-    const cachedRound = takeCachedRound();
-    round = cachedRound ?? chooseRound(options.countryIndex);
-    lastStreetViewCountryCode = round.countryCode;
+    round = nextRound ?? chooseRound();
+    nextRound = null;
+    rememberRound(round);
+    warmRoundCache();
     resetCurrentCountry(message, tone);
   }
 

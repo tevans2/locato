@@ -1,6 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../../src/core/streetview";
+import {
+  emptyStreetViewHistory, mergeStreetViewRounds, rememberStreetViewRounds, selectStreetViewRounds, streetViewCatalog,
+  type StreetViewCountryRound, type StreetViewFrame, type StreetViewHistory,
+} from "../../src/core/streetview";
 
 interface StreetViewMetadataResponse {
   readonly status?: string;
@@ -37,6 +40,7 @@ export interface StreetViewLocationPoolOptions {
   readonly dailyGenerateCount?: number;
   readonly refreshHours?: number;
   readonly metadataRadiusMeters?: number;
+  readonly containsLocation?: (countryCode: string, lat: number, lng: number) => boolean;
 }
 
 export interface StreetViewLocationPoolStats {
@@ -54,20 +58,9 @@ const DEFAULT_DAILY_GENERATE_COUNT = 50;
 const DEFAULT_REFRESH_HOURS = 24;
 const DEFAULT_METADATA_RADIUS_METERS = 1000;
 const EARTH_KM_PER_LATITUDE_DEGREE = 111;
-const MAX_ROUNDS_PER_BATCH = 10;
+const MAX_ROUNDS_PER_BATCH = 20;
 
-const fallbackFrames = streetViewCountryRounds.flatMap((round) => round.frames.map((frame) => ({ countryCode: round.countryCode, frame })));
-
-function shuffle<T>(items: readonly T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const current = copy[i]!;
-    copy[i] = copy[j]!;
-    copy[j] = current;
-  }
-  return copy;
-}
+const fallbackFrames = streetViewCatalog.flatMap((round) => round.frames.map((frame) => ({ countryCode: round.countryCode, frame })));
 
 function randomHeading(): number {
   return Math.floor(Math.random() * 360);
@@ -103,18 +96,6 @@ function toFrame(entry: StreetViewPoolEntry): StreetViewFrame {
   };
 }
 
-function fallbackRoundForCountry(countryCode: string): StreetViewCountryRound | null {
-  return streetViewCountryRounds.find((round) => round.countryCode === countryCode && round.frames.length >= 3) ?? null;
-}
-
-function chooseFallbackRound(lastCountryCode: string | null): StreetViewCountryRound {
-  const rounds = streetViewCountryRounds.filter((round) => round.frames.length >= 3);
-  const available = rounds.length > 1 && lastCountryCode ? rounds.filter((round) => round.countryCode !== lastCountryCode) : rounds;
-  const round = available[Math.floor(Math.random() * available.length)] ?? rounds[0];
-  if (!round) throw new Error("No fallback Street View country rounds are available.");
-  return { countryCode: round.countryCode, frames: shuffle(round.frames).slice(0, 3) };
-}
-
 function emptyPool(): StreetViewPoolFile {
   return { version: 1, lastGeneratedAt: null, entries: [] };
 }
@@ -127,7 +108,8 @@ export class StreetViewLocationPool {
   private readonly refreshHours: number;
   private readonly metadataRadiusMeters: number;
   private generationPromise: Promise<StreetViewPoolFile> | null = null;
-  private lastCountryCode: string | null = null;
+  private readonly playerHistory = new Map<string, StreetViewHistory>();
+  private readonly containsLocation: NonNullable<StreetViewLocationPoolOptions["containsLocation"]>;
 
   constructor(options: StreetViewLocationPoolOptions) {
     this.storagePath = options.storagePath;
@@ -136,6 +118,7 @@ export class StreetViewLocationPool {
     this.dailyGenerateCount = options.dailyGenerateCount ?? DEFAULT_DAILY_GENERATE_COUNT;
     this.refreshHours = options.refreshHours ?? DEFAULT_REFRESH_HOURS;
     this.metadataRadiusMeters = options.metadataRadiusMeters ?? DEFAULT_METADATA_RADIUS_METERS;
+    this.containsLocation = options.containsLocation ?? (() => true);
   }
 
   async stats(): Promise<StreetViewLocationPoolStats> {
@@ -152,38 +135,27 @@ export class StreetViewLocationPool {
   }
 
   async createRound(): Promise<StreetViewCountryRound> {
-    const pool = await this.loadPool();
-    this.refreshInBackgroundIfNeeded(pool);
-    return this.createRoundFromPool(pool);
+    return (await this.createRounds(1))[0]!;
   }
 
-  async createRounds(count: number): Promise<StreetViewCountryRound[]> {
+  async createRounds(count: number, playerId?: string): Promise<StreetViewCountryRound[]> {
     const requestedCount = Number.isFinite(count) ? Math.trunc(count) : 1;
     const safeCount = Math.min(Math.max(requestedCount, 1), MAX_ROUNDS_PER_BATCH);
     const pool = await this.loadPool();
     this.refreshInBackgroundIfNeeded(pool);
-    return Array.from({ length: safeCount }, () => this.createRoundFromPool(pool));
+    const history = (playerId ? this.playerHistory.get(playerId) : undefined) ?? emptyStreetViewHistory;
+    const generated = pool.entries.map((entry) => ({ countryCode: entry.countryCode, frames: [toFrame(entry)] }));
+    const rounds = selectStreetViewRounds(mergeStreetViewRounds([...streetViewCatalog, ...generated]), safeCount, { history });
+    if (playerId) {
+      this.playerHistory.delete(playerId);
+      this.playerHistory.set(playerId, rememberStreetViewRounds(history, rounds));
+      if (this.playerHistory.size > 500) this.playerHistory.delete(this.playerHistory.keys().next().value!);
+    }
+    return rounds;
   }
 
   warm(): void {
     void this.loadPool().then((pool) => this.refreshInBackgroundIfNeeded(pool));
-  }
-
-  private createRoundFromPool(pool: StreetViewPoolFile): StreetViewCountryRound {
-    const countries = shuffle([...new Set(pool.entries.map((entry) => entry.countryCode))]);
-    const availableCountries = this.lastCountryCode && countries.length > 1 ? countries.filter((countryCode) => countryCode !== this.lastCountryCode) : countries;
-
-    for (const countryCode of availableCountries) {
-      const round = this.createRoundForCountry(countryCode, pool.entries);
-      if (round) {
-        this.lastCountryCode = countryCode;
-        return round;
-      }
-    }
-
-    const fallback = chooseFallbackRound(this.lastCountryCode);
-    this.lastCountryCode = fallback.countryCode;
-    return fallback;
   }
 
   private refreshInBackgroundIfNeeded(pool: StreetViewPoolFile): void {
@@ -200,7 +172,6 @@ export class StreetViewLocationPool {
   }
 
   private shouldRefresh(pool: StreetViewPoolFile): boolean {
-    if (pool.entries.length === 0) return true;
     if (!pool.lastGeneratedAt) return true;
     const last = Date.parse(pool.lastGeneratedAt);
     if (!Number.isFinite(last)) return true;
@@ -209,25 +180,17 @@ export class StreetViewLocationPool {
 
   private async generateAndSave(pool: StreetViewPoolFile): Promise<StreetViewPoolFile> {
     const generated = await this.generateBatch(pool.entries);
-    const existingKeys = new Set<string>();
-    const merged: StreetViewPoolEntry[] = [];
-
-    for (const entry of [...generated, ...pool.entries]) {
-      const key = duplicateKey(entry.countryCode, entry.lat, entry.lng);
-      if (existingKeys.has(key)) continue;
-      existingKeys.add(key);
-      merged.push(entry);
-      if (merged.length >= this.maxEntries) break;
-    }
-
-    const updated: StreetViewPoolFile = { version: 1, lastGeneratedAt: new Date().toISOString(), entries: merged };
+    const entries = uniqueEntries([...generated, ...pool.entries]).slice(0, this.maxEntries);
+    const updated: StreetViewPoolFile = { version: 1, lastGeneratedAt: new Date().toISOString(), entries };
     await this.savePool(updated);
     return updated;
   }
 
   private async generateBatch(existingEntries: readonly StreetViewPoolEntry[]): Promise<StreetViewPoolEntry[]> {
     const generated: StreetViewPoolEntry[] = [];
-    const seen = new Set(existingEntries.map((entry) => duplicateKey(entry.countryCode, entry.lat, entry.lng)));
+    const seen = new Set([...fallbackFrames.map(({ countryCode, frame }) => duplicateKey(countryCode, frame.lat, frame.lng)),
+      ...existingEntries.map((entry) => duplicateKey(entry.countryCode, entry.lat, entry.lng))]);
+    const panoramaIds = new Set(existingEntries.map((entry) => entry.panoId));
     const maxAttempts = Math.max(this.dailyGenerateCount * 8, 80);
 
     for (let attempt = 0; attempt < maxAttempts && generated.length < this.dailyGenerateCount; attempt += 1) {
@@ -235,12 +198,13 @@ export class StreetViewLocationPool {
       if (!seed) break;
       const candidate = jitterAround(seed.frame);
       const key = duplicateKey(seed.countryCode, candidate.lat, candidate.lng);
-      if (seen.has(key)) continue;
+      if (seen.has(key) || !this.containsLocation(seed.countryCode, candidate.lat, candidate.lng)) continue;
       const entry = await this.validateCandidate(seed.countryCode, candidate.lat, candidate.lng);
       if (!entry) continue;
       const validatedKey = duplicateKey(entry.countryCode, entry.lat, entry.lng);
-      if (seen.has(validatedKey)) continue;
+      if (seen.has(validatedKey) || (entry.panoId && panoramaIds.has(entry.panoId))) continue;
       seen.add(validatedKey);
+      panoramaIds.add(entry.panoId);
       generated.push(entry);
     }
 
@@ -256,12 +220,12 @@ export class StreetViewLocationPool {
     });
 
     try {
-      const response = await fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?${params.toString()}`);
+      const response = await fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?${params.toString()}`, { signal: AbortSignal.timeout(10_000) });
       if (!response.ok) return null;
       const data = (await response.json()) as StreetViewMetadataResponse;
       const resolvedLat = data.location?.lat;
       const resolvedLng = data.location?.lng;
-      if (data.status !== "OK" || typeof resolvedLat !== "number" || typeof resolvedLng !== "number") return null;
+      if (data.status !== "OK" || typeof resolvedLat !== "number" || typeof resolvedLng !== "number" || !this.containsLocation(countryCode, resolvedLat, resolvedLng)) return null;
       const panoId = typeof data.pano_id === "string" && data.pano_id.length > 0 ? data.pano_id : null;
       return {
         id: createEntryId(countryCode, resolvedLat, resolvedLng, panoId),
@@ -280,20 +244,12 @@ export class StreetViewLocationPool {
     }
   }
 
-  private createRoundForCountry(countryCode: string, entries: readonly StreetViewPoolEntry[]): StreetViewCountryRound | null {
-    const generatedFrames = shuffle(entries.filter((entry) => entry.countryCode === countryCode)).map(toFrame);
-    const fallback = fallbackRoundForCountry(countryCode);
-    const frames = fallback ? [...generatedFrames, ...shuffle(fallback.frames)] : generatedFrames;
-    if (frames.length < 3) return null;
-    return { countryCode, frames: frames.slice(0, 3) };
-  }
-
   private async loadPool(): Promise<StreetViewPoolFile> {
     try {
       const raw = await readFile(this.storagePath, "utf8");
       const data = JSON.parse(raw) as Partial<StreetViewPoolFile>;
       if (data.version !== 1 || !Array.isArray(data.entries)) return emptyPool();
-      return { version: 1, lastGeneratedAt: typeof data.lastGeneratedAt === "string" ? data.lastGeneratedAt : null, entries: data.entries.filter(isPoolEntry) };
+      return { version: 1, lastGeneratedAt: typeof data.lastGeneratedAt === "string" ? data.lastGeneratedAt : null, entries: uniqueEntries(data.entries.filter(isPoolEntry).filter((entry) => this.containsLocation(entry.countryCode, entry.lat, entry.lng))) };
     } catch {
       return emptyPool();
     }
@@ -301,8 +257,26 @@ export class StreetViewLocationPool {
 
   private async savePool(pool: StreetViewPoolFile): Promise<void> {
     await mkdir(dirname(this.storagePath), { recursive: true });
-    await writeFile(this.storagePath, `${JSON.stringify(pool, null, 2)}\n`, "utf8");
+    const temporaryPath = `${this.storagePath}.${crypto.randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(pool, null, 2)}\n`, "utf8");
+      await rename(temporaryPath, this.storagePath);
+    } finally {
+      await rm(temporaryPath, { force: true });
+    }
   }
+}
+
+function uniqueEntries(entries: readonly StreetViewPoolEntry[]): StreetViewPoolEntry[] {
+  const locations = new Set<string>();
+  const panoramaIds = new Set<string>();
+  return entries.filter((entry) => {
+    const location = duplicateKey(entry.countryCode, entry.lat, entry.lng);
+    if (locations.has(location) || (entry.panoId && panoramaIds.has(entry.panoId))) return false;
+    locations.add(location);
+    if (entry.panoId) panoramaIds.add(entry.panoId);
+    return true;
+  });
 }
 
 function isPoolEntry(value: unknown): value is StreetViewPoolEntry {
@@ -317,6 +291,7 @@ function isPoolEntry(value: unknown): value is StreetViewPoolEntry {
     typeof entry.pitch === "number" &&
     typeof entry.fov === "number" &&
     typeof entry.createdAt === "string" &&
+    (entry.panoId === undefined || typeof entry.panoId === "string") &&
     entry.source === "generated"
   );
 }

@@ -4,7 +4,7 @@ import type { CountryIndex } from "../../core/countries";
 import { createGeoGuessrQueue, GEOGUESSR_MAX_GAME_SCORE, GEOGUESSR_MAX_ROUND_SCORE, GEOGUESSR_ROUND_LIMIT, scoreGeoGuessrGuess, type GeoGuessrGuessResult, type GeoGuessrLocation } from "../../core/geoguessr";
 import type { GameModeId } from "../../core/gameModes";
 import type { LngLatPoint } from "../../core/maptap/distance";
-import { streetViewCountryRounds, type StreetViewCountryRound } from "../../core/streetview";
+import type { StreetViewCountryRound } from "../../core/streetview";
 import { createGeoGuessMap, googleMapsJavaScriptApiKey } from "../components/GeoGuessMap";
 import { createGeoStreetView } from "../components/GeoStreetView";
 import { createPrivateStreetView } from "../components/PrivateStreetView";
@@ -80,7 +80,7 @@ async function fetchLocations(signal: AbortSignal): Promise<GeoGuessrLocation[]>
     return createGeoGuessrQueue(`online:${Date.now()}`, GEOGUESSR_ROUND_LIMIT, value);
   } catch { return []; }
 }
-function fallbackLocations(): GeoGuessrLocation[] { return createGeoGuessrQueue(`solo:${Date.now()}:${Math.random()}`, GEOGUESSR_ROUND_LIMIT, streetViewCountryRounds); }
+function fallbackLocations(): GeoGuessrLocation[] { return createGeoGuessrQueue(`solo:${Date.now()}:${Math.random()}`, GEOGUESSR_ROUND_LIMIT); }
 const formatDistance = formatKm;
 
 export function createGeoGuessrScreen(options: GeoGuessrScreenOptions, overrides: Partial<GeoGuessrScreenServices> = {}): Screen {

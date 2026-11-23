@@ -88,6 +88,7 @@ describe("Street View country run", () => {
     expect(next.textContent).toBe("See results");
     next.click();
 
+    expect(new Set(codes).size).toBe(STREETVIEW_RUN_LENGTH);
     const stage = ui.$(".gb-results-stage")!;
     expect(stage.hidden).toBe(false);
     const stats = [...stage.querySelectorAll(".shell-results-stat strong")].map((node) => node.textContent);
@@ -102,6 +103,7 @@ describe("Street View country run", () => {
     expect(stage.hidden).toBe(true);
     await ui.ready();
     expect(ui.$(".streetview-stats .stat-value")?.textContent).toBe(`1 / ${STREETVIEW_RUN_LENGTH}`);
+    expect(codes).not.toContain(ui.currentCode());
   });
 
   it("uses the focus layout inside the daily challenge", async () => {
