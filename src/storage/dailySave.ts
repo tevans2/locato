@@ -140,6 +140,7 @@ export interface DailyProgressSave {
   readonly themeScoped?: true;
   /** Round 8 is an Overland route (dailies started before it keep eight prompt rounds). */
   readonly overlandRound?: true;
+  readonly streetViewRotation?: true;
   readonly challengeVersion?: 2;
   readonly rounds?: readonly DailyRoundResult[];
   /** The server's signed note of when this attempt started (requested when play begins). */

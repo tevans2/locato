@@ -1,6 +1,6 @@
 import { createSeededRandom, shuffle } from "../game";
 import { haversineDistanceKm, normalizeLongitude, type LngLatPoint } from "../maptap/distance";
-import { streetViewCountryRounds, type StreetViewCountryRound, type StreetViewFrame } from "../streetview";
+import { streetViewCatalog, type StreetViewCountryRound, type StreetViewFrame } from "../streetview";
 
 export const GEOGUESSR_ROUND_LIMIT = 5;
 export const GEOGUESSR_MAX_ROUND_SCORE = 5000;
@@ -35,11 +35,11 @@ export function scoreGeoGuessrGuess(guess: LngLatPoint, target: GeoGuessrLocatio
   };
 }
 
-export function geoGuessrLocations(rounds: readonly StreetViewCountryRound[] = streetViewCountryRounds): readonly GeoGuessrLocation[] {
+export function geoGuessrLocations(rounds: readonly StreetViewCountryRound[] = streetViewCatalog): readonly GeoGuessrLocation[] {
   return rounds.flatMap((round) => round.frames.map((frame) => ({ ...frame, countryCode: round.countryCode })));
 }
 
-export function createGeoGuessrQueue(seed: string, count = GEOGUESSR_ROUND_LIMIT, rounds: readonly StreetViewCountryRound[] = streetViewCountryRounds): GeoGuessrLocation[] {
+export function createGeoGuessrQueue(seed: string, count = GEOGUESSR_ROUND_LIMIT, rounds: readonly StreetViewCountryRound[] = streetViewCatalog): GeoGuessrLocation[] {
   const locations = geoGuessrLocations(rounds);
   if (locations.length === 0) return [];
   const random = createSeededRandom(seed);

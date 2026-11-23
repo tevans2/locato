@@ -1,6 +1,7 @@
 import { type CountryId, type CountryIndex } from "../core/countries";
 import { createGameEngine, createRandomSeed, type GameEngine, type GameState } from "../core/game";
 import { createDailyChallenge, createDailyChallengeWithoutOverland, dailyRoundMark, getLocalDailyDate, scoreDailyOverlandRound, createLegacyDailyChallenge, createMixedThemeDailyChallenge, createDailyShareText, DAILY_COUNTRY_COUNT, DAILY_MAX_SCORE, DAILY_POINTS_PER_ROUND, scoreDailyMapTapRound, scoreDailyRound, type DailyRoundMark, type DailyRoundResult } from "../core/dailyChallenge";
+import { streetViewRoundForReplay, streetViewRoundId } from "../core/streetview";
 import { DEFAULT_CATEGORY_IDS, resolveCategoryIds } from "../core/categories";
 import { createPromptCountryIndex, DEFAULT_FLAG_POOL, isFlagPool, normalizeFlagPool, type FlagPool } from "../core/flagPools";
 import { isFlyoverGameModeId, isMapTapGameModeId, isMysteryGameModeId, isOverlandGameModeId, isPromptGameModeId, isStreetViewGameModeId, isWorldMapGameModeId, isWorldSplitGameModeId, promptGameModeFromCategoryIds, type GameModeId, type WorldMapGameModeId } from "../core/gameModes";
@@ -12,7 +13,6 @@ import { fetchDailyChallengeResult, recordGame, requestDailyStartTicket, saveDai
 import { type WorldMapRunResult } from "../ui/screens/CountryGuessingScreen";
 import { findMapTapLocation } from "../core/maptap/locations";
 import { overlandRouteBetween } from "../core/overland";
-import { streetViewCountryRounds } from "../core/streetview";
 import { createDailyResultScreen } from "../ui/screens/DailyResultScreen";
 import { createDailyIntroScreen, createDailyPracticeCompleteScreen } from "../ui/screens/DailyIntroScreen";
 import { createAuthControls } from "../ui/components/AuthPanel";
@@ -473,6 +473,7 @@ export function createApp(options: AppOptions): App {
     if (saved && saved.challengeVersion !== 2) challenge = createLegacyDailyChallenge(options.countryIndex, challenge.date);
     else if (saved && saved.themeScoped !== true) challenge = createMixedThemeDailyChallenge(options.countryIndex, challenge.date);
     else if (saved && saved.overlandRound !== true) challenge = createDailyChallengeWithoutOverland(options.countryIndex, challenge.date);
+    else if (saved && challenge.streetViewRotation && saved.streetViewRotation !== true) challenge = createDailyChallenge(options.countryIndex, challenge.date, { legacyStreetView: true });
     if (!play && saved?.marks.length !== DAILY_COUNTRY_COUNT) {
       mount(createDailyIntroScreen({ shell, challenge, roundsPlayed: saved?.roundIndex ?? 0,
         onStart: () => runNavigation(startDailyChallenge(true)) }));
@@ -540,6 +541,7 @@ export function createApp(options: AppOptions): App {
         ...(challenge.challengeVersion === 2 ? { challengeVersion: 2, rounds: [...(prompt?.rounds ?? dailyRounds)] } : {}),
         ...(challenge.themeScoped ? { themeScoped: true } : {}),
         ...(challenge.overlandRoute ? { overlandRound: true } : {}),
+        ...(challenge.streetViewRotation ? { streetViewRotation: true } : {}),
         ...(startTicket ? { startTicket } : {}),
       }, progressUserId);
     }
@@ -597,19 +599,20 @@ export function createApp(options: AppOptions): App {
 
     function startDailyStreetViewRound(): void {
       persistDaily("street-view");
-      const round = streetViewCountryRounds.find((item) => item.countryCode === challenge.streetViewCountryCode && options.countryIndex.byCode.has(item.countryCode));
-      if (!round) {
+      const round = challenge.streetViewRound;
+      if (!round || !options.countryIndex.byCode.has(round.countryCode)) {
         addDailyMark("miss");
         dailyRounds.push({ categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, points: 0, hintsUsed: 0, wrongGuesses: 0, missed: true });
         finishDailyChallenge();
         return;
       }
+      const targetId = challenge.streetViewRotation ? streetViewRoundId(round) : null;
       let recorded = false;
       function recordResult({ missed, wrongGuesses }: { readonly missed: boolean; readonly wrongGuesses: number }): void {
         if (recorded) return;
         recorded = true;
         dailyScore += scoreDailyRound(0, missed, wrongGuesses);
-        dailyRounds.push({ categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, points: scoreDailyRound(0, missed, wrongGuesses), hintsUsed: 0, wrongGuesses, missed });
+        dailyRounds.push({ categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, ...(targetId ? { targetId } : {}), points: scoreDailyRound(0, missed, wrongGuesses), hintsUsed: 0, wrongGuesses, missed });
         addDailyMark(missed ? "miss" : wrongGuesses > 0 ? "hint" : "correct");
         dailyFinishedAt = Date.now();
         persistDaily("street-view");
@@ -838,7 +841,7 @@ export function createApp(options: AppOptions): App {
         mount(createOverlandScreen({ ...nav, worldCountryFeatures: features, countryIndex: options.countryIndex, storage: options.storage,
           dailyChallenge: { date, title, practice: true, route, progress: { round: position + 1, total: rounds.length }, onComplete } }));
       } else if (round.categoryId === "streetview-country") {
-        const streetRound = streetViewCountryRounds.find((candidate) => candidate.countryCode === round.countryCode);
+        const streetRound = streetViewRoundForReplay(round.countryCode!, round.targetId);
         if (!streetRound) { onComplete(); return; }
         mount(createStreetViewCountryScreen({ ...nav, countryIndex: options.countryIndex,
           dailyChallenge: { date, title, practice: true, round: streetRound, progress: { round: position + 1, total: rounds.length }, onComplete } }));

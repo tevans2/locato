@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { indexCountries, rawCountries } from "../src/core/countries";
-import { streetViewCountryRounds } from "../src/core/streetview";
+import { streetViewCatalog, streetViewCountryRounds } from "../src/core/streetview";
 import type { Screen } from "../src/app/router";
 
 let screen: Screen | undefined;
@@ -62,7 +62,9 @@ describe("Street View Country frame loading", () => {
     const loader = screen.element.querySelector<HTMLElement>(".streetview-loader")!;
     const firstFrame = screen.element.querySelector<HTMLIFrameElement>(".streetview-frame.is-buffer")!;
     const location = new URL(firstFrame.src).searchParams.get("location");
-    const round = streetViewCountryRounds.find((candidate) => `${candidate.frames[0]!.lat},${candidate.frames[0]!.lng}` === location)!;
+    const round = mode === "daily" ? streetViewCountryRounds[0]! : streetViewCatalog.find((candidate) =>
+      candidate.frames.some(({ lat, lng }) => `${lat},${lng}` === location))!;
+    const shownLocations = new Set<string>();
     const wrongGuesses = rawCountries.filter((country) => country.code !== round.countryCode).slice(0, 2);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -75,8 +77,15 @@ describe("Street View Country frame loading", () => {
       await vi.advanceTimersByTimeAsync(150);
 
       const active = screen.element.querySelector<HTMLIFrameElement>(".streetview-frame.is-active")!;
-      const frame = round.frames[attempt]!;
-      expect(new URL(active.src).searchParams.get("location")).toBe(`${frame.lat},${frame.lng}`);
+      const activeLocation = new URL(active.src).searchParams.get("location")!;
+      if (mode === "daily") {
+        const frame = round.frames[attempt]!;
+        expect(activeLocation).toBe(`${frame.lat},${frame.lng}`);
+      } else {
+        expect(round.frames.map(({ lat, lng }) => `${lat},${lng}`)).toContain(activeLocation);
+      }
+      expect(shownLocations.has(activeLocation)).toBe(false);
+      shownLocations.add(activeLocation);
       expect(getComputedStyle(active).position).toBe("absolute");
       expect(getComputedStyle(active).opacity).toBe("1");
       expect(active.hidden).toBe(false);

@@ -5,7 +5,8 @@ import { indexCountries, rawCountries } from "../src/core/countries";
 import { fameTier } from "../src/core/countries/fame";
 import { createGameEngine } from "../src/core/game";
 import { createSoloSave, hydrateGameState } from "../src/storage/localSave";
-import { streetViewCountryRounds } from "../src/core/streetview";
+import { streetViewCountryRounds, streetViewLocationKey, streetViewRoundForReplay, streetViewRoundId } from "../src/core/streetview";
+import { DAILY_STREET_VIEW_ROTATION_START } from "../src/core/streetview/dailyRotation";
 import { findMapTapLocation } from "../src/core/maptap/locations";
 
 describe("daily challenge", () => {
@@ -91,9 +92,49 @@ describe("daily challenge", () => {
       expect(challenge.countryIds).toHaveLength(7);
       for (const id of challenge.countryIds) expect(challenge.theme!.countryCodes).toContain(index.byId[id]!.code);
       expect(findMapTapLocation(challenge.mapTapTargetId)!.lat).toBeLessThan(0);
-      const streetRound = streetViewCountryRounds.find((round) => round.countryCode === challenge.streetViewCountryCode)!;
+      const streetRound = challenge.streetViewRound!;
       for (const frame of streetRound.frames) expect(frame.lat).toBeLessThan(0);
     }
+  });
+
+  it("rotates themed Street View countries and uses new coordinates across twelve weeks", () => {
+    const index = indexCountries(rawCountries);
+    const start = Date.parse(DAILY_STREET_VIEW_ROTATION_START);
+    const americas = new Set<string>();
+    const locations = new Set<string>();
+    for (let day = 0; day < 84; day++) {
+      const date = new Date(start + day * 86_400_000).toISOString().slice(0, 10);
+      const challenge = createDailyChallenge(index, date);
+      const round = challenge.streetViewRound!;
+      expect(challenge.theme!.countryCodes).toContain(round.countryCode);
+      expect(challenge.streetViewCountryCode).toBe(round.countryCode);
+      expect(challenge.streetViewRotation).toBe(true);
+      expect(round.frames).toHaveLength(3);
+      expect(createDailyChallenge(index, date).streetViewRound).toEqual(round);
+      for (const frame of round.frames) {
+        const key = streetViewLocationKey(frame);
+        expect(locations.has(key)).toBe(false);
+        locations.add(key);
+      }
+      if (challenge.theme!.id === "americas") americas.add(round.countryCode);
+    }
+    expect(americas.size).toBeGreaterThanOrEqual(10);
+  });
+
+  it("preserves the archived Uruguay frames and replays the exact rotated frames from a result", () => {
+    const index = indexCountries(rawCountries);
+    const archived = createDailyChallenge(index, "2026-11-17");
+    expect(archived.theme!.id).toBe("americas");
+    expect(archived.streetViewRound).toEqual(streetViewCountryRounds.find((round) => round.countryCode === "UY"));
+    const legacyAttempt = createDailyChallenge(index, DAILY_STREET_VIEW_ROTATION_START, { legacyStreetView: true });
+    expect(legacyAttempt.streetViewRound).toEqual(archived.streetViewRound);
+
+    const rotated = createDailyChallenge(index, DAILY_STREET_VIEW_ROTATION_START).streetViewRound!;
+    const result = { categoryId: "streetview-country", countryCode: rotated.countryCode, targetId: streetViewRoundId(rotated),
+      points: 8, hintsUsed: 0, wrongGuesses: 1, missed: false };
+    expect(parseDailyRoundResults([result])).toEqual([result]);
+    expect(streetViewRoundForReplay(result.countryCode, result.targetId)).toEqual(rotated);
+    expect(parseDailyRoundResults([{ ...result, countryCode: "JP" }])).toBeNull();
   });
 
   it("plays and resumes the explicit daily categories instead of reassigning them", () => {

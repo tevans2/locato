@@ -7,6 +7,8 @@ import { createOverlandRound, guessOverland, overlandGraph, type OverlandRound, 
 import type { OverlandScreenOptions } from "../src/ui/screens/OverlandScreen";
 import { createDailyResultSave, readDailyProgress, readDailyResult, saveDailyProgress, saveDailyResult } from "../src/storage/dailySave";
 import { createGameEngine } from "../src/core/game";
+import { streetViewRoundId } from "../src/core/streetview";
+import { DAILY_STREET_VIEW_ROTATION_START } from "../src/core/streetview/dailyRotation";
 import { createSoloSave } from "../src/storage/localSave";
 import type { SoloGameScreenOptions } from "../src/ui/screens/SoloGameScreen";
 import type { MapTapScreenOptions } from "../src/ui/screens/MapTapScreen";
@@ -37,7 +39,7 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ entries: [], summary: null }), { status: 200 })));
 });
-afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 /** A route played perfectly: a shortest route's countries, in order. */
 function solve(route: OverlandRoute): OverlandRound {
@@ -73,6 +75,7 @@ async function signIn() {
 
 describe("daily app orchestration", () => {
   it.each([false, true])("shows the original intro, resumes and saves ten rounds (signed in: %s)", async (signedIn) => {
+    vi.setSystemTime(new Date(`${DAILY_STREET_VIEW_ROTATION_START}T12:00:00`));
     const account = signedIn ? await signIn() : null;
     const userId = account?.userId ?? null;
     const { root, app } = setup();
@@ -93,7 +96,7 @@ describe("daily app orchestration", () => {
     });
     first.dailyChallenge!.onProgress!({ score: 17, hintsUsed: 1, marks, rounds, roundHintsUsed: 0, roundWrongGuesses: 0 });
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)?.rounds).toEqual(rounds);
-    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)?.themeScoped).toBe(true);
+    expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ themeScoped: true, streetViewRotation: true });
     app.navigate({ type: "landing" });
     app.navigate({ type: "daily-challenge" });
     await vi.waitFor(() => expect(root.querySelector("#daily-intro")).not.toBeNull());
@@ -120,7 +123,7 @@ describe("daily app orchestration", () => {
     captured.map[0]!.dailyChallenge!.onComplete(pin);
     expect(captured.street).toHaveLength(1);
     expect(captured.street[0]!.ranked).toBeUndefined();
-    expect(captured.street[0]!.dailyChallenge!.round.countryCode).toBe(challenge.streetViewCountryCode);
+    expect(captured.street[0]!.dailyChallenge!.round).toEqual(challenge.streetViewRound);
     captured.street[0]!.dailyChallenge!.onResult!({ missed: false, wrongGuesses: 1 });
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toMatchObject({ roundIndex: 10, score: 90 });
     // Refreshing after the answer was shown goes to results, without replaying the finale.
@@ -131,6 +134,7 @@ describe("daily app orchestration", () => {
     const result = readDailyResult(window.localStorage, challenge.date, userId)!;
     expect(result.score).toBe(90);
     expect(result.rounds).toHaveLength(10);
+    expect(result.rounds?.at(-1)?.targetId).toBe(streetViewRoundId(challenge.streetViewRound!));
     expect(result.rounds!.map((round) => round.points)).toEqual([7, 10, 10, 10, 10, 10, 10, 10, 5, 8]);
     expect(root.querySelectorAll(".daily-recap-row")).toHaveLength(10);
     expect(readDailyProgress(window.localStorage, challenge.date, challenge.seed, userId)).toBeNull();
@@ -219,6 +223,7 @@ describe("daily app orchestration", () => {
   });
 
   it("replays only losses across all modes without changing the daily result or other practice saves", async () => {
+    vi.setSystemTime(new Date(`${DAILY_STREET_VIEW_ROTATION_START}T12:00:00`));
     const { root, app } = setup();
     const date = getLocalDailyDate();
     const challenge = createDailyChallenge(index, date);
@@ -227,7 +232,7 @@ describe("daily app orchestration", () => {
     const route = challenge.overlandRoute!;
     rounds.push({ categoryId: "overland", targetId: `${route.start}-${route.end}`, points: scoreDailyRound(0, false, 1), hintsUsed: 0, wrongGuesses: 1, missed: false },
       { categoryId: "map-tap", targetId: challenge.mapTapTargetId, points: 5, hintsUsed: 0, wrongGuesses: 0, missed: false, distanceKm: 1000 },
-      { categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, points: scoreDailyRound(0, false, 1), hintsUsed: 0, wrongGuesses: 1, missed: false });
+      { categoryId: "streetview-country", countryCode: challenge.streetViewCountryCode, targetId: streetViewRoundId(challenge.streetViewRound!), points: scoreDailyRound(0, false, 1), hintsUsed: 0, wrongGuesses: 1, missed: false });
     const result = createDailyResultSave({ date, seed: challenge.seed, score: 81, timeMs: 100_000, hintsUsed: 0,
       marks: ["correct", "correct", "miss", "correct", "correct", "correct", "correct", "hint", "hint", "hint"], rounds, challengeVersion: 2 });
     saveDailyResult(window.localStorage, result);
@@ -244,7 +249,7 @@ describe("daily app orchestration", () => {
     replay.onComplete(solve(route));
     expect(captured.map[0]!.dailyChallenge!.target.id).toBe(challenge.mapTapTargetId);
     captured.map[0]!.dailyChallenge!.onComplete({ target: (await import("../src/core/maptap/locations")).findMapTapLocation(challenge.mapTapTargetId)!, guess: { lat: 0, lng: 0 }, distanceKm: 0, score: 5000, maxScore: 5000, decayKm: 1000, toleranceKm: 0 });
-    expect(captured.street[0]!.dailyChallenge!.round.countryCode).toBe(challenge.streetViewCountryCode);
+    expect(captured.street[0]!.dailyChallenge!.round).toEqual(challenge.streetViewRound);
     captured.street[0]!.dailyChallenge!.onComplete({ missed: false, wrongGuesses: 0 });
     expect(root.querySelector("#daily-practice-result")).not.toBeNull();
     expect(readDailyResult(window.localStorage, date)).toEqual(result);
